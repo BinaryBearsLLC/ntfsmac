@@ -56,3 +56,38 @@ setup() {
 @test "vmproxy is embedded into the generated rootfs vm-setup.sh flow (no vmproxy-bsd artifact produced)" {
   [ ! -e "$REPO_ROOT/vendor/bin/vmproxy-bsd" ]
 }
+
+@test "build-all.sh wires static libblkid linking (no homebrew util-linux runtime dep)" {
+  # Regression for tosbaha's crash (#1): anylinuxfs used to dynamically link
+  # /opt/homebrew/*/libblkid.1.dylib (via libblkid-rs-sys + the submodule's
+  # .cargo/config.toml PKG_CONFIG_PATH=/opt/homebrew/opt/util-linux/lib/pkgconfig),
+  # so it aborted at launch on any machine without `brew install util-linux`.
+  # The fix builds a static libblkid.a from a pinned util-linux source and tells
+  # the anylinuxfs cargo build to link it statically. Assert the wiring is present:
+  # PKG_CONFIG_ALL_STATIC=1 forces the pkg-config crate to static archives, and
+  # PKG_CONFIG_PATH must point at our static-build output dir (not the homebrew
+  # path) so the build picks up our .a + .pc, not the homebrew dylib. Cargo [env]
+  # default force=false means a shell-exported PKG_CONFIG_PATH overrides the
+  # submodule's hardcoded homebrew path — that override is what this checks.
+  [ -f "$SCRIPT" ]
+  run grep -E 'PKG_CONFIG_ALL_STATIC=1' "$SCRIPT"
+  [ "$status" -eq 0 ]
+  # Active (non-comment) PKG_CONFIG_PATH assignment only — comments legitimately name the
+  # homebrew path to explain why we override it (same comment-tolerance the freebsd test
+  # above uses). `^[[:space:]]*PKG_CONFIG_PATH=` matches the real assignment, not comment
+  # lines that merely mention the variable.
+  run grep -E '^[[:space:]]*PKG_CONFIG_PATH=' "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"/opt/homebrew/opt/util-linux"* ]]
+}
+
+@test "vendor/bin/anylinuxfs does not dynamically link libblkid (static-linked, no DYLD abort)" {
+  # The real acceptance guard for #1: even with the wiring above, the proof is
+  # the built binary's own linkage. Any libblkid*.dylib entry here means the
+  # static-link regressed and the tosbaha crash returns on machines without
+  # `brew install util-linux`. Runs the real build (see full-build test above).
+  [ -x "$BIN_ANYLINUXFS" ]
+  run otool -L "$BIN_ANYLINUXFS"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"libblkid"* ]]
+}

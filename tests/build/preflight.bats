@@ -29,7 +29,7 @@ EOF
 
 @test "fails when a required tool is missing from PATH" {
   local minimal_path
-  minimal_path=$(stub_path_with "git cargo rustc go umoci codesign curl shasum")
+  minimal_path=$(stub_path_with "git cargo rustc go umoci codesign curl shasum pkg-config brew")
   rm -f "$STUB_DIR/umoci"
   PATH="$minimal_path" run "$PREFLIGHT"
   [ "$status" -eq 1 ]

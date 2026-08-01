@@ -40,6 +40,41 @@ check_tool "lld" ld.lld
 check_tool "codesign" codesign -v
 check_tool "curl" curl
 check_tool "shasum" shasum --version
+# pkg-config: libblkid-rs-sys resolves libblkid via pkg-config. brew: required to locate
+# the util-linux install whose static archives we stage (tosbaha #1 fix).
+check_tool "pkg-config" pkg-config --version
+check_tool "brew" brew --version
+
+# util-linux (Homebrew) is a build dep — its static libblkid.a is what anylinuxfs links.
+# Assert the formula is installed AND ships the static archive (not just the dylib), since
+# the whole fix depends on the .a being present. Build-machine setup: `brew install util-linux`.
+check_util_linux_static() {
+  local prefix
+  prefix="$(brew --prefix util-linux 2>/dev/null)" || true
+  if [[ -z "$prefix" || ! -d "$prefix" ]]; then
+    printf '%-20s %-10s %s\n' "util-linux" "FAIL" "not installed via Homebrew (run: brew install util-linux)"
+    FAIL=1
+    return
+  fi
+  if [[ ! -f "$prefix/lib/libblkid.a" || ! -f "$prefix/lib/libuuid.a" ]]; then
+    printf '%-20s %-10s %s\n' "util-linux (.a)" "FAIL" "static archive missing in $prefix/lib (libblkid.a / libuuid.a)"
+    FAIL=1
+    return
+  fi
+  printf '%-20s %-10s %s\n' "util-linux (.a)" "OK" "$prefix/lib/libblkid.a"
+
+  # gettext: libblkid.a references _libintl_gettext (GNU gettext, not in libSystem).
+  # Homebrew gettext ships libintl.a — assert it's present, same rationale as util-linux.
+  local gettext_prefix
+  gettext_prefix="$(brew --prefix gettext 2>/dev/null)" || true
+  if [[ -z "$gettext_prefix" || ! -f "$gettext_prefix/lib/libintl.a" ]]; then
+    printf '%-20s %-10s %s\n' "gettext (.a)" "FAIL" "libintl.a missing (run: brew install gettext)"
+    FAIL=1
+    return
+  fi
+  printf '%-20s %-10s %s\n' "gettext (.a)" "OK" "$gettext_prefix/lib/libintl.a"
+}
+check_util_linux_static
 
 if [[ "$FAIL" -ne 0 ]]; then
   echo ""

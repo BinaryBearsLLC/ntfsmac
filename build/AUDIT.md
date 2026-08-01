@@ -130,3 +130,66 @@ replacement list, but *how* it gets substituted — patching anylinuxfs's embedd
 building `init-rootfs`'s Go binary, vs. `build/init-rootfs.sh` building the rootfs directly via
 `umoci` + our own `apk add` step bypassing anylinuxfs's Go tool — is `v-alpine-rootfs`'s decision
 to make, not this audit's.
+
+## Host-side static libblkid — Homebrew static-archive staging (tosbaha #1 fix, 2026-08-01)
+
+**Problem (real, from the issue tracker):** the macOS-host `anylinuxfs` binary dynamically
+linked `/opt/homebrew/*/libblkid.1.dylib` because `libblkid-rs`/`libblkid-rs-sys` (Cargo dep
+at `anylinuxfs/Cargo.toml:12`) resolves libblkid via pkg-config, and the submodule's
+`anylinuxfs/.cargo/config.toml` hardcodes
+`PKG_CONFIG_PATH=/opt/homebrew/opt/util-linux/lib/pkgconfig`. On any machine without
+`brew install util-linux`, the binary aborted at launch (`Library not loaded: libblkid.1.dylib`,
+DYLD Namespace code 1) — broke both the CLI and the GUI (the GUI shells out to the same
+`/usr/local/ntfsmac/bin/anylinuxfs`).
+
+**Decision (Kaveen):** static-link `libblkid` into `anylinuxfs` so the shipped binary has no
+libblkid dylib in its `otool -L` output. **Use Homebrew's already-built static archives —
+NOT a vanilla util-linux from-source build.** Homebrew's `util-linux` is the build known to
+work on macOS (a vanilla tarball build is the risky path we deliberately do not take; an
+earlier plan to build util-linux 2.40.4 from source with upstream PR #4173 was rejected on
+this basis). `build-libblkid-static.sh` stages Homebrew's `libblkid.a` + `libuuid.a` (Homebrew
+ships both) into a dylib-free stage dir, authors `blkid.pc`/`uuid.pc` pointing at it, and
+`build-all.sh` points the anylinuxfs cargo build there. With only `.a` in the stage,
+`-lblkid`/`-luuid` resolve to the static archives for certain. Rejected alternatives:
+- **Document `brew install util-linux`** — violates the CLAUDE.md non-negotiable that
+  `vendor/bin/anylinuxfs list` works with zero brew taps beyond build-toolchain ones at runtime.
+- **Bundle a Homebrew util-linux dylib + rpath/sign fixes** — a prebuilt dylib plus
+  per-target rpath/install_name wiring in `install.sh` and `package-app.sh`. Static is
+  cleaner on the distribution side (nothing to bundle).
+
+**Transitive deps (found by a real static-link proof, not guessed):** `libblkid.a` references
+`_libintl_gettext` (GNU gettext — not in libSystem), so Homebrew `gettext`'s `libintl.a` is
+staged too and `intl` is added to `blkid.pc`'s `Requires.private`. `libintl.a` in turn
+references `_iconv`/`_iconv_open` (→ `libiconv.2.dylib`, a **system** lib in `/usr/lib`) and
+`_CFArrayGetCount` (→ CoreFoundation, a **system** framework). `intl.pc` declares
+`Libs.private: -liconv -framework CoreFoundation`. Net runtime deps added are all
+OS-provided (libSystem, libiconv, CoreFoundation — present on every macOS); **no Homebrew
+dylib is needed at runtime.** `libuuid` needs `-lpthread` (libSystem provides it), declared
+in `uuid.pc`'s `Libs.private`. The proof: a tiny C program linked via
+`pkg-config --static --libs blkid` builds clean, runs (`blkid_get_cache` succeeds), and
+`otool -L` shows only the three system libs — no `libblkid`/`libuuid`/`libintl` dylib.
+
+**Build dep (not a runtime dep):** `util-linux` and `gettext` are Homebrew **build-toolchain**
+deps. `build/sources.lock` records `UTIL_LINUX_BREW_FORMULA=util-linux` (no tarball/sha256 —
+we consume Homebrew's install, not a fetched artifact). `build/preflight.sh` asserts both
+formulas are installed AND ship the static archives (`libblkid.a`/`libuuid.a`/`libintl.a`),
+since the whole fix depends on the `.a` being present, not just the dylib.
+
+**Wiring (`build/build-all.sh`):** `build-libblkid-static.sh` runs before
+`build_anylinuxfs`; the latter exports `PKG_CONFIG_PATH=<stage>/lib/pkgconfig` +
+`PKG_CONFIG_ALL_STATIC=1` around `cargo build --release` (Cargo `[env]` default `force=false`
+→ shell env wins over the submodule's homebrew path), AND neutralizes the homebrew
+`PKG_CONFIG_PATH` line in the CACHE_DIR copy of `.cargo/config.toml` (belt-and-suspenders:
+if the env override ever stopped winning, the build still couldn't fall back to the dylib).
+The submodule itself is never edited — same rule as `patch_vmproxy_mount_tmpfs`. The stage
+defaults to a **space-free** path under `$TMPDIR` (not the repo) for the same reason
+`build-all.sh` copies anylinuxfs to a space-free `CACHE_DIR`: this repo's path-with-spaces
+makes pkg-config backslash-escape the `-I`/`-L` paths, which the pkg-config Rust crate
+mis-parses.
+
+**Acceptance:** `tests/build/build-all.bats` asserts (1) the wiring is present (fast, grep)
+and (2) `otool -L vendor/bin/anylinuxfs` has no `libblkid` entry (slow, real build).
+`tests/build/util-linux.bats` runs the stager for real (it only copies Homebrew's `.a` +
+headers + authors `.pc` — fast, no source build) and asserts the stage is dylib-free, the
+`.pc` chain pulls `uuid`+`intl` statically, and `pkg-config --static --libs blkid` resolves
+to the staged archives.

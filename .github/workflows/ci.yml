@@ -22,7 +22,7 @@ jobs:
             | xargs -0 shellcheck -S warning
       - name: Install build dependencies
         run: |
-          brew install llvm lld umoci xz util-linux
+          brew install llvm lld umoci xz util-linux gettext pkg-config
           echo "/opt/homebrew/opt/llvm/bin" >> $GITHUB_PATH
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -46,7 +46,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Install build dependencies
         run: |
-          brew install llvm lld xz util-linux
+          brew install llvm lld xz util-linux gettext pkg-config
           echo "/opt/homebrew/opt/llvm/bin" >> $GITHUB_PATH
       - name: Run Rust tests
         run: ./vendor/src/anylinuxfs/run-rust-tests.sh
