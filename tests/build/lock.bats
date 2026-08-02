@@ -16,7 +16,8 @@ setup() {
              LIBKRUNFW_VERSION LIBKRUNFW_IMAGES_SHA256 LIBKRUNFW_MODULES_SHA256 \
              VMNET_HELPER_VERSION VMNET_HELPER_SHA256 \
              GVPROXY_VERSION GVPROXY_COMMIT \
-             ALPINE_TAG ALPINE_DIGEST; do
+             ALPINE_TAG ALPINE_DIGEST \
+             UTIL_LINUX_BREW_FORMULA; do
     run "$LOCK_SH" get "$key"
     [ "$status" -eq 0 ]
     [ -n "$output" ]

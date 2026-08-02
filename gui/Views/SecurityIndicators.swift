@@ -1,9 +1,9 @@
 import SwiftUI
 
 /// GUI-PLAN.md v1 feature 5: "Security indicators (isolated network ✓, VPN-bypass ✓)". Three
-/// states, not two — `PLAN.md` Phase 1 (pf/route hardening) is deferrable/non-blocking
-/// (`SHARED_TASK_NOTES.md` GATES section), so a real install can legitimately have no hardening
-/// data to report at all. `.unknown` exists specifically so "no data" never renders as `.enforced`.
+/// states, not two — `PLAN.md` treats Phase 1 (pf/route hardening) as deferrable/non-blocking,
+/// so a real install can legitimately have no hardening data to report at all. `.unknown`
+/// exists specifically so "no data" never renders as `.enforced`.
 public enum SecurityIndicatorStatus: Equatable, Sendable {
     case enforced
     case notEnforced
@@ -47,7 +47,7 @@ public enum SecurityIndicator {
 /// Read-only display. Wiring real `isolatedNetwork`/`vpnBypass`/`pfRulesLoaded` values from a
 /// live helper/diagnose check is later units' territory (`3-diagnose-ui` runs `ntfsmac diagnose
 /// --json`; Phase 1's own pf-anchor/route-guard state isn't currently surfaced by `diagnose.sh`
-/// at all — flagged in `SHARED_TASK_NOTES.md`) — this unit's Files list is display-only.
+/// at all) — this unit's Files list is display-only.
 /// `ui/prototype.html`'s Security section (comp lines 201-224) always shows three rows
 /// (network isolated / VPN bypass active / pf firewall rules loaded), stacked vertically with a
 /// small circular checkmark badge each — `pfRulesLoaded` didn't exist before this pass because

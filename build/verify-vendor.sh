@@ -12,7 +12,7 @@
 # use, and VM boot on an ad-hoc-signed binary needs the com.apple.security.hypervisor
 # entitlement. Adding that entitlement is a signing change — PLAN.md §0.3 HARD-STOPs
 # any unit that touches signing/entitlements outside §3's plan; that's `2-signing`'s
-# job, not this one. See SHARED_TASK_NOTES.md for the full real finding.
+# job, not this one. See build/AUDIT.md for the full real finding.
 set -uo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
@@ -142,7 +142,7 @@ main() {
   echo "verify-vendor: all checks passed."
   echo "verify-vendor: NOTE — live 'anylinuxfs list' (VM boot / real apk install) deferred to"
   echo "verify-vendor: 2-signing (needs com.apple.security.hypervisor entitlement). Not run here"
-  echo "verify-vendor: by design — see this script's header and SHARED_TASK_NOTES.md."
+  echo "verify-vendor: by design — see this script's header and build/AUDIT.md."
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

@@ -87,6 +87,23 @@ private struct FakeReadOnlyChecker: MountReadOnlyChecking {
 }
 
 @MainActor
+@Test func mountDerivesExtDriverForExtDriveAndNtfs3gForNtfs() async {
+    // The GUI defaults to .ntfs3g; for an ext drive it must instead send .ext so the helper
+    // skips --fs-driver and passes --ignore-permissions (all_squash). PopoverContentView calls
+    // mount(drive) with no driver, so the controller must derive it from drive.fsType.
+    let fake = FakeHelper()
+    let appState = AppState()
+    let controller = MountController(helper: fake, readOnlyChecker: FakeReadOnlyChecker(isReadOnly: false), appState: appState)
+
+    let extDrive = Drive(identifier: "disk4s1", fsType: "ext", label: "LinuxVol", size: "31.5 GB")
+    await controller.mount(extDrive)
+    #expect(fake.mountCalls[0].driver == .ext)
+
+    await controller.mount(sampleDrive)
+    #expect(fake.mountCalls.last!.driver == .ntfs3g)
+}
+
+@MainActor
 @Test func unmountRoutesThroughHelperAndTransitionsToIdle() async {
     let fake = FakeHelper()
     let appState = AppState()
@@ -169,7 +186,7 @@ private struct FakeReadOnlyChecker: MountReadOnlyChecking {
 }
 
 @MainActor
-@Test func mountingASecondDriveWhileOneIsMountedIsRejectedWithoutOrphaningTheFirst() async {
+@Test func mountingASecondDriveWhileOneIsMountedMountsBothDrives() async {
     let fake = FakeHelper()
     let appState = AppState()
     let controller = MountController(helper: fake, readOnlyChecker: FakeReadOnlyChecker(isReadOnly: false), appState: appState)
@@ -178,7 +195,39 @@ private struct FakeReadOnlyChecker: MountReadOnlyChecking {
     await controller.mount(sampleDrive)
     await controller.mount(otherDrive)
 
-    #expect(fake.mountCalls.count == 1)
-    #expect(controller.mountedDrive == sampleDrive)
+    #expect(fake.mountCalls.count == 2)
+    #expect(controller.mountedDriveIDs == Set(["disk4s2", "disk5s1"]))
     #expect(appState.state == .mountedReadWrite)
+}
+
+@MainActor
+@Test func unmountTargetsSpecificDriveAndLeavesOthersMounted() async {
+    let fake = FakeHelper()
+    let appState = AppState()
+    let controller = MountController(helper: fake, readOnlyChecker: FakeReadOnlyChecker(isReadOnly: false), appState: appState)
+    let otherDrive = Drive(identifier: "disk5s1", fsType: "ext4", label: "ExtVol", size: "32.0 GB")
+
+    await controller.mount(sampleDrive)
+    await controller.mount(otherDrive)
+    await controller.unmount(driveID: sampleDrive.identifier)
+
+    #expect(fake.unmountCalls == ["disk4s2"])
+    #expect(controller.mountedDriveIDs == Set(["disk5s1"]))
+    #expect(appState.state == .mountedReadWrite)
+}
+
+@MainActor
+@Test func unmountingLastDriveReturnsToIdle() async {
+    let fake = FakeHelper()
+    let appState = AppState()
+    let controller = MountController(helper: fake, readOnlyChecker: FakeReadOnlyChecker(isReadOnly: false), appState: appState)
+    let otherDrive = Drive(identifier: "disk5s1", fsType: "ext4", label: "ExtVol", size: "32.0 GB")
+
+    await controller.mount(sampleDrive)
+    await controller.mount(otherDrive)
+    await controller.unmount(driveID: sampleDrive.identifier)
+    await controller.unmount(driveID: otherDrive.identifier)
+
+    #expect(controller.mountedDriveIDs.isEmpty)
+    #expect(appState.state == .idle)
 }

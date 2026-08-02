@@ -12,7 +12,7 @@
 # lookup ignores $HOME otherwise).
 #
 # Also vendors the built init-rootfs binary itself to vendor/bin/init-rootfs — the
-# real fix for the GATE-CLI-BEFORE-GUI blocker documented in SHARED_TASK_NOTES.md:
+# real fix for the GATE-CLI-BEFORE-GUI blocker documented in build/AUDIT.md:
 # anylinuxfs's Rust code (main.rs) expects an init-rootfs helper at
 # $PREFIX/libexec/init-rootfs and spawns it directly (vm_image.rs Command::new); it
 # was being built here already but only into the ephemeral $CACHE_DIR, never vendored.
@@ -26,11 +26,12 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 # shellcheck source=lib/lock.sh
 source "$SCRIPT_DIR/lib/lock.sh"
 
-# NOTE: deliberately NOT under $REPO_ROOT. This repo's own path contains spaces
-# ("/Volumes/My Shared Files/..."), and krun-init-blob's build.rs (a libkrun dep,
-# pulled in by vmrunner-sys) whitespace-splits the CC_LINUX compiler path — a space
-# in the path truncates it and the build fails with "failed to execute /Volumes/My:
-# No such file or directory". Confirmed by building the identical sources from a
+# NOTE: deliberately NOT under $REPO_ROOT. This repo's own path can contain spaces
+# (e.g. when checked out on a "Windows Shared Folder" network volume), and
+# krun-init-blob's build.rs (a libkrun dep, pulled in by vmrunner-sys)
+# whitespace-splits the CC_LINUX compiler path — a space in the path truncates it
+# and the build fails with "failed to execute <repo>: No such file or directory"
+# (truncated at the first space). Confirmed by building the identical sources from a
 # space-free path, which compiles clean. Building from a space-free cache dir outside
 # the repo is the fix, not a workaround around a real bug in our own code.
 CACHE_DIR="${NTFSMAC_ROOTFS_CACHE_DIR:-${TMPDIR:-/tmp}/ntfsmac-build/init-rootfs-build}"
@@ -41,8 +42,8 @@ CACHE_DIR="${NTFSMAC_ROOTFS_CACHE_DIR:-${TMPDIR:-/tmp}/ntfsmac-build/init-rootfs
 # writes (curl downloads, tar extraction, go build output — see vendor/kernel,
 # vendor/bin) work fine on this volume; it's specifically this fsync pattern that
 # doesn't. Redirecting the real OCI pull/unpack to a space-free, POSIX-reliable cache
-# dir outside the repo. Flagged in SHARED_TASK_NOTES.md — PLAN.md's literal "output
-# under vendor/rootfs/" wording can't be satisfied on-volume; open decision for Kaveen.
+# dir outside the repo. Flagged in build/AUDIT.md — PLAN.md's literal "output
+# under vendor/rootfs/" wording can't be satisfied on-volume; open decision for the maintainer.
 ROOTFS_HOME="${NTFSMAC_VENDOR_ROOTFS_DIR:-${TMPDIR:-/tmp}/ntfsmac-build/rootfs-home}"
 TRIMMED_LIST="$REPO_ROOT/build/alpine-packages.trimmed.txt"
 BIN_DIR="${NTFSMAC_VENDOR_BIN_DIR:-$REPO_ROOT/vendor/bin}"
@@ -50,8 +51,8 @@ BIN_DIR="${NTFSMAC_VENDOR_BIN_DIR:-$REPO_ROOT/vendor/bin}"
 require_pin() {
   local key="$1" val
   val="$(lock_get "$key")" || { echo "init-rootfs: HARD-STOP — pin '$key' missing from sources.lock" >&2; exit 1; }
-  if [[ "$val" == "TODO-KAVEEN" || -z "$val" ]]; then
-    echo "init-rootfs: HARD-STOP — pin '$key' is unresolved (TODO-KAVEEN)" >&2
+  if [[ "$val" == "TODO-UNRESOLVED" || -z "$val" ]]; then
+    echo "init-rootfs: HARD-STOP — pin '$key' is unresolved (TODO-UNRESOLVED)" >&2
     exit 1
   fi
   printf '%s\n' "$val"

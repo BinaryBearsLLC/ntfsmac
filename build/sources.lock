@@ -39,3 +39,17 @@ GVPROXY_COMMIT=9cfc86f66679ef0feed0f20ba1df558fe2bef5c6
 # Pinned to a specific patch tag + digest, never :latest (L9/HARD-STOP).
 ALPINE_TAG=3.23.5
 ALPINE_DIGEST=sha256:d858bb5442632a31bd4bca6c5e601dbe6b536fd7942092ea6a08a0a95805693c
+
+# util-linux — Homebrew BUILD-toolchain dep (not a runtime dep, not built from source here).
+# anylinuxfs depends on libblkid-rs/libblkid-rs-sys for host-side FS probing; the submodule's
+# .cargo/config.toml otherwise points pkg-config at Homebrew's util-linux dylib, making
+# anylinuxfs dynamically link /opt/homebrew/*/libblkid.1.dylib and abort at launch on
+# machines without `brew install util-linux` (tosbaha #1). The fix: build-libblkid-static.sh
+# stages Homebrew's already-built static archives (libblkid.a + libuuid.a — Homebrew ships
+# both) into a dylib-free stage dir, and build-all.sh points the anylinuxfs cargo build at
+# it (PKG_CONFIG_ALL_STATIC=1 + our PKG_CONFIG_PATH). The shipped binary links libblkid
+# statically → no runtime dylib → fixes both CLI and GUI (same binary). No tarball/sha256 pin
+# here because we consume Homebrew's install, not a fetched artifact; preflight.sh asserts
+# the static archives are present. Homebrew's util-linux is the build known to work on macOS
+# (a vanilla util-linux from-source build is the risky path we deliberately don't take).
+UTIL_LINUX_BREW_FORMULA=util-linux

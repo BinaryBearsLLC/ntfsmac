@@ -31,7 +31,7 @@ source "$NFS_MOUNT_LIB_DIR/resolve-vendor-bin.sh"
 # produces a cryptic "command not found" from run-with-progress.sh at runtime.
 ANYLINUXFS_BIN="${NTFSMAC_ANYLINUXFS_BIN:-$(resolve_vendor_bin anylinuxfs || true)}"
 
-# run_anylinuxfs_mount <device> <fs_driver> [mount_point] [read_only]
+# run_anylinuxfs_mount <device> <fs_driver> [mount_point] [read_only] [ignore_perms]
 # <device> must already be validate_device()-checked by the caller — this function does
 # not re-validate. Only this function ever prepends "/dev/" (L6: raw /dev/-prefixed
 # input is rejected upstream; this is our own controlled construction, not user input).
@@ -44,13 +44,22 @@ ANYLINUXFS_BIN="${NTFSMAC_ANYLINUXFS_BIN:-$(resolve_vendor_bin anylinuxfs || tru
 # what ntfs-3g's own dirty-journal check would otherwise have allowed server-side. There
 # is deliberately no anylinuxfs/ntfs-3g flag to *request* read-only (confirmed: no `force`
 # or mode field exists on `MountCmd` in cli.rs) — this is the only real lever available.
+#
+# <ignore_perms> (any non-empty value): passes --ignore-permissions to anylinuxfs. ext is a
+# real Unix filesystem with its own ownership bits, so unlike NTFS (which anylinuxfs remaps
+# to the host user via uid=/gid=, cmd_mount.rs WINDOWS_LABELS.fs_types) ext can't be remapped
+# at mount time — without this flag, files belong to whatever uid/gid the disk stored and the
+# macOS user can't open lost+found or write. --ignore-permissions sets all_squash,anonuid=0,
+# anongid=0 on the NFS export (vendor vmproxy/main.rs:1327), mapping all client access to
+# server root. NTFS never gets this — "do not change the NTFS part": ntfs-3g already owns
+# the uid/gid remap and adding all_squash there would change NTFS behavior.
 run_anylinuxfs_mount() {
   if [[ -z "$ANYLINUXFS_BIN" ]]; then
     echo "mount: FATAL — anylinuxfs binary not found at any known install path (try reinstalling: sudo bash install.sh, or 'ntfsmac diagnose')" >&2
     return 1
   fi
 
-  local device="$1" fs_driver="${2:-}" mount_point="${3:-}" read_only="${4:-}"
+  local device="$1" fs_driver="${2:-}" mount_point="${3:-}" read_only="${4:-}" ignore_perms="${5:-}"
   local disk_ident="/dev/${device}"
 
   # Auto-eject: if macOS already auto-mounted this partition with its own (read-only) NTFS
@@ -75,8 +84,17 @@ run_anylinuxfs_mount() {
   [[ -n "$mount_point" ]] && args+=("$mount_point")
   local nfs_opts="soft"
   [[ -n "$read_only" ]] && nfs_opts="soft,ro"
+  # Throughput tuning — default-on (PLAN.md L8 owner-override, see README "Performance"):
+  # rsize/wsize=1MB (NFSv3/TCP max transfer unit; kernel auto-negotiates down to the server's
+  # cap, so this never fails or loses data — it just widens the pipe) + readahead=16 (macOS
+  # mount_nfs read-ahead window; pure prefetch). Near-zero risk, no integrity path. rsize ==
+  # wsize on purpose: macOS mount_nfs warns on a high wsize/rsize ratio ("unexpected readahead
+  # RPCs"). This is the single place --nfs-options is set (comment block above), so the GUI
+  # path (helper → ntfsmac mount → mount.sh → here) inherits tuning with no GUI/XPC change.
+  nfs_opts="$nfs_opts,rsize=1048576,wsize=1048576,readahead=16"
   args+=(--nfs-options "$nfs_opts")
   [[ -n "$fs_driver" ]] && args+=(-t "$fs_driver")
+  [[ -n "$ignore_perms" ]] && args+=(--ignore-permissions)
 
   # Bounded + heartbeated (NTFSMAC_MOUNT_TIMEOUT, default 240s — generous: first-run download +
   # VM boot legitimately takes 1-2 min per the notice above, this just bounds a truly wedged

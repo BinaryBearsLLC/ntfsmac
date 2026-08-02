@@ -112,7 +112,51 @@ PYEOF
 # fetched. The feature flag only toggles some inactive (for our target) code paths
 # compiling in, not any extra built artifact.
 build_anylinuxfs() {
-  if ! (cd "$CACHE_DIR/anylinuxfs" && cargo build --release 2>&1); then
+  # Static-link libblkid into anylinuxfs (tosbaha #1 fix). Without this, libblkid-rs-sys
+  # resolves libblkid via the submodule's .cargo/config.toml, which hardcodes
+  # PKG_CONFIG_PATH=/opt/homebrew/opt/util-linux/lib/pkgconfig → anylinuxfs dynamically
+  # links /opt/homebrew/*/libblkid.1.dylib and aborts at launch on machines without
+  # `brew install util-linux`. build-libblkid-static.sh produced a static libblkid.a +
+  # libuuid.a + .pc files in $LIBBLKID_STAGE; point pkg-config at that stage and force
+  # static archives. Two belt-and-suspenders measures, both required:
+  #   1. Export PKG_CONFIG_PATH + PKG_CONFIG_ALL_STATIC=1 in the shell env. Cargo's
+  #      .cargo/config.toml [env] defaults to force=false, so a shell-exported var wins
+  #      over the submodule's hardcoded homebrew path.
+  #   2. Neutralize the homebrew PKG_CONFIG_PATH line in the CACHE_DIR copy of
+  #      .cargo/config.toml (the submodule itself is never edited — same rule as
+  #      patch_vmproxy_mount_tmpfs). If the env override ever stopped winning, the build
+  #      would silently fall back to the homebrew dylib; this removes that fallback path.
+  local libblkid_stage="${NTFSMAC_LIBBLKID_STAGE:-${TMPDIR:-/tmp}/ntfsmac-build/libblkid-static}"
+  if [[ ! -f "$libblkid_stage/lib/libblkid.a" ]]; then
+    echo "build-all: HARD-STOP — static libblkid.a not found at $libblkid_stage (build-libblkid-static.sh should have run first in main(); check brew install util-linux + gettext)" >&2
+    return 1
+  fi
+  local cargo_config="$CACHE_DIR/anylinuxfs/.cargo/config.toml"
+  if [[ -f "$cargo_config" ]] && grep -q '/opt/homebrew/opt/util-linux' "$cargo_config"; then
+    python3 - "$cargo_config" <<'PYEOF'
+import sys
+path = sys.argv[1]
+with open(path, "r") as f:
+    lines = f.readlines()
+out = []
+for line in lines:
+    # Comment out the homebrew util-linux PKG_CONFIG_PATH so the build can't fall back to
+    # the shared dylib if the shell-env override ever stops winning. Preserve the line
+    # (commented) so the rationale stays readable in the patched copy.
+    if "PKG_CONFIG_PATH" in line and "/opt/homebrew/opt/util-linux" in line and not line.lstrip().startswith("#"):
+        out.append("# " + line.rstrip() + "  # neutralized by build-all.sh: static libblkid is used instead (tosbaha #1 fix)\n")
+    else:
+        out.append(line)
+with open(path, "w") as f:
+    f.writelines(out)
+print("build-all: neutralized homebrew PKG_CONFIG_PATH in anylinuxfs .cargo/config.toml (static libblkid)")
+PYEOF
+  fi
+
+  if ! (cd "$CACHE_DIR/anylinuxfs" && \
+        PKG_CONFIG_PATH="$libblkid_stage/lib/pkgconfig" \
+        PKG_CONFIG_ALL_STATIC=1 \
+        cargo build --release 2>&1); then
     echo "build-all: HARD-STOP — anylinuxfs fails to compile even with default features (a real build error). See output above." >&2
     return 1
   fi
@@ -125,7 +169,7 @@ build_anylinuxfs() {
   # checks signature validity, not which entitlements are embedded. Without
   # com.apple.security.hypervisor, Hypervisor.framework's vm_create fails with exactly
   # "start vm error: Invalid argument (errno 22)" on real Apple Silicon hardware — no VM/
-  # nested-virtualization involved, confirmed on Kaveen's bare M3 Pro. `build/sign.sh` is the
+  # nested-virtualization involved, confirmed on a bare Apple Silicon Mac. `build/sign.sh` is the
   # one script that actually embeds the required entitlements (build/entitlements/
   # anylinuxfs.entitlements); it existed but nothing in the build pipeline ever called it, so
   # every real build silently shipped an unbootable anylinuxfs. Calling it here — the one
@@ -155,8 +199,18 @@ run_tests() {
   echo "build-all: cargo test — common-utils"
   (cd "$CACHE_DIR/common-utils" && cargo test) || return 1
 
+  # anylinuxfs's debug test build re-runs libblkid-rs-sys's build script, which needs
+  # the SAME static-libblkid env as build_anylinuxfs (PKG_CONFIG_PATH at the staged .pc
+  # + PKG_CONFIG_ALL_STATIC=1). Without this the test build fails with "Package blkid not
+  # found" — the neutralized .cargo/config.toml removed the homebrew fallback deliberately,
+  # so the only valid pkg-config path is our stage. vmproxy doesn't link libblkid, so it
+  # needs no special env.
+  local libblkid_stage="${NTFSMAC_LIBBLKID_STAGE:-${TMPDIR:-/tmp}/ntfsmac-build/libblkid-static}"
   echo "build-all: cargo test — anylinuxfs"
-  (cd "$CACHE_DIR/anylinuxfs" && cargo test) || return 1
+  (cd "$CACHE_DIR/anylinuxfs" && \
+    PKG_CONFIG_PATH="$libblkid_stage/lib/pkgconfig" \
+    PKG_CONFIG_ALL_STATIC=1 \
+    cargo test) || return 1
 
   echo "build-all: cargo test — vmproxy (host target: $host_target)"
   (cd "$CACHE_DIR/vmproxy" && cargo test --target "$host_target") || return 1
@@ -169,6 +223,12 @@ main() {
   "$REPO_ROOT/build/init-rootfs.sh" || true  # non-fatal: see build/AUDIT.md — vmproxy-embed gap resolves after this unit builds vmproxy
 
   prepare_build_copy || exit 1
+
+  # Stage Homebrew's static libblkid.a anylinuxfs links against (tosbaha #1 fix). Must run
+  # before build_anylinuxfs — it produces the dylib-free stage (libblkid.a + libuuid.a +
+  # .pc) that build_anylinuxfs points PKG_CONFIG_PATH at. Idempotent (rm -rf stage on every
+  # run). No source build, no fetch — consumes Homebrew's already-built static archives.
+  "$REPO_ROOT/build/build-libblkid-static.sh" || { echo "build-all: HARD-STOP — build-libblkid-static.sh failed" >&2; exit 1; }
 
   build_anylinuxfs || exit 1
   build_vmproxy || exit 1

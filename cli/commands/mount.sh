@@ -13,7 +13,7 @@ source "$SCRIPT_DIR/../lib/list-drives.sh"
 source "$SCRIPT_DIR/../lib/interactive-select.sh"
 
 usage() {
-  echo "usage: mount.sh [--fs-driver ntfs-3g|ntfs3] [--read-only] <device> [mount_point]" >&2
+  echo "usage: mount.sh [--fs-driver ntfs-3g|ntfs3] [--read-only] [--ignore-permissions] <device> [mount_point]" >&2
 }
 
 cmd_mount() {
@@ -30,7 +30,7 @@ cmd_mount() {
     exec sudo "$0" "$@"
   fi
 
-  local fs_driver="" device="" mount_point="" read_only=""
+  local fs_driver="" device="" mount_point="" read_only="" ignore_perms=""
   local -a positional=()
 
   while [[ $# -gt 0 ]]; do
@@ -46,6 +46,14 @@ cmd_mount() {
         ;;
       --read-only)
         read_only="1"
+        shift
+        ;;
+      # ext drives need all_squash on the NFS export so the macOS user can write past ext's
+      # Unix ownership (see nfs-mount.sh). The GUI helper passes this for ext as its signal
+      # that the drive is ext-family — and to skip the fstype probe below. A CLI user can also
+      # set it explicitly for an ext drive the probe missed (e.g. a wedged `anylinuxfs list`).
+      --ignore-permissions)
+        ignore_perms="1"
         shift
         ;;
       --)
@@ -69,8 +77,9 @@ cmd_mount() {
   mount_point="${positional[1]:-}"
 
   # No device given: list compatible drives instead of just erroring on missing args.
+  local chosen_fstype=""
   if [[ -z "$device" ]]; then
-    local -a idents=() menu_lines=()
+    local -a idents=() fstypes=() menu_lines=()
     local ident label size fstype
     local drives_tmp
     drives_tmp="$(mktemp)"
@@ -85,6 +94,7 @@ cmd_mount() {
     while IFS=$'\t' read -r ident label size fstype; do
       [[ -n "$ident" ]] || continue
       idents+=("$ident")
+      fstypes+=("$fstype")
       menu_lines+=("/dev/$ident  $label  $size  $fstype")
     done < "$drives_tmp"
     rm -f "$drives_tmp"
@@ -102,13 +112,20 @@ cmd_mount() {
 
     local choice
     choice="$(prompt_choice "${#idents[@]}")" || { echo "mount: cancelled" >&2; return 1; }
-    device="${idents[$((choice - 1))]}"
+    local idx=$((choice - 1))
+    device="${idents[$idx]}"
+    chosen_fstype="${fstypes[$idx]}"
   fi
 
   if [[ -n "$fs_driver" && "$fs_driver" != "ntfs-3g" && "$fs_driver" != "ntfs3" ]]; then
     echo "mount: invalid --fs-driver '$fs_driver' (must be ntfs-3g or ntfs3)" >&2
     return 1
   fi
+  # Remember whether --fs-driver was explicitly given before ntfs-3g is cleared to "" below —
+  # the auto-detect uses this to skip the fstype probe when the caller already named an NTFS
+  # driver (the GUI helper passes --fs-driver for ntfs; only the direct/picker CLI paths with
+  # no --fs-driver auto-probe for ext).
+  local explicit_driver="$fs_driver"
   # ntfs-3g is the implicit default (L1) — only pass -t to opt into ntfs3.
   [[ "$fs_driver" == "ntfs-3g" ]] && fs_driver=""
 
@@ -116,7 +133,22 @@ cmd_mount() {
     return 1
   fi
 
-  if run_anylinuxfs_mount "$device" "$fs_driver" "$mount_point" "$read_only"; then
+  # ext needs --ignore-permissions (all_squash) so the macOS user can write past ext's Unix
+  # ownership (see nfs-mount.sh). Only auto-set it when the caller didn't already pass
+  # --ignore-permissions AND didn't explicitly name an NTFS driver — the picker already has
+  # the fstype in hand (no probe), the direct path probes fs_type_for_device (one `anylinuxfs
+  # list`). NTFS is left untouched: "do not change the NTFS part".
+  if [[ -z "$ignore_perms" && -z "$explicit_driver" ]]; then
+    local fstype="$chosen_fstype"
+    if [[ -z "$fstype" ]]; then
+      fstype="$(fs_type_for_device "$device")"
+    fi
+    case "$fstype" in
+      ext|ext2|ext3|ext4) ignore_perms="1" ;;
+    esac
+  fi
+
+  if run_anylinuxfs_mount "$device" "$fs_driver" "$mount_point" "$read_only" "$ignore_perms"; then
     echo "mount: $device mounted"
     return 0
   fi
