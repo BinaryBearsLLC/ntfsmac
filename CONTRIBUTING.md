@@ -17,6 +17,11 @@ privilege boundary) — don't re-litigate those in a PR without discussion first
 - CLI build/install: `./install.sh` (refuses non-arm64, ad-hoc signs, strips quarantine
   xattrs).
 - GUI build: `swift build` via `Package.swift`, or open in Xcode.
+- Interactive release build: double-click `build.command`, or run
+  `./build.command [cli|gui|both]`. It reuses the repository's existing build scripts and
+  writes verified CLI and/or GUI artifacts under `dist/`; it does not install them. Missing
+  command-line dependencies are offered for installation only after explicit confirmation;
+  full Xcode remains an Apple/App Store installation.
 
 ## Testing
 
