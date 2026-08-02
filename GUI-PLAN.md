@@ -84,6 +84,15 @@ Menu-bar agent → click icon → popover. No windows except Preferences and the
 | `Retry` | Re-attempt last action |
 | `Diagnose` | Jump to diagnostics |
 
+### Diagnostic summary
+
+Diagnostic rows distinguish confirmed health, expected or transitional information, actionable
+warnings, and unavailable context. A stopped vmnet bridge is informational while ntfsmac is idle
+or starting a mount; it becomes a warning only when a drive is already mounted and the private NFS
+network is expected to be active. Unknown or malformed values are shown neutrally rather than as
+confirmed failures. Short explanations remain available through native help and accessibility
+text without widening the popover.
+
 ### Preferences window
 
 | Control | Type | Default |
