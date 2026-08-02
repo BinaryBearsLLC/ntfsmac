@@ -242,7 +242,7 @@ public struct PopoverContentView: View {
             }
 
             if showDiagnose {
-                DiagnosePanel(runner: diagnoseRunner)
+                DiagnosePanel(runner: diagnoseRunner, mountState: appState.state)
             }
 
             Divider()
@@ -445,4 +445,3 @@ struct FDAPromptView: View {
         .frame(width: 340)
     }
 }
-
