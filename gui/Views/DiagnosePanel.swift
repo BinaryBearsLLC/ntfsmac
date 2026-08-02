@@ -60,6 +60,8 @@ public struct DiagnosePanel: View {
                         Label("\(row.label): \(row.value)", systemImage: row.isHealthy ? "checkmark.circle" : "exclamationmark.circle")
                             .foregroundStyle(row.isHealthy ? Color.primary : Color.orange)
                             .font(.caption)
+                            .help(TooltipCopy.diagnosticExplanation(for: row.id))
+                            .accessibilityHint(TooltipCopy.diagnosticExplanation(for: row.id))
                     }
                 }
                 .padding(10)

@@ -84,6 +84,12 @@ Menu-bar agent → click icon → popover. No windows except Preferences and the
 | `Retry` | Re-attempt last action |
 | `Diagnose` | Jump to diagnostics |
 
+### Contextual help
+
+Controls and statuses whose purpose is not immediately obvious expose concise native macOS help
+on hover. Tooltip copy does not replace accessibility labels or hints, does not duplicate long
+paragraphs across views, and must not change layout, focus order, or the macOS 13.0 target.
+
 ### Preferences window
 
 | Control | Type | Default |

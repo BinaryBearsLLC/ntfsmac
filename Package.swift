@@ -75,6 +75,7 @@ let package = Package(
                 "FirstRun/HelperUninstaller.swift", "FirstRun/CLIInstallChecker.swift", "Views/CLIMissingView.swift",
                 "Preferences/Settings.swift", "Preferences/PreferencesView.swift",
                 "Style/Colors.swift", "Style/GlassTheme.swift", "Style/Icons.swift", "Style/PillButtons.swift",
+                "Style/TooltipCopy.swift",
                 "Views/PopoverContentView.swift",
             ]
         ),
