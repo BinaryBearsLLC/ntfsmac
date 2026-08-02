@@ -84,6 +84,13 @@ Menu-bar agent → click icon → popover. No windows except Preferences and the
 | `Retry` | Re-attempt last action |
 | `Diagnose` | Jump to diagnostics |
 
+### Diagnostic panel
+
+The diagnostic box includes a compact `Hide` action in its header. Hiding changes only panel
+visibility: it does not clear the last result, cancel an in-progress run, or touch mount/helper
+state. Selecting `Diagnose` again always reopens the box and starts one fresh diagnostic run.
+`Hide` remains keyboard-reachable and available for result, error, and running states.
+
 ### Preferences window
 
 | Control | Type | Default |

@@ -70,7 +70,7 @@ public struct PopoverContentView: View {
     public let helperClient: HelperClient
 
     @Environment(\.colorScheme) private var colorScheme
-    @State private var showDiagnose = false
+    @State private var diagnosePresentation = DiagnosePanelPresentation()
     @State private var showFDAPrompt = false
 
     public init(
@@ -241,8 +241,10 @@ public struct PopoverContentView: View {
                 Text(errorMessage).font(.caption).foregroundStyle(Color.ntfsRed)
             }
 
-            if showDiagnose {
-                DiagnosePanel(runner: diagnoseRunner)
+            if diagnosePresentation.isVisible {
+                DiagnosePanel(runner: diagnoseRunner) {
+                    diagnosePresentation.hide()
+                }
             }
 
             Divider()
@@ -353,7 +355,7 @@ public struct PopoverContentView: View {
             .buttonStyle(.glassIcon(colorScheme: colorScheme))
 
             Button {
-                showDiagnose = true
+                diagnosePresentation.show()
                 Task { await diagnoseRunner.run() }
             } label: {
                 HStack(spacing: 5) {
@@ -445,4 +447,3 @@ struct FDAPromptView: View {
         .frame(width: 340)
     }
 }
-

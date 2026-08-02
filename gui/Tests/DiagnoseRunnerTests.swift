@@ -95,3 +95,38 @@ private final class FakeRunner: PrivilegedCommandRunning {
     #expect(runner.errorMessage?.contains("NSCocoaErrorDomain") == false)
     #expect(runner.errorMessage == "ntfsmac isn't installed yet. If you just installed the helper, this can take a few seconds — try again, or use Preferences ▸ Reinstall privileged helper.")
 }
+
+@Test func diagnosticPresentationCoversHiddenRunningResultAndErrorPhases() {
+    let report = DiagnoseReport(healthy: true, missingBinaries: 0, quarantinedBinaries: 0, kernelPin: "match", bridge: "up")
+    var presentation = DiagnosePanelPresentation()
+
+    #expect(presentation.phase(report: report, errorMessage: "failure", isRunning: true) == .hidden)
+    presentation.show()
+    #expect(presentation.phase(report: nil, errorMessage: nil, isRunning: true) == .running)
+    #expect(presentation.phase(report: report, errorMessage: nil, isRunning: false) == .result)
+    #expect(presentation.phase(report: nil, errorMessage: "failure", isRunning: false) == .error)
+    presentation.hide()
+    #expect(presentation.phase(report: report, errorMessage: nil, isRunning: false) == .hidden)
+}
+
+@MainActor
+@Test func hidingKeepsDiagnosticDataAndReopeningRunsExactlyOnceAgain() async {
+    let fake = FakeRunner()
+    let runner = DiagnoseRunner(runner: fake, ntfsmacPath: "/fake/ntfsmac", fileExists: { _ in true })
+    var presentation = DiagnosePanelPresentation()
+
+    presentation.show()
+    await runner.run()
+    #expect(fake.calls.count == 1)
+    let firstReport = runner.report
+
+    presentation.hide()
+    #expect(!presentation.isVisible)
+    #expect(runner.report == firstReport)
+
+    presentation.show()
+    await runner.run()
+    #expect(presentation.isVisible)
+    #expect(fake.calls.count == 2)
+    #expect(runner.report == firstReport)
+}
