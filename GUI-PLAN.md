@@ -19,11 +19,16 @@ Menu-bar agent → click icon → popover. No windows except Preferences and the
 
 | Colour | Meaning |
 |--------|---------|
-| Grey | Idle, nothing mounted |
+| System-adaptive | Idle, nothing mounted |
 | Blue (pulsing) | Mounting |
 | Green | Mounted read/write |
 | Yellow | Mounted **read-only** (dirty journal) |
 | Red | Error |
+
+The idle SF Symbol is an AppKit template image, so macOS supplies the same contrasting tint used
+by native menu-bar apps. This keeps the icon visible across light and dark menu-bar backgrounds
+without adding a preference or first-run animation. Saturated colours remain reserved for real
+mounting, mounted, warning, and error states.
 
 ---
 

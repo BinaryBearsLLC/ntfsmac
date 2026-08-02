@@ -116,17 +116,16 @@ struct NtfsmacApp: App {
             // `ui/prototype.html`'s red menu-bar icon ("Error — Helper Missing", comp lines
             // 636-657) is driven by the helper install outcome, not `AppState.state` — these were
             // previously fully decoupled, so a denied/failed helper install left the icon grey.
-            HStack(spacing: 3) {
-                StatusIconView(state: helperInstaller.state.isDeniedOrFailed ? .error : appState.state)
-            }
-            .task { driveScanner.startPolling() }
-            .task(id: helperInstaller.state) {
-                if helperInstaller.state == .installing || helperInstaller.state == .notChecked {
-                    cliAutoStager.reset()
+            StatusIconView(state: helperInstaller.state.isDeniedOrFailed ? .error : appState.state)
+                .accessibilityLabel("ntfsmac")
+                .task { driveScanner.startPolling() }
+                .task(id: helperInstaller.state) {
+                    if helperInstaller.state == .installing || helperInstaller.state == .notChecked {
+                        cliAutoStager.reset()
+                    }
+                    guard helperInstaller.state == .installed else { return }
+                    await cliAutoStager.stageIfNeeded()
                 }
-                guard helperInstaller.state == .installed else { return }
-                await cliAutoStager.stageIfNeeded()
-            }
         }
         .menuBarExtraStyle(.window)
     }
