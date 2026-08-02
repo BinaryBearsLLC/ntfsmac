@@ -63,6 +63,7 @@ public struct FirstRunView: View {
                 }
                 .buttonStyle(.glassNeutral(colorScheme: colorScheme))
                 .disabled(diagnoseRunner.isRunning)
+                .help(TooltipCopy.text(for: .diagnose))
             }
 
             if diagnosePresentation.isVisible {
@@ -140,11 +141,14 @@ public struct FirstRunView: View {
                 SettingsGearGlyph(color: .secondary)
             }
             .buttonStyle(.glassIcon(colorScheme: colorScheme))
+            .accessibilityLabel("Open Settings")
+            .help(TooltipCopy.text(for: .settings))
             Spacer()
             Button(action: onQuit) {
                 Text("Quit").frame(height: 28)
             }
             .buttonStyle(.glassFooter(colorScheme: colorScheme))
+            .help(TooltipCopy.text(for: .quit))
         }
     }
 }

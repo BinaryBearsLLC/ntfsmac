@@ -103,6 +103,12 @@ visibility: it does not clear the last result, cancel an in-progress run, or tou
 state. Selecting `Diagnose` again always reopens the box and starts one fresh diagnostic run.
 `Hide` remains keyboard-reachable and available for result, error, and running states.
 
+### Contextual help
+
+Controls and statuses whose purpose is not immediately obvious expose concise native macOS help
+on hover. Tooltip copy does not replace accessibility labels or hints, does not duplicate long
+paragraphs across views, and must not change layout, focus order, or the macOS 13.0 target.
+
 ### Preferences window
 
 | Control | Type | Default |
