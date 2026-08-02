@@ -89,7 +89,7 @@ mounting, mounted, warning, and error states.
 | `Retry` | Re-attempt last action |
 | `Diagnose` | Jump to diagnostics |
 
-### Diagnostic summary
+### Diagnostic panel
 
 Diagnostic rows distinguish confirmed health, expected or transitional information, actionable
 warnings, and unavailable context. A stopped vmnet bridge is informational while ntfsmac is idle
@@ -97,6 +97,11 @@ or starting a mount; it becomes a warning only when a drive is already mounted a
 network is expected to be active. Unknown or malformed values are shown neutrally rather than as
 confirmed failures. Short explanations remain available through native help and accessibility
 text without widening the popover.
+
+The diagnostic box includes a compact `Hide` action in its header. Hiding changes only panel
+visibility: it does not clear the last result, cancel an in-progress run, or touch mount/helper
+state. Selecting `Diagnose` again always reopens the box and starts one fresh diagnostic run.
+`Hide` remains keyboard-reachable and available for result, error, and running states.
 
 ### Preferences window
 
