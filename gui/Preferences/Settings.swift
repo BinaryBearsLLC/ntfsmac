@@ -21,7 +21,7 @@ public struct RealLaunchAtLoginService: LaunchAtLoginService {
     }
 }
 
-/// GUI-PLAN.md "Preferences window" table, exactly these five controls — this unit's Don't
+/// GUI-PLAN.md "Settings page" table, exactly these controls — this unit's Don't
 /// clause: no controls beyond this table. Persisted via `UserDefaults` (constructor-injected so
 /// tests use an isolated suite, never the real `.standard` domain).
 @MainActor
@@ -49,7 +49,7 @@ public final class Settings: ObservableObject {
         launchAtLogin = defaults.object(forKey: Keys.launchAtLogin) as? Bool ?? Defaults.launchAtLogin
     }
 
-    /// GUI-PLAN.md "Preferences window" table's literal Default column.
+    /// GUI-PLAN.md "Settings page" table's literal Default column.
     public enum Defaults {
         public static let launchAtLogin = false
     }

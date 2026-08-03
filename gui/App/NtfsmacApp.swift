@@ -16,6 +16,7 @@ struct NtfsmacApp: App {
     @StateObject private var helperUninstaller: HelperUninstaller
     @StateObject private var cliInstallChecker: CLIInstallChecker
     @StateObject private var settings = Settings()
+    @StateObject private var navigation = PopoverNavigation()
 
     private let finderOpener = FinderOpener()
     private let helperClient = HelperClient()
@@ -64,10 +65,6 @@ struct NtfsmacApp: App {
         })
         _helperUninstaller = StateObject(wrappedValue: helperUninstaller)
 
-        let settings = self.settings
-        PreferencesOpener.configure {
-            AnyView(PreferencesView(settings: settings, installer: helperInstaller, uninstaller: helperUninstaller))
-        }
     }
 
     var body: some Scene {
@@ -80,11 +77,13 @@ struct NtfsmacApp: App {
                 remountController: remountController,
                 diagnoseRunner: diagnoseRunner,
                 helperInstaller: helperInstaller,
+                helperUninstaller: helperUninstaller,
                 cliInstallChecker: cliInstallChecker,
                 cliAutoStager: cliAutoStager,
                 settings: settings,
                 finderOpener: finderOpener,
-                helperClient: helperClient
+                helperClient: helperClient,
+                navigation: navigation
             )
             .popoverGlassBackground()
         } label: {
