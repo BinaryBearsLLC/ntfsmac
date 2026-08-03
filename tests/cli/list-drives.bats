@@ -69,6 +69,33 @@ STUB
   [[ "$output" == *"disk4s4"* ]]
 }
 
+@test "list_mountable_drives surfaces unlabeled MBR NTFS with real Windows_NTFS TYPE column" {
+  # Captured from a real 248 GB external MBR disk. Windows_NTFS is the partition type, not an
+  # allow-listed blkid token; it must be normalized to ntfs rather than dropped.
+  cat > "$STUB_DIR/anylinuxfs" <<STUB
+#!/bin/bash
+printf '%s\n' '   1:               Windows_NTFS                         248.0 GB   disk4s1'
+exit 0
+STUB
+  chmod +x "$STUB_DIR/anylinuxfs"
+  run list_mountable_drives
+  [ "$status" -eq 0 ]
+  [ "$output" = $'disk4s1\t\t248.0 GB\tntfs' ]
+}
+
+@test "list_mountable_drives preserves label from real MBR Windows_NTFS TYPE column" {
+  # Captured from a second real 8.1 GB USB stick.
+  cat > "$STUB_DIR/anylinuxfs" <<STUB
+#!/bin/bash
+printf '%s\n' '   1:               Windows_NTFS USB_8GB                 8.1 GB     disk5s1'
+exit 0
+STUB
+  chmod +x "$STUB_DIR/anylinuxfs"
+  run list_mountable_drives
+  [ "$status" -eq 0 ]
+  [ "$output" = $'disk5s1\tUSB_8GB\t8.1 GB\tntfs' ]
+}
+
 @test "list_mountable_drives calls anylinuxfs list without --microsoft" {
   CALL_LOG="$STUB_DIR/list.calls"
   cat > "$STUB_DIR/anylinuxfs" <<STUB

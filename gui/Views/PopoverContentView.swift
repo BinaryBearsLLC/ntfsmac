@@ -64,9 +64,11 @@ public struct PopoverContentView: View {
     @ObservedObject public var remountController: RemountController
     @ObservedObject public var diagnoseRunner: DiagnoseRunner
     @ObservedObject public var helperInstaller: HelperInstaller
+    @ObservedObject public var helperUninstaller: HelperUninstaller
     @ObservedObject public var cliInstallChecker: CLIInstallChecker
     @ObservedObject public var cliAutoStager: CLIAutoStager
     @ObservedObject public var settings: Settings
+    @StateObject private var navigation: PopoverNavigation
     public let finderOpener: FinderOpener
     public let helperClient: HelperClient
 
@@ -82,11 +84,13 @@ public struct PopoverContentView: View {
         remountController: RemountController,
         diagnoseRunner: DiagnoseRunner,
         helperInstaller: HelperInstaller,
+        helperUninstaller: HelperUninstaller,
         cliInstallChecker: CLIInstallChecker,
         cliAutoStager: CLIAutoStager,
         settings: Settings,
         finderOpener: FinderOpener,
-        helperClient: HelperClient
+        helperClient: HelperClient,
+        navigation: PopoverNavigation
     ) {
         self.appState = appState
         self.driveScanner = driveScanner
@@ -95,23 +99,59 @@ public struct PopoverContentView: View {
         self.remountController = remountController
         self.diagnoseRunner = diagnoseRunner
         self.helperInstaller = helperInstaller
+        self.helperUninstaller = helperUninstaller
         self.cliInstallChecker = cliInstallChecker
         self.cliAutoStager = cliAutoStager
         self.settings = settings
         self.finderOpener = finderOpener
         self.helperClient = helperClient
+        _navigation = StateObject(wrappedValue: navigation)
+    }
+
+    /// Source-compatible initializer matching the original public surface. The production app
+    /// supplies its long-lived uninstaller/navigation objects through the designated initializer.
+    public init(
+        appState: AppState,
+        driveScanner: DriveScanner,
+        mountController: MountController,
+        throughputMonitor: ThroughputMonitor,
+        remountController: RemountController,
+        diagnoseRunner: DiagnoseRunner,
+        helperInstaller: HelperInstaller,
+        cliInstallChecker: CLIInstallChecker,
+        cliAutoStager: CLIAutoStager,
+        settings: Settings,
+        finderOpener: FinderOpener,
+        helperClient: HelperClient
+    ) {
+        self.init(
+            appState: appState,
+            driveScanner: driveScanner,
+            mountController: mountController,
+            throughputMonitor: throughputMonitor,
+            remountController: remountController,
+            diagnoseRunner: diagnoseRunner,
+            helperInstaller: helperInstaller,
+            helperUninstaller: HelperUninstaller(),
+            cliInstallChecker: cliInstallChecker,
+            cliAutoStager: cliAutoStager,
+            settings: settings,
+            finderOpener: finderOpener,
+            helperClient: helperClient,
+            navigation: PopoverNavigation()
+        )
     }
 
     public var body: some View {
         Group {
-            // Helper install is a self-contained SMJobBless/XPC flow that doesn't touch the CLI
-            // tree at all — gating it behind `cliInstallChecker.isInstalled` would block the
-            // "Install Helper…" button while the CLI is still being staged. `CLIAutoStager`
-            // stages the CLI (bundled into the .app by `build/package-app.sh`, no tap/Homebrew
-            // needed) the moment the helper finishes installing, so helper state is checked
-            // first; CLI-missing is the brief, self-clearing window between "helper just
-            // installed" and "CLIAutoStager finished running install.sh through it."
-            if showFDAPrompt {
+            if navigation.page == .settings {
+                PreferencesView(
+                    settings: settings,
+                    installer: helperInstaller,
+                    uninstaller: helperUninstaller,
+                    onBack: navigation.showMain
+                )
+            } else if showFDAPrompt {
                 FDAPromptView(
                     onOpenSettings: {
                         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
@@ -125,12 +165,27 @@ public struct PopoverContentView: View {
                         mountController.clearError()
                     }
                 )
+            // Helper install is a self-contained SMJobBless/XPC flow that doesn't touch the CLI
+            // tree at all — gating it behind `cliInstallChecker.isInstalled` would block the
+            // "Install Helper…" button while the CLI is still being staged. `CLIAutoStager`
+            // stages the CLI (bundled into the .app by `build/package-app.sh`, no tap/Homebrew
+            // needed) the moment the helper finishes installing, so helper state is checked
+            // first; CLI-missing is the brief, self-clearing window between "helper just
+            // installed" and "CLIAutoStager finished running install.sh through it."
             } else if helperInstaller.state != .installed {
-                // GUI-PLAN.md "App shape": "No windows except Preferences and the first-run
-                // helper prompt" — the popover itself gates on the helper being installed first.
-                FirstRunView(installer: helperInstaller, diagnoseRunner: diagnoseRunner, onQuit: quit)
+                FirstRunView(
+                    installer: helperInstaller,
+                    diagnoseRunner: diagnoseRunner,
+                    onOpenSettings: navigation.showSettings,
+                    onQuit: quit
+                )
             } else if !cliInstallChecker.isInstalled {
-                CLIMissingView(checker: cliInstallChecker, stager: cliAutoStager, onQuit: quit)
+                CLIMissingView(
+                    checker: cliInstallChecker,
+                    stager: cliAutoStager,
+                    onOpenSettings: navigation.showSettings,
+                    onQuit: quit
+                )
             } else {
                 mainContent
             }
@@ -139,6 +194,9 @@ public struct PopoverContentView: View {
             if newValue == "FDA_REQUIRED" {
                 showFDAPrompt = true
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .ntfsmacOpenSettings)) { _ in
+            navigation.showSettings()
         }
     }
 
@@ -351,7 +409,7 @@ public struct PopoverContentView: View {
     private var footer: some View {
         HStack(spacing: 5) {
             Button {
-                PreferencesOpener.open()
+                navigation.showSettings()
             } label: {
                 SettingsGearGlyph(color: .secondary)
             }
@@ -401,7 +459,12 @@ public struct PopoverContentView: View {
     }
 }
 
-/// A beautiful modal prompt guiding the user to grant Full Disk Access to the privileged helper daemon.
+enum FDAPromptCopy {
+    static let helperServiceName = "com.khr898.ntfsmac.helper"
+    static let instructions = "macOS lists the ntfsmac Helper under its technical service name, \(helperServiceName). Enable that entry in Full Disk Access. If it is not listed, add it with the '+' button."
+}
+
+/// A modal prompt guiding the user to grant Full Disk Access to the privileged helper daemon.
 struct FDAPromptView: View {
     let onOpenSettings: () -> Void
     let onCancel: () -> Void
@@ -430,7 +493,7 @@ struct FDAPromptView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             
-            Text("To proceed, open System Settings and ensure the **ntfsmac helper** (com.khr898.ntfsmac.helper) is enabled under the Full Disk Access list. If it is not in the list, you can add it manually using the '+' button.")
+            Text(FDAPromptCopy.instructions)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.leading)

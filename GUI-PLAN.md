@@ -13,7 +13,8 @@
 
 ## App shape
 
-Menu-bar agent → click icon → popover. No windows except Preferences and the first-run helper prompt.
+Menu-bar agent → click icon → popover. Settings is a page inside that same popover; the only
+separate system UI is the first-run helper authorization prompt.
 
 ### Menu-bar icon states
 
@@ -62,7 +63,7 @@ mounting, mounted, warning, and error states.
 | Drive row `[Mount]` | Mount that drive r/w via XPC helper | A compatible drive is detected |
 | Refresh (↻) | Re-scan drives now | Always |
 | `Diagnose` | Run CLI diagnostic, show summary | Always |
-| ⚙ (gear) | Open Preferences | Always |
+| ⚙ (gear) | Navigate to Settings in the popover | Always |
 | `Quit` | Exit app, tear down network state | Always |
 
 ### Popover — mounted
@@ -111,7 +112,12 @@ Controls and statuses whose purpose is not immediately obvious expose concise na
 on hover. Tooltip copy does not replace accessibility labels or hints, does not duplicate long
 paragraphs across views, and must not change layout, focus order, or the macOS 13.0 target.
 
-### Preferences window
+### Settings page
+
+The gear replaces the main popover content with Settings. A keyboard-reachable `Back` action
+returns to the previous application content. Normal, first-run, and CLI-repair screens all use the
+same route and the same long-lived Settings/helper objects; navigation does not open an `NSWindow`
+or recreate in-flight state.
 
 | Control | Type | Default |
 |---------|------|---------|
