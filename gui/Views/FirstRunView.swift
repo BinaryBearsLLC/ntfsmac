@@ -52,8 +52,20 @@ public struct FirstRunView: View {
                 .buttonStyle(.glassPrimary())
 
                 Button {
+                    let mode = DiagnoseActionMode.resolve(
+                        commandPressed: NSEvent.modifierFlags.contains(.command)
+                    )
                     showDiagnose = true
-                    Task { await diagnoseRunner.run() }
+                    Task {
+                        switch mode {
+                        case .summary:
+                            await diagnoseRunner.run()
+                        case .developerJSONExport:
+                            if let document = await diagnoseRunner.runForDeveloperExport() {
+                                DeveloperDiagnoseSavePanel.present(document: document)
+                            }
+                        }
+                    }
                 } label: {
                     HStack(spacing: 5) {
                         DiagnoseGlyph()
