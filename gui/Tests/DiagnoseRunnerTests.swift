@@ -15,6 +15,10 @@ private let degradedJSON = """
 {"healthy":false,"missing_binaries":2,"quarantined_binaries":1,"kernel_pin":"mismatch","bridge":"down"}
 """
 
+private let developerExportJSON = """
+{"healthy":false,"macos_version":"26.5","missing_binaries":0,"quarantined_binaries":0,"kernel_pin":"match","bridge":"down"}
+"""
+
 private final class FakeRunner: PrivilegedCommandRunning {
     var result = CommandResult(output: healthyJSON, exitCode: 0)
     private(set) var calls: [(String, [String])] = []
@@ -65,6 +69,23 @@ private final class FakeRunner: PrivilegedCommandRunning {
     #expect(fake.calls[0].1 == ["diagnose", "--json"])
     #expect(runner.report?.healthy == false)
     #expect(runner.errorMessage == nil)
+}
+
+@MainActor
+@Test func developerExportReusesDiagnoseJsonAndWorksForDegradedExitStatus() async throws {
+    let fake = FakeRunner()
+    fake.result = CommandResult(output: developerExportJSON, exitCode: 1)
+    let runner = DiagnoseRunner(runner: fake, ntfsmacPath: "/fake/ntfsmac", fileExists: { _ in true })
+
+    let document = await runner.runForDeveloperExport()
+
+    #expect(fake.calls.count == 1)
+    #expect(fake.calls[0].1 == ["diagnose", "--json"])
+    #expect(runner.report?.healthy == false)
+    #expect(runner.errorMessage == nil)
+    #expect(document != nil)
+    let object = try JSONSerialization.jsonObject(with: document!.data) as? [String: Any]
+    #expect(object?["macos_version"] as? String == "26.5")
 }
 
 @MainActor

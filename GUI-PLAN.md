@@ -57,6 +57,7 @@ Menu-bar agent → click icon → popover. No windows except Preferences and the
 | Drive row `[Mount]` | Mount that drive r/w via XPC helper | A compatible drive is detected |
 | Refresh (↻) | Re-scan drives now | Always |
 | `Diagnose` | Run CLI diagnostic, show summary | Always |
+| `⌘`-click `Diagnose` | Run the same read-only diagnostic and save its JSON for developer support | Always |
 | ⚙ (gear) | Open Preferences | Always |
 | `Quit` | Exit app, tear down network state | Always |
 
@@ -83,6 +84,7 @@ Menu-bar agent → click icon → popover. No windows except Preferences and the
 | Error message | Plain-language cause (helper not installed, binary missing, mount failed) |
 | `Retry` | Re-attempt last action |
 | `Diagnose` | Jump to diagnostics |
+| `⌘`-click `Diagnose` | Save the same read-only diagnostic JSON for developer support |
 
 ### Preferences window
 
