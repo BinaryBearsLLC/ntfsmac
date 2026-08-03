@@ -190,12 +190,17 @@ verify that path specifically), the write/read/remove round-trips, `diagnose --j
 
 ```
 $ NTFSMAC_PREFIX/bin/ntfsmac diagnose
+diagnose: ntfsmac version: 1.0 (1)
+diagnose: macOS version: <version>
+diagnose: architecture: arm64
+diagnose: privileged helper: installed
 diagnose: vendor binaries missing: 3
+diagnose:   missing components: gvproxy vmnet-helper vmproxy
 diagnose: quarantined binaries: 0
 diagnose: kernel pin: unknown
 diagnose: vmnet bridge: down
-diagnose: current NFS mounts:
-  (none)
+diagnose: VPN default route: not detected
+diagnose: current NFS mount count: 0
 diagnose: overall: degraded
 ```
 
@@ -276,9 +281,13 @@ The menu-bar icon itself uses a placeholder SF Symbol for now — see "app icon"
    plain language.
 6. Hold Command (⌘) and click `Diagnose`. The same diagnostic summary should run, followed by a
    native save panel proposing `ntfsmac-diagnose-<timestamp>.json`. Save it to a temporary location,
-   confirm the file is valid JSON and contains `healthy`, `macos_version`, `missing_binaries`,
-   `quarantined_binaries`, `kernel_pin`, and `bridge`, then remove only that test export. Canceling
-   the save panel must create no file. No network upload should occur.
+   confirm the file is valid JSON and contains `diagnostic_schema`, `healthy`, `ntfsmac_version`,
+   `build_version`, `macos_version`, `architecture`, `helper_installed`, `missing_binaries`,
+   `missing_components`, `quarantined_binaries`, `quarantined_components`, `kernel_pin`, `bridge`,
+   `vpn_default_route`, and `nfs_mount_count`. Confirm it does **not** contain usernames, serials,
+   hardware model, volume labels, disk identifiers, mount paths, VPN provider/interface, IP, DNS,
+   or route details; then remove only that test export. Canceling the save panel must create no
+   file. No network upload should occur.
 7. Click `Unmount` — icon returns to grey/idle, drive drops off the mounted row.
 8. Click the gear icon — Preferences window opens (compare against Gap 2's screen). Toggle
    settings, close, reopen — confirm they persisted (backed by `UserDefaults`, should survive

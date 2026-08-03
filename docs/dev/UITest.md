@@ -124,6 +124,12 @@ is installed"), built a real, tested pipeline:
 | 10 | Preferences window | Yes | Real `NSWindow`, 4 controls (not GUI-PLAN's 5 — "Default mount mode"/"Default mount point" aren't implemented as separate controls in the current build). Reinstall and Uninstall buttons both live-tested for real (see below), not just unit-tested. |
 | 11 | Diagnose panel | Yes | Single button, styled output card. The 2026-08-03 Command-click export path is covered by automated action-routing, JSON-validation, degraded-result, and exact-destination write tests; the packaged menu-bar app was launched successfully, but the native save-panel click-through remains an explicit manual gate because the closed `LSUIElement` popover is not exposed to Computer Use. |
 
+2026-08-03 diagnostic/version polish: automated coverage verifies the secondary Settings version,
+schema-2 decode/render/export, forbidden privacy keys, helper-presence semantics for root-owned mode
+`0544`, and backward decoding of the previous six-field JSON. The packaged branch build launches,
+but Computer Use still cannot open the closed `LSUIElement` menu-bar popover; visual confirmation of
+`Version 1.0 (1)` and the expanded Diagnose rows remains part of the maintainer's final manual pass.
+
 Light/dark appearance toggle still not walked for any state — deferred, not done this session (budget).
 
 ## Live GUI audit session (2026-07-12, this pass)

@@ -1,31 +1,102 @@
 import Foundation
 import HelperShared
 
-/// Summary fields decoded from `ntfsmac diagnose --json` (`cli/commands/diagnose.sh`'s `main()`,
-/// `json_mode` branch). The CLI also emits `macos_version`; Swift's decoder deliberately ignores
-/// that extra field for the four-row UI summary, while `DeveloperDiagnoseDocument` preserves the
-/// complete raw JSON for support reports.
+/// Privacy-safe fields decoded from `ntfsmac diagnose --json`. Optional fields preserve
+/// compatibility with an older CLI during the brief app-update/staging window; the original
+/// health fields remain required.
 public struct DiagnoseReport: Codable, Equatable, Sendable {
+    public let diagnosticSchema: Int?
     public let healthy: Bool
+    public let ntfsmacVersion: String?
+    public let buildVersion: String?
+    public let macosVersion: String?
+    public let architecture: String?
+    public let helperInstalled: Bool?
     public let missingBinaries: Int
+    public let missingComponents: [String]?
     public let quarantinedBinaries: Int
+    public let quarantinedComponents: [String]?
     public let kernelPin: String
     public let bridge: String
+    public let vpnDefaultRoute: Bool?
+    public let nfsMountCount: Int?
 
     enum CodingKeys: String, CodingKey {
+        case diagnosticSchema = "diagnostic_schema"
         case healthy
+        case ntfsmacVersion = "ntfsmac_version"
+        case buildVersion = "build_version"
+        case macosVersion = "macos_version"
+        case architecture
+        case helperInstalled = "helper_installed"
         case missingBinaries = "missing_binaries"
+        case missingComponents = "missing_components"
         case quarantinedBinaries = "quarantined_binaries"
+        case quarantinedComponents = "quarantined_components"
         case kernelPin = "kernel_pin"
         case bridge
+        case vpnDefaultRoute = "vpn_default_route"
+        case nfsMountCount = "nfs_mount_count"
     }
 
-    public init(healthy: Bool, missingBinaries: Int, quarantinedBinaries: Int, kernelPin: String, bridge: String) {
+    public init(
+        healthy: Bool,
+        missingBinaries: Int,
+        quarantinedBinaries: Int,
+        kernelPin: String,
+        bridge: String
+    ) {
+        self.init(
+            healthy: healthy,
+            missingBinaries: missingBinaries,
+            quarantinedBinaries: quarantinedBinaries,
+            kernelPin: kernelPin,
+            bridge: bridge,
+            diagnosticSchema: nil,
+            ntfsmacVersion: nil,
+            buildVersion: nil,
+            macosVersion: nil,
+            architecture: nil,
+            helperInstalled: nil,
+            missingComponents: nil,
+            quarantinedComponents: nil,
+            vpnDefaultRoute: nil,
+            nfsMountCount: nil
+        )
+    }
+
+    public init(
+        healthy: Bool,
+        missingBinaries: Int,
+        quarantinedBinaries: Int,
+        kernelPin: String,
+        bridge: String,
+        diagnosticSchema: Int?,
+        ntfsmacVersion: String?,
+        buildVersion: String?,
+        macosVersion: String?,
+        architecture: String?,
+        helperInstalled: Bool?,
+        missingComponents: [String]?,
+        quarantinedComponents: [String]?,
+        vpnDefaultRoute: Bool?,
+        nfsMountCount: Int?
+    ) {
+        self.diagnosticSchema = diagnosticSchema
         self.healthy = healthy
+        self.ntfsmacVersion = ntfsmacVersion
+        self.buildVersion = buildVersion
+        self.macosVersion = macosVersion
+        self.architecture = architecture
+        self.helperInstalled = helperInstalled
         self.missingBinaries = missingBinaries
+        self.missingComponents = missingComponents
         self.quarantinedBinaries = quarantinedBinaries
+        self.quarantinedComponents = quarantinedComponents
         self.kernelPin = kernelPin
         self.bridge = bridge
+        self.vpnDefaultRoute = vpnDefaultRoute
+        self.nfsMountCount = nfsMountCount
     }
 }
 

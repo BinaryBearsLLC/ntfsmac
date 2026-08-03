@@ -721,6 +721,16 @@ still-open VM-boot gate and an end-to-end "connect a real NTFS drive" walkthroug
   user-selected `.json` destination. Cancellation writes nothing and ntfsmac never uploads the
   report. The JSON contains the existing CLI health fields, including `macos_version`; no mount,
   helper, XPC, signing, network-policy, or deployment-target behavior changed.
+- **Privacy-safe diagnostic/version polish follow-up (2026-08-03)** — schema 2 adds the canonical
+  release/build, macOS version, architecture, helper presence, fixed internal names for missing or
+  quarantined runtime components, a yes/no VPN-default-route signal, and active NFS mount count.
+  CLI text, CLI JSON, the GUI summary, and Command-click export use the same fields. Reports omit
+  usernames, hardware/serial/device/volume identity, mount paths, and VPN/interface/address/DNS/
+  route details. Settings shows the same release/build in secondary text, and packaging now
+  hard-stops if the canonical CLI version differs from either GUI or helper Info.plist metadata.
+  SMJobBless still installs the helper as a standalone `TOOL`; macOS may therefore show a generic
+  icon plus `com.khr898.ntfsmac.helper` in Full Disk Access. The app now explains the exact entry;
+  no signature/resource-fork workaround or privilege-architecture migration was introduced.
 
 ## DECISIONS
 

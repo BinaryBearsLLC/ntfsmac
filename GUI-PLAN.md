@@ -105,6 +105,12 @@ text without widening the popover.
 | Show speed in menu bar | Toggle | Off |
 | Reinstall privileged helper | Button | — |
 
+The diagnostic panel renders the same privacy-safe schema exported by Command-click Diagnose:
+release/build, macOS and architecture, helper presence, fixed runtime component failures,
+kernel/bridge state, a yes/no VPN tunnel signal, and the active NFS mount count. It never displays
+or exports usernames, serials, volume/device identity, local paths, VPN identity, addresses, DNS,
+or routes.
+
 ---
 
 ## Control → privilege boundary (non-negotiable)
