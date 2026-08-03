@@ -31,6 +31,7 @@ teardown() {
   [ -x "$PREFIX_DIR/libexec/init-rootfs" ]
   [ -f "$PREFIX_DIR/lib/modules.squashfs" ]
   [ -x "$PREFIX_DIR/libexec/ntfsmac/commands/mount.sh" ]
+  [ -f "$PREFIX_DIR/libexec/ntfsmac/lib/version.sh" ]
 }
 
 @test "symlinks ntfsmac onto an already-on-PATH directory automatically" {
@@ -100,6 +101,8 @@ STUB
   [ "$status" -eq 0 ]
   run "$PREFIX_DIR/bin/ntfsmac" diagnose --json
   [[ "$output" == \{*\} ]]
+  [[ "$output" == *'"diagnostic_schema":2'* ]]
+  [[ "$output" == *'"ntfsmac_version":"1.0"'* ]]
 }
 
 @test "ntfsmac help lists every real command, none left off" {

@@ -52,6 +52,28 @@ teardown() {
   [ "$output" = "ntfsmac-gui" ]
 }
 
+@test "GUI, helper, and CLI diagnostics share one product and build version" {
+  # shellcheck source=../../cli/lib/version.sh
+  source "$REPO_ROOT/cli/lib/version.sh"
+  run /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$REPO_ROOT/gui/Info.plist"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$NTFSMAC_VERSION" ]
+  run /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$REPO_ROOT/gui/Info.plist"
+  [ "$output" = "$NTFSMAC_BUILD_VERSION" ]
+  run /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$REPO_ROOT/helper/Info.plist"
+  [ "$output" = "$NTFSMAC_VERSION" ]
+  run /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$REPO_ROOT/helper/Info.plist"
+  [ "$output" = "$NTFSMAC_BUILD_VERSION" ]
+}
+
+@test "package-app hard-stops before build when canonical version metadata drifts" {
+  local mismatched_version="$OUT_DIR/mismatched-version.sh"
+  printf 'NTFSMAC_VERSION="999"\nNTFSMAC_BUILD_VERSION="999"\nNTFSMAC_DIAGNOSTIC_SCHEMA_VERSION="2"\n' > "$mismatched_version"
+  NTFSMAC_VERSION_LIB="$mismatched_version" run "$SCRIPT"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"does not match canonical"* ]]
+}
+
 @test "ad-hoc signs the helper binary, the gui binary, and the outer bundle" {
   run "$SCRIPT"
   [ "$status" -eq 0 ]

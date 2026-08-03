@@ -8,6 +8,7 @@ public struct PreferencesView: View {
     @ObservedObject public var installer: HelperInstaller
     @ObservedObject public var uninstaller: HelperUninstaller
     public let onBack: (() -> Void)?
+    public let productVersion: ProductVersion
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var isConfirmingUninstall = false
@@ -18,10 +19,27 @@ public struct PreferencesView: View {
         uninstaller: HelperUninstaller,
         onBack: (() -> Void)?
     ) {
+        self.init(
+            settings: settings,
+            installer: installer,
+            uninstaller: uninstaller,
+            onBack: onBack,
+            productVersion: .current()
+        )
+    }
+
+    public init(
+        settings: Settings,
+        installer: HelperInstaller,
+        uninstaller: HelperUninstaller,
+        onBack: (() -> Void)?,
+        productVersion: ProductVersion
+    ) {
         self.settings = settings
         self.installer = installer
         self.uninstaller = uninstaller
         self.onBack = onBack
+        self.productVersion = productVersion
     }
 
     /// Source-compatible initializer for existing embeddings. The production app always supplies
@@ -47,7 +65,14 @@ public struct PreferencesView: View {
                 }
 
                 Spacer()
-                Text("Settings").font(.system(size: 13, weight: .semibold))
+                VStack(spacing: 1) {
+                    Text("Settings")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(productVersion.settingsText)
+                        .font(.system(size: 9, weight: .regular))
+                        .foregroundStyle(.secondary.opacity(0.72))
+                        .accessibilityLabel("ntfsmac \(productVersion.settingsText)")
+                }
                 Spacer()
 
                 // Balance the Back pill so the title stays centered without adding a second

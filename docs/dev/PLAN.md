@@ -435,11 +435,13 @@ sha256-checked downloads verified by checksum assertions, not unit tests).
 #### `2-diagnose`
 - **Deps:** `2-device-validation` · **Tier:** medium
 - **Files:** `cli/commands/diagnose.sh`, `tests/cli/diagnose.bats`
-- **Do:** report vendor binaries present, vmnet-helper reachable, bridge up, kernel pin match,
-  quarantine xattr status, current mounts; provide `--json` output (consumed later by GUI feature 7);
-  exit code reflects health.
+- **Do:** report the canonical release/build and schema, macOS version, arm64 architecture,
+  privileged-helper presence, fixed runtime component names for missing/quarantined binaries,
+  bridge and kernel-pin state, a yes/no VPN tunnel signal, and active NFS mount count; provide
+  privacy-safe `--json` output (consumed later by GUI feature 7); exit code reflects health.
 - **Don't:** perform any privileged op (diagnose is read-only).
-- **Acceptance:** `diagnose.bats` covers healthy + each degraded branch and the JSON shape.
+- **Acceptance:** `diagnose.bats` covers healthy + each degraded branch, the versioned JSON shape,
+  and exclusion of local paths, user/device identity, and network details.
 
 #### `2-install-sh`
 - **Deps:** `2-mount`, `2-unmount`, `2-diagnose` · **Tier:** medium
@@ -554,7 +556,9 @@ sha256-checked downloads verified by checksum assertions, not unit tests).
   `gui/Tests/DeveloperDiagnoseExportTests.swift`
 - **Do:** run `ntfsmac diagnose --json`, render a plain-language summary; reachable from idle + error
   states; non-privileged. A Command-click on Diagnose may save that same JSON to a user-selected
-  local file for developer support; it must never upload the report automatically.
+  local file for developer support; it must never upload the report automatically. Render the
+  release/build, OS/architecture, helper, named runtime components, kernel/bridge, VPN boolean,
+  and NFS count without rendering or exporting user, device, volume, path, or network identity.
 - **Acceptance:** `DiagnoseRunnerTests` parse sample diagnose JSON (healthy + degraded) into summary
   rows; developer-export tests preserve the CLI fields, reject invalid JSON, and write only to the
   explicitly selected destination.
@@ -571,11 +575,13 @@ sha256-checked downloads verified by checksum assertions, not unit tests).
 #### `3-preferences`
 - **Deps:** `3-menubar-shell`, `3-first-run-install` · **Tier:** medium
 - **Files:** `gui/Preferences/PreferencesView.swift`, `gui/Preferences/Settings.swift`, `gui/Tests/SettingsTests.swift`
-- **Do:** controls with GUI-PLAN defaults — Launch at login (off), Default mount mode (Read-write),
+- **Do:** show the release/build below the Settings title as small secondary text; controls with
+  GUI-PLAN defaults — Launch at login (off), Default mount mode (Read-write),
   Default mount point (`/Volumes/<label>`), Show speed in menu bar (off), Reinstall privileged helper
   (button → `3-first-run-install`); persist via `@AppStorage`/UserDefaults.
 - **Don't:** add controls beyond the GUI-PLAN table.
-- **Acceptance:** `SettingsTests` assert defaults + persistence round-trip.
+- **Acceptance:** `SettingsTests` assert defaults + persistence round-trip; `ProductVersionTests`
+  assert bundle metadata formatting and the build gate rejects GUI/helper/CLI version drift.
 
 #### `3-liquid-glass`  ← styling pass, last, solo
 - **Deps:** all Phase 3 feature units · **Tier:** medium

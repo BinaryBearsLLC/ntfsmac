@@ -32,7 +32,29 @@ plist_get() {
   /usr/libexec/PlistBuddy -c "Print :$2" "$1"
 }
 
+validate_product_versions() {
+  local version_lib="${NTFSMAC_VERSION_LIB:-$REPO_ROOT/cli/lib/version.sh}"
+  if [[ ! -r "$version_lib" ]]; then
+    echo "package-app: HARD-STOP — product version source missing: $version_lib" >&2
+    return 1
+  fi
+  # shellcheck disable=SC1090
+  source "$version_lib"
+
+  local plist release build
+  for plist in "$REPO_ROOT/gui/Info.plist" "$REPO_ROOT/helper/Info.plist"; do
+    release="$(plist_get "$plist" CFBundleShortVersionString)" || return 1
+    build="$(plist_get "$plist" CFBundleVersion)" || return 1
+    if [[ "$release" != "$NTFSMAC_VERSION" || "$build" != "$NTFSMAC_BUILD_VERSION" ]]; then
+      echo "package-app: HARD-STOP — $(basename "$(dirname "$plist")") version $release ($build) does not match canonical $NTFSMAC_VERSION ($NTFSMAC_BUILD_VERSION)" >&2
+      return 1
+    fi
+  done
+}
+
 main() {
+  validate_product_versions || exit 1
+
   local manifest_file="$REPO_ROOT/helper/GeneratedCLIManifest.swift"
   local restore_manifest=1
   [[ -n "${NTFSMAC_KEEP_GENERATED_MANIFEST:-}" ]] && restore_manifest=0
