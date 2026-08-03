@@ -13,12 +13,11 @@ set -u
 
 # Filesystems ntfsmac mounts: NTFS + BitLocker + ext2/3/4 (kernel auto-detect, no --fs-driver).
 # The real anylinuxfs TYPE column is NOT always a single blkid fstype token: for NTFS, blkid's
-# fs_type is empty in this build, so darwin::augment_line falls back to the raw GPT type name
-# "Microsoft Basic Data" (vendor/.../diskutil/darwin.rs: fs_type.unwrap_or(part_type)). The
-# parser captures the whole TYPE+NAME blob and derives fstype from it — the "Microsoft Basic
-# Data" prefix is exactly what the server's own --microsoft filter keys on (WINDOWS_FS_TYPES
-# in vendor/.../diskutil/mod.rs), so matching it client-side replicates --microsoft's
-# reliability without a second anylinuxfs call. Note: "Microsoft Basic Data" is the GPT type
+# fs_type can be empty, so darwin::augment_line falls back to the raw partition type name:
+# "Microsoft Basic Data" on GPT and "Windows_NTFS" on MBR. The parser captures the whole
+# TYPE+NAME blob and derives fstype from it — both prefixes are in the server's own
+# WINDOWS_FS_TYPES set, so matching them client-side replicates --microsoft's reliability
+# without a second anylinuxfs call. Note: "Microsoft Basic Data" is the GPT type
 # for ntfs AND exfat; when blkid resolves exfat it surfaces as "exfat" and is dropped by the
 # allow-set, but the rare GPT-fallback case can't distinguish the two (same limitation as the
 # server's --microsoft filter). Keep this array and DriveListParser's allowedFsTypes in sync
@@ -73,7 +72,8 @@ list_mountable_drives() {
       local blob="${BASH_REMATCH[1]}" size="${BASH_REMATCH[2]}" ident="${BASH_REMATCH[3]}"
       [[ "$ident" =~ ^disk[0-9]+s[0-9]+$ ]] || continue
       # Derive fstype + label from the TYPE+NAME blob. The GPT type name "Microsoft Basic
-      # Data" covers ntfs AND exfat (both use that GPT type). exfat is out of scope — when
+      # Data" covers ntfs AND exfat (both use that GPT type), while "Windows_NTFS" is emitted
+      # for MBR NTFS partitions. exfat is out of scope — when
       # blkid resolves it, it surfaces as "exfat" and is dropped by NTFSMAC_ALLOWED_FS_TYPES;
       # the rare GPT-fallback case can't distinguish ntfs from exfat (same limitation as the
       # server's --microsoft filter). Match it as a prefix — same key the server filter uses,
@@ -83,6 +83,9 @@ list_mountable_drives() {
       if [[ "$blob" == "Microsoft Basic Data"* ]]; then
         fstype="ntfs"
         label="${blob#Microsoft Basic Data}"
+      elif [[ "$blob" == "Windows_NTFS"* ]]; then
+        fstype="ntfs"
+        label="${blob#Windows_NTFS}"
       elif [[ "$blob" == "BitLocker"* ]]; then
         fstype="BitLocker"
         label="${blob#BitLocker}"

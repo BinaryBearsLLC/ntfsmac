@@ -118,12 +118,12 @@ $NTFSMAC_PREFIX/bin/anylinuxfs list             # should list your drive as ntfs
                                                  # folded in here)
 ```
 
-Verified, no fix needed: `anylinuxfs list --microsoft` (what the GUI's `DriveScanner` also calls)
-already lists every "Windows Basic Data" partition — `diskutil` names GPT Windows partitions
-`Microsoft Basic Data` and legacy MBR ones `Windows_NTFS`/`Windows_FAT_32`; vendor's own
-`WINDOWS_PART_TYPES` filter (`vendor/src/anylinuxfs/anylinuxfs/src/diskutil/mod.rs:288-293`)
-already matches all three, restricted to `ntfs`/`exfat`/`BitLocker` filesystems
-(`WINDOWS_FS_TYPES`). Nothing to change here.
+Fixed: `anylinuxfs list` can preserve the raw partition type when blkid does not return an NTFS
+fstype. GPT partitions then appear as `Microsoft Basic Data`, while real MBR NTFS media appears
+as `Windows_NTFS`. The GUI and CLI parsers already normalized the GPT prefix but treated the MBR
+prefix as an unknown fstype and silently dropped the drive. Both parsers now normalize
+`Windows_NTFS` to `ntfs` and preserve any following volume label. Regression fixtures mirror two
+real external MBR disks: an unlabeled 248 GB `disk4s1` and labeled 8.1 GB `USB_8GB`/`disk5s1`.
 
 Fixed — confirmed a real code bug, not a Parallels/nested-virtualization environment issue as
 first suspected (ruled out: confirmed this exact run was on the bare Apple Silicon Mac Terminal).
@@ -267,8 +267,8 @@ The menu-bar icon itself uses a placeholder SF Symbol for now — see "app icon"
    `NTFSMAC_PREFIX=/usr/local/ntfsmac ./install.sh` (real `sudo`-writable location, may need
    `sudo` for `/usr/local`) once, or tell me and I'll check what `HelperClient`/`HelperService`
    actually expect before you do anything destructive to `/usr/local`.
-2. Popover should show your drive in the list (same `anylinuxfs list --microsoft` data Part A's
-   `list` command showed). Click `[Mount]`.
+2. Popover should show your drive in the list (the same filtered `anylinuxfs list` data Part A's
+   `list` command showed, including MBR `Windows_NTFS`). Click `[Mount]`.
 3. Icon should pulse blue while mounting, then turn green with the drive shown as mounted, a
    live (if idle) speed bar, and security indicators.
 4. Click `Open in Finder` — a real Finder window should reveal the mount point.
