@@ -30,9 +30,9 @@ anything this file does not state. Follow these rules literally.
    unit) pass. Code with no passing check is unfinished — do not emit a completion signal.
 4. **Obey the locked non-negotiables in §1.** They are settled. Do not "optimize," swap, or
    question them. Violating one is an automatic merge rejection.
-5. **When blocked or unsure, STOP and write to `SHARED_TASK_NOTES.md`** under `## BLOCKED`, then
-   emit `NTFSMAC_UNIT_BLOCKED:<unit-id>`. Do **not** proceed on a guess. A blocked unit is a
-   success; a hallucinated unit is a failure that corrupts the build.
+5. **When blocked or unsure, STOP** and emit `NTFSMAC_UNIT_BLOCKED:<unit-id>`, recording the
+   reason in the PR. Do **not** proceed on a guess. A blocked unit is a success; a hallucinated
+   unit is a failure that corrupts the build.
 
 ### 0.2 Never do these (auto-reject list)
 
@@ -48,11 +48,11 @@ anything this file does not state. Follow these rules literally.
 - ❌ Never add a new external dependency, Cargo feature, or Alpine package that is not already
   justified in `build/AUDIT.md`. Adding one is a HARD-STOP (§0.3).
 - ❌ Never create a new top-level `*.md` planning document. The only markdown files this build
-  creates are build artifacts explicitly named in a unit (`build/AUDIT.md`, `SHARED_TASK_NOTES.md`).
+  creates are build artifacts explicitly named in a unit (`build/AUDIT.md`).
 
-### 0.3 HARD-STOP triggers — stop and ask Kaveen, never auto-proceed
+### 0.3 HARD-STOP triggers — stop and ask the maintainer, never auto-proceed
 
-Emit `NTFSMAC_UNIT_BLOCKED:<unit-id>`, record the reason in `SHARED_TASK_NOTES.md`, and wait if:
+Emit `NTFSMAC_UNIT_BLOCKED:<unit-id>`, record the reason in the PR, and wait if:
 
 - A `build/sources.lock` pin you need (version / commit / sha256 / digest) is empty or missing.
 - Dropping the `-F freebsd` Cargo feature does **not** compile clean (keep the flag, log why — §V).
@@ -62,16 +62,10 @@ Emit `NTFSMAC_UNIT_BLOCKED:<unit-id>`, record the reason in `SHARED_TASK_NOTES.m
 - A destructive git operation (force-push, history rewrite, branch delete) would be required.
 - Any instruction you were given conflicts with §1 (locked non-negotiables). §1 wins; stop.
 
-### 0.4 Orientation: use graphify, not blind reads
-
-`graphify-out/graph.json` exists. To understand how something connects, run
-`graphify query "<question>"` or `graphify explain "<concept>"` **before** reading source files.
-Read a raw file only to edit it or to check a specific line. This applies to sub-agents too.
-
-### 0.5 What "done" looks like for a unit
+### 0.4 What "done" looks like for a unit
 
 1. All acceptance checks in the unit pass locally / in CI.
-2. `build/sources.lock`, `build/AUDIT.md`, and `SHARED_TASK_NOTES.md` updated if the unit says so.
+2. `build/sources.lock`, `build/AUDIT.md` updated if the unit says so.
 3. A de-sloppify pass has removed slop (see §7.2).
 4. Branch lands on `main`. Then, and only then, emit `NTFSMAC_UNIT_COMPLETE:<unit-id>`.
 
@@ -91,11 +85,12 @@ Copied from `CLAUDE.md`. These bind every unit.
 | L6 | **Device names validated against `^disk[0-9]+s[0-9]+$`** before any shell invocation — in the CLI **and** the GUI/helper (both, independently). |
 | L7 | **Platform:** Apple Silicon (arm64) only, macOS 13.0+. No Intel fallback paths. |
 | L8 | **Security & connection stability outrank speed.** Speed tuning (rsize/wsize/async export) is opt-in, documented as risk, never silently defaulted on. |
-| L9 | **Vendored sources are exactly those in the `CLAUDE.md` table.** No forks/mirrors without an explicit Kaveen sign-off. Drop `freebsd-bootstrap`, `vmproxy-bsd`, and never fetch `init-freebsd`. |
+|     | **Owner override (2026-08-02):** the near-zero-risk subset `rsize`/`wsize`/`readahead` is now **default-on** in `cli/lib/nfs-mount.sh` (`rsize=1048576,wsize=1048576,readahead=16`). Transfer-unit size + read prefetch only — no data-integrity surface, kernel auto-negotiates down — distinct from the `async` export data-loss class L8 protects. `async` export remains opt-in/absent. Both CLI and GUI inherit it via the shared mount layer; no GUI control added. |
+| L9 | **Vendored sources are exactly those in the `CLAUDE.md` table.** No forks/mirrors without an explicit maintainer sign-off. Drop `freebsd-bootstrap`, `vmproxy-bsd`, and never fetch `init-freebsd`. |
 | L10 | **Repo owner is `khr898`.** Repo `github.com/khr898/ntfsmac`; tap `khr898/ntfsmac`. No `YOURUSERNAME` literals. |
 
 > SMJobBless note (non-blocking): `SMJobBless` is legacy on macOS 13+; `SMAppService` is the modern
-> equivalent. `CLAUDE.md` mandates SMJobBless, so it stays. If Kaveen later approves `SMAppService`,
+> equivalent. `CLAUDE.md` mandates SMJobBless, so it stays. If the maintainer later approves `SMAppService`,
 > that is a §3 change and a HARD-STOP until approved — not an implementer's call.
 
 ---
@@ -273,9 +268,9 @@ sha256-checked downloads verified by checksum assertions, not unit tests).
 - **Do:** define the pin table with keys: `anylinuxfs` (commit), `libkrun` (commit), `libkrunfw`
   (version+sha256, **nohajc fork**), `vmnet-helper` (version+sha256, **nirs**), `gvproxy` (`v0.8.9`
   commit), `alpine` (tag+digest). Write `lock.sh get <key>`.
-- **Don't:** invent any pin value — leave unknown pins as an explicit `TODO-KAVEEN` placeholder and
-  record them under `## OPEN PINS` in `SHARED_TASK_NOTES.md`. A `TODO-KAVEEN` pin is a HARD-STOP for
-  any unit that consumes it (§0.3). Do **not** add an `init-freebsd` key.
+- **Don't:** invent any pin value — leave unknown pins as an explicit `TODO-UNRESOLVED` placeholder
+  and record them under `## OPEN PINS` in the PR. A `TODO-UNRESOLVED` pin is a HARD-STOP for any
+  unit that consumes it (§0.3). Do **not** add an `init-freebsd` key.
 - **Acceptance:**
   - `lock.sh get <key>` returns each pinned value.
   - `lock.bats` asserts every required key present; asserts `init-freebsd` **absent**; asserts no key
@@ -320,7 +315,7 @@ sha256-checked downloads verified by checksum assertions, not unit tests).
   `alpine-packages.trimmed.txt`.
 - **Don't:** cut any package on name alone — verify it isn't a transitive dep first. Any cut **beyond**
   the settled list (`freebsd-bootstrap`, `vmproxy-bsd`, `-F freebsd`) is a HARD-STOP: flag it for
-  Kaveen, do not auto-apply.
+  the maintainer, do not auto-apply.
 - **Acceptance:** `AUDIT.md` covers every package with a justification; `freebsd` feature marked
   test-drop; `blkid` explicitly kept; `alpine-packages.trimmed.txt` written.
 
@@ -331,7 +326,7 @@ sha256-checked downloads verified by checksum assertions, not unit tests).
   both at the `sources.lock` version; verify sha256 against the lock **before** unpacking; abort +
   delete on mismatch.
 - **Don't:** fetch from `containers/libkrunfw`; fetch `init-freebsd`; proceed if the pin is
-  `TODO-KAVEEN` (HARD-STOP).
+  `TODO-UNRESOLVED` (HARD-STOP).
 - **Acceptance:** `fetch-prebuilt.bats` feeds a wrong-checksum fixture and asserts abort + non-zero
   exit + no artifact left behind.
 
@@ -340,7 +335,7 @@ sha256-checked downloads verified by checksum assertions, not unit tests).
 - **Files:** `build/build-gvproxy.sh`, `tests/build/gvproxy.bats`
 - **Do:** build from `containers/gvisor-tap-vsock` at the lock commit/tag (`v0.8.9`) → `vendor/bin/gvproxy`;
   cross-check the tag against anylinuxfs's `download-dependencies.sh` and warn on drift.
-- **Don't:** substitute a different version without a Kaveen sign-off.
+- **Don't:** substitute a different version without a maintainer sign-off.
 - **Acceptance:** `gvproxy.bats` asserts `file vendor/bin/gvproxy` reports `arm64` and it is executable.
 
 #### `v-alpine-rootfs`
@@ -467,8 +462,8 @@ sha256-checked downloads verified by checksum assertions, not unit tests).
 #### `2-brew-formula`
 - **Deps:** `2-install-sh`, `2-signing` · **Tier:** medium
 - **Files:** `Formula/ntfsmac.rb`, `tests/formula.bats` — live in the separate
-  `khr898/homebrew-ntfsmac` tap repo, not this one (see `docs/dev/TAP_SETUP.md`); this repo keeps
-  `install.sh` as its own direct CLI install path.
+  `khr898/homebrew-ntfsmac` tap repo, not this one; this repo keeps `install.sh` as its own
+  direct CLI install path.
 - **Do:** formula lives in the **tap** `khr898/ntfsmac`; installs the ad-hoc-signed CLI; `brew audit
   --strict` clean; post-install verifies no quarantine xattr.
 - **Don't:** target homebrew-core; produce a cask (L4).
@@ -616,20 +611,9 @@ stray debug output; **keep** real business-logic and security tests.
 
 ### 7.4 Guardrails
 - Per unit: `--max-runs 6`; `--max-cost` by tier — trivial $2 / small $5 / medium $12 / large $25.
-- Hard stops that escalate to Kaveen and never auto-proceed (also see §0.3): destructive git ops;
+- Hard stops that escalate to the maintainer and never auto-proceed (also see §0.3): destructive git ops;
   any signing/entitlement/XPC change deviating from §3/L4/L5; unfilled `sources.lock` pins
-  (`TODO-KAVEEN`); a `-F freebsd` drop that won't compile clean.
-
-### 7.5 Cross-iteration memory — `SHARED_TASK_NOTES.md` (`docs/dev/`, alongside this file)
-Updated at the end of every iteration. A fresh worker reads it first. Sections:
-- `## GATES` — restate GATE-CLI-BEFORE-GUI and Phase-1-deferrable at the top, always.
-- `## PROGRESS` — checklist mirroring §6 unit ids with landed / blocked status.
-- `## DECISIONS` — audit cuts confirmed (`v-audit`), whether `-F freebsd` was dropped or kept-with-reason,
-  resolved `sources.lock` pins, any forced macOS-target bump.
-- `## OPEN PINS` — `TODO-KAVEEN` items still blocking.
-- `## FIXTURES` — reusable bats mocks (anylinuxfs/mount) + the Swift `HelperClient` mock, so later units
-  don't re-invent them.
-- `## BLOCKED` — current HARD-STOPs awaiting Kaveen.
+  (`TODO-UNRESOLVED`); a `-F freebsd` drop that won't compile clean.
 
 ---
 
@@ -643,20 +627,20 @@ Updated at the end of every iteration. A fresh worker reads it first. Sections:
 | R4 | Upstream drift (anylinuxfs / gvproxy / libkrunfw) | High | Everything pinned in `sources.lock`; Cargo.lock exact commit for libkrun; verify gvproxy vs anylinuxfs download script. |
 | R5 | Dependency bloat / building unneeded FreeBSD & fs tooling | Med | Mandatory `v-audit`; settled cuts; justify every artifact in `AUDIT.md`; verify transitive deps before cutting (blkid stays). |
 | R6 | Dirty NTFS mounted r/w → corruption | High | Detect dirty flag; default RO + explicit warning (prototype RO/dirty state); user opts into rw knowingly. |
-| R7 | Speed tuning corrupts on unstable link | Med | Off by default; opt-in only; documented as risk (L8). |
+| R7 | Speed tuning corrupts on unstable link | Med | `async` export (the data-loss lever) stays off/absent. `rsize`/`wsize`/`readahead` defaulted on via L8 owner override — no integrity surface, so no corruption risk on unstable link. |
 | R8 | vmnet bridge leaks to other interfaces | Med | Phase 1 pf anchor scopes to the `/30`; route cleanup on teardown. Flag if deferred. |
-| R9 | SMJobBless legacy on 13+ | Med | Keep SMJobBless per CLAUDE.md; isolate behind one Swift module; `SMAppService` swap is a Kaveen decision. |
+| R9 | SMJobBless legacy on 13+ | Med | Keep SMJobBless per CLAUDE.md; isolate behind one Swift module; `SMAppService` swap is a maintainer decision. |
 | R10 | GUI drifts from locked design | Low | Already-built screens are source of truth (`ui/prototype.html` removed 2026-07-13); no redesign. |
 
 ---
 
 ## §9 — Open decisions (resolve before / during the loop)
 
-These are **not** implementer guesses — they are Kaveen calls. Until resolved, dependent units HARD-STOP.
+These are **not** implementer guesses — they are maintainer calls. Until resolved, dependent units HARD-STOP.
 
 1. **`sources.lock` pins** — libkrunfw version+sha256, vmnet-helper version+sha256, anylinuxfs commit,
    libkrun commit, gvproxy commit, alpine tag+digest. `v-fetch-prebuilt` / `v-alpine-rootfs` cannot run
-   until filled (currently `TODO-KAVEEN`).
+   until filled (currently `TODO-UNRESOLVED`).
 2. **`-F freebsd` drop** — test-first in `v-anylinuxfs-build`; if it won't compile clean, keep the flag
    and log why (do not block the whole phase on it).
 3. **Phase 1 timing** — this plan treats pf hardening as post-Phase-2, non-blocking. Confirm, or say if

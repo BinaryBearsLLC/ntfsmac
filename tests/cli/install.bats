@@ -113,6 +113,15 @@ STUB
   [[ "$output" == *"uninstall"* ]]
 }
 
+@test "ntfsmac mount help reflects NTFS and ext support" {
+  run "$SCRIPT"
+  [ "$status" -eq 0 ]
+  run "$PREFIX_DIR/bin/ntfsmac" help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"NTFS"* ]]
+  [[ "$output" == *"ext"* ]]
+}
+
 @test "ntfsmac with no args and --help both show the same help" {
   run "$SCRIPT"
   [ "$status" -eq 0 ]

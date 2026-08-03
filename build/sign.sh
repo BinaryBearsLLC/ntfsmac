@@ -22,10 +22,10 @@
 # `#cgo darwin LDFLAGS: -framework Hypervisor`. Upstream's own build-app.sh signs it
 # with the identical entitlements plist for this reason.
 #
-# Decided 2026-07-10 (Kaveen, via AskUserQuestion): add the entitlement now rather than
+# Decided 2026-07-10 (maintainer, via AskUserQuestion): add the entitlement now rather than
 # leave it deferred, so GATE-CLI-BEFORE-GUI can actually fire. Recorded here since this
 # deviates from PLAN.md's literal 2-signing Do/Don't/Acceptance wording, which didn't
-# originally mention entitlements at all — see SHARED_TASK_NOTES.md.
+# originally mention entitlements at all — see build/AUDIT.md.
 set -uo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)

@@ -16,7 +16,7 @@ public enum TooltipCopy {
         case .settings:
             "Open Settings"
         case .refresh:
-            "Scan again for connected NTFS drives"
+            "Scan again for supported drives"
         case .diagnose:
             "Check runtime components and the private network"
         case .mount:
@@ -32,27 +32,13 @@ public enum TooltipCopy {
 
     public static func status(for state: MountState) -> String {
         switch state {
-        case .idle: "Idle — no drive is mounted"
+        case .idle: "Idle — no supported drive is mounted"
         case .mounting: "Mount in progress"
-        case .mountedReadWrite: "Drive mounted read/write"
-        case .mountedReadOnly: "Drive deliberately mounted read-only"
-        case .mountedReadOnlyDirty: "Drive mounted read-only because its journal is unclean"
+        case .mountedReadWrite: "All mounted drives are read/write"
+        case .mountedReadOnly: "At least one mounted drive is read-only"
+        case .mountedReadOnlyDirty: "At least one mounted NTFS drive has an unclean journal"
         case .error: "ntfsmac needs attention"
         }
     }
 
-    public static func diagnosticExplanation(for rowID: String) -> String {
-        switch rowID {
-        case "binaries":
-            "The four runtime components required by ntfsmac"
-        case "quarantine":
-            "Whether macOS quarantine can block a required runtime component"
-        case "kernel":
-            "Whether the installed kernel bundle matches the version tested by the project"
-        case "bridge":
-            "The private host-only network used for NFS traffic to the microVM"
-        default:
-            "Diagnostic status"
-        }
-    }
 }

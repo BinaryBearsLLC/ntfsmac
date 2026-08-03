@@ -8,6 +8,38 @@ import AppKit
 /// Header status dot (comp's `dotPulseGreen`/`dotPulseYellow` keyframes) — pulses for every
 /// active/mounted state, static for idle/error, same opacity-fade technique `StatusIconView`
 /// already uses for the tray icon (no `.symbolEffect`, stays macOS 13.0-compatible).
+/// No-drives empty-state copy, extracted as testable constants (same pattern as
+/// `DirtyBanner.bannerCopy`) — `PopoverStateRenderTests` renders to an `ImageRenderer` image
+/// which can't be grepped for text, so the strings live here for `EmptyStateCopyTests`.
+enum EmptyStateCopy {
+    static let title = "No NTFS / ext drives connected"
+    static let subtitle = "Connect an NTFS or ext drive to\nget started"
+}
+
+/// "Other available devices" section copy — the unmounted-drives list shown below the mounted
+/// list when one or more drives are already mounted. Says "devices" (not "drives") and only
+/// renders once something is primary: before mounting, the detected drives are just "the drives",
+/// not "other", so the labeled section is suppressed in the idle state. Mirrors
+/// `EmptyStateCopy`'s testable-constant pattern.
+enum OtherAvailableCopy {
+    static let label = "Other available devices"
+}
+
+/// Pure gating decision for the "Other available devices" section, extracted from the view so the
+/// idle-vs-mounted behavior is testable without rendering an image. The section (header + small
+/// Refresh button) renders whenever a drive is mounted — it must stay visible even when no
+/// unmounted drive is currently listed, so the Refresh button stays available to re-scan for
+/// newly connected drives without unmounting first. The per-drive rows render only when
+/// `rowsRender(availableCount:)` is true (at least one unmounted drive detected).
+enum OtherAvailableSection {
+    /// Header + Refresh button render iff a drive is mounted (never in the idle state — there the
+    /// detected drives are the primary list, not "other").
+    static func shouldRender(isMounted: Bool) -> Bool { isMounted }
+
+    /// Per-drive rows render only when at least one unmounted drive is actually available.
+    static func rowsRender(availableCount: Int) -> Bool { availableCount > 0 }
+}
+
 private struct HeaderStatusDot: View {
     let color: Color
     let isPulsing: Bool
@@ -103,7 +135,6 @@ public struct PopoverContentView: View {
                 mainContent
             }
         }
-        .task(id: appState.state) { syncThroughputMonitor() }
         .onChange(of: mountController.errorMessage) { newValue in
             if newValue == "FDA_REQUIRED" {
                 showFDAPrompt = true
@@ -125,34 +156,86 @@ public struct PopoverContentView: View {
 
             Divider()
 
-            DriveListView(
-                drives: driveScanner.drives,
-                mountedDriveID: mountController.mountedDrive?.id,
-                isDirty: appState.state == .mountedReadOnlyDirty,
-                onMount: { drive in
-                    Task {
-                        await mountController.mount(
-                            drive,
-                            mountPoint: nil,
-                            readOnly: false
+            // Mounted drives — one DriveRow per drive, each with its own Unmount pill. Scales to
+            // the number of drives anylinuxfs is exporting (one microVM per mount, mixed NTFS+ext).
+            if !mountController.mountedDrives.isEmpty {
+                ForEach(mountController.mountedDrives) { entry in
+                    DriveRow(
+                        drive: entry.drive,
+                        isMounted: true,
+                        isDirty: entry.isDirty,
+                        onUnmount: { Task { await mountController.unmount(driveID: entry.id) } },
+                        onMountAnyway: { remountController.requestRemount() }
+                    )
+                }
+            }
+
+            // Before anything is mounted: the detected drives are the primary list, not "other" —
+            // nothing is primary yet, so no "Other available" section header. Each row is a
+            // mountable DriveRow, with a Refresh pill (icon + "Refresh" text, same shape as the
+            // no-drives empty-state Refresh) above the list so the user can re-scan before mounting.
+            if mountController.mountedDrives.isEmpty && !driveScanner.drives.isEmpty {
+                HStack(spacing: 6) {
+                    Spacer()
+                    Button {
+                        Task { await driveScanner.refresh() }
+                    } label: {
+                        HStack(spacing: 6) {
+                            RefreshGlyph()
+                            Text("Refresh")
+                        }
+                    }
+                    .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                }
+                ForEach(driveScanner.drives) { drive in
+                    DriveRow(
+                        drive: drive,
+                        isMounted: false,
+                        onMount: { mountDrive(drive) }
+                    )
+                }
+            }
+
+            // Mounted: the "Other available devices" header + small Refresh button render below the
+            // mounted list, above SecurityIndicators — and STAY rendered even when no unmounted
+            // drive is currently listed, so the Refresh button stays available to re-scan for newly
+            // connected drives. The per-drive rows render only when an unmounted drive is detected.
+            if OtherAvailableSection.shouldRender(isMounted: !mountController.mountedDrives.isEmpty) {
+                Divider()
+                HStack(spacing: 6) {
+                    Text(OtherAvailableCopy.label)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button {
+                        Task { await driveScanner.refresh() }
+                    } label: {
+                        RefreshGlyph()
+                    }
+                    .buttonStyle(.glassIcon(colorScheme: colorScheme))
+                }
+                if OtherAvailableSection.rowsRender(availableCount: otherAvailableDrives.count) {
+                    ForEach(otherAvailableDrives) { drive in
+                        DriveRow(
+                            drive: drive,
+                            isMounted: false,
+                            onMount: { mountDrive(drive) }
                         )
                     }
-                },
-                onUnmount: { _ in Task { await mountController.unmount() } },
-                onMountAnyway: { remountController.requestRemount() }
-            )
+                }
+            }
 
-            if mountController.mountedDrive != nil {
+            if mountController.mountedDrives.isEmpty && driveScanner.drives.isEmpty {
+                emptyState
+            }
+
+            if !mountController.mountedDrives.isEmpty {
                 Divider()
-                SpeedBar(appState: appState, monitor: throughputMonitor)
-                Divider()
-                // Phase 1 (pf/route hardening) is deferrable/non-blocking (SHARED_TASK_NOTES.md
-                // GATES section) and `diagnose.sh` doesn't currently surface its state at all
+                // Phase 1 (pf/route hardening) is deferrable/non-blocking (PLAN.md) and
+                // `diagnose.sh` doesn't currently surface its state at all
                 // (confirmed by `3-security-indicators`) — `.unknown` for both is the only
                 // honest value available today, never a fabricated `.enforced`.
                 SecurityIndicatorsView(isolatedNetwork: .unknown, vpnBypass: .unknown)
-            } else if driveScanner.drives.isEmpty {
-                emptyState
             }
 
             if let errorMessage = mountController.errorMessage ?? remountController.errorMessage, errorMessage != "FDA_REQUIRED" {
@@ -201,6 +284,17 @@ public struct PopoverContentView: View {
         }
     }
 
+    /// Drives the scanner sees that aren't currently mounted — the "Other available" section.
+    private var otherAvailableDrives: [Drive] {
+        driveScanner.drives.filter { !mountController.mountedDriveIDs.contains($0.id) }
+    }
+
+    /// Mount an unmounted drive r/w at its default mount point. Shared by the idle primary list
+    /// and the mounted "Other available devices" section — both offer the same per-row Mount action.
+    private func mountDrive(_ drive: Drive) {
+        Task { await mountController.mount(drive, mountPoint: nil, readOnly: false) }
+    }
+
     private var headerSubtitle: String {
         switch appState.state {
         case .idle:
@@ -227,8 +321,8 @@ public struct PopoverContentView: View {
             .frame(width: 44, height: 44)
 
             VStack(spacing: 4) {
-                Text("No NTFS drives connected").font(.system(size: 12.5, weight: .medium)).foregroundStyle(.secondary)
-                Text("Connect an NTFS drive to\nget started")
+                Text(EmptyStateCopy.title).font(.system(size: 12.5, weight: .medium)).foregroundStyle(.secondary)
+                Text(EmptyStateCopy.subtitle)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary.opacity(0.7))
                     .multilineTextAlignment(.center)
@@ -290,14 +384,12 @@ public struct PopoverContentView: View {
         }
     }
 
-    private func syncThroughputMonitor() {
-        switch appState.state {
-        case .mounting, .mountedReadWrite, .mountedReadOnly, .mountedReadOnlyDirty:
-            throughputMonitor.start()
-        case .idle, .error:
-            throughputMonitor.stop()
-        }
-    }
+    // ponytail: throughputMonitor is retained in the init signature (not removed) because
+    // dropping it cascades to Package.swift's NtfsmacGUI sources list + ThroughputTests + the
+    // app wiring in NtfsmacApp. The Combined speed section it fed was removed per the multi-mount
+    // rework; the ThroughputMonitor subsystem is now unused UI-side. Upgrade path: remove the
+    // subsystem in one go (Package.swift source + ThroughputTests + this property + init param +
+    // NtfsmacApp StateObject + renderPopover helper).
 
     /// GUI-PLAN.md "Popover — idle": "Quit | Exit app, tear down network state". Best-effort —
     /// terminates either way so a slow/failed teardown never blocks quitting.

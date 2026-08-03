@@ -184,7 +184,7 @@ accepted the real VM password without leaking to any other window).
 `security-reviewer` pass on `HelperClient`'s XPC error-handling change (privileged-surface change,
 same standing recommendation as `stageCLI` above).
 
-## Ground rule for the audit (Kaveen's instruction, verbatim — unchanged)
+## Ground rule for the audit (maintainer's instruction, verbatim — unchanged)
 
 "I told to follow the prototype but it doesn't mean you have to invent dead buttons and exact
 icons" — every button in the real app must be wired to a real action; a control the comp shows
@@ -198,8 +198,8 @@ but the app has no real behavior for gets flagged for a decision, never a silent
    changes. Not done this session (implemented + unit-tested + live-verified, but that's not a
    substitute for independent review).
 2. Decide whether to build a mocked `MountState` preview harness to reach states 5–9 without a
-   real drive, or accept they stay untested until real hardware is available — Kaveen's call, not
-   invented here.
+   real drive, or accept they stay untested until real hardware is available — the maintainer's
+   call, not invented here.
 3. Light/dark appearance pass once states 3–9 are reachable, not worth a separate pass for just
    1/2/4/10/11.
 4. Nothing committed yet this session — diff summary owed before Gate 2 (commit).

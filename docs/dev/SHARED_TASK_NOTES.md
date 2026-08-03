@@ -5,7 +5,7 @@ every session. Updated at the end of every unit.
 
 ## GATES
 
-- **GATE-CLI-BEFORE-GUI**: **still not fired.** Kaveen's decision (2026-07-10, this
+- **GATE-CLI-BEFORE-GUI**: **still not fired.** the maintainer's decision (2026-07-10, this
   session): option (a) from below — build+vendor the real `init-rootfs` Go helper.
   Done: `build/init-rootfs.sh` already built this binary (vmrunner-sys + `go build`)
   into an ephemeral `$CACHE_DIR`, just never copied it anywhere durable — added
@@ -54,26 +54,26 @@ every session. Updated at the end of every unit.
   on the installed binary at the moment of failure (`codesign -d --entitlements` on
   `$PREFIX/libexec/init-rootfs` shows `com.apple.security.hypervisor`, verified right
   before the failing run). This means **the actual live VM boot cannot be verified from
-  inside this agent's sandboxed Bash tool, on this real M3 Pro Mac or otherwise** — it
-  needs to be run in Kaveen's own real Terminal, outside the coding-agent sandbox, where
+  inside this agent's sandboxed Bash tool, on a real Apple Silicon Mac or otherwise** — it
+  needs to be run in the maintainer's own real Terminal, outside the coding-agent sandbox, where
   `kern.hv_support` should read `1`. Repro for that real run:
   `NTFSMAC_PREFIX=$(mktemp -d); export NTFSMAC_PREFIX; ./install.sh &&
   $NTFSMAC_PREFIX/bin/anylinuxfs list`. **GATE-CLI-BEFORE-GUI still has
   not fired** — everything up to the real VM boot is now verified working; the VM boot
-  step itself is the one remaining unknown, and it's a Kaveen-in-Terminal task, not
-  further autonomous work here. Do not start Phase 3 until Kaveen confirms that repro
+  step itself is the one remaining unknown, and it's a maintainer-in-Terminal task, not
+  further autonomous work here. Do not start Phase 3 until the maintainer confirms that repro
   either succeeds or reports a *different* real error from inside a real Terminal.
   **2026-07-10, later same day — real repro attempt, found a bug in the repro line itself
   (not a code bug):** the originally-documented one-liner
   (`NTFSMAC_PREFIX=$(mktemp -d) ./install.sh && $NTFSMAC_PREFIX/bin/anylinuxfs list`)
   is broken shell usage — `VAR=val cmd1 && cmd2` scopes `VAR` to `cmd1`'s environment
   only in bash/zsh; it is never exported to the shell, so `cmd2` sees `$NTFSMAC_PREFIX`
-  as empty. Kaveen hit exactly this: `zsh: no such file or directory: /bin/anylinuxfs`.
+  as empty. the maintainer hit exactly this: `zsh: no such file or directory: /bin/anylinuxfs`.
   Also tried `$NTFSMAC_PREFIX/bin/ntfsmac list` — not a real bug either, `ntfsmac` is the
   thin dispatcher and only wires `mount`/`unmount`/`diagnose` (per `2-install-sh`); `list`
   was never in its scope, the repro must call `anylinuxfs list` directly. Repro line above
   corrected to `export` the var first. **GATE-CLI-BEFORE-GUI: real VM boot still
-  unverified** — this attempt never reached `hv_vm_create`. **2026-07-10, Kaveen decision:
+  unverified** — this attempt never reached `hv_vm_create`. **2026-07-10, maintainer decision:
   proceeding into Phase 3 (GUI) anyway, gate deliberately overridden — not resolved, a
   conscious deviation from PLAN.md §4's build-order rule.** Re-run the corrected repro
   when convenient; if it still fails with `Invalid argument (errno 22)` /
@@ -128,7 +128,7 @@ every session. Updated at the end of every unit.
       same class of issue as the earlier `graphify-out/graph.json` git-add failure.
       Real output therefore lands outside the repo (`$TMPDIR/ntfsmac-build/...`),
       not literally at `vendor/rootfs/` as PLAN.md's Do clause says — **flagging for
-      Kaveen**, this volume constraint may need a project-wide decision (e.g. a
+      the maintainer**, this volume constraint may need a project-wide decision (e.g. a
       documented dev-build-cache-dir convention) rather than a per-unit workaround.
       New toolchain dep `lld` (separate Homebrew formula from `llvm`) installed and
       added to `preflight.sh`. **Real DAG gap found:** the vendored tool's full flow
@@ -159,7 +159,7 @@ every session. Updated at the end of every unit.
       `com.apple.quarantine` xattr, `vendor/kernel/modules.squashfs` sha256 matches
       `LIBKRUNFW_MODULES_SHA256` pin exactly, `anylinuxfs --version` runs (real
       dyld/libkrun link check). `verify-vendor.bats` 5/5 green (real run, not mocked).
-      **Real finding, deliberately NOT resolved here (Kaveen confirmed, 2026-07-10):**
+      **Real finding, deliberately NOT resolved here (the maintainer confirmed, 2026-07-10):**
       `vendor/bin/anylinuxfs list` genuinely cannot succeed yet — `run_list()`
       (`main.rs:918-922`) unconditionally calls `vm_image::init()`, which requires the
       guest rootfs's real Alpine packages (`bash`, `blkid`, `cryptsetup`, `nfs-utils`,
@@ -253,7 +253,7 @@ work. `NTFSMAC_PHASE_COMPLETE:phase-1`
       binary, codesign doesn't apply). `verify-signature.sh` checks `codesign -v` passes,
       the signature is literally `Signature=adhoc` (not a real Developer ID — L4), and no
       quarantine xattr.
-      **Updated 2026-07-10 — entitlement added, Kaveen approved:** `anylinuxfs` now also
+      **Updated 2026-07-10 — entitlement added, the maintainer approved:** `anylinuxfs` now also
       gets `build/entitlements/anylinuxfs.entitlements` embedded
       (`com.apple.security.hypervisor` + `cs.disable-library-validation`) via
       `--entitlements`, still ad-hoc identity (`-s -`, L4-compliant). Real, corrected
@@ -317,7 +317,7 @@ resolved.
       `isValidUnmountTarget`, always exercised regardless. Not unit-tested (can't fake a real XPC
       connection's SecCode in XCTest) — same class of sandbox-unverifiable gap as the VM boot
       check, flagged rather than silently skipped.
-      **Kaveen decision (2026-07-10):** GUI bundles its own copies of vendor binaries into
+      **maintainer decision (2026-07-10):** GUI bundles its own copies of vendor binaries into
       `ntfsmac.app/Contents/Resources` (self-contained DMG, no Homebrew/CLI dependency) —
       but the privileged helper itself always resolves binaries at the fixed `installPrefix =
       "/usr/local/ntfsmac"` (same path `install.sh` already uses), because the helper runs
@@ -651,7 +651,7 @@ resolved.
       a screenshot diff or a committed manual sign-off checklist — this environment has no
       screenshot/rendering pipeline for a real running macOS app (same class of sandbox-unverifiable
       gap as the earlier VM-boot check), so no automated visual-parity proof is committed here.
-      **Kaveen: please eyeball the built app against `ui/prototype.html`'s dark+light comps
+      **the maintainer: please eyeball the built app against `ui/prototype.html`'s dark+light comps
       (mounted/idle/dirty/error states, Preferences window) and confirm parity** — nothing else
       blocks this, it's purely a "can't screenshot from inside this sandbox" gap, not an unfinished
       feature.
@@ -660,8 +660,8 @@ resolved.
       logic, consistent with this repo's established "views aren't directly unit-tested" convention).
 
 **Phase 3 (GUI) all units complete.** `NTFSMAC_PHASE_COMPLETE:phase-3` — GATE-CLI-BEFORE-GUI was
-deliberately overridden by Kaveen (2026-07-10, see GATES section above), so this doesn't reopen
-that question; the one remaining real gap for Kaveen is the visual sign-off just above, plus the
+deliberately overridden by the maintainer (2026-07-10, see GATES section above), so this doesn't reopen
+that question; the one remaining real gap for the maintainer is the visual sign-off just above, plus the
 still-unverified real VM boot (`kern.hv_support` sandbox limitation, also above). No further §6
 units remain in PLAN.md's task list for Phase 3.
 
@@ -725,28 +725,28 @@ still-open VM-boot gate and an end-to-end "connect a real NTFS drive" walkthroug
 - **GUI privileged self-uninstall** — Preferences → "Uninstall ntfsmac" routes through the
   already-authorized helper (`removeDependencies` then `uninstallHelper`, ordering enforced in
   code) so dragging the `.app` to Trash afterward leaves nothing. Security-reviewed (approve).
-  **Real, un-resolved policy flag for Kaveen, not decided here:** these 2 new actions are
+  **Real, un-resolved policy flag for the maintainer, not decided here:** these 2 new actions are
   irreversible and system-wide, and sit behind the same best-effort, ad-hoc-signing-only identity
   check (`verifyClientIdentity`) that was previously only gating reversible actions
   (mount/unmount/pf toggle). That check's weakness was already accepted for L4 (ad-hoc signing, no
   cert chain) — this raises what it now guards. Worth a conscious go/no-go, not a silent ship.
-- **`ui/prototype.html` deleted (Kaveen, 2026-07-13).** The original static HTML/SVG design comp
+- **`ui/prototype.html` deleted (the maintainer, 2026-07-13).** The original static HTML/SVG design comp
   is gone — `CLAUDE.md`, `PLAN.md` (§0 header, §4 Phase 3, §6 `3-xpc-helper`/`3-liquid-glass`, R10)
   updated to point at the already-built SwiftUI screens as the visual source of truth instead.
   Anything not yet built that still needed a literal-CSS lookup from the prototype (remaining
   `3-liquid-glass` polish, any un-walked states in `docs/dev/UITest.md`) now has to go off the
-  running app + Kaveen's direction — flag if a specific value can't be recovered that way.
+  running app + the maintainer's direction — flag if a specific value can't be recovered that way.
 
 ## DECISIONS
 
 - License: MIT chosen for `p0-repo-layout` (not specified in PLAN.md/CLAUDE.md — no lock
-  rule governs it; cheap to change later, flag if Kaveen wants otherwise).
+  rule governs it; cheap to change later, flag if the maintainer wants otherwise).
 - Toolchain: `rust`, `go`, `umoci`, `gh`, `shellcheck`, `bats-core` installed via
   `brew install` on the dev machine to support Phase V/CI work (build-toolchain taps only,
   per Phase V exit criteria "zero brew taps beyond build-toolchain ones").
 - `v-audit`: Alpine packages trimmed 13→8 (kept: bash blkid cryptsetup lsblk mount nfs-utils
   ntfs-3g squashfs-tools; cut: btrfs-progs lvm2 mdadm ntfs-3g-progs zfs). Full evidence in
-  `build/AUDIT.md`. **Reversed 2026-07-10:** Kaveen wants `cryptsetup` (LUKS/BitLocker
+  `build/AUDIT.md`. **Reversed 2026-07-10:** the maintainer wants `cryptsetup` (LUKS/BitLocker
   encrypted-volume mount support) kept — don't cut features that help the experience. Re-added
   to the trimmed list. Wiring a passphrase param through the XPC mount surface is now an open
   item for Phase 2 (`2-mount`) / Phase 3 — PLAN.md's `mount(device, driver, tuning)` signature

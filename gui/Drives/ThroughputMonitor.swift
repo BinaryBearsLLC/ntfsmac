@@ -10,9 +10,9 @@ public protocol InterfaceByteCounting {
 /// for its NAT/bridged networking — documented macOS/vmnet.framework behavior, not this repo's
 /// own convention. Matching by name prefix is a heuristic: checked first whether the CLI exposes
 /// a real interface name anywhere (`RuntimeInfo` in `vendor/.../api.rs`, `diagnose.sh`) — it
-/// doesn't, so there is no exact per-mount identifier available to the GUI today. Flagged in
-/// `SHARED_TASK_NOTES.md` for verification against a real mount; sums in+out bytes across every
-/// matching interface rather than trying to pick "the one" bridge.
+/// doesn't, so there is no exact per-mount identifier available to the GUI today. Flagged for
+/// verification against a real mount; sums in+out bytes across every matching interface rather
+/// than trying to pick "the one" bridge.
 public struct RealInterfaceByteCounter: InterfaceByteCounting {
     public init() {}
 

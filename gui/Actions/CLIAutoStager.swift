@@ -44,9 +44,12 @@ public final class CLIAutoStager: ObservableObject {
 
     public func stageIfNeeded() async {
         guard !didAttempt else { return }
-        checker.check()
-        guard !checker.isInstalled else { return }
         guard bundleResourcesURL != nil else { return }
+        // Don't skip when the CLI is "installed" — it may be stale. stageCLI is idempotent: it
+        // no-ops (returns exitCode 0) when the installed CLI tree hash already matches the
+        // helper's pinned hash, and re-runs install.sh only when stale/missing. Without calling
+        // it here, a new app build re-blesses the helper but never re-stages the bundled CLI, so
+        // the installed `ntfsmac` stays old and rejects flags the new helper sends.
         didAttempt = true
         await attemptStage()
     }
@@ -76,10 +79,6 @@ public final class CLIAutoStager: ObservableObject {
 
     private func attemptStage() async {
         checker.check()
-        guard !checker.isInstalled else {
-            lastFailureReason = nil
-            return
-        }
         guard let resourcesURL = bundleResourcesURL else {
             lastFailureReason = "ntfsmac.app is missing its bundled setup resources — reinstall the app."
             return

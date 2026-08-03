@@ -37,9 +37,9 @@ teardown() {
   [ ! -f "$f" ]
 }
 
-@test "require_pin HARD-STOPs on an unresolved TODO-KAVEEN pin" {
+@test "require_pin HARD-STOPs on an unresolved TODO-UNRESOLVED pin" {
   local lock="$TMPDIR_TEST/sources.lock"
-  printf 'SOME_KEY=TODO-KAVEEN\n' > "$lock"
+  printf 'SOME_KEY=TODO-UNRESOLVED\n' > "$lock"
   NTFSMAC_SOURCES_LOCK="$lock" run bash -c "source '$SCRIPT'; require_pin SOME_KEY"
   [ "$status" -ne 0 ]
   [[ "$output" == *"HARD-STOP"* ]]

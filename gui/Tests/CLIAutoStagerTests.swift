@@ -17,7 +17,12 @@ final class FakeCLIStaging: CLIStaging {
     }
 }
 
-@MainActor @Test func stageIfNeededSkipsWhenCLIAlreadyInstalled() async throws {
+@MainActor @Test func stageIfNeededStillCallsStageCLIWhenAlreadyInstalledSoHelperCanDetectStaleness() async throws {
+    // A new app build re-blesses the helper but, before this fix, never re-staged the CLI
+    // (CLIAutoStager skipped on "any ntfsmac installed"). The installed `ntfsmac` then stayed
+    // stale and rejected flags the new helper sent (e.g. --ignore-permissions). stageCLI is now
+    // idempotent — the helper no-ops when the installed tree hash matches its pinned hash — so
+    // it's safe (and required) to call even when the CLI is already present.
     let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: dir) }
@@ -31,7 +36,7 @@ final class FakeCLIStaging: CLIStaging {
 
     await stager.stageIfNeeded()
 
-    #expect(helper.calls.isEmpty, "CLI already present — must never invoke the privileged stage command")
+    #expect(helper.calls.count == 1, "CLI present but possibly stale — must still call stageCLI so the helper can no-op-or-reinstall")
 }
 
 @MainActor @Test func stageIfNeededCallsHelperWithBundledInstallScriptPath() async {

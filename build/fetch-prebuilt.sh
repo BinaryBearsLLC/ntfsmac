@@ -3,7 +3,7 @@
 # Downloads libkrunfw (nohajc fork) kernel Image + modules.squashfs, and vmnet-helper
 # (nirs/vmnet-helper), both at sources.lock pins. Verifies sha256 BEFORE unpacking;
 # aborts and deletes the artifact on mismatch. Never fetches init-freebsd or
-# containers/libkrunfw. HARD-STOPs if any pin is missing/TODO-KAVEEN.
+# containers/libkrunfw. HARD-STOPs if any pin is missing/TODO-UNRESOLVED.
 set -uo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
@@ -17,8 +17,8 @@ BIN_DIR="${NTFSMAC_VENDOR_BIN_DIR:-$REPO_ROOT/vendor/bin}"
 require_pin() {
   local key="$1" val
   val="$(lock_get "$key")" || { echo "fetch-prebuilt: HARD-STOP — pin '$key' missing from sources.lock" >&2; exit 1; }
-  if [[ "$val" == "TODO-KAVEEN" || -z "$val" ]]; then
-    echo "fetch-prebuilt: HARD-STOP — pin '$key' is unresolved (TODO-KAVEEN)" >&2
+  if [[ "$val" == "TODO-UNRESOLVED" || -z "$val" ]]; then
+    echo "fetch-prebuilt: HARD-STOP — pin '$key' is unresolved (TODO-UNRESOLVED)" >&2
     exit 1
   fi
   printf '%s\n' "$val"

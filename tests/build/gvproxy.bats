@@ -13,10 +13,10 @@ setup() {
   [ -x "$SCRIPT" ]
 }
 
-@test "build-gvproxy.sh HARD-STOPs on an unresolved TODO-KAVEEN pin" {
+@test "build-gvproxy.sh HARD-STOPs on an unresolved TODO-UNRESOLVED pin" {
   local lock
   lock="$(mktemp)"
-  printf 'GVPROXY_VERSION=TODO-KAVEEN\nGVPROXY_COMMIT=TODO-KAVEEN\n' > "$lock"
+  printf 'GVPROXY_VERSION=TODO-UNRESOLVED\nGVPROXY_COMMIT=TODO-UNRESOLVED\n' > "$lock"
   NTFSMAC_SOURCES_LOCK="$lock" run "$SCRIPT"
   rm -f "$lock"
   [ "$status" -ne 0 ]

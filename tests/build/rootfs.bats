@@ -18,10 +18,10 @@ setup() {
   [ -x "$SCRIPT" ]
 }
 
-@test "init-rootfs.sh HARD-STOPs on an unresolved TODO-KAVEEN pin" {
+@test "init-rootfs.sh HARD-STOPs on an unresolved TODO-UNRESOLVED pin" {
   local lock
   lock="$(mktemp)"
-  printf 'ALPINE_TAG=TODO-KAVEEN\nALPINE_DIGEST=TODO-KAVEEN\n' > "$lock"
+  printf 'ALPINE_TAG=TODO-UNRESOLVED\nALPINE_DIGEST=TODO-UNRESOLVED\n' > "$lock"
   NTFSMAC_SOURCES_LOCK="$lock" run "$SCRIPT"
   rm -f "$lock"
   [ "$status" -ne 0 ]
