@@ -128,7 +128,7 @@ is installed"), built a real, tested pipeline:
 | 4 | Idle, no drives / with drive | Yes | Icons, Mount, Diagnose, gear, Quit all confirmed real and working |
 | 5–9 | Mounting / mounted (rw/ro/dirty) / error | Yes | Unblocked this session via the `DemoScaffold` mock-`MountState` harness (`NTFSMAC_UI_DEMO=clean\|dirty\|error`). All 5 states walked live: mounting (blue pulsing), mounted read-write (green), mounted read-only-dirty (yellow, unclean-journal banner, "Mount read/write anyway…"), error (red, plain-language message). Menu-bar icon color confirmed correct for every state (see bug fix below). |
 | 10 | In-popover Settings page | Yes | Packaged app verified live on 2026-08-03: gear replaced the popover content with Settings; Back restored the drive list; Launch at login, Reinstall…, and Uninstall… controls were visible; no separate window opened. |
-| 11 | Diagnose panel | Yes | Single button, styled output card |
+| 11 | Diagnose panel | Yes | Single button, styled output card. The 2026-08-03 Command-click export path is covered by automated action-routing, JSON-validation, degraded-result, and exact-destination write tests; the packaged menu-bar app was launched successfully, but the native save-panel click-through remains an explicit manual gate because the closed `LSUIElement` popover is not exposed to Computer Use. |
 
 Light/dark appearance toggle still not walked for any state — deferred, not done this session (budget).
 
