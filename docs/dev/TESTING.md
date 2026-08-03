@@ -274,13 +274,18 @@ The menu-bar icon itself uses a placeholder SF Symbol for now — see "app icon"
 3. Icon should pulse blue while mounting, then turn green with the drive shown as mounted, a
    live (if idle) speed bar, and security indicators.
 4. Click `Open in Finder` — a real Finder window should reveal the mount point.
-5. Click `Diagnose` in the footer, then the `Diagnose` button inside the panel that appears —
-   should match Part A's `diagnose --json` output in plain language.
-6. Click `Unmount` — icon returns to grey/idle, drive drops off the mounted row.
-7. Click the gear icon — Settings replaces the popover content. Toggle settings, use Back, reopen
+5. Click `Diagnose` in the footer — the panel should match Part A's `diagnose --json` output in
+   plain language. Hide and reopen it to confirm a fresh run still works.
+6. Hold Command (⌘) and click `Diagnose`. The same diagnostic summary should run, followed by a
+   native save panel proposing `ntfsmac-diagnose-<timestamp>.json`. Save it to a temporary location,
+   confirm the file is valid JSON and contains `healthy`, `macos_version`, `missing_binaries`,
+   `quarantined_binaries`, `kernel_pin`, and `bridge`, then remove only that test export. Canceling
+   the save panel must create no file. No network upload should occur.
+7. Click `Unmount` — icon returns to grey/idle, drive drops off the mounted row.
+8. Click the gear icon — Settings replaces the popover content. Toggle settings, use Back, reopen
    Settings — confirm they persisted (backed by `UserDefaults`, should survive
    without even restarting the app).
-8. Click `Quit` — app should exit; `mount | grep nfs` back in Terminal should show nothing
+9. Click `Quit` — app should exit; `mount | grep nfs` back in Terminal should show nothing
    ntfsmac-related left mounted.
 
 ### Force a dirty-journal (read-only) test, optional

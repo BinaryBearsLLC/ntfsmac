@@ -743,6 +743,12 @@ still-open VM-boot gate and an end-to-end "connect a real NTFS drive" walkthroug
   runtime `PreferencesOpener` window implementation was removed; deprecated source-compatible
   adapters remain for downstream callers, but the app does not use them. No mount, helper
   privilege, signing, or deployment-target behavior changed.
+- **GUI developer diagnostic export follow-up (2026-08-03)** — a normal Diagnose click remains
+  unchanged; Command-click runs the same unprivileged `ntfsmac diagnose --json`, keeps the normal
+  summary visible, validates and pretty-prints the CLI output, then presents an `NSSavePanel` for a
+  user-selected `.json` destination. Cancellation writes nothing and ntfsmac never uploads the
+  report. The JSON contains the existing CLI health fields, including `macos_version`; no mount,
+  helper, XPC, signing, network-policy, or deployment-target behavior changed.
 
 ## DECISIONS
 
