@@ -177,6 +177,42 @@ private func awaitReply(_ body: (@escaping (Data?, String?) -> Void) -> Void) as
     #expect(runner.calls[0].arguments == ["mount", "disk2s1", "--fs-driver", "ntfs-3g", "--read-only"])
 }
 
+@Test func mountExtDriverOmitsFsDriverAndAppendsIgnorePermissions() async {
+    // ext is a real Unix fs; the helper must NOT pass --fs-driver (kernel auto-detects, ntfs-3g
+    // can't mount ext4) and MUST pass --ignore-permissions so the export gets all_squash and the
+    // macOS user can write past ext's ownership. This is the GUI fix for the ext-permission bug.
+    let runner = FakeRunner()
+    let service = HelperService(runner: runner)
+    let (data, error) = await awaitReply { reply in
+        service.mount(device: "disk4s1", driver: FsDriver.ext.rawValue, mountPoint: nil, readOnly: false, reply: reply)
+    }
+    #expect(data != nil)
+    #expect(error == nil)
+    #expect(runner.calls.count == 1)
+    #expect(runner.calls[0].arguments == ["mount", "disk4s1", "--ignore-permissions"])
+}
+
+@Test func mountExtDriverWithReadOnlyAppendsReadOnlyAfterIgnorePermissions() async {
+    let runner = FakeRunner()
+    let service = HelperService(runner: runner)
+    let (data, error) = await awaitReply { reply in
+        service.mount(device: "disk4s1", driver: FsDriver.ext.rawValue, mountPoint: "/Volumes/Ext", readOnly: true, reply: reply)
+    }
+    #expect(data != nil)
+    #expect(error == nil)
+    #expect(runner.calls[0].arguments == ["mount", "disk4s1", "/Volumes/Ext", "--ignore-permissions", "--read-only"])
+}
+
+@Test func mountNtfs3gDriverStillPassesFsDriverAndNoIgnorePermissions() async {
+    // "do not change the NTFS part": ntfs mounts keep --fs-driver and never get all_squash.
+    let runner = FakeRunner()
+    let service = HelperService(runner: runner)
+    let (_, _) = await awaitReply { reply in
+        service.mount(device: "disk2s1", driver: FsDriver.ntfs3g.rawValue, mountPoint: nil, readOnly: false, reply: reply)
+    }
+    #expect(runner.calls[0].arguments == ["mount", "disk2s1", "--fs-driver", "ntfs-3g"])
+}
+
 @Test func unmountRejectsInvalidTargetWithoutRunningAnything() async {
     let runner = FakeRunner()
     let service = HelperService(runner: runner)

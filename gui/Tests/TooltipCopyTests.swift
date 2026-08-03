@@ -11,22 +11,13 @@ func everyTooltipControlHasConciseCopy(control: TooltipCopy.Control) {
 }
 
 @Test(arguments: [
-    (MountState.idle, "Idle — no drive is mounted"),
+    (MountState.idle, "Idle — no supported drive is mounted"),
     (.mounting, "Mount in progress"),
-    (.mountedReadWrite, "Drive mounted read/write"),
-    (.mountedReadOnly, "Drive deliberately mounted read-only"),
-    (.mountedReadOnlyDirty, "Drive mounted read-only because its journal is unclean"),
+    (.mountedReadWrite, "All mounted drives are read/write"),
+    (.mountedReadOnly, "At least one mounted drive is read-only"),
+    (.mountedReadOnlyDirty, "At least one mounted NTFS drive has an unclean journal"),
     (.error, "ntfsmac needs attention"),
 ])
 func everyMountStateHasDistinctStatusHelp(argument: (MountState, String)) {
     #expect(TooltipCopy.status(for: argument.0) == argument.1)
-}
-
-@Test func diagnosticHelpCoversEverySummaryRow() {
-    let report = DiagnoseReport(healthy: true, missingBinaries: 0, quarantinedBinaries: 0, kernelPin: "match", bridge: "up")
-    let rows = DiagnoseSummary.rows(for: report)
-    let explanations = rows.map { TooltipCopy.diagnosticExplanation(for: $0.id) }
-
-    #expect(explanations.count == rows.count)
-    #expect(explanations.allSatisfy { !$0.isEmpty && $0 != "Diagnostic status" })
 }

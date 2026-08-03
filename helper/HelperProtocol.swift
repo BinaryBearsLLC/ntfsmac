@@ -167,6 +167,13 @@ public enum FsDriver: String, Codable, Sendable {
     // the implicit default, ntfs3 is opt-in only via this flag, never an `-o` token).
     case ntfs3g = "ntfs-3g"
     case ntfs3 = "ntfs3"
+    // ext2/3/4: the kernel auto-detects, so this is NOT a --fs-driver value. It's the GUI's
+    // signal to the helper to skip --fs-driver (ntfs-3g can't mount ext4) and pass
+    // --ignore-permissions instead, so the NFS export gets all_squash,anonuid=0,anongid=0
+    // (vendor vmproxy/main.rs:1327) and the macOS user can write past ext's Unix ownership.
+    // Reuses the existing `driver` XPC channel — no protocol signature change. NTFS keeps
+    // .ntfs3g/.ntfs3 and never gets all_squash ("do not change the NTFS part").
+    case ext = "ext"
 }
 
 /// Generic passthrough result for wrapper scripts that only ever print human-readable text —
@@ -418,7 +425,13 @@ public final class HelperService: NSObject, HelperXPCProtocol {
         }
         var args = [device]
         if let mountPoint { args.append(mountPoint) }
-        args.append(contentsOf: ["--fs-driver", fsDriver.rawValue])
+        if fsDriver == .ext {
+            // ext: no --fs-driver (kernel auto-detects; ntfs-3g can't mount ext4) + all_squash
+            // so the macOS user can write past ext's Unix ownership. NTFS keeps --fs-driver.
+            args.append("--ignore-permissions")
+        } else {
+            args.append(contentsOf: ["--fs-driver", fsDriver.rawValue])
+        }
         if readOnly { args.append("--read-only") }
         let result = runner.run("\(resolvePrefix())/bin/ntfsmac", ["mount"] + args)
         encode(result, reply: reply)
@@ -540,7 +553,22 @@ public final class HelperService: NSObject, HelperXPCProtocol {
             reply(nil, "rejected: cli-src content does not match the hash pinned into this helper at build time — refusing (possible tampering)")
             return
         }
+        // Idempotency: if the installed CLI tree already matches this helper's pinned hash, skip
+        // the reinstall. Without this, a new app build re-blesses the helper but `CLIAutoStager`
+        // never re-stages (it skips on "any ntfsmac installed"), so the installed `ntfsmac` stays
+        // stale and rejects flags the new helper sends (e.g. --ignore-permissions). The marker is
+        // written by this helper after a successful install, so a mismatch/missing marker means
+        // "stale or first run" → run install.sh, then refresh the marker.
+        let markerPath = "\(installPrefix)/libexec/ntfsmac/cli-tree.sha256"
+        if let marker = try? String(contentsOfFile: markerPath, encoding: .utf8),
+           marker.trimmingCharacters(in: .whitespacesAndNewlines) == expectedCLITreeHash {
+            encode(CommandResult(output: "cli already current", exitCode: 0), reply: reply)
+            return
+        }
         let result = runner.run(resolvedScriptPath.path, ["--no-path-link"])
+        if result.exitCode == 0 {
+            try? expectedCLITreeHash.write(toFile: markerPath, atomically: true, encoding: .utf8)
+        }
         encode(result, reply: reply)
     }
 

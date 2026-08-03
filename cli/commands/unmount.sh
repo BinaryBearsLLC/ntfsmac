@@ -7,7 +7,7 @@
 # --wait-for-vm: synchronously waiting for VM process exit risks blocking on a
 # wedged/dead VM — PLAN.md's Don't clause ("never block indefinitely on a dead mount").
 # Calls Phase-1 pf teardown if that unit has landed (soft-optional — Phase 1 is
-# deferrable per SHARED_TASK_NOTES.md; its absence here is not an error).
+# deferrable per PLAN.md (non-blocking); its absence here is not an error).
 set -u
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)

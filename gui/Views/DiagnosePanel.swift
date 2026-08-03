@@ -141,25 +141,11 @@ public struct DiagnosePanel: View {
     public let mountState: MountState?
     public let onHide: (() -> Void)?
 
-    public init(runner: DiagnoseRunner) {
-        self.runner = runner
-        self.mountState = nil
-        self.onHide = nil
-    }
-
-    public init(runner: DiagnoseRunner, mountState: MountState?) {
-        self.runner = runner
-        self.mountState = mountState
-        self.onHide = nil
-    }
-
-    public init(runner: DiagnoseRunner, onHide: @escaping () -> Void) {
-        self.runner = runner
-        self.mountState = nil
-        self.onHide = onHide
-    }
-
-    public init(runner: DiagnoseRunner, mountState: MountState?, onHide: @escaping () -> Void) {
+    public init(
+        runner: DiagnoseRunner,
+        mountState: MountState? = nil,
+        onHide: (() -> Void)? = nil
+    ) {
         self.runner = runner
         self.mountState = mountState
         self.onHide = onHide

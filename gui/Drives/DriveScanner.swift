@@ -1,13 +1,15 @@
 import Foundation
 import HelperShared
 
-/// One partition `anylinuxfs list --microsoft` reports as NTFS/exFAT/BitLocker-compatible.
-/// GUI-PLAN.md "Auto-detect compatible drives" — read-only, no privileged call (this unit's
-/// Don't clause: listing never goes through the XPC helper).
+/// One partition `anylinuxfs list` reports as mountable by ntfsmac: NTFS/BitLocker
+/// (the existing Windows set) or ext2/3/4. GUI-PLAN.md "Auto-detect compatible drives" —
+/// read-only, no privileged call (this unit's Don't clause: listing never goes through the
+/// XPC helper).
 public struct Drive: Identifiable, Equatable, Sendable {
     /// `diskNsM`, already re-checked against `deviceNamePattern` (L6) at parse time.
     public let identifier: String
-    /// Raw value from `WINDOWS_FS_TYPES` (`vendor/.../diskutil/mod.rs`): "ntfs" | "exfat" | "BitLocker".
+    /// Raw fstype anylinuxfs emits: "ntfs" | "BitLocker" (WINDOWS_FS_TYPES) or
+    /// "ext" (GPT-name fallback) or "ext2" | "ext3" | "ext4" (blkid fs_type). See `allowedFsTypes` below.
     public let fsType: String
     /// Volume label; empty when the partition has none.
     public let label: String
@@ -24,16 +26,39 @@ public struct Drive: Identifiable, Equatable, Sendable {
     }
 }
 
-/// Parses `anylinuxfs list --microsoft` text into `Drive` models. There is no `--json` flag on
-/// `ListCmd` (confirmed in `cli.rs`, same finding `3-xpc-helper` made for mount/unmount) — the
-/// real output is `diskutil list`, augmented in place: `darwin::augment_line` substitutes the
-/// TYPE column with the real fs_type and the NAME column with the volume label at fixed widths
+/// Parses `anylinuxfs list` text into `Drive` models. There is no `--json` flag on `ListCmd`
+/// (confirmed in `cli.rs`, same finding `3-xpc-helper` made for mount/unmount) — the real output
+/// is `diskutil list`, augmented in place: `darwin::augment_line` substitutes the TYPE column
+/// with the real fs_type and the NAME column with the volume label at fixed widths
 /// (`vendor/src/anylinuxfs/anylinuxfs/src/diskutil/{mod,darwin}.rs`). Whole-disk rows (index 0,
 /// scheme line) and the header line never end in a `diskNsM` identifier, so anchoring on
 /// `validateDevice` for the trailing token naturally excludes them without special-casing.
+///
+/// The TYPE column is NOT always a single blkid fstype token: for NTFS, blkid's fs_type is
+/// empty in this build, so `augment_line` falls back to the raw GPT type name "Microsoft Basic
+/// Data" (darwin.rs: `fs_type.unwrap_or(part_type)`). The regex captures the TYPE+NAME columns
+/// as one blob and `deriveFsTypeAndLabel` splits fstype from its prefix — "Microsoft Basic Data"
+/// is exactly what the server's `--microsoft` filter keys on (WINDOWS_FS_TYPES in mod.rs), so
+/// matching it client-side replicates `--microsoft`'s reliability without a second `anylinuxfs`
+/// call. The fstype is display-only — mount validates `--fs-driver` itself, never the picker.
+///
+/// Scope filter: bare `anylinuxfs list` returns every Linux FS type (btrfs/xfs/zfs/LUKS/LVM/...).
+/// ntfsmac mounts only NTFS + BitLocker + ext2/3/4 (exFAT is excluded — macOS already reads/writes
+/// it natively), so `allowedFsTypes` drops the rest client-side. Mirrors
+/// `NTFSMAC_ALLOWED_FS_TYPES` in cli/lib/list-drives.sh — bash and Swift can't share source,
+/// two impls kept in sync deliberately.
 public enum DriveListParser {
+    /// Filesystems ntfsmac mounts: Windows (WINDOWS_FS_TYPES minus exfat — macOS already
+    /// reads/writes exFAT) + ext2/3/4 (kernel auto-detect, no --fs-driver). Keep in sync with
+    /// `NTFSMAC_ALLOWED_FS_TYPES` in cli/lib/list-drives.sh.
+    static let allowedFsTypes: Set<String> = ["ntfs", "BitLocker", "ext", "ext2", "ext3", "ext4"]
+
+    /// Captures the TYPE+NAME columns as one blob (group 1), then size (group 2) and ident
+    /// (group 3) from the right. Splitting TYPE from NAME positionally is fragile (both are
+    /// multi-word, space-padded to fixed widths) and unnecessary: ident is unambiguous from
+    /// the right, and fstype is derived from the blob's prefix by `deriveFsTypeAndLabel`.
     private static let partitionLine = try! NSRegularExpression(
-        pattern: #"^\s*\d+:\s+(\S+)\s+(.+?)\s+(\*?[0-9.]+\s+\S+)\s+(\S+)\s*$"#
+        pattern: #"^\s*\d+:\s+(.+?)\s+(\*?[0-9.]+\s+\S+)\s+(\S+)\s*$"#
     )
 
     public static func parse(_ output: String) -> [Drive] {
@@ -43,14 +68,49 @@ public enum DriveListParser {
     private static func parseLine(_ line: String) -> Drive? {
         let range = NSRange(line.startIndex..., in: line)
         guard let match = partitionLine.firstMatch(in: line, range: range),
-              let fsType = capture(match, 1, in: line),
-              let rawLabel = capture(match, 2, in: line),
-              let size = capture(match, 3, in: line),
-              let ident = capture(match, 4, in: line),
+              let blob = capture(match, 1, in: line),
+              let size = capture(match, 2, in: line),
+              let ident = capture(match, 3, in: line),
               validateDevice(ident)
         else { return nil }
 
-        return Drive(identifier: ident, fsType: fsType, label: rawLabel.trimmingCharacters(in: .whitespaces), size: size)
+        let (fsType, label) = deriveFsTypeAndLabel(blob)
+        guard allowedFsTypes.contains(fsType) else { return nil }
+        return Drive(identifier: ident, fsType: fsType, label: label, size: size)
+    }
+
+    /// Splits the TYPE+NAME blob into (fstype, label). "Microsoft Basic Data" is the GPT type
+    /// for ntfs (and exfat, but exfat is out of scope — when blkid resolves exfat it surfaces as
+    /// "exfat" and is dropped by `allowedFsTypes`; the rare GPT-fallback case can't distinguish
+    /// ntfs from exfat, same limitation as the server's `--microsoft` filter). Match it as a
+    /// prefix, same key the server filter uses, so NTFS survives even when blkid's fs_type is
+    /// empty. "BitLocker" is its own GPT type. Everything else is a blkid single-token fstype
+    /// (ext2/3/4, sometimes ntfs) followed by the label.
+    private static func deriveFsTypeAndLabel(_ blob: String) -> (fsType: String, label: String) {
+        let trimmed = blob.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("Microsoft Basic Data") {
+            let label = trimmed.dropFirst("Microsoft Basic Data".count).trimmingCharacters(in: .whitespaces)
+            return ("ntfs", label)
+        }
+        if trimmed.hasPrefix("BitLocker") {
+            let label = trimmed.dropFirst("BitLocker".count).trimmingCharacters(in: .whitespaces)
+            return ("BitLocker", label)
+        }
+        // GPT type name "Linux Filesystem" (GUID 0FC63DAF-...) is what darwin::augment_line falls
+        // back to when blkid can't resolve the ext superblock (darwin.rs fs_type.unwrap_or(
+        // part_type); the name is in LINUX_PART_TYPES, mod.rs). One GPT type covers ALL ext
+        // versions — ext2, ext3, ext4 — Apple diskutil does not distinguish them, so the GPT
+        // name can't either. Map to a generic "ext" fstype (kernel auto-detects at mount; no
+        // --fs-driver needed). The single-token branch would grab "Linux" and the allow-set
+        // would reject the row — the ext equivalent of the NTFS "Microsoft Basic Data" bug.
+        if trimmed.hasPrefix("Linux Filesystem") {
+            let label = trimmed.dropFirst("Linux Filesystem".count).trimmingCharacters(in: .whitespaces)
+            return ("ext", label)
+        }
+        let parts = trimmed.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+        let fsType = parts.isEmpty ? "" : String(parts[0])
+        let label = parts.count > 1 ? String(parts[1]).trimmingCharacters(in: .whitespaces) : ""
+        return (fsType, label)
     }
 
     private static func capture(_ match: NSTextCheckingResult, _ index: Int, in line: String) -> String? {
@@ -59,10 +119,12 @@ public enum DriveListParser {
     }
 }
 
-/// Polls `anylinuxfs list --microsoft` on an interval plus on-demand (Refresh ↻ button,
-/// GUI-PLAN.md "Popover — idle"). Reuses `HelperShared`'s `PrivilegedCommandRunning`/
-/// `RealCommandRunner` seam (already used by `HelperService`) instead of a second process-spawn
-/// helper — this call itself is unprivileged, only the runner shape is reused.
+/// Polls `anylinuxfs list` on an interval plus on-demand (Refresh ↻ button,
+/// GUI-PLAN.md "Popover — idle"). Bare `list` (all types) — `DriveListParser.allowedFsTypes`
+/// filters to ntfsmac's mount scope (NTFS-family + ext2/3/4) client-side. Reuses `HelperShared`'s
+/// `PrivilegedCommandRunning`/`RealCommandRunner` seam (already used by `HelperService`) instead
+/// of a second process-spawn helper — this call itself is unprivileged, only the runner shape
+/// is reused.
 @MainActor
 public final class DriveScanner: ObservableObject {
     @Published public private(set) var drives: [Drive] = []
@@ -107,7 +169,7 @@ public final class DriveScanner: ObservableObject {
     }
 
     public func refresh() async {
-        let result = runner.run(anylinuxfsPath, ["list", "--microsoft"])
+        let result = runner.run(anylinuxfsPath, ["list"])
 
         if result.exitCode == 0 {
             drives = DriveListParser.parse(result.output)

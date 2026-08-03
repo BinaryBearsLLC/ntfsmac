@@ -1,10 +1,11 @@
 # TDD Evidence: static-link libblkid into anylinuxfs (tosbaha #1 fix)
 
 **Source plan:** conversational `/ecc:plan` output, then a user-driven pivot. Original plan
-was Option C (build static libblkid from a pinned vanilla util-linux source). **Kaveen
-rejected the vanilla from-source build** ("we already surely know homebrew version works for
-this… don't try to add a different one") and directed the fix to consume Homebrew's
-already-built static archives instead. No `*.plan.md` file; journeys derived during this run.
+was Option C (build static libblkid from a pinned vanilla util-linux source). **The
+maintainer rejected the vanilla from-source build** ("we already surely know homebrew
+version works for this… don't try to add a different one") and directed the fix to consume
+Homebrew's already-built static archives instead. No `*.plan.md` file; journeys derived
+during this run.
 
 ## User journey
 
@@ -69,7 +70,7 @@ present on every macOS); **no Homebrew dylib is needed at runtime.**
 - Fast (non-build) tests: all PASS (`util-linux.bats` 4/4, `lock.bats` 6/6, `preflight.bats` isolated tests PASS, `build-all.bats` wiring + linkage PASS — 17/17 in the filtered fast subset).
 - **Full build: GREEN on this macOS VM.** `./build/build-all.sh` exit 0 — "build-all: done". `vendor/bin/anylinuxfs` built (Mach-O arm64), ad-hoc signed with entitlements via `sign.sh`. `otool -L` confirms no `libblkid`/`libuuid`/`libintl`/homebrew dylib (test 2 PASS). cargo test GREEN for all three crates: common-utils 8 passed, anylinuxfs 41 passed, vmproxy 8 passed.
 - `run_tests` gap found and fixed during the real run: the debug test build of anylinuxfs re-runs libblkid-rs-sys's build script, which needs the SAME `PKG_CONFIG_PATH`+`PKG_CONFIG_ALL_STATIC` env as `build_anylinuxfs`. Without it the test build fails with "Package blkid not found" (the neutralized `.cargo/config.toml` removed the homebrew fallback deliberately). Fix: `run_tests` now exports that env around the anylinuxfs `cargo test`. Verified GREEN (41 passed).
-- The "Failed to run VM: start vm error: Invalid argument (errno 22)" line during `init-rootfs` is the vmproxy-embed step trying to boot the microVM — fails in this sandbox (no real hypervisor), non-fatal, build still exits 0. Expected on the build machine to succeed (real M3 Pro has Hypervisor.framework).
+- The "Failed to run VM: start vm error: Invalid argument (errno 22)" line during `init-rootfs` is the vmproxy-embed step trying to boot the microVM — fails in this sandbox (no real hypervisor), non-fatal, build still exits 0. Expected on a real Apple Silicon Mac to succeed (Hypervisor.framework is present).
 - **Risk closed by the pivot:** the vanilla from-source build risk (configure/make failing on macOS arm64, byte-difference from Homebrew) is eliminated — we consume Homebrew's known-good static archives directly. The full anylinuxfs cargo build picks up the staged `.pc` correctly (proven by the GREEN release build + test 2).
 
 ## Merge evidence

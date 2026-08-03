@@ -88,7 +88,7 @@ public final class RemountController: ObservableObject {
     /// (double-tap while the first `await` is still in flight) from firing a second privileged
     /// mount RPC for the same device — the same class of race `MountController.mount()` already
     /// guards against.
-    public func confirmRemount(_ drive: Drive, driver: FsDriver = .ntfs3g) async {
+    public func confirmRemount(_ drive: Drive, driver: FsDriver? = nil) async {
         guard isConfirmingRemount, !isRemounting else { return }
         isConfirmingRemount = false
         isRemounting = true
@@ -103,7 +103,8 @@ public final class RemountController: ObservableObject {
         do {
             // Always `readOnly: false` — "Mount read/write anyway" is explicitly the user
             // overriding the dirty-journal read-only fallback, never a read-only request.
-            let result = try await helper.mount(device: drive.identifier, driver: driver, mountPoint: nil, readOnly: false)
+            let resolvedDriver = driver ?? MountController.driverFor(drive.fsType)
+            let result = try await helper.mount(device: drive.identifier, driver: resolvedDriver, mountPoint: nil, readOnly: false)
             guard result.exitCode == 0 else {
                 fail(result.output)
                 return

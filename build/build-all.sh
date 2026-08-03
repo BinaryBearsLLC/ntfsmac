@@ -169,7 +169,7 @@ PYEOF
   # checks signature validity, not which entitlements are embedded. Without
   # com.apple.security.hypervisor, Hypervisor.framework's vm_create fails with exactly
   # "start vm error: Invalid argument (errno 22)" on real Apple Silicon hardware — no VM/
-  # nested-virtualization involved, confirmed on Kaveen's bare M3 Pro. `build/sign.sh` is the
+  # nested-virtualization involved, confirmed on a bare Apple Silicon Mac. `build/sign.sh` is the
   # one script that actually embeds the required entitlements (build/entitlements/
   # anylinuxfs.entitlements); it existed but nothing in the build pipeline ever called it, so
   # every real build silently shipped an unbootable anylinuxfs. Calling it here — the one

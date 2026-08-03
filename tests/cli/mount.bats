@@ -99,6 +99,32 @@ STUB
   [[ "$output" == *"--nfs-options soft,ro"* ]]
 }
 
+# Throughput tuning (PLAN.md L8 owner-override, default-on): rsize/wsize/readahead are
+# always appended to --nfs-options — not opt-in. Near-zero risk (transfer-unit size +
+# read-ahead; kernel auto-negotiates down; no integrity path), documented as the explicit
+# L8 override in README + docs/dev/PLAN.md. See throughput-tuning.tdd.md.
+@test "always appends rsize/wsize/readahead tuning (default mount)" {
+  run "$SCRIPT" disk2s1
+  [ "$status" -eq 0 ]
+  run cat "$CALL_LOG"
+  [[ "$output" == *"rsize=1048576"* ]]
+  [[ "$output" == *"wsize=1048576"* ]]
+  [[ "$output" == *"readahead=16"* ]]
+  # rsize == wsize: macOS mount_nfs warns on a high wsize/rsize ratio ("unexpected readahead
+  # RPCs"); keep them equal.
+  [[ "$output" == *"rsize=1048576,wsize=1048576"* ]]
+}
+
+@test "tuning is present alongside --read-only (soft,ro,...,rsize=...)" {
+  run "$SCRIPT" --read-only disk2s1
+  [ "$status" -eq 0 ]
+  run cat "$CALL_LOG"
+  [[ "$output" == *"--nfs-options soft,ro,"* ]]
+  [[ "$output" == *"rsize=1048576"* ]]
+  [[ "$output" == *"wsize=1048576"* ]]
+  [[ "$output" == *"readahead=16"* ]]
+}
+
 @test "auto-ejects the partition from macOS before mounting (diskutil unmount, not eject)" {
   run "$SCRIPT" disk2s1
   [ "$status" -eq 0 ]
@@ -118,7 +144,7 @@ STUB
 #!/bin/bash
 if [[ "\$1" == "list" ]]; then
   echo "   1:                        ntfs MyDrive                  100.0 GB   disk2s1"
-  echo "   2:                       exfat OtherDrive               32.0 GB   disk3s2"
+  echo "   2:                        ext4 OtherDrive                32.0 GB   disk3s2"
   exit 0
 fi
 echo "\$@" >> "$CALL_LOG"
@@ -207,6 +233,86 @@ STUB
   run "$SCRIPT" disk2s1
   [ "$status" -ne 0 ]
   [[ "$output" == *"no response after 1s"* ]]
+}
+
+@test "auto-passes --ignore-permissions for an ext drive on the direct path (probed fstype)" {
+  # mount.sh probes fs_type_for_device when no --fs-driver is given; an ext drive needs
+  # --ignore-permissions so the NFS export gets all_squash and the macOS user can write past
+  # ext's Unix ownership. The probe reuses list_mountable_drives, so the stub must answer `list`.
+  cat > "$STUB_DIR/anylinuxfs" <<STUB
+#!/bin/bash
+if [[ "\$1" == "list" ]]; then
+  printf '%s\n' '   1:                       Linux Filesystem MyVol        31.5 GB    disk4s1'
+  exit 0
+fi
+echo "\$@" >> "$CALL_LOG"
+exit 0
+STUB
+  chmod +x "$STUB_DIR/anylinuxfs"
+
+  run "$SCRIPT" disk4s1
+  [ "$status" -eq 0 ]
+  run cat "$CALL_LOG"
+  [[ "$output" == *"--ignore-permissions"* ]]
+}
+
+@test "does not pass --ignore-permissions for an NTFS drive on the direct path" {
+  # NTFS must NOT get all_squash — ntfs-3g already remaps uid/gid, and the user instruction is
+  # "do not change on the NTFS part". A probed ntfs fstype leaves --ignore-permissions off.
+  cat > "$STUB_DIR/anylinuxfs" <<STUB
+#!/bin/bash
+if [[ "\$1" == "list" ]]; then
+  printf '%s\n' '   1:       Microsoft Basic Data MyDrive                100.0 GB   disk2s1'
+  exit 0
+fi
+echo "\$@" >> "$CALL_LOG"
+exit 0
+STUB
+  chmod +x "$STUB_DIR/anylinuxfs"
+
+  run "$SCRIPT" disk2s1
+  [ "$status" -eq 0 ]
+  run cat "$CALL_LOG"
+  [[ "$output" != *"--ignore-permissions"* ]]
+}
+
+@test "explicit --ignore-permissions flag is forwarded to anylinuxfs and skips the probe" {
+  # The GUI helper passes --ignore-permissions for ext (its signal that the drive is ext-family,
+  # avoiding a second `anylinuxfs list` probe). mount.sh must forward it as-is.
+  cat > "$STUB_DIR/anylinuxfs" <<STUB
+#!/bin/bash
+echo "\$@" >> "$CALL_LOG"
+exit 0
+STUB
+  chmod +x "$STUB_DIR/anylinuxfs"
+
+  run "$SCRIPT" --ignore-permissions disk4s1
+  [ "$status" -eq 0 ]
+  run cat "$CALL_LOG"
+  [[ "$output" == *"--ignore-permissions"* ]]
+}
+
+@test "picker-chosen ext drive gets --ignore-permissions (no extra probe)" {
+  # Picker already has the fstype column from list_mountable_drives, so it does not re-probe;
+  # it threads the fstype straight into the --ignore-permissions decision.
+  cat > "$STUB_DIR/anylinuxfs" <<STUB
+#!/bin/bash
+if [[ "\$1" == "list" ]]; then
+  printf '%s\n' \
+    '   1:                        ntfs WinVol                      100.0 GB   disk2s1' \
+    '   2:                       ext4 LinuxVol                      50.0 GB   disk3s2'
+  exit 0
+fi
+echo "\$@" >> "$CALL_LOG"
+exit 0
+STUB
+  chmod +x "$STUB_DIR/anylinuxfs"
+
+  run "$SCRIPT" <<< "2"
+  [ "$status" -eq 0 ]
+  run cat "$CALL_LOG"
+  [[ "$output" == *"/dev/disk3s2"* ]]
+  [[ "$output" == *"--ignore-permissions"* ]]
 }
 
 @test "self-elevates via sudo when not root, instead of erroring or hitting anylinuxfs's cryptic probe error" {

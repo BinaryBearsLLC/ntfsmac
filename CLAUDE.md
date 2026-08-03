@@ -13,7 +13,7 @@ Full spec: **`docs/dev/PLAN.md`** (architecture, phases, build steps) and **`GUI
 - **Driver:** ntfs-3g default. ntfs3 is opt-in only via `--fs-driver ntfs3`, never via an `-o` token (it's inert there).
 - **Transport:** NFS only, over vmnet-helper host-only `/30` bridge. No SMB. No loopback/`127.94.0.1` design — that's dead, don't resurrect it.
 - **NFS mount mode stays `soft`** — never switch to `hard`, it's what prevents a kernel panic on hot-unplug.
-- **Signing:** ad-hoc only (`codesign -s -`). No paid Apple Developer account, no notarization. This is why the GUI is DMG-only (never a Homebrew cask) and the CLI is a formula in Kaveen's own tap (never homebrew-core).
+- **Signing:** ad-hoc only (`codesign -s -`). No paid Apple Developer account, no notarization. This is why the GUI is DMG-only (never a Homebrew cask) and the CLI is a formula in the project's own tap (never homebrew-core).
 - **Every control that mounts/unmounts/touches pf/route goes through the SMJobBless XPC helper** — never a raw `sudo` shell-out from Swift UI code.
 - **Device names validated against `^disk[0-9]+s[0-9]+$`** before any shell invocation, in both CLI and GUI/helper.
 - **Platform:** Apple Silicon only. Don't add Intel fallback paths.
@@ -27,15 +27,15 @@ CLI (Phase 0 → V → 1 → 2) fully working and installable before any Phase 3
 
 - CLI: zsh scripts + vendored Rust/Go binaries (built via Phase V, not hand-written by us).
 - GUI: Swift + SwiftUI, menu-bar agent (`LSUIElement`, no Dock icon), macOS 13.0+ target unless a specific API forces higher — verify, don't assume.
-- Dev machine: MacBook M3 Pro, Parallels available for VM-based testing if ever needed (shouldn't be — no Linux VM step exists in this build).
-- Kaveen's language background: Python/Java, newer to Rust/Swift/shell and to CI/CD, licensing, security-policy infra. Explain non-boilerplate Rust/Swift/shell decisions briefly when introducing them; don't over-explain repeated patterns.
+- Dev machine: Apple Silicon Mac. (VM-based testing isn't part of this build — no Linux VM step exists.)
+- The maintainer's language background: Python/Java, newer to Rust/Swift/shell and to CI/CD, licensing, security-policy infra. Explain non-boilerplate Rust/Swift/shell decisions briefly when introducing them; don't over-explain repeated patterns.
 
 ## Working style
 
-- Kaveen reviews and decides; doesn't want to hand-write boilerplate. Generate full files/scripts, flag the specific lines that need a decision.
+- The maintainer reviews and decides; doesn't want to hand-write boilerplate. Generate full files/scripts, flag the specific lines that need a decision.
 - Deliver complete, consolidated output per unit of work — not incremental step-by-step prompting. A "unit" = one phase's deliverables, or one component build script, not the whole project at once.
 - Don't pause mid-task for confirmation on mechanical steps. Do stop and ask before: destructive git operations, anything touching signing/entitlements in a way that deviates from PLAN.md, or scope decisions PLAN.md leaves open (e.g. version pins not yet filled in `sources.lock`).
-- Errors get reported after Kaveen runs something, not pre-emptively hedged against. Don't pre-apologize for code that hasn't been tested yet.
+- Errors get reported after the maintainer runs something, not pre-emptively hedged against. Don't pre-apologize for code that hasn't been tested yet.
 - Direct, casual, no filler, no encouragement padding. Flag scope creep against PLAN.md explicitly if a request drifts from it.
 
 ## Repo identity
@@ -72,20 +72,10 @@ Known cuts already decided in PLAN.md — treat these as settled, not open quest
 - **Test dropping the `freebsd` feature flag** (`-F freebsd`) from the `anylinuxfs` and `vmproxy` Cargo builds. Confirm it still compiles clean without the flag before committing to it — don't drop blind.
 - **Never fetch `init-freebsd`** from libkrun releases (see table above).
 
-Beyond this settled list: if a build step, Cargo feature, Alpine package, or fetched artifact isn't clearly required for {NTFS mount, ntfs-3g default / ntfs3 opt-in, NFS export over vmnet, Apple Silicon}, don't silently include it — call it out and confirm with Kaveen before adding it to `sources.lock`, `build-all.sh`, or the Alpine package list. This is an ongoing decision, not a one-time pass — re-check it any time a new upstream component gets pulled in. Never remove a package/feature without confirming it isn't a transitive dependency of something that is needed (e.g. `blkid` looks droppable but is almost certainly required for disk identification — verify before cutting, don't cut on name alone).
+Beyond this settled list: if a build step, Cargo feature, Alpine package, or fetched artifact isn't clearly required for {NTFS mount, ntfs-3g default / ntfs3 opt-in, NFS export over vmnet, Apple Silicon}, don't silently include it — call it out and confirm with the maintainer before adding it to `sources.lock`, `build-all.sh`, or the Alpine package list. This is an ongoing decision, not a one-time pass — re-check it any time a new upstream component gets pulled in. Never remove a package/feature without confirming it isn't a transitive dependency of something that is needed (e.g. `blkid` looks droppable but is almost certainly required for disk identification — verify before cutting, don't cut on name alone).
 
 
 
 - After Phase V: `vendor/bin/anylinuxfs list` works with zero brew taps beyond build-toolchain ones; runtime kernel image matches the `sources.lock` pin, not whatever libkrun's build-time libkrunfw dragged in.
 - Before any Homebrew formula work: confirm ad-hoc signed binaries carry no quarantine xattr from the install path used.
 - Before Phase 3 starts: Phase 2 CLI deliverables in PLAN.md are all checked off.
-
-## graphify
-
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
-
-Rules:
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

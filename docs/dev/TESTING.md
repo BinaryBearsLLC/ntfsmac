@@ -1,6 +1,6 @@
 # ntfsmac — manual test guide
 
-Run this from Kaveen's own Terminal, on the real M3 Pro, outside the coding-agent sandbox.
+Run this from your own Terminal, on a real Apple Silicon Mac, outside the coding-agent sandbox.
 Every item below either can't be verified from inside that sandbox, or (until this update)
 couldn't be exercised because the GUI pieces were built unit-by-unit and never wired together.
 
@@ -41,36 +41,35 @@ auto-mount-on-detect, only the manual `[Mount]` button, which always mounts read
 
 **Why this is a sandbox gap:** `sysctl kern.hv_support` returns `0` inside the coding-agent's
 Bash tool — Hypervisor.framework has no hardware virtualization available there, independent of
-code signing/entitlements. Your real Terminal on the M3 Pro should report `1`.
+code signing/entitlements. Your real Terminal on an Apple Silicon Mac should report `1`.
 
 ```bash
 sysctl kern.hv_support
 # expect: kern.hv_support: 1 — if 0 on your real Mac too, stop and tell me, that's a new finding.
 ```
 
-Fixed: confirmed `1` on the real M3 Pro — Gap 1 passes, no code change needed.
+Fixed: confirmed `1` on the real Apple Silicon Mac — Gap 1 passes, no code change needed.
 
 If that's `1`, skip straight to "End-to-end: connect a real NTFS drive" below — it folds this
 gate's install+list check into the same walkthrough instead of a separate throwaway prefix.
 
 ---
 
-## Gap 2: Liquid Glass visual parity vs. `ui/prototype.html`
+## Gap 2: Liquid Glass visual parity vs. the built SwiftUI screens
 
 No longer blocked by Gap 0. Do this after the end-to-end walkthrough below, once the app has
 been through every state at least once:
 
 - **Dark/light**: toggle System Settings → Appearance, reopen the popover each time, compare
-  against `ui/prototype.html`'s matching dark/light comp — corner radius, blur/translucency,
+  against the matching built dark/light screen — corner radius, blur/translucency,
   border, drop shadow, and (once a drive is mounted) the green/blue/yellow/red accent colors.
 - **States to walk**: idle (no drives) → mounting (blue pulsing icon) → mounted r/w (green) →
   unmount → (if you can trigger a dirty journal — see below) mounted read-only (yellow, banner
   visible) → unplug the helper's launchd job or rename a vendor binary to force an error state
   (red) — real repro, not required, only if you want full color coverage.
-- **Preferences window**: open via the gear button, compare against the comp's "Preferences
-  Window" dark-mode comp (light isn't in the comp — not a gap, the comp only shows one
-  appearance for this screen).
-- Known approximation, not a bug: the popover's drop shadow collapses the comp's two-layer
+- **Preferences window**: open via the gear button, compare against the Preferences screen
+  (light isn't separately specified — not a gap, only one appearance is defined for this screen).
+- Known approximation, not a bug: the popover's drop shadow collapses the original two-layer
   box-shadow + inset rim-light into one `.shadow()` call (SwiftUI has no multi-shadow primitive)
   — documented in `gui/Style/GlassTheme.swift`'s doc comment, expect it to look *close*, not
   pixel-identical, at the shadow edge specifically.
@@ -100,7 +99,7 @@ underneath), and the CLI gives you plain stdout instead of having to read UI sta
 - Plug it in before starting. `diskutil list` should show it; note its identifier, e.g. `disk4`,
   and the NTFS partition under it, e.g. `disk4s1`. No need to eject it yourself first —
   `ntfsmac mount`/the GUI's `[Mount]` button now does that automatically.
-- **Run this from the bare M3 Pro Terminal, not from inside a Parallels (or any other) VM
+- **Run this from a bare Apple Silicon Mac Terminal, not from inside a Parallels (or any other) VM
   guest.** Hypervisor.framework nested virtualization is unreliable/unsupported in that
   configuration and will surface as VM-boot or device-probe failures below that look like
   ntfsmac bugs but aren't.
@@ -108,7 +107,7 @@ underneath), and the CLI gives you plain stdout instead of having to read UI sta
 ### Part A — CLI
 
 ```bash
-cd "/Volumes/My Shared Files/Windows Shared Folder/ntfsmac"
+cd <repo>
 diskutil list                                   # find the real disk4sN for your NTFS partition
 
 NTFSMAC_PREFIX=$(mktemp -d)
@@ -127,7 +126,7 @@ already matches all three, restricted to `ntfs`/`exfat`/`BitLocker` filesystems
 (`WINDOWS_FS_TYPES`). Nothing to change here.
 
 Fixed — confirmed a real code bug, not a Parallels/nested-virtualization environment issue as
-first suspected (ruled out: Kaveen confirmed this exact run was on the bare M3 Pro Terminal).
+first suspected (ruled out: confirmed this exact run was on the bare Apple Silicon Mac Terminal).
 `build/build-all.sh` and `build/init-rootfs.sh` each did their own bare `codesign -s -` with no
 entitlements; `build/sign.sh` (which embeds `com.apple.security.hypervisor`,
 `build/entitlements/anylinuxfs.entitlements`) existed but nothing in the pipeline ever called
@@ -142,11 +141,14 @@ install.sh-populated prefix. Re-run `./install.sh` from a fresh build to pick up
 
 
 
-$NTFSMAC_PREFIX/bin/ntfsmac mount disk4s1       # replace with your real identifier
+```bash
+$ NTFSMAC_PREFIX/bin/ntfsmac mount disk4s1       # replace with your real identifier
+```
 
-kaveenhimash@MacBook-Pro ntfsmac % $NTFSMAC_PREFIX/bin/ntfsmac mount disk4s4
+```
 macOS: Error: Cannot probe /dev/disk4s4: LibErr(0); Insufficient permissions?
 mount: failed to mount disk4s4
+```
 
 Fixed — real cause, confirmed against upstream's own docs
 (`vendor/src/anylinuxfs/docs/important-notes.md` "Permissions"): `anylinuxfs mount` needs raw
@@ -160,6 +162,7 @@ sudo when not root".
 
 
 
+```bash
 mount | grep nfs                                # confirm it's mounted, options include "soft"
 ls /Volumes/<label>                             # replace <label> with the real volume name
 touch /Volumes/<label>/ntfsmac-test.txt         # real write test
@@ -185,7 +188,8 @@ which case it should land read-only — see "force a dirty-journal test" below i
 verify that path specifically), the write/read/remove round-trips, `diagnose --json` reports
 `"healthy": true`, and unmount is clean.
 
-kaveenhimash@MacBook-Pro ntfsmac % $NTFSMAC_PREFIX/bin/ntfsmac diagnose    
+```
+$ NTFSMAC_PREFIX/bin/ntfsmac diagnose
 diagnose: vendor binaries missing: 3
 diagnose: quarantined binaries: 0
 diagnose: kernel pin: unknown
@@ -193,23 +197,27 @@ diagnose: vmnet bridge: down
 diagnose: current NFS mounts:
   (none)
 diagnose: overall: degraded
+```
 
 Fixed: not a separate bug — downstream of the VM-boot/probe environment mismatch above (nothing
-ever mounted, so nothing to report). Re-check after re-running Part A from the bare M3 Pro.
+ever mounted, so nothing to report). Re-check after re-running Part A from the bare Apple Silicon
+Mac.
 
 If any step fails, capture the exact stdout/stderr and bring it back rather than re-running
 blindly — this is genuinely the first time this path has run against real hardware outside the
 sandbox.
 
-kaveenhimash@MacBook-Pro ntfsmac % $NTFSMAC_PREFIX/bin/ntfsmac uninstall
+```
+$ NTFSMAC_PREFIX/bin/ntfsmac uninstall
 pf-teardown: done
-uninstall: removed /var/folders/gd/fb3b9br90v39jccfhp2j7csm0000gn/T/tmp.Fz6rnlwhhi
-uninstall: removed /Users/kaveenhimash/.anylinuxfs (rootfs cache + config.toml)
+uninstall: removed <tmp-prefix>
+uninstall: removed ~/.anylinuxfs (rootfs cache + config.toml)
 uninstall: not running as root — the GUI's privileged helper (if installed) was left in place.
 uninstall: re-run with 'sudo' to remove it too, or use the GUI's own Uninstall control in Preferences.
 uninstall: done
-kaveenhimash@MacBook-Pro ntfsmac % $NTFSMAC_PREFIX/bin/ntfsmac diagnose 
-zsh: no such file or directory: /var/folders/gd/fb3b9br90v39jccfhp2j7csm0000gn/T/tmp.Fz6rnlwhhi/bin/ntfsmac
+$ NTFSMAC_PREFIX/bin/ntfsmac diagnose
+zsh: no such file or directory: <tmp-prefix>/bin/ntfsmac
+```
 
 Fixed: not a bug — expected. `uninstall` removed the prefix, so `ntfsmac` (which lived under it)
 is legitimately gone; `diagnose` erroring with "no such file" afterward is the correct outcome.
@@ -231,102 +239,20 @@ inside Xcode.app, not standalone Command Line Tools; building with only CLT sele
 "external macro implementation type ... could not be found" (see the fixed build failure below).
 
 ```bash
-cd "/Volumes/My Shared Files/Windows Shared Folder/ntfsmac"
+cd <repo>
 swift build
 swift run ntfsmac-gui
 ```
 
-Fixed: root cause identified for the build failure below —
-```
-Building for debugging...
-/Users/kaveenhimash/Parallels/Windows Shared Folder/ntfsmac/Package.swift: HelperShared: ld: warning: search path '/Library/Developer/CommandLineTools/Developer/Library/Frameworks' not found
-/Users/kaveenhimash/Parallels/Windows Shared Folder/ntfsmac/Package.swift: ntfsmac-helper: ld: warning: search path '/Library/Developer/CommandLineTools/Developer/Library/Frameworks' not found
-/Users/kaveenhimash/Parallels/Windows Shared Folder/ntfsmac/Package.swift: ntfsmac-helper-product: ld: warning: search path '/Library/Developer/CommandLineTools/Developer/usr/lib' not found
-/Users/kaveenhimash/Parallels/Windows Shared Folder/ntfsmac/Package.swift: ntfsmac-helper-product: ld: warning: search path '/Library/Developer/CommandLineTools/Developer/Library/Frameworks' not found
-error: SwiftCompile normal arm64 failed with a nonzero exit code. Command line:     cd /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder
-    
-/Users/kaveenhimash/Parallels/Windows Shared Folder/ntfsmac/gui/Preferences/PreferencesView.swift:12:24: error: external macro implementation type 'SwiftUIMacros.StateMacro' could not be found for macro 'State()'; plugin for module 'SwiftUIMacros' not found
- 10 |     @ObservedObject public var uninstaller: HelperUninstaller
- 11 | 
- 12 |     @State private var isConfirmingUninstall = false
-    |                        `- error: external macro implementation type 'SwiftUIMacros.StateMacro' could not be found for macro 'State()'; plugin for module 'SwiftUIMacros' not found
- 13 | 
- 14 |     public init(settings: Settings, installer: HelperInstaller, uninstaller: HelperUninstaller) {
-
-[204 / 228] NtfsmacGUI39m'State()' declared here
-1 | @attached(accessor, names: named(init), named(get), named(set)) @attached(peer, names: prefixed(`_`), prefixed(__), prefixed(`$`)) public macro State() = #externalMacro(module: "SwiftUIMacros", type: "StateMacro")
-  |                                                                                                                                                 `- note: 'State()' declared here
-
-/Users/kaveenhimash/Parallels/Windows Shared Folder/ntfsmac/gui/Preferences/PreferencesView.swift:12:24: error: external macro implementation type 'SwiftUIMacros.StateMacro' could not be found for macro 'State()'; plugin for module 'SwiftUIMacros' not found
- 10 |     @ObservedObject public var uninstaller: HelperUninstaller
- 11 | 
- 12 |     @State private var isConfirmingUninstall = false
-    |                        `- error: external macro implementation type 'SwiftUIMacros.StateMacro' could not be found for macro 'State()'; plugin for module 'SwiftUIMacros' not found
- 13 | 
- 14 |     public init(settings: Settings, installer: HelperInstaller, uninstaller: HelperUninstaller) {
-
-SwiftUI.State:1:145: note: 'State()' declared here
-1 | @attached(accessor, names: named(init), named(get), named(set)) @attached(peer, names: prefixed(`_`), prefixed(__), prefixed(`$`)) public macro State() = #externalMacro(module: "SwiftUIMacros", type: "StateMacro")
-  |                                                                                                                                                 `- note: 'State()' declared here
-
-/Users/kaveenhimash/Parallels/Windows Shared Folder/ntfsmac/gui/Status/StatusIcon.swift:42:24: error: external macro implementation type 'SwiftUIMacros.StateMacro' could not be found for macro 'State()'; plugin for module 'SwiftUIMacros' not found
-40 | public struct StatusIconView: View {
-41 |     let state: MountState
-42 |     @State private var isDim = false
-   |                        `- error: external macro implementation type 'SwiftUIMacros.StateMacro' could not be found for macro 'State()'; plugin for module 'SwiftUIMacros' not found
-43 | 
-44 |     public init(state: MountState) {
-
-SwiftUI.State:1:145: note: 'State()' declared here
-1 | @attached(accessor, names: named(init), named(get), named(set)) @attached(peer, names: prefixed(`_`), prefixed(__), prefixed(`$`)) public macro State() = #externalMacro(module: "SwiftUIMacros", type: "StateMacro")
-  |                                                                                                                                                 `- note: 'State()' declared here
-
-/Users/kaveenhimash/Parallels/Windows Shared Folder/ntfsmac/gui/Status/StatusIcon.swift:42:24: error: external macro implementation type 'SwiftUIMacros.StateMacro' could not be found for macro 'State()'; plugin for module 'SwiftUIMacros' not found
-40 | public struct StatusIconView: View {
-41 |     let state: MountState
-42 |     @State private var isDim = false
-   |                        `- error: external macro implementation type 'SwiftUIMacros.StateMacro' could not be found for macro 'State()'; plugin for module 'SwiftUIMacros' not found
-43 | 
-44 |     public init(state: MountState) {
-
-SwiftUI.State:1:145: note: 'State()' declared here
-1 | @attached(accessor, names: named(init), named(get), named(set)) @attached(peer, names: prefixed(`_`), prefixed(__), prefixed(`$`)) public macro State() = #externalMacro(module: "SwiftUIMacros", type: "StateMacro")
-  |                                                                                                                                                 `- note: 'State()' declared here
-
-/Users/kaveenhimash/Parallels/Windows Shared Folder/ntfsmac/gui/Views/PopoverContentView.swift:24:24: error: external macro implementation type 'SwiftUIMacros.StateMacro' could not be found for macro 'State()'; plugin for module 'SwiftUIMacros' not found
- 22 |     public let helperClient: HelperClient
- 23 | 
- 24 |     @State private var showDiagnose = false
-    |                        `- error: external macro implementation type 'SwiftUIMacros.StateMacro' could not be found for macro 'State()'; plugin for module 'SwiftUIMacros' not found
- 25 | 
- 26 |     public init(
-
-SwiftUI.State:1:145: note: 'State()' declared here
-1 | @attached(accessor, names: named(init), named(get), named(set)) @attached(peer, names: prefixed(`_`), prefixed(__), prefixed(`$`)) public macro State() = #externalMacro(module: "SwiftUIMacros", type: "StateMacro")
-  |                                                                                                                                                 `- note: 'State()' declared here
-
-/Users/kaveenhimash/Parallels/Windows Shared Folder/ntfsmac/gui/Views/PopoverContentView.swift:24:24: error: external macro implementation type 'SwiftUIMacros.StateMacro' could not be found for macro 'State()'; plugin for module 'SwiftUIMacros' not found
- 22 |     public let helperClient: HelperClient
- 23 | 
- 24 |     @State private var showDiagnose = false
-    |                        `- error: external macro implementation type 'SwiftUIMacros.StateMacro' could not be found for macro 'State()'; plugin for module 'SwiftUIMacros' not found
- 25 | 
- 26 |     public init(
-
-SwiftUI.State:1:145: note: 'State()' declared here
-1 | @attached(accessor, names: named(init), named(get), named(set)) @attached(peer, names: prefixed(`_`), prefixed(__), prefixed(`$`)) public macro State() = #externalMacro(module: "SwiftUIMacros", type: "StateMacro")
-  |                                                                                                                                                 `- note: 'State()' declared here
-Failed frontend command:
-/Library/Developer/CommandLineTools/usr/bin/swift-frontend -frontend -emit-module -experimental-skip-non-inlinable-function-bodies-without-types /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/Actions/DiagnoseRunner.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/Actions/FinderOpener.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/Actions/MountController.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/Actions/RemountController.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/Drives/DriveScanner.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/Drives/ThroughputMonitor.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/FirstRun/HelperInstaller.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/FirstRun/HelperUninstaller.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/Helper/HelperClient.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/Preferences/PreferencesView.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/Preferences/Settings.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/State/AppState.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/Status/StatusIcon.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/Style/Colors.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/Style/GlassTheme.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/Views/DiagnosePanel.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/Views/DirtyBanner.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/Views/DriveRow.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/Views/FirstRunView.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/Views/PopoverContentView.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/Views/SecurityIndicators.swift /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/gui/Views/SpeedBar.swift -target arm64-apple-macos13.0 -disable-cross-import-overlay-search -load-resolved-plugin /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/libObservationMacros.dylib\#\#ObservationMacros -load-resolved-plugin /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/libSwiftMacros.dylib\#\#SwiftMacros -disable-implicit-swift-modules -Xcc -fno-implicit-modules -Xcc -fno-implicit-module-maps -explicit-swift-module-map-file /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/.build/out/Intermediates.noindex/ntfsmac-gui.build/Debug/NtfsmacGUI-t.build/Objects-normal/arm64/NtfsmacGUI-dependencies-1.json -Xllvm -aarch64-use-tbi -enable-objc-interop -stack-check -sdk /Library/Developer/CommandLineTools/SDKs/MacOSX27.0.sdk -I /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/.build/out/Products/Debug -Isystem /Library/Developer/CommandLineTools/Developer/usr/lib -F /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/.build/out/Products/Debug/PackageFrameworks -F /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/.build/out/Products/Debug -F /Library/Developer/CommandLineTools/Library/Developer/Frameworks -F /Library/Developer/CommandLineTools/Developer/Library/Frameworks -module-cache-path /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/.build/out/Intermediates.noindex/SwiftExplicitPrecompiledModules -color-diagnostics -Xcc -fcolor-diagnostics -enable-testing -g -debug-info-format\=dwarf -dwarf-version\=4 -swift-version 6 -Onone -D SWIFT_PACKAGE -D DEBUG -D SWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE -D Xcode -serialize-debugging-options -enable-experimental-feature DebugDescriptionMacro -empty-abi-descriptor -validate-clang-modules-once -clang-build-session-file /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/.build/out/ModuleCache.noindex/Session.modulevalidation -Xcc -working-directory -Xcc /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder -enable-anonymous-context-mangled-names -file-compilation-dir /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -Xcc -ivfsstatcache -Xcc /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/.build/out/SDKStatCaches.noindex/macosx27.0-26A5378i-1aa54e4a50e311dbd51de5aafe7eca3dffd68ff603bdaacc80b00cb8898de72d.sdkstatcache -Xcc -fmodules-prune-interval\=86400 -Xcc -fmodules-prune-after\=345600 -Xcc -I/Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/.build/out/Products/Debug/include -Xcc -I/Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/.build/out/Intermediates.noindex/ntfsmac-gui.build/Debug/NtfsmacGUI-t.build/DerivedSources-normal/arm64 -Xcc -I/Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/.build/out/Intermediates.noindex/ntfsmac-gui.build/Debug/NtfsmacGUI-t.build/DerivedSources/arm64 -Xcc -I/Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/.build/out/Intermediates.noindex/ntfsmac-gui.build/Debug/NtfsmacGUI-t.build/DerivedSources -Xcc -DSWIFT_PACKAGE -Xcc -DDEBUG\=1 -no-auto-bridging-header-chaining -module-name NtfsmacGUI -package-name ntfsmac -const-gather-protocols-file /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/.build/out/Intermediates.noindex/ntfsmac-gui.build/Debug/NtfsmacGUI-t.build/Objects-normal/arm64/NtfsmacGUI_const_extract_protocols.json -disable-clang-spi -clang-target arm64-apple-macos27.0 -target-sdk-version 27.0 -target-sdk-name macosx27.0 -in-process-plugin-server-path /Library/Developer/CommandLineTools/usr/lib/swift/host/libSwiftInProcPluginServer.dylib -emit-module-doc-path /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/.build/out/Intermediates.noindex/ntfsmac-gui.build/Debug/NtfsmacGUI-t.build/Objects-normal/arm64/NtfsmacGUI.swiftdoc -emit-module-source-info-path /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/.build/out/Intermediates.noindex/ntfsmac-gui.build/Debug/NtfsmacGUI-t.build/Objects-normal/arm64/NtfsmacGUI.swiftsourceinfo -emit-objc-header-path /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/.build/out/Intermediates.noindex/ntfsmac-gui.build/Debug/NtfsmacGUI-t.build/Objects-normal/arm64/NtfsmacGUI-Swift.h -serialize-diagnostics-path /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/.build/out/Intermediates.noindex/ntfsmac-gui.build/Debug/NtfsmacGUI-t.build/Objects-normal/arm64/NtfsmacGUI-primary-emit-module.dia -emit-dependencies-path /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/.build/out/Intermediates.noindex/ntfsmac-gui.build/Debug/NtfsmacGUI-t.build/Objects-normal/arm64/NtfsmacGUI-primary-emit-module.d -parse-as-library -o /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/.build/out/Intermediates.noindex/ntfsmac-gui.build/Debug/NtfsmacGUI-t.build/Objects-normal/arm64/NtfsmacGUI.swiftmodule -emit-abi-descriptor-path /Users/kaveenhimash/Parallels/Windows\ Shared\ Folder/ntfsmac/.build/out/Intermediates.noindex/ntfsmac-gui.build/Debug/NtfsmacGUI-t.build/Objects-normal/arm64/NtfsmacGUI.abi.json
-
-error: Build failed
-
+Fixed: root cause identified for the build failure below — the failing build was running against
+the standalone Command Line Tools, with no Xcode.app toolchain in play. The `@State` macro
+plugin ships inside Xcode.app, not CLT, so `@State` failed to expand:
 
 ```
+error: external macro implementation type 'SwiftUIMacros.StateMacro' could not be found for macro 'State()'; plugin for module 'SwiftUIMacros' not found
+```
 
-Confirms the CLT-only diagnosis: the build path is `/Users/kaveenhimash/Parallels/Windows Shared
-Folder/...` and the SDK is `/Library/Developer/CommandLineTools/SDKs/MacOSX27.0.sdk` — no
-Xcode.app toolchain in play. Not an ntfsmac code bug; select full Xcode per the prerequisite
+Confirms the CLT-only diagnosis. Not an ntfsmac code bug; select full Xcode per the prerequisite
 above and re-run.
 
 (No `.app` bundle exists yet — packaging is separate, unbuilt work. Expect a Dock icon too,
@@ -349,7 +275,7 @@ The menu-bar icon itself uses a placeholder SF Symbol for now — see "app icon"
 5. Click `Diagnose` in the footer, then the `Diagnose` button inside the panel that appears —
    should match Part A's `diagnose --json` output in plain language.
 6. Click `Unmount` — icon returns to grey/idle, drive drops off the mounted row.
-7. Click the gear icon — Preferences window opens (compare against Gap 2's comp). Toggle
+7. Click the gear icon — Preferences window opens (compare against Gap 2's screen). Toggle
    settings, close, reopen — confirm they persisted (backed by `UserDefaults`, should survive
    without even restarting the app).
 8. Click `Quit` — app should exit; `mount | grep nfs` back in Terminal should show nothing
@@ -368,14 +294,14 @@ skip if inconvenient — Part A/B above are the primary coverage.
 ## What's fully testable today, no drive, no new code
 
 ```bash
-cd "/Volumes/My Shared Files/Windows Shared Folder/ntfsmac"
+cd <repo>
 swift test
 ```
 
 If you hit `error: input file '...runner.swift' was modified during the build` — real,
-already-documented SPM/network-share fsync race (this repo lives on
-`/Volumes/My Shared Files/Windows Shared Folder/`, same class of quirk `build/AUDIT.md`
-documents for `v-alpine-rootfs`). Work around it with a local build cache:
+already-documented SPM/network-share fsync race (when the repo lives on a path-with-spaces
+network volume, same class of quirk `build/AUDIT.md` documents for `v-alpine-rootfs`). Work
+around it with a local build cache:
 
 ```bash
 swift test --build-path /tmp/ntfsmac-build
@@ -442,6 +368,29 @@ under a live mount.
 
 ---
 
+## Swift conventions
+
+Project-wide Swift conventions for the GUI (`gui/`) and helper (`helper/`):
+
+- **Test framework:** Swift Testing (`import Testing`) with `@Test` and `#expect` — see
+  `gui/Tests/`. Each test owns its state via `init`/`deinit`; no shared mutable state between
+  tests. Use parameterized `@Test(arguments:)` to cover input variants in one test.
+- **Immutability:** prefer `let` over `var`; default to `struct` with value semantics, reach
+  for `class` only when identity/reference semantics are required.
+- **Concurrency:** Swift 6 strict concurrency. Prefer `Sendable` value types across isolation
+  boundaries, actors for shared mutable state, structured concurrency (`async let`, `TaskGroup`)
+  over unstructured `Task {}`.
+- **Logging:** no `print()` in production paths — use `os.Logger`.
+- **Secrets:** Keychain Services for anything sensitive (tokens/passwords/keys), never
+  `UserDefaults`. Build-time secrets via environment variables or `.xcconfig`. Never hardcode
+  secrets in source.
+- **Transport:** keep App Transport Security enabled; validate server certificates.
+- **Build caveat:** SPM on a path-with-spaces volume can hit the `runner.swift modified during
+  the build` race — build off-volume with `--build-path /tmp/ntfsmac-build` (see
+  `build/AUDIT.md`).
+
+---
+
 ## Priority order
 
 1. **Part A (CLI end-to-end)** — highest value, this is the very first real hardware test of
@@ -449,4 +398,4 @@ under a live mount.
 2. **Part B (GUI end-to-end)** — same underlying path, confirms the wiring works for real.
 3. **Gap 2 (visual parity)** — do this while you're already walking states in Part B.
 4. **Uninstall (CLI + GUI)** — confirm no leftovers, both paths.
-5. Optional dirty-journal repro, if you want full state coverage                                                                                                                                                                                                                                                                                                   
+5. Optional dirty-journal repro, if you want full state coverage

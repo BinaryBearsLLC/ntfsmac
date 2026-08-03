@@ -54,11 +54,12 @@ private func renderPopover(
     appState: AppState,
     mountController: MountController,
     helperInstaller: HelperInstaller,
-    cliInstallChecker: CLIInstallChecker
+    cliInstallChecker: CLIInstallChecker,
+    driveScanner: DriveScanner = DriveScanner()
 ) -> CGSize? {
     let view = PopoverContentView(
         appState: appState,
-        driveScanner: DriveScanner(),
+        driveScanner: driveScanner,
         mountController: mountController,
         throughputMonitor: ThroughputMonitor(),
         remountController: RemountController(appState: appState),
@@ -84,7 +85,25 @@ private func renderPopover(
     #expect(appState.state == .mountedReadWrite)
 
     let size = renderPopover(appState: appState, mountController: controller, helperInstaller: helperInstaller, cliInstallChecker: cliInstallChecker)
-    #expect(size != nil, "mountedReadWrite popover must render a non-empty image — SpeedBar/SecurityIndicators/Unmount row all live in this state")
+    #expect(size != nil, "mountedReadWrite popover must render a non-empty image — Unmount row + SecurityIndicators live in this state")
+}
+
+@MainActor @Test func mountedWithTwoDrivesRendersBothUnmountRows() async throws {
+    // Multi-mount: mounted screen ForEach-es over mountedDrives, one DriveRow (with its own
+    // Unmount pill) per drive. A two-drive render that produces a non-empty image proves the
+    // per-row path didn't collapse the popover. View content can't be grepped from an
+    // ImageRenderer image, so structural non-collapse is the available safety net here.
+    let (helperInstaller, cliInstallChecker, cleanup) = try await makeInstalledDependencies()
+    defer { cleanup() }
+    let appState = AppState()
+    let controller = MountController(helper: FakeHelper(), appState: appState)
+    await controller.mount(sampleDrive)
+    await controller.mount(Drive(identifier: "disk5s1", fsType: "ext4", label: "ExtVol", size: "32.0 GB"))
+    #expect(controller.mountedDriveIDs == Set(["disk4s2", "disk5s1"]))
+    #expect(appState.state == .mountedReadWrite)
+
+    let size = renderPopover(appState: appState, mountController: controller, helperInstaller: helperInstaller, cliInstallChecker: cliInstallChecker)
+    #expect(size != nil, "multi-mount popover (two mounted rows, each with Unmount) must render a non-empty image")
 }
 
 @MainActor @Test func mountedReadOnlyStateRendersWithoutCollapsing() async throws {
@@ -153,3 +172,73 @@ private func renderPopover(
     let size = renderPopover(appState: appState, mountController: controller, helperInstaller: helperInstaller, cliInstallChecker: cliInstallChecker)
     #expect(size != nil)
 }
+
+// "Other available" section split: idle-with-drives renders the detected drives as the primary
+// list (mountable rows + a Refresh pill, no "Other available" label) — must not collapse. Drive
+// scanner seeded via the same FakeListRunner seam DriveScannerTests uses (real `anylinuxfs list`
+// output shape), so the popover actually has a drive row to render in the idle state.
+@MainActor @Test func idleWithDrivesRendersWithoutCollapsing() async throws {
+    let (helperInstaller, cliInstallChecker, cleanup) = try await makeInstalledDependencies()
+    defer { cleanup() }
+    let appState = AppState()
+    let controller = MountController(helper: FakeHelper(), appState: appState)
+    let scanner = DriveScanner(runner: SeededListRunner(output: sampleListOutput), anylinuxfsPath: "/stub/anylinuxfs")
+    await scanner.refresh()
+    #expect(scanner.drives.count == 1)
+
+    let size = renderPopover(appState: appState, mountController: controller, helperInstaller: helperInstaller, cliInstallChecker: cliInstallChecker, driveScanner: scanner)
+    #expect(size != nil, "idle-with-drives popover (detected drive row + Refresh pill, no 'Other available' label) must render a non-empty image")
+}
+
+// Mounted with a second unmounted drive available: the "Other available devices" section renders
+// below the mounted list and above SecurityIndicators. A render that produces a non-empty image
+// proves the mounted-branch section path didn't collapse the popover.
+@MainActor @Test func mountedWithUnmountedAvailableRendersSection() async throws {
+    let (helperInstaller, cliInstallChecker, cleanup) = try await makeInstalledDependencies()
+    defer { cleanup() }
+    let appState = AppState()
+    let controller = MountController(helper: FakeHelper(), appState: appState)
+    await controller.mount(sampleDrive)
+    #expect(appState.state == .mountedReadWrite)
+    // Scanner sees the mounted drive plus a second unmounted one.
+    let scanner = DriveScanner(runner: SeededListRunner(output: sampleMultiDriveListOutput), anylinuxfsPath: "/stub/anylinuxfs")
+    await scanner.refresh()
+    #expect(scanner.drives.count == 2)
+    #expect(scanner.drives.map(\.identifier) == ["disk4s2", "disk5s1"])
+    #expect(!scanner.drives.map(\.identifier).allSatisfy { controller.mountedDriveIDs.contains($0) })
+
+    let size = renderPopover(appState: appState, mountController: controller, helperInstaller: helperInstaller, cliInstallChecker: cliInstallChecker, driveScanner: scanner)
+    #expect(size != nil, "mounted + available-unmounted popover (mounted row + 'Other available devices' section) must render a non-empty image")
+}
+
+// Minimal fake runner for render tests: returns a fixed `anylinuxfs list` output so DriveScanner
+// has real parsed drives without spawning a process. Same shape as DriveScannerTests' FakeListRunner.
+private final class SeededListRunner: PrivilegedCommandRunning {
+    let output: String
+    init(output: String) { self.output = output }
+    func run(_ executablePath: String, _ arguments: [String]) -> CommandResult {
+        CommandResult(output: output, exitCode: 0)
+    }
+    func runPipingStdin(_ input: String, to executablePath: String, _ arguments: [String]) -> CommandResult {
+        CommandResult(output: "", exitCode: 0)
+    }
+}
+
+private let sampleListOutput = """
+/dev/disk4 (external, physical):
+   #:                       TYPE NAME                    SIZE       IDENTIFIER
+   0:      GUID_partition_scheme                        *500.1 GB   disk4
+   1:                       ntfs My Drive                500.0 GB   disk4s2
+"""
+
+private let sampleMultiDriveListOutput = """
+/dev/disk4 (external, physical):
+   #:                       TYPE NAME                    SIZE       IDENTIFIER
+   0:      GUID_partition_scheme                        *500.1 GB   disk4
+   1:                       ntfs My Drive                500.0 GB   disk4s2
+
+/dev/disk5 (external, physical):
+   #:                       TYPE NAME                    SIZE       IDENTIFIER
+   0:  FDisk_partition_scheme                            *64.0 GB    disk5
+   1:                       ext4 ExtVol                   64.0 GB    disk5s1
+"""

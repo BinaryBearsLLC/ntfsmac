@@ -38,8 +38,8 @@ main() {
   local version commit
   version="$(lock_get GVPROXY_VERSION)" || { echo "build-gvproxy: HARD-STOP — GVPROXY_VERSION missing from sources.lock" >&2; exit 1; }
   commit="$(lock_get GVPROXY_COMMIT)" || { echo "build-gvproxy: HARD-STOP — GVPROXY_COMMIT missing from sources.lock" >&2; exit 1; }
-  if [[ "$version" == "TODO-KAVEEN" || "$commit" == "TODO-KAVEEN" ]]; then
-    echo "build-gvproxy: HARD-STOP — GVPROXY_VERSION/COMMIT unresolved (TODO-KAVEEN)" >&2
+  if [[ "$version" == "TODO-UNRESOLVED" || "$commit" == "TODO-UNRESOLVED" ]]; then
+    echo "build-gvproxy: HARD-STOP — GVPROXY_VERSION/COMMIT unresolved (TODO-UNRESOLVED)" >&2
     exit 1
   fi
 
