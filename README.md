@@ -89,6 +89,28 @@ environment…` so it doesn't look like a hang. Every mount after that reuses th
 rootfs and starts the microVM directly, with no network needed. If the first mount fails
 offline, get online once, let it finish, then subsequent mounts work on a cold start.
 
+**Can't write to an ext volume / `Operation not permitted`.** ext2/3/4 are real
+Unix filesystems with their own ownership bits, so ntfsmac auto-passes
+`--ignore-permissions` for any ext-family drive (the NFS export gets
+`all_squash,anonuid=0,anongid=0` and the macOS mount gets `noowners` — files appear
+owned by you and are writable). You should not need to pass `--ignore-permissions`
+yourself for ext; if an ext mount is read-only, reinstall (older CLI builds had a bug
+that skipped the flag for unlabeled ext drives). Verify the flag reached the mount:
+
+```sh
+mount | grep nfs     # expect "noowners" in the options for an ext volume
+```
+
+If `noowners` is present but `ls`/`cp` on the mounted volume still says
+`Operation not permitted`, the volume is writable but **macOS is blocking the
+app's access to the mount point** — this is a privacy/TCC gate, not an NFS
+permission issue. Grant Full Disk Access: **System Settings → Privacy & Security
+→ Full Disk Access**, add **Terminal** (for the CLI) and/or the **ntfsmac** app
+(for the GUI), then restart that app. The GUI prompts for this on first mount;
+the CLI does not, so grant it manually the first time. This is required for
+proper operation — without it macOS refuses the app access to `/Volumes/*`
+mounts even though the NFS export itself is read/write.
+
 **A drive doesn't show up / macOS says "unidentifiable."** ntfsmac mounts
 **partitions** (`diskNsN`, e.g. `disk4s1`), never a whole disk (`disk4`) — the device
 name is validated against `^disk[0-9]+s[0-9]+$` before any command touches it. If macOS
