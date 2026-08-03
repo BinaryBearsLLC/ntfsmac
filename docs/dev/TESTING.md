@@ -268,6 +268,9 @@ The menu-bar icon itself uses a placeholder SF Symbol for now — see "app icon"
    actually expect before you do anything destructive to `/usr/local`.
 2. Popover should show your drive in the list (the same filtered `anylinuxfs list` data Part A's
    `list` command showed, including MBR `Windows_NTFS`). Click `[Mount]`.
+   If Full Disk Access is required, macOS lists the component as
+   `com.khr898.ntfsmac.helper`; this is the technical service name of **ntfsmac Helper**, not an
+   unrelated package. Enable that exact entry, return to ntfsmac, and retry the mount.
 3. Icon should pulse blue while mounting, then turn green with the drive shown as mounted, a
    live (if idle) speed bar, and security indicators.
 4. Click `Open in Finder` — a real Finder window should reveal the mount point.

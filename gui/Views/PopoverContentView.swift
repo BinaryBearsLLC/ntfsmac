@@ -459,7 +459,12 @@ public struct PopoverContentView: View {
     }
 }
 
-/// A beautiful modal prompt guiding the user to grant Full Disk Access to the privileged helper daemon.
+enum FDAPromptCopy {
+    static let helperServiceName = "com.khr898.ntfsmac.helper"
+    static let instructions = "macOS lists the ntfsmac Helper under its technical service name, \(helperServiceName). Enable that entry in Full Disk Access. If it is not listed, add it with the '+' button."
+}
+
+/// A modal prompt guiding the user to grant Full Disk Access to the privileged helper daemon.
 struct FDAPromptView: View {
     let onOpenSettings: () -> Void
     let onCancel: () -> Void
@@ -488,7 +493,7 @@ struct FDAPromptView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             
-            Text("To proceed, open System Settings and ensure the **ntfsmac helper** (com.khr898.ntfsmac.helper) is enabled under the Full Disk Access list. If it is not in the list, you can add it manually using the '+' button.")
+            Text(FDAPromptCopy.instructions)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.leading)
