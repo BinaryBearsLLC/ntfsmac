@@ -15,12 +15,23 @@ public struct CLIMissingView: View {
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject public var checker: CLIInstallChecker
     @ObservedObject public var stager: CLIAutoStager
+    public let onOpenSettings: () -> Void
     public let onQuit: () -> Void
 
-    public init(checker: CLIInstallChecker, stager: CLIAutoStager, onQuit: @escaping () -> Void) {
+    public init(
+        checker: CLIInstallChecker,
+        stager: CLIAutoStager,
+        onOpenSettings: @escaping () -> Void,
+        onQuit: @escaping () -> Void
+    ) {
         self.checker = checker
         self.stager = stager
+        self.onOpenSettings = onOpenSettings
         self.onQuit = onQuit
+    }
+
+    public init(checker: CLIInstallChecker, stager: CLIAutoStager, onQuit: @escaping () -> Void) {
+        self.init(checker: checker, stager: stager, onOpenSettings: {}, onQuit: onQuit)
     }
 
     public var body: some View {
@@ -73,7 +84,7 @@ public struct CLIMissingView: View {
 
             HStack(spacing: 5) {
                 Button {
-                    PreferencesOpener.open()
+                    onOpenSettings()
                 } label: {
                     SettingsGearGlyph(color: colorScheme == .dark ? .white.opacity(0.52) : .black.opacity(0.45))
                 }

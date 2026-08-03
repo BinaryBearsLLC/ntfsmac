@@ -55,7 +55,8 @@ private func renderPopover(
     mountController: MountController,
     helperInstaller: HelperInstaller,
     cliInstallChecker: CLIInstallChecker,
-    driveScanner: DriveScanner = DriveScanner()
+    driveScanner: DriveScanner = DriveScanner(),
+    navigation: PopoverNavigation = PopoverNavigation()
 ) -> CGSize? {
     let view = PopoverContentView(
         appState: appState,
@@ -65,15 +66,77 @@ private func renderPopover(
         remountController: RemountController(appState: appState),
         diagnoseRunner: DiagnoseRunner(),
         helperInstaller: helperInstaller,
+        helperUninstaller: HelperUninstaller(),
         cliInstallChecker: cliInstallChecker,
         cliAutoStager: CLIAutoStager(checker: cliInstallChecker),
         settings: Settings(defaults: UserDefaults(suiteName: UUID().uuidString)!),
         finderOpener: FinderOpener(),
-        helperClient: HelperClient()
+        helperClient: HelperClient(),
+        navigation: navigation
     )
     let renderer = ImageRenderer(content: view)
     guard let image = renderer.nsImage, image.size.width > 0, image.size.height > 0 else { return nil }
     return image.size
+}
+
+@MainActor @Test func settingsPageRendersFromNormalContentWithoutASeparateWindow() async throws {
+    let (helperInstaller, cliInstallChecker, cleanup) = try await makeInstalledDependencies()
+    defer { cleanup() }
+    let navigation = PopoverNavigation()
+    navigation.showSettings()
+    let appState = AppState()
+
+    let size = renderPopover(
+        appState: appState,
+        mountController: MountController(helper: FakeHelper(), appState: appState),
+        helperInstaller: helperInstaller,
+        cliInstallChecker: cliInstallChecker,
+        navigation: navigation
+    )
+
+    #expect(size?.width == 320)
+    #expect(navigation.page == .settings)
+}
+
+@MainActor @Test func settingsRouteIsAvailableDuringFirstRun() {
+    let navigation = PopoverNavigation()
+    navigation.showSettings()
+    let checker = CLIInstallChecker(candidatePaths: ["/nonexistent"], anylinuxfsPaths: ["/nonexistent"])
+    checker.check()
+    let appState = AppState()
+
+    let size = renderPopover(
+        appState: appState,
+        mountController: MountController(helper: FakeHelper(), appState: appState),
+        helperInstaller: HelperInstaller(service: InstalledService()),
+        cliInstallChecker: checker,
+        navigation: navigation
+    )
+
+    #expect(size?.width == 320)
+}
+
+@MainActor @Test func settingsRouteIsAvailableDuringCliRepair() async {
+    let helperInstaller = HelperInstaller(service: InstalledService())
+    await helperInstaller.installIfNeeded()
+    #expect(helperInstaller.state == .installed)
+
+    let checker = CLIInstallChecker(candidatePaths: ["/nonexistent"], anylinuxfsPaths: ["/nonexistent"])
+    checker.check()
+    #expect(!checker.isInstalled)
+
+    let navigation = PopoverNavigation()
+    navigation.showSettings()
+    let appState = AppState()
+    let size = renderPopover(
+        appState: appState,
+        mountController: MountController(helper: FakeHelper(), appState: appState),
+        helperInstaller: helperInstaller,
+        cliInstallChecker: checker,
+        navigation: navigation
+    )
+
+    #expect(size?.width == 320)
 }
 
 @MainActor @Test func mountedReadWriteStateRendersWithoutCollapsing() async throws {

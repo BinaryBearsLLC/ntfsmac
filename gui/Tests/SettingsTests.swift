@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import NtfsmacGUI
 
-// GUI-PLAN.md "Preferences window". Acceptance: assert defaults + persistence round-trip.
+// GUI-PLAN.md "Settings page". Acceptance: assert defaults + persistence round-trip.
 // Uses an isolated UserDefaults suite per test (never the real .standard domain).
 
 private func makeIsolatedDefaults(_ testName: String) -> UserDefaults {

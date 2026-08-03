@@ -77,6 +77,7 @@ let package = Package(
                 "Preferences/Settings.swift", "Preferences/PreferencesView.swift",
                 "Style/Colors.swift", "Style/GlassTheme.swift", "Style/Icons.swift", "Style/PillButtons.swift",
                 "Style/TooltipCopy.swift",
+                "State/PopoverNavigation.swift",
                 "Views/PopoverContentView.swift",
             ]
         ),

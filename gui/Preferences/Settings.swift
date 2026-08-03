@@ -198,7 +198,7 @@ public final class Settings: ObservableObject {
         }
     }
 
-    /// GUI-PLAN.md "Preferences window" table's literal Default column.
+    /// GUI-PLAN.md "Settings page" table's literal Default column.
     public enum Defaults {
         public static let launchAtLogin = false
     }
