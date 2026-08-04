@@ -21,27 +21,37 @@ public enum HelperClientError: Error {
 /// without an `@unchecked Sendable` escape hatch.
 @MainActor
 public final class HelperClient: Sendable {
-    // `nonisolated(unsafe)`: same documented exception as before (`invalidate()` is thread-safe
-    // per Apple's docs); all access now goes through `currentConnection()`, guarded by
-    // `connectionLock`.
+    // `nonisolated(unsafe)`: all access goes through `currentConnection()` or the invalidation
+    // handler, both guarded by `connectionLock`.
     //
-    // Self-healing: an invalidated NSXPCConnection never reconnects on its own — a connection that
-    // dies right after a fresh SMJobBless (daemon not listening yet) used to stay dead for the
-    // rest of the process, reading as "can't talk to helper until restart." `currentConnection()`
-    // rebuilds it on the next call instead.
-    private nonisolated(unsafe) var connection: NSXPCConnection
+    // The connection is intentionally lazy. Creating/resuming it in `init` races first-run
+    // SMJobBless: the app constructs its clients before the helper exists, leaving their first
+    // real request attached to a failed bootstrap connection. The user then sees "couldn't
+    // communicate with helper" immediately after authorizing a successful install. Creating it
+    // at the first privileged request removes that race; an invalidated connection is still
+    // rebuilt on the following call.
+    private nonisolated(unsafe) var connection: NSXPCConnection?
     private let connectionLock = NSLock()
     private let machServiceName: String
-    private nonisolated(unsafe) var needsReconnect = false
+    private let connectionFactory: @Sendable (String) -> NSXPCConnection
 
     public init(machServiceName: String = helperMachServiceName) {
         self.machServiceName = machServiceName
-        self.connection = Self.makeConnection(machServiceName: machServiceName)
-        wireInvalidationHandler(on: connection)
+        self.connectionFactory = Self.makeConnection(machServiceName:)
+        self.connection = nil
+    }
+
+    init(
+        machServiceName: String,
+        connectionFactory: @escaping @Sendable (String) -> NSXPCConnection
+    ) {
+        self.machServiceName = machServiceName
+        self.connectionFactory = connectionFactory
+        self.connection = nil
     }
 
     deinit {
-        connection.invalidate()
+        connection?.invalidate()
     }
 
     private nonisolated static func makeConnection(machServiceName: String) -> NSXPCConnection {
@@ -51,29 +61,33 @@ public final class HelperClient: Sendable {
         return connection
     }
 
-    // Runs on XPC's own queue, not the main actor (same as `call()`/`version()` below). Only flips
-    // a flag; `currentConnection()` does the actual rebuild lazily on the next call.
+    // Runs on XPC's own queue, not the main actor (same as `call()`/`version()` below). Clear only
+    // the connection that actually invalidated: a delayed callback from an old connection must
+    // not discard a newer replacement.
     private nonisolated func wireInvalidationHandler(on connection: NSXPCConnection) {
-        connection.invalidationHandler = { [weak self] in
-            guard let self else { return }
+        connection.invalidationHandler = { [weak self, weak connection] in
+            guard let self, let connection else { return }
             helperClientLog.notice("XPC connection invalidated — will rebuild on next call")
             self.connectionLock.lock()
-            self.needsReconnect = true
+            if self.connection === connection {
+                self.connection = nil
+            }
             self.connectionLock.unlock()
         }
     }
 
-    // `connectionLock`-guarded so the invalidation callback above and a `call()`/`version()`
-    // caller can't race over which connection is "current."
+    // `connectionLock`-guarded so construction and invalidation cannot race over which connection
+    // is current. Nothing is created until the first actual helper request.
     private nonisolated func currentConnection() -> NSXPCConnection {
         connectionLock.lock()
         defer { connectionLock.unlock() }
-        if needsReconnect {
-            connection = Self.makeConnection(machServiceName: machServiceName)
-            wireInvalidationHandler(on: connection)
-            needsReconnect = false
+        if let connection {
+            return connection
         }
-        return connection
+        let newConnection = connectionFactory(machServiceName)
+        connection = newConnection
+        wireInvalidationHandler(on: newConnection)
+        return newConnection
     }
 
     // `nonisolated`: NSXPCConnection invokes both this and the error handler below from its own
