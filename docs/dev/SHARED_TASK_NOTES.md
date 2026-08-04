@@ -749,6 +749,30 @@ still-open VM-boot gate and an end-to-end "connect a real NTFS drive" walkthroug
   user-selected `.json` destination. Cancellation writes nothing and ntfsmac never uploads the
   report. The JSON contains the existing CLI health fields, including `macos_version`; no mount,
   helper, XPC, signing, network-policy, or deployment-target behavior changed.
+- **Privacy-safe diagnostic/version polish follow-up (2026-08-03)** — schema 2 adds the canonical
+  release/build, macOS version, architecture, helper presence, fixed internal names for missing or
+  quarantined runtime components, a yes/no VPN-default-route signal, and active NFS mount count.
+  CLI text, CLI JSON, the GUI summary, and Command-click export use the same fields. Reports omit
+  usernames, hardware/serial/device/volume identity, mount paths, and VPN/interface/address/DNS/
+  route details. Settings shows the same release/build in secondary text, and packaging now
+  hard-stops if the canonical CLI version differs from either GUI or helper Info.plist metadata.
+  SMJobBless still installs the helper as a standalone `TOOL`; macOS may therefore show a generic
+  icon plus `com.khr898.ntfsmac.helper` in Full Disk Access. The app now explains the exact entry;
+  no signature/resource-fork workaround or privilege-architecture migration was introduced.
+- **Version-source and inline-uninstall follow-up (2026-08-04)** — `gui/Info.plist` is the sole
+  release/build source for the app and packaged source tree. `install.sh` stores its exact plist
+  beside the installed CLI resolver; packaging verifies helper metadata matches it, eliminating the
+  former shell constants. Settings now renders complete-uninstall confirmation inside the popover,
+  consumes it once, and displays dependency/helper phases plus the final result. This fixes the
+  transient `confirmationDialog` dismissal that could close Settings without beginning removal;
+  helper XPC methods, privileges, signing, and deletion scope are unchanged.
+- **First-run XPC bootstrap race follow-up (2026-08-04)** — live testing found that the first
+  Uninstall immediately after authorizing a new helper could report a communication failure, while
+  Reinstall plus a second Uninstall succeeded. Each `HelperClient` previously created/resumed its
+  `NSXPCConnection` during app initialization, before a first-run helper existed. Connections are
+  now lazy and are created only by the first privileged request; invalidation still clears only the
+  matching connection for safe recreation. No privileged operation is retried automatically, so
+  potentially non-idempotent requests cannot be duplicated after a lost reply.
 
 ## DECISIONS
 

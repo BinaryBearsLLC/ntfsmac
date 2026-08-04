@@ -25,8 +25,13 @@ are already built into the vendored kernel image.
 - **Multiple concurrent mounts** — mount more than one drive at once. The CLI mounts each
   device independently, and the GUI's mounted view lists every mounted drive with its own
   status and speed indicator (the old single-drive "Combined" speed readout is gone).
-- **`diagnose` reports macOS version** — the health check now prints the running macOS
-  version, for faster triage and bug reports.
+- **More useful, privacy-safe diagnostics** — CLI and GUI reports now identify the ntfsmac
+  version/build, macOS version, architecture, helper presence, affected runtime components,
+  VPN tunnel use as a yes/no signal, and the active NFS mount count without exposing local
+  paths or network identity.
+- **Reliable in-popover uninstall** — Settings keeps the destructive confirmation and removal
+  progress inside the menu-bar popover, then reports success or a plain-language failure instead
+  of dismissing the transient window before the helper operation starts.
 
 ## Requirements
 
@@ -75,17 +80,35 @@ report, hold **Command (⌘)** while clicking **Diagnose**: ntfsmac runs the sam
 the file is written; ntfsmac never uploads or sends it automatically. Review it if desired, then
 attach it manually to a bug report.
 
+The report is intentionally narrow. It does **not** include usernames, device identifiers,
+serial numbers, volume labels, mount paths, VPN provider/interface names, IP addresses, DNS
+servers, or routing tables. Component names such as `vmproxy` are fixed ntfsmac runtime names,
+not values taken from your Mac.
+
 What each line means:
 
 | `diagnose` line | Meaning / fix |
 | --- | --- |
-| `macOS version: <ver>` | Must be **13.0+** on Apple Silicon. An `unsupported` note here is fatal — older macOS can't run the microVM path. |
+| `ntfsmac version: <release> (<build>)` | Identifies the exact app/CLI build that produced the report. The same value appears below the Settings title. |
+| `macOS version: <ver>` / `architecture: <arch>` | Must be **13.0+** and `arm64`. An `unsupported` note is fatal. |
+| `privileged helper: installed` | Required by the GUI for privileged mount/network operations. A CLI-only installation can legitimately report `not installed`. |
 | `vendor binaries missing: N` (N > 0) | A vendored binary (`anylinuxfs`/`gvproxy`/`vmnet-helper`/`vmproxy`) wasn't found. Reinstall: `brew reinstall ntfsmac`, or re-run `install.sh`. |
 | `quarantined binaries: N` (N > 0) | Gatekeeper quarantined a vendored binary, so it won't launch. Reinstall (the installer strips the xattr), or clear it: `xattr -dr com.apple.quarantine <path>`. |
 | `kernel pin: mismatch` / `missing` | The pinned `modules.squashfs` kernel image doesn't match `sources.lock`. Reinstall to restore the pinned image. |
 | `vmnet bridge: down` | Expected when nothing is mounted; it should read `up` while a volume is mounted. If it stays `down` during a mount, approve the vmnet-helper permission prompt and retry. |
-| `current NFS mounts:` | Lists your mounted volume(s); `(none)` when idle. |
+| `VPN default route: detected` | A tunnel owns the default route. This is informational; the report does not record which VPN/interface or any address/route details. |
+| `current NFS mount count: N` | Number of active NFS mounts, without their names or paths. |
 | `overall: degraded` | One of the fatal checks above failed — fix that line first. |
+
+The app bundle's `CFBundleShortVersionString` and `CFBundleVersion` are the product-version source
+of truth. Packaging verifies the embedded helper matches them, and installation copies that exact
+metadata beside the CLI so Settings, text diagnostics, and JSON diagnostics cannot silently drift.
+
+When macOS asks for Full Disk Access it may show the standalone privileged tool with a generic
+executable icon and its technical service name, `com.khr898.ntfsmac.helper`. This is **ntfsmac
+Helper**, not an unrelated package; enable that exact entry. The SMJobBless helper is one signed
+executable rather than an app/resource bundle, so its icon cannot be customized independently
+without changing the privileged-helper architecture.
 
 **First mount needs network (one-time).** The first time you mount a drive, the
 vendored `init-rootfs` pulls a pinned Alpine Linux image (~50–150 MB) from Docker Hub and

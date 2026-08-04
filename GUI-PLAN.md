@@ -119,7 +119,8 @@ paragraphs across views, and must not change layout, focus order, or the macOS 1
 The gear replaces the main popover content with Settings. A keyboard-reachable `Back` action
 returns to the previous application content. Normal, first-run, and CLI-repair screens all use the
 same route and the same long-lived Settings/helper objects; navigation does not open an `NSWindow`
-or recreate in-flight state.
+or recreate in-flight state. The title includes the app release/build directly underneath in
+small secondary text; it is informative and never competes visually with the `Settings` heading.
 
 | Control | Type | Default |
 |---------|------|---------|
@@ -128,6 +129,17 @@ or recreate in-flight state.
 | Default mount point | Path picker | `/Volumes/<label>` |
 | Show speed in menu bar | Toggle | Off |
 | Reinstall privileged helper | Button | — |
+| Uninstall ntfsmac | Destructive button with in-popover confirmation and progress | — |
+
+Uninstall confirmation stays inside the transient menu-bar popover. Cancel returns to Settings;
+confirming consumes that confirmation once, disables duplicate starts, and keeps the current
+removal phase or final error visible until completion.
+
+The diagnostic panel renders the same privacy-safe schema exported by Command-click Diagnose:
+release/build, macOS and architecture, helper presence, fixed runtime component failures,
+kernel/bridge state, a yes/no VPN tunnel signal, and the active NFS mount count. It never displays
+or exports usernames, serials, volume/device identity, local paths, VPN identity, addresses, DNS,
+or routes.
 
 ---
 

@@ -1,5 +1,26 @@
 import SwiftUI
 
+/// MenuBarExtra uses a transient window. A native `confirmationDialog` dismisses that window as
+/// its destructive button is selected, which made the uninstall action appear to vanish before
+/// it reliably reached `HelperUninstaller`. Keep confirmation state in the popover itself instead.
+public struct UninstallConfirmationPresentation: Equatable, Sendable {
+    public private(set) var isVisible: Bool
+
+    public init(isVisible: Bool = false) {
+        self.isVisible = isVisible
+    }
+
+    public mutating func request() { isVisible = true }
+    public mutating func cancel() { isVisible = false }
+
+    /// Consumes one explicit confirmation. A stale/double action cannot start two uninstalls.
+    public mutating func confirm() -> Bool {
+        guard isVisible else { return false }
+        isVisible = false
+        return true
+    }
+}
+
 /// GUI-PLAN.md "Settings page" table, using the same controls and application-owned state as the
 /// former Preferences window. "Reinstall privileged helper" reuses `HelperInstaller.install()`
 /// directly — the same path `3-first-run-install` built for first-run, per that unit's Do clause.
@@ -8,9 +29,10 @@ public struct PreferencesView: View {
     @ObservedObject public var installer: HelperInstaller
     @ObservedObject public var uninstaller: HelperUninstaller
     public let onBack: (() -> Void)?
+    public let productVersion: ProductVersion
 
     @Environment(\.colorScheme) private var colorScheme
-    @State private var isConfirmingUninstall = false
+    @State private var uninstallConfirmation: UninstallConfirmationPresentation
 
     public init(
         settings: Settings,
@@ -18,10 +40,47 @@ public struct PreferencesView: View {
         uninstaller: HelperUninstaller,
         onBack: (() -> Void)?
     ) {
+        self.init(
+            settings: settings,
+            installer: installer,
+            uninstaller: uninstaller,
+            onBack: onBack,
+            productVersion: .current(),
+            uninstallConfirmation: .init()
+        )
+    }
+
+    public init(
+        settings: Settings,
+        installer: HelperInstaller,
+        uninstaller: HelperUninstaller,
+        onBack: (() -> Void)?,
+        productVersion: ProductVersion
+    ) {
+        self.init(
+            settings: settings,
+            installer: installer,
+            uninstaller: uninstaller,
+            onBack: onBack,
+            productVersion: productVersion,
+            uninstallConfirmation: .init()
+        )
+    }
+
+    init(
+        settings: Settings,
+        installer: HelperInstaller,
+        uninstaller: HelperUninstaller,
+        onBack: (() -> Void)?,
+        productVersion: ProductVersion,
+        uninstallConfirmation: UninstallConfirmationPresentation
+    ) {
         self.settings = settings
         self.installer = installer
         self.uninstaller = uninstaller
         self.onBack = onBack
+        self.productVersion = productVersion
+        _uninstallConfirmation = State(initialValue: uninstallConfirmation)
     }
 
     /// Source-compatible initializer for existing embeddings. The production app always supplies
@@ -47,7 +106,14 @@ public struct PreferencesView: View {
                 }
 
                 Spacer()
-                Text("Settings").font(.system(size: 13, weight: .semibold))
+                VStack(spacing: 1) {
+                    Text("Settings")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(productVersion.settingsText)
+                        .font(.system(size: 9, weight: .regular))
+                        .foregroundStyle(.secondary.opacity(0.72))
+                        .accessibilityLabel("ntfsmac \(productVersion.settingsText)")
+                }
                 Spacer()
 
                 // Balance the Back pill so the title stays centered without adding a second
@@ -95,38 +161,71 @@ public struct PreferencesView: View {
                         ProgressView().controlSize(.small)
                     }
                     Button("Uninstall…", role: .destructive) {
-                        isConfirmingUninstall = true
+                        uninstallConfirmation.request()
                     }
-                    .disabled(uninstaller.state == .removingDependencies || uninstaller.state == .removingHelper)
+                    .disabled(
+                        uninstaller.state == .removingDependencies
+                            || uninstaller.state == .removingHelper
+                            || isUninstallComplete
+                    )
                 }
+            }
+
+            if uninstallConfirmation.isVisible {
+                inlineUninstallConfirmation
             }
         }
         .padding(12)
         .frame(width: 320)
         .fixedSize(horizontal: false, vertical: true)
         .onAppear { settings.refreshLaunchAtLoginStatus() }
-        .confirmationDialog(
-            "Uninstall ntfsmac completely?",
-            isPresented: $isConfirmingUninstall
-        ) {
-            Button("Uninstall Everything", role: .destructive) {
-                Task { await uninstaller.uninstallEverything() }
+    }
+
+    private var inlineUninstallConfirmation: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Uninstall ntfsmac completely?")
+                .font(.system(size: 13, weight: .semibold))
+            Text("Removes the CLI, all vendored dependencies, and this privileged helper. Afterward, you can drag ntfsmac.app to the Trash. This can't be undone.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 8) {
+                Spacer()
+                Button("Cancel") {
+                    uninstallConfirmation.cancel()
+                }
+                .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+
+                Button("Uninstall Everything", role: .destructive) {
+                    guard uninstallConfirmation.confirm() else { return }
+                    Task { await uninstaller.uninstallEverything() }
+                }
+                .buttonStyle(.glassDestructive(colorScheme: colorScheme))
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Removes the CLI, all vendored dependencies, and this privileged helper. After this, dragging ntfsmac.app to the Trash leaves nothing behind. This can't be undone — you'll need to reinstall to use ntfsmac again.")
         }
+        .glassCard()
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Confirm complete ntfsmac uninstall")
     }
 
     private var uninstallSubtitle: String {
         switch uninstaller.state {
-        case .idle, .removingDependencies, .removingHelper:
+        case .idle:
             return "Remove the CLI, dependencies, and this helper — no leftovers"
+        case .removingDependencies:
+            return "Removing CLI and dependencies…"
+        case .removingHelper:
+            return "Removing privileged helper…"
         case .done:
             return "Uninstalled. Safe to drag ntfsmac.app to the Trash."
         case .failed(let message):
             return "Failed: \(message)"
         }
+    }
+
+    private var isUninstallComplete: Bool {
+        if case .done = uninstaller.state { return true }
+        return false
     }
 
     private var launchAtLoginSubtitle: String {

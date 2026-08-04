@@ -130,6 +130,29 @@ is installed"), built a real, tested pipeline:
 | 10 | In-popover Settings page | Yes | Packaged app verified live on 2026-08-03: gear replaced the popover content with Settings; Back restored the drive list; Launch at login, Reinstall…, and Uninstall… controls were visible; no separate window opened. |
 | 11 | Diagnose panel | Yes | Single button, styled output card. The 2026-08-03 Command-click export path is covered by automated action-routing, JSON-validation, degraded-result, and exact-destination write tests; the packaged menu-bar app was launched successfully, but the native save-panel click-through remains an explicit manual gate because the closed `LSUIElement` popover is not exposed to Computer Use. |
 
+2026-08-03 diagnostic/version polish: automated coverage verifies the secondary Settings version,
+schema-2 decode/render/export, forbidden privacy keys, helper-presence semantics for root-owned mode
+`0544`, and backward decoding of the previous six-field JSON. The packaged branch build launches,
+but Computer Use still cannot open the closed `LSUIElement` menu-bar popover; visual confirmation of
+`Version 1.0 (1)` and the expanded Diagnose rows remains part of the maintainer's final manual pass.
+
+2026-08-04 uninstall/version follow-up: `gui/Info.plist` is now the only release/build source in a
+source or package tree; installer tests prove the installed CLI consumes its exact plist snapshot,
+and packaging rejects helper drift. The native `confirmationDialog` was replaced with an inline
+Settings card because selecting its destructive action dismissed the transient `MenuBarExtra`
+window before the operation reliably started. Swift tests cover request/cancel/single-consume state
+and render the confirmation inside the 320-point Settings view. A real privileged removal remains a
+separate destructive live gate and must verify both phase labels and all filesystem/launchd results.
+
+2026-08-04 first-run XPC follow-up: the first live uninstall displayed a communication failure
+immediately after a successful first-run SMJobBless; Reinstall followed by a second Uninstall then
+completed and live filesystem/launchd checks confirmed no leftovers. Root cause was eager
+`NSXPCConnection` construction during app initialization, before the helper existed. `HelperClient`
+now creates/resumes its connection only for the first real privileged request and still recreates
+it after invalidation. Automated coverage asserts app/client construction performs zero connection
+factory calls. A fresh packaged first-run install followed by one Uninstall remains the final live
+regression gate for this follow-up.
+
 Light/dark appearance toggle still not walked for any state — deferred, not done this session (budget).
 
 ## Live GUI audit session (2026-07-12, this pass)

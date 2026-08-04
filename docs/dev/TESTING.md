@@ -189,12 +189,17 @@ verify that path specifically), the write/read/remove round-trips, `diagnose --j
 
 ```
 $ NTFSMAC_PREFIX/bin/ntfsmac diagnose
+diagnose: ntfsmac version: 1.0 (1)
+diagnose: macOS version: <version>
+diagnose: architecture: arm64
+diagnose: privileged helper: installed
 diagnose: vendor binaries missing: 3
+diagnose:   missing components: gvproxy vmnet-helper vmproxy
 diagnose: quarantined binaries: 0
 diagnose: kernel pin: unknown
 diagnose: vmnet bridge: down
-diagnose: current NFS mounts:
-  (none)
+diagnose: VPN default route: not detected
+diagnose: current NFS mount count: 0
 diagnose: overall: degraded
 ```
 
@@ -270,7 +275,9 @@ The menu-bar icon itself uses a placeholder SF Symbol for now — see "app icon"
    `list` command showed, including MBR `Windows_NTFS`). Click `[Mount]`.
    If Full Disk Access is required, macOS lists the component as
    `com.khr898.ntfsmac.helper`; this is the technical service name of **ntfsmac Helper**, not an
-   unrelated package. Enable that exact entry, return to ntfsmac, and retry the mount.
+   unrelated package. Because SMJobBless installs it as a standalone privileged executable,
+   System Settings may show a generic executable icon instead of the app icon. Enable that exact
+   entry, return to ntfsmac, and retry the mount.
 3. Icon should pulse blue while mounting, then turn green with the drive shown as mounted, a
    live (if idle) speed bar, and security indicators.
 4. Click `Open in Finder` — a real Finder window should reveal the mount point.
@@ -278,12 +285,18 @@ The menu-bar icon itself uses a placeholder SF Symbol for now — see "app icon"
    plain language. Hide and reopen it to confirm a fresh run still works.
 6. Hold Command (⌘) and click `Diagnose`. The same diagnostic summary should run, followed by a
    native save panel proposing `ntfsmac-diagnose-<timestamp>.json`. Save it to a temporary location,
-   confirm the file is valid JSON and contains `healthy`, `macos_version`, `missing_binaries`,
-   `quarantined_binaries`, `kernel_pin`, and `bridge`, then remove only that test export. Canceling
-   the save panel must create no file. No network upload should occur.
+   confirm the file is valid JSON and contains `diagnostic_schema`, `healthy`, `ntfsmac_version`,
+   `build_version`, `macos_version`, `architecture`, `helper_installed`, `missing_binaries`,
+   `missing_components`, `quarantined_binaries`, `quarantined_components`, `kernel_pin`, `bridge`,
+   `vpn_default_route`, and `nfs_mount_count`. Confirm it does **not** contain usernames, serials,
+   hardware model, volume labels, disk identifiers, mount paths, VPN provider/interface, IP, DNS,
+   or route details; then remove only that test export. Canceling the save panel must create no
+   file. No network upload should occur.
 7. Click `Unmount` — icon returns to grey/idle, drive drops off the mounted row.
-8. Click the gear icon — Settings replaces the popover content. Toggle settings, use Back, reopen
-   Settings — confirm they persisted (backed by `UserDefaults`, should survive
+8. Click the gear icon — Settings replaces the popover content. Confirm the release/build from
+   `gui/Info.plist` appears directly below `Settings` as small secondary text (currently
+   `Version 1.0 (1)`). Toggle settings, use Back, reopen Settings —
+   confirm they persisted (backed by `UserDefaults`, should survive
    without even restarting the app).
 9. Click `Quit` — app should exit; `mount | grep nfs` back in Terminal should show nothing
    ntfsmac-related left mounted.
@@ -359,7 +372,11 @@ unfamiliar.
 
 ### GUI
 
-Preferences → "Uninstall ntfsmac" → confirm the dialog. This routes through the *already*
+Settings → "Uninstall…" → confirm the destructive card inside the popover. Cancel must leave the
+Settings page open and change nothing. Confirming must keep the popover open, replace the idle
+subtitle with `Removing CLI and dependencies…` and then `Removing privileged helper…`, and finish
+with either the safe-to-trash success message or a visible failure. The action is single-shot:
+additional clicks cannot start a second uninstall. This routes through the *already*
 privileged helper (no new auth prompt — it's already running with the trust the first-run
 install granted it) to remove `$installPrefix` + your real `~/.anylinuxfs`/logs, then un-bless
 itself (`launchctl bootout` + delete its own launchd plist/binary). Verify the same way as the
@@ -368,6 +385,11 @@ dragging `ntfsmac.app` to the Trash should leave nothing else on disk — check 
 Preferences/com.khr898.ntfsmac.settings.plist` too if you want to confirm even the stored
 Preferences are gone (the uninstall flow doesn't currently clear `UserDefaults` — a real,
 minor, non-blocking gap: run `defaults delete com.khr898.ntfsmac` manually if you want that too).
+
+Also exercise this directly after a genuine first-run install, without pressing Reinstall in
+between. `HelperClient` must not bootstrap XPC while the helper is still absent; the first
+Uninstall attempt after authorization must therefore communicate successfully. Requiring a second
+Reinstall/Uninstall cycle is a regression even if that later attempt succeeds.
 
 **Real safety property to spot-check:** if you have a drive mounted, "Uninstall ntfsmac" should
 refuse (same active-mount check the CLI makes) rather than silently ripping the helper out from
