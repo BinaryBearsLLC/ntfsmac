@@ -102,6 +102,11 @@ small secondary text; it is informative and never competes visually with the `Se
 | Default mount point | Path picker | `/Volumes/<label>` |
 | Show speed in menu bar | Toggle | Off |
 | Reinstall privileged helper | Button | — |
+| Uninstall ntfsmac | Destructive button with in-popover confirmation and progress | — |
+
+Uninstall confirmation stays inside the transient menu-bar popover. Cancel returns to Settings;
+confirming consumes that confirmation once, disables duplicate starts, and keeps the current
+removal phase or final error visible until completion.
 
 The diagnostic panel renders the same privacy-safe schema exported by Command-click Diagnose:
 release/build, macOS and architecture, helper presence, fixed runtime component failures,

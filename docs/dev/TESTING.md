@@ -293,8 +293,9 @@ The menu-bar icon itself uses a placeholder SF Symbol for now — see "app icon"
    or route details; then remove only that test export. Canceling the save panel must create no
    file. No network upload should occur.
 7. Click `Unmount` — icon returns to grey/idle, drive drops off the mounted row.
-8. Click the gear icon — Settings replaces the popover content. Confirm `Version 1.0 (1)` appears
-   directly below `Settings` as small secondary text. Toggle settings, use Back, reopen Settings —
+8. Click the gear icon — Settings replaces the popover content. Confirm the release/build from
+   `gui/Info.plist` appears directly below `Settings` as small secondary text (currently
+   `Version 1.0 (1)`). Toggle settings, use Back, reopen Settings —
    confirm they persisted (backed by `UserDefaults`, should survive
    without even restarting the app).
 9. Click `Quit` — app should exit; `mount | grep nfs` back in Terminal should show nothing
@@ -371,7 +372,11 @@ unfamiliar.
 
 ### GUI
 
-Preferences → "Uninstall ntfsmac" → confirm the dialog. This routes through the *already*
+Settings → "Uninstall…" → confirm the destructive card inside the popover. Cancel must leave the
+Settings page open and change nothing. Confirming must keep the popover open, replace the idle
+subtitle with `Removing CLI and dependencies…` and then `Removing privileged helper…`, and finish
+with either the safe-to-trash success message or a visible failure. The action is single-shot:
+additional clicks cannot start a second uninstall. This routes through the *already*
 privileged helper (no new auth prompt — it's already running with the trust the first-run
 install granted it) to remove `$installPrefix` + your real `~/.anylinuxfs`/logs, then un-bless
 itself (`launchctl bootout` + delete its own launchd plist/binary). Verify the same way as the
@@ -380,6 +385,11 @@ dragging `ntfsmac.app` to the Trash should leave nothing else on disk — check 
 Preferences/com.khr898.ntfsmac.settings.plist` too if you want to confirm even the stored
 Preferences are gone (the uninstall flow doesn't currently clear `UserDefaults` — a real,
 minor, non-blocking gap: run `defaults delete com.khr898.ntfsmac` manually if you want that too).
+
+Also exercise this directly after a genuine first-run install, without pressing Reinstall in
+between. `HelperClient` must not bootstrap XPC while the helper is still absent; the first
+Uninstall attempt after authorization must therefore communicate successfully. Requiring a second
+Reinstall/Uninstall cycle is a regression even if that later attempt succeeds.
 
 **Real safety property to spot-check:** if you have a drive mounted, "Uninstall ntfsmac" should
 refuse (same active-mount check the CLI makes) rather than silently ripping the helper out from

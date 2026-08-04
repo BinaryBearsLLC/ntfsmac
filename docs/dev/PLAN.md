@@ -578,10 +578,15 @@ sha256-checked downloads verified by checksum assertions, not unit tests).
 - **Do:** show the release/build below the Settings title as small secondary text; controls with
   GUI-PLAN defaults — Launch at login (off), Default mount mode (Read-write),
   Default mount point (`/Volumes/<label>`), Show speed in menu bar (off), Reinstall privileged helper
-  (button → `3-first-run-install`); persist via `@AppStorage`/UserDefaults.
+  (button → `3-first-run-install`); persist via `@AppStorage`/UserDefaults. Read release/build from
+  the app bundle metadata, with `gui/Info.plist` as the source/package-tree source of truth and an
+  exact installed CLI snapshot. Keep complete-uninstall confirmation and progress inside the
+  menu-bar popover so the transient window cannot dismiss the operation.
 - **Don't:** add controls beyond the GUI-PLAN table.
 - **Acceptance:** `SettingsTests` assert defaults + persistence round-trip; `ProductVersionTests`
-  assert bundle metadata formatting and the build gate rejects GUI/helper/CLI version drift.
+  assert bundle metadata formatting; CLI install/diagnose tests prove the copied plist is used;
+  the build gate rejects helper/app version drift; uninstall-presentation tests cover explicit
+  confirmation, cancellation/double-start protection, and the rendered inline state.
 
 #### `3-liquid-glass`  ← styling pass, last, solo
 - **Deps:** all Phase 3 feature units · **Tier:** medium

@@ -29,6 +29,9 @@ are already built into the vendored kernel image.
   version/build, macOS version, architecture, helper presence, affected runtime components,
   VPN tunnel use as a yes/no signal, and the active NFS mount count without exposing local
   paths or network identity.
+- **Reliable in-popover uninstall** — Settings keeps the destructive confirmation and removal
+  progress inside the menu-bar popover, then reports success or a plain-language failure instead
+  of dismissing the transient window before the helper operation starts.
 
 ## Requirements
 
@@ -96,6 +99,10 @@ What each line means:
 | `VPN default route: detected` | A tunnel owns the default route. This is informational; the report does not record which VPN/interface or any address/route details. |
 | `current NFS mount count: N` | Number of active NFS mounts, without their names or paths. |
 | `overall: degraded` | One of the fatal checks above failed — fix that line first. |
+
+The app bundle's `CFBundleShortVersionString` and `CFBundleVersion` are the product-version source
+of truth. Packaging verifies the embedded helper matches them, and installation copies that exact
+metadata beside the CLI so Settings, text diagnostics, and JSON diagnostics cannot silently drift.
 
 When macOS asks for Full Disk Access it may show the standalone privileged tool with a generic
 executable icon and its technical service name, `com.khr898.ntfsmac.helper`. This is **ntfsmac
