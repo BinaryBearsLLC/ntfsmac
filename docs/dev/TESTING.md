@@ -274,8 +274,9 @@ The menu-bar icon itself uses a placeholder SF Symbol for now — see "app icon"
 5. Click `Diagnose` in the footer, then the `Diagnose` button inside the panel that appears —
    should match Part A's `diagnose --json` output in plain language.
 6. Click `Unmount` — icon returns to grey/idle, drive drops off the mounted row.
-7. Click the gear icon — Settings replaces the popover content. Toggle settings, use Back, reopen
-   Settings — confirm they persisted (backed by `UserDefaults`, should survive
+7. Click the gear icon — Settings replaces the popover content. Confirm the current app
+   release/build appears directly below `Settings` as small secondary text. Toggle settings, use
+   Back, reopen Settings — confirm they persisted (backed by `UserDefaults`, should survive
    without even restarting the app).
 8. Click `Quit` — app should exit; `mount | grep nfs` back in Terminal should show nothing
    ntfsmac-related left mounted.

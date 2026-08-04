@@ -90,7 +90,8 @@ separate system UI is the first-run helper authorization prompt.
 The gear replaces the main popover content with Settings. A keyboard-reachable `Back` action
 returns to the previous application content. Normal, first-run, and CLI-repair screens all use the
 same route and the same long-lived Settings/helper objects; navigation does not open an `NSWindow`
-or recreate in-flight state.
+or recreate in-flight state. The title includes the app release/build directly underneath in
+small secondary text; it is informative and never competes visually with the `Settings` heading.
 
 | Control | Type | Default |
 |---------|------|---------|

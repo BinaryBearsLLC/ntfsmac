@@ -29,6 +29,7 @@ import Testing
         installer: HelperInstaller(),
         uninstaller: HelperUninstaller(),
         onBack: {},
+        productVersion: ProductVersion(release: "test", build: "test"),
         uninstallConfirmation: .init(isVisible: true)
     )
     let renderer = ImageRenderer(content: view)
