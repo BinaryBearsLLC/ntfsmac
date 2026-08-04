@@ -14,6 +14,8 @@ setup() {
   SYMLINK_DIR="$(mktemp -d)/bin"
   export NTFSMAC_PATH_SYMLINK="$SYMLINK_DIR/ntfsmac"
   export NTFSMAC_SKIP_ROOT_CHECK=1
+  EXPECTED_RELEASE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$REPO_ROOT/gui/Info.plist")"
+  EXPECTED_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$REPO_ROOT/gui/Info.plist")"
 }
 
 teardown() {
@@ -32,6 +34,18 @@ teardown() {
   [ -f "$PREFIX_DIR/lib/modules.squashfs" ]
   [ -x "$PREFIX_DIR/libexec/ntfsmac/commands/mount.sh" ]
   [ -f "$PREFIX_DIR/libexec/ntfsmac/lib/version.sh" ]
+  [ -f "$PREFIX_DIR/libexec/ntfsmac/lib/product-info.plist" ]
+}
+
+@test "installed CLI version comes from the copied canonical app Info.plist" {
+  run "$SCRIPT"
+  [ "$status" -eq 0 ]
+  run cmp "$REPO_ROOT/gui/Info.plist" "$PREFIX_DIR/libexec/ntfsmac/lib/product-info.plist"
+  [ "$status" -eq 0 ]
+  run "$PREFIX_DIR/bin/ntfsmac" diagnose --json
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"\"ntfsmac_version\":\"$EXPECTED_RELEASE\""* ]]
+  [[ "$output" == *"\"build_version\":\"$EXPECTED_BUILD\""* ]]
 }
 
 @test "symlinks ntfsmac onto an already-on-PATH directory automatically" {
@@ -102,7 +116,7 @@ STUB
   run "$PREFIX_DIR/bin/ntfsmac" diagnose --json
   [[ "$output" == \{*\} ]]
   [[ "$output" == *'"diagnostic_schema":2'* ]]
-  [[ "$output" == *'"ntfsmac_version":"1.0"'* ]]
+  [[ "$output" == *"\"ntfsmac_version\":\"$EXPECTED_RELEASE\""* ]]
 }
 
 @test "ntfsmac help lists every real command, none left off" {

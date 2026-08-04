@@ -75,6 +75,15 @@ install_cli() {
   cp "$REPO_ROOT"/cli/commands/*.sh "$PREFIX/libexec/ntfsmac/commands/" || return 1
   cp "$REPO_ROOT"/cli/lib/*.sh "$PREFIX/libexec/ntfsmac/lib/" || return 1
 
+  # gui/Info.plist is the single product-version source. Keep an exact snapshot beside the
+  # installed resolver so CLI-only/Homebrew installs do not depend on an app bundle or duplicate
+  # release/build constants in shell code.
+  if [[ ! -r "$REPO_ROOT/gui/Info.plist" ]]; then
+    echo "install.sh: HARD-STOP — canonical product metadata missing: $REPO_ROOT/gui/Info.plist" >&2
+    return 1
+  fi
+  cp "$REPO_ROOT/gui/Info.plist" "$PREFIX/libexec/ntfsmac/lib/product-info.plist" || return 1
+
   # Copy lock.sh and sources.lock so ntfsmac diagnose can verify the kernel pin on installed
   # systems — best-effort only: these are diagnostic-only and their absence must never prevent
   # the core CLI (mount/unmount) from installing. The files may be absent from older app bundles

@@ -127,6 +127,19 @@ teardown() {
   [[ "$output" == *'"macos_version":"14.5"'* ]]
 }
 
+@test "product version is resolved from project metadata rather than shell constants" {
+  local product_info="$FIXTURE_DIR/Info.plist"
+  cp "$REPO_ROOT/gui/Info.plist" "$product_info"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 9.8" "$product_info"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 765" "$product_info"
+  export NTFSMAC_PRODUCT_INFO_PLIST_OVERRIDE="$product_info"
+
+  run "$SCRIPT" --json
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"ntfsmac_version":"9.8"'* ]]
+  [[ "$output" == *'"build_version":"765"'* ]]
+}
+
 @test "degraded: non-arm64 architecture is unsupported" {
   export NTFSMAC_ARCHITECTURE_OVERRIDE="x86_64"
   run "$SCRIPT"
