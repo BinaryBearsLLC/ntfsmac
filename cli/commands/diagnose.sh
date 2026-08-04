@@ -13,6 +13,7 @@ if [[ -r "$VERSION_LIB" ]]; then
   # Runtime and installed layouts resolve this file from different roots.
   # shellcheck disable=SC1090
   source "$VERSION_LIB"
+  ntfsmac_load_product_version "$REPO_ROOT"
 else
   NTFSMAC_VERSION="unknown"
   NTFSMAC_BUILD_VERSION="unknown"
