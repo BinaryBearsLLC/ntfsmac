@@ -572,7 +572,8 @@ sha256-checked downloads verified by checksum assertions, not unit tests).
   (button → `3-first-run-install`); persist via `@AppStorage`/UserDefaults.
 - **Don't:** add controls beyond the GUI-PLAN table.
 - **Acceptance:** `SettingsTests` assert defaults + persistence round-trip; `ProductVersionTests`
-  assert bundle metadata formatting.
+  assert bundle metadata formatting; `PreferencesUninstallTests` assert inline confirmation and
+  one-shot destructive action; `HelperClientTests` assert no XPC connection is created at launch.
 
 #### `3-liquid-glass`  ← styling pass, last, solo
 - **Deps:** all Phase 3 feature units · **Tier:** medium

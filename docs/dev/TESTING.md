@@ -278,7 +278,11 @@ The menu-bar icon itself uses a placeholder SF Symbol for now — see "app icon"
    release/build appears directly below `Settings` as small secondary text. Toggle settings, use
    Back, reopen Settings — confirm they persisted (backed by `UserDefaults`, should survive
    without even restarting the app).
-8. Click `Quit` — app should exit; `mount | grep nfs` back in Terminal should show nothing
+8. As the final cleanup check, click `Uninstall…` in Settings. Confirm the destructive prompt stays
+   inside the popover; cancel once, reopen it, then confirm. A freshly installed helper must uninstall
+   on the first confirmed attempt, the UI must reach `Uninstalled`, and the uninstall action must
+   remain disabled afterward.
+9. Click `Quit` — app should exit; `mount | grep nfs` back in Terminal should show nothing
    ntfsmac-related left mounted.
 
 ### Force a dirty-journal (read-only) test, optional

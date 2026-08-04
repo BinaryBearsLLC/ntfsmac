@@ -101,6 +101,12 @@ small secondary text; it is informative and never competes visually with the `Se
 | Show speed in menu bar | Toggle | Off |
 | Reinstall privileged helper | Button | — |
 
+The destructive uninstall confirmation is rendered inside the Settings page so selecting it does
+not dismiss the transient menu-bar popover before the operation starts. Cancel consumes no action;
+confirm can start the flow only once, and the control remains disabled while removal is active or
+after it completes. The helper XPC connection is created lazily on the first privileged request,
+not merely because the app launched.
+
 ---
 
 ## Control → privilege boundary (non-negotiable)
