@@ -4,14 +4,22 @@
 > human setup steps. This file (mirrored at [AGENTS.md](AGENTS.md)) is AI-agent instructions —
 > read it before generating code in this repo, human or agent.
 
-NTFS read/write on Apple Silicon macOS, no kernel extension, no SIP modification. Wraps `anylinuxfs` (libkrun microVM running ntfs-3g, exported to macOS over NFS on a host-only vmnet bridge). CLI first, GUI second — build order is fixed, don't jump ahead.
+NTFS read/write on Apple Silicon macOS, no kernel extension, no SIP modification. Wraps `anylinuxfs` (libkrun microVM running ntfs-3g, exported to macOS over NFS on a dedicated private `/30` vmnet link). CLI first, GUI second — build order is fixed, don't jump ahead.
 
-Full spec: **`docs/dev/PLAN.md`** (architecture, phases, build steps) and **`GUI-PLAN.md`** (SwiftUI menu-bar app, button-level spec). Read the relevant phase section before writing code for it — don't work from memory of what these say. `ui/prototype.html` (the original static HTML/SVG design comp) was removed 2026-07-13 — the already-built SwiftUI screens are now the visual source of truth for colors, radii, spacing, and the vibrancy/blur recipe. Match what's already built; don't re-design.
+Current priorities: **`docs/BINARYBEARS_ROADMAP.md`**. Historical architecture/build plan:
+**`docs/dev/PLAN.md`**. Current GUI behavior contract: **`GUI-PLAN.md`**. Read the relevant
+document before writing code; do not infer product status from old execution notes. `ui/prototype.html`
+(the original static HTML/SVG design comp) was removed 2026-07-13 — the already-built SwiftUI
+screens are now the visual source of truth for colors, radii, spacing, and the vibrancy/blur
+recipe. Match what's already built; don't re-design.
 
 ## Non-negotiables (do not re-litigate)
 
 - **Driver:** ntfs-3g default. ntfs3 is opt-in only via `--fs-driver ntfs3`, never via an `-o` token (it's inert there).
-- **Transport:** NFS only, over vmnet-helper host-only `/30` bridge. No SMB. No loopback/`127.94.0.1` design — that's dead, don't resurrect it.
+- **Transport:** NFS only, over a dedicated private vmnet-helper `/30` link. No SMB. No
+  loopback/`127.94.0.1` design — that's dead, don't resurrect it. The pinned anylinuxfs source
+  launches vmnet-helper with `--operation-mode=shared`; do not call that strict network isolation
+  unless effective PF/route evidence proves the narrower claim.
 - **NFS mount mode stays `soft`** — never switch to `hard`, it's what prevents a kernel panic on hot-unplug.
 - **Signing:** ad-hoc only (`codesign -s -`). No paid Apple Developer account, no notarization. This is why the GUI is DMG-only (never a Homebrew cask) and the CLI is a formula in the project's own tap (never homebrew-core).
 - **Every control that mounts/unmounts/touches pf/route goes through the SMJobBless XPC helper** — never a raw `sudo` shell-out from Swift UI code.
@@ -40,7 +48,12 @@ CLI (Phase 0 → V → 1 → 2) fully working and installable before any Phase 3
 
 ## Repo identity
 
-Own repo: `github.com/khr898/ntfsmac`, remote `git@github.com:khr898/ntfsmac.git`. **`PLAN.md` still has `YOURUSERNAME` placeholders in several spots** (target repo line, tap install instructions, `install.sh`'s `NTFSMAC_REPO`, release notes template) — treat `YOURUSERNAME` as `khr898` wherever it appears in PLAN.md rather than leaving it literal in generated code/scripts. Homebrew tap is `khr898/ntfsmac`.
+Development fork: `github.com/BinaryBearsLLC/ntfsmac` (`origin`). Original upstream:
+`github.com/khr898/ntfsmac` (`upstream`). Existing Homebrew/release references under `khr898`
+describe the upstream distribution unless the BinaryBears fork creates and documents its own
+channel. Never leave `YOURUSERNAME` literals, never silently rewrite upstream distribution links
+as fork links, and never open or modify an upstream pull request unless the maintainer explicitly
+requests that action. Pull requests to the BinaryBears fork target its `main` branch.
 
 
 
@@ -53,7 +66,7 @@ Everything vendored/built comes from these. Use these exact repos — don't subs
 | libkrunfw (kernel image + modules, vendored prebuilt) | `https://github.com/nohajc/libkrunfw/releases` — this is nohajc's fork, NOT `containers/libkrunfw` upstream | version + sha256 in `build/sources.lock` |
 | vmnet-helper (Apple-signed, vendored prebuilt) | `https://github.com/nirs/vmnet-helper/releases` | version + sha256 in `build/sources.lock` |
 | gvproxy (built from source, pure Go) | `https://github.com/containers/gvisor-tap-vsock`, tag `v0.8.9` (verify against anylinuxfs's `download-dependencies.sh` for drift before building) | commit in `build/sources.lock` |
-| Alpine rootfs base (pulled by init-rootfs via umoci) | Docker Hub `alpine` image | pin to a specific tag + digest in `build/sources.lock` — never `alpine:latest` |
+| Alpine rootfs base (pulled by init-rootfs via umoci) | Docker Hub `alpine` image | build input is pinned to a specific tag + digest in `build/sources.lock`; the shipped runtime's remaining `alpine:latest` default is a P0 roadmap gap and must not be described as solved |
 
 Don't fetch: `init-freebsd` (containers/libkrun releases) — FreeBSD guest init, not needed for NTFS, do not add to `sources.lock` or `fetch-prebuilt.sh`.
 

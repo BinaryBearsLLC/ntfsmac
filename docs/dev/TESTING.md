@@ -1,5 +1,11 @@
 # ntfsmac — manual test guide
 
+> [!NOTE]
+> This is the real-hardware procedure and a record of earlier gaps, not the product roadmap. See
+> [`../BINARYBEARS_ROADMAP.md`](../BINARYBEARS_ROADMAP.md) for current completion status and
+> pending NTFS3/security/integrity work. Statements labelled **Was** or **Fixed** are retained as
+> historical evidence; the explicit current-state corrections below are authoritative.
+
 Run this from your own Terminal, on a real Apple Silicon Mac, outside the coding-agent sandbox.
 Every item below either can't be verified from inside that sandbox, or (until this update)
 couldn't be exercised because the GUI pieces were built unit-by-unit and never wired together.
@@ -19,20 +25,19 @@ Now: `gui/Views/PopoverContentView.swift` composes all of it, driven by `AppStat
 wires them in — reviewed (`ecc:swift-reviewer`, approve), 77/77 tests still green. So:
 
 - The popover now shows the first-run helper-install prompt until the XPC helper is installed,
-  then the real drive list, mount/unmount buttons, speed bar, dirty-RO banner, security
-  indicators (currently `.unknown`/`.unknown` — Phase 1 pf/route hardening state isn't surfaced
-  by `diagnose.sh` yet, a separate, already-documented gap, not new here), Open in Finder,
-  Diagnose panel, Refresh, and Quit (which tears down pf/route state via the helper first).
+  then the real multi-drive list, mount/unmount buttons, dirty-RO banner, three SECURITY
+  indicators (currently `unknown` because Phase 1 state is not surfaced), Diagnose panel,
+  Refresh, and Quit.
 - The gear button replaces the current popover content with the in-popover Settings page. `Back`
   returns to the previous app content; no separate Preferences `NSWindow` or private selector is
   used.
 
-**Known, deliberately out-of-scope limitations that remain** (don't report these as new bugs):
-`Settings.defaultMountMode`/`defaultMountPoint` are stored but not yet threaded into the actual
-mount call (`MountController.mount()` has no parameter for either yet — v1 has no
-auto-mount-on-detect, only the manual `[Mount]` button, which always mounts read-write via
-`ntfs-3g`). Security indicators show `.unknown` until a later unit surfaces Phase 1 state through
-`diagnose.sh`.
+**Known, deliberately tracked limitations that remain:** the current GUI mount button uses
+`ntfs-3g` read/write by default; NTFS3 has no GUI control. Open in Finder and transfer telemetry
+have tested implementation foundations but are not exposed by the current multi-drive popover.
+SECURITY indicators stay `unknown` until the live mount transaction publishes measured PF/route
+state. These items belong to the canonical roadmap rather than being reported as regressions in
+an ordinary current-build pass.
 
 ---
 
@@ -242,10 +247,13 @@ through the popover instead of `ntfsmac` directly, so a CLI failure will fail he
 inside Xcode.app, not standalone Command Line Tools; building with only CLT selected fails with
 "external macro implementation type ... could not be found" (see the fixed build failure below).
 
+Always test the packaged application, because the privileged helper cannot be installed from a
+raw SwiftPM executable:
+
 ```bash
 cd <repo>
-swift build
-swift run ntfsmac-gui
+./build.command gui
+open dist/ntfsmac.app
 ```
 
 Fixed: root cause identified for the build failure below — the failing build was running against
@@ -259,18 +267,10 @@ error: external macro implementation type 'SwiftUIMacros.StateMacro' could not b
 Confirms the CLT-only diagnosis. Not an ntfsmac code bug; select full Xcode per the prerequisite
 above and re-run.
 
-(No `.app` bundle exists yet — packaging is separate, unbuilt work. Expect a Dock icon too,
-since `LSUIElement` only takes effect inside a real `.app` bundle — not a bug, just unpackaged.
-The menu-bar icon itself uses a placeholder SF Symbol for now — see "app icon" note below.)
-
 1. Click the menu-bar icon. If the privileged helper isn't installed yet, you'll get a real
-   `SMJobBless` auth prompt (admin password) — approve it. This installs to the fixed
-   `/usr/local/ntfsmac` prefix (not the `$NTFSMAC_PREFIX` temp dir from Part A — the GUI's helper
-   always uses the real install path, per `3-xpc-helper`'s design). If Part A's `./install.sh`
-   only installed to a temp prefix, the GUI's helper won't find binaries there; either also run
-   `NTFSMAC_PREFIX=/usr/local/ntfsmac ./install.sh` (real `sudo`-writable location, may need
-   `sudo` for `/usr/local`) once, or tell me and I'll check what `HelperClient`/`HelperService`
-   actually expect before you do anything destructive to `/usr/local`.
+   `SMJobBless` auth prompt (admin password) — approve it. The packaged app then stages its
+   bundled CLI/runtime through the helper; no separate Homebrew or manual CLI install is required
+   for this GUI pass.
 2. Popover should show your drive in the list (the same filtered `anylinuxfs list` data Part A's
    `list` command showed, including MBR `Windows_NTFS`). Click `[Mount]`.
    If Full Disk Access is required, macOS lists the component as
@@ -279,11 +279,11 @@ The menu-bar icon itself uses a placeholder SF Symbol for now — see "app icon"
    System Settings may show a generic executable icon instead of the app icon. Enable that exact
    entry, return to ntfsmac, and retry the mount.
 3. Icon should pulse blue while mounting, then turn green with the drive shown as mounted, a
-   live (if idle) speed bar, and security indicators.
-4. Click `Open in Finder` — a real Finder window should reveal the mount point.
-5. Click `Diagnose` in the footer — the panel should match Part A's `diagnose --json` output in
+   per-drive Unmount action, and three neutral/unknown SECURITY indicators. Do not expect a speed
+   row or Open in Finder control in the current UI.
+4. Click `Diagnose` in the footer — the panel should match Part A's `diagnose --json` output in
    plain language. Hide and reopen it to confirm a fresh run still works.
-6. Hold Command (⌘) and click `Diagnose`. The same diagnostic summary should run, followed by a
+5. Hold Command (⌘) and click `Diagnose`. The same diagnostic summary should run, followed by a
    native save panel proposing `ntfsmac-diagnose-<timestamp>.json`. Save it to a temporary location,
    confirm the file is valid JSON and contains `diagnostic_schema`, `healthy`, `ntfsmac_version`,
    `build_version`, `macos_version`, `architecture`, `helper_installed`, `missing_binaries`,
@@ -292,13 +292,14 @@ The menu-bar icon itself uses a placeholder SF Symbol for now — see "app icon"
    hardware model, volume labels, disk identifiers, mount paths, VPN provider/interface, IP, DNS,
    or route details; then remove only that test export. Canceling the save panel must create no
    file. No network upload should occur.
-7. Click `Unmount` — icon returns to grey/idle, drive drops off the mounted row.
-8. Click the gear icon — Settings replaces the popover content. Confirm the release/build from
+6. Click `Unmount` — icon returns to its system-adaptive idle state and the drive drops off the
+   mounted row.
+7. Click the gear icon — Settings replaces the popover content. Confirm the release/build from
    `gui/Info.plist` appears directly below `Settings` as small secondary text (currently
-   `Version 1.0 (1)`). Toggle settings, use Back, reopen Settings —
-   confirm they persisted (backed by `UserDefaults`, should survive
-   without even restarting the app).
-9. Click `Quit` — app should exit; `mount | grep nfs` back in Terminal should show nothing
+   `Version 1.0 (1)`). Exercise Launch at login if appropriate, use Back, and reopen Settings.
+   Confirm the reinstall and uninstall controls are visible; run the destructive uninstall only
+   in its dedicated clean-install/lifecycle test.
+8. Click `Quit` — app should exit; `mount | grep nfs` back in Terminal should show nothing
    ntfsmac-related left mounted.
 
 ### Force a dirty-journal (read-only) test, optional

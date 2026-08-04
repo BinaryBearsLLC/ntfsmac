@@ -1,14 +1,26 @@
 # ntfsmac — Full Build Plan
 
+> [!IMPORTANT]
+> **Status audit (2026-08-04):** this is the historical architecture and implementation plan that
+> produced the original CLI/GUI foundation. It is not the current BinaryBears product roadmap and
+> should not be used to infer that every lower-layer primitive is live in the shipped mount flow.
+> Use [`../BINARYBEARS_ROADMAP.md`](../BINARYBEARS_ROADMAP.md) for current priorities and
+> completion status; use [`../../GUI-PLAN.md`](../../GUI-PLAN.md) for the current GUI contract.
+>
+> Baseline build/CLI/GUI units are implemented. Phase 1 packet-filter and route **primitives** and
+> their unit tests were completed, but the 2026-08-04 audit found that live mount integration,
+> effective-rule verification, and evidence-backed UI/diagnostic state remain roadmap work.
+
 > NTFS read/write on Apple Silicon macOS, no kernel extension, no SIP modification.
 > Wraps `anylinuxfs` (libkrun microVM running ntfs-3g, exported to macOS over NFS on a
-> host-only vmnet bridge). CLI first, GUI second.
+> dedicated private `/30` vmnet link). CLI first, GUI second.
 >
 > **Companion docs:** `CLAUDE.md` (rules + vendored-source table), `GUI-PLAN.md` (Phase 3
 > button-level spec). `ui/prototype.html` (the original locked-UI design comp) was removed
 > 2026-07-13 — remaining GUI work is locked to the already-built screens, not a separate file.
 >
-> This file is the single source of build truth. It is written to be executed by
+> Within its historical implementation scope, this file is the source of build truth. It was
+> written to be executed by
 > **autonomous Claude Code loops**, including lower-tier implementer models. Read §0 before
 > touching anything.
 
@@ -44,7 +56,8 @@ anything this file does not state. Follow these rules literally.
 - ❌ Never use a device string in a shell command before it passes `^disk[0-9]+s[0-9]+$`. (§1, §3)
 - ❌ Never fetch `init-freebsd`. Never build `freebsd-bootstrap` or `vmproxy-bsd`. (§1)
 - ❌ Never pin an Alpine image to `:latest` — always tag **plus** digest. (§1)
-- ❌ Never leave a literal `YOURUSERNAME` in any generated file — the repo owner is `khr898`. (§1)
+- ❌ Never leave a literal `YOURUSERNAME` in any generated file. The BinaryBears fork uses
+  `BinaryBearsLLC/ntfsmac`; historical upstream distribution/tap references use `khr898`. (§1)
 - ❌ Never add a new external dependency, Cargo feature, or Alpine package that is not already
   justified in `build/AUDIT.md`. Adding one is a HARD-STOP (§0.3).
 - ❌ Never create a new top-level `*.md` planning document. The only markdown files this build
@@ -78,7 +91,7 @@ Copied from `CLAUDE.md`. These bind every unit.
 | # | Rule |
 |---|------|
 | L1 | **Driver:** `ntfs-3g` is the default. `ntfs3` is opt-in **only** via `--fs-driver ntfs3`, never as an `-o` token. |
-| L2 | **Transport:** NFS only, over the vmnet-helper host-only `/30` bridge. No SMB. No loopback / `127.94.0.1`. |
+| L2 | **Transport:** NFS only, over a dedicated private vmnet-helper `/30` link. The pinned implementation uses vmnet-helper `--operation-mode=shared`; strict isolation is a separate evidence-backed PF/route goal. No SMB. No loopback / `127.94.0.1`. |
 | L3 | **NFS mount mode is always `soft`.** Never `hard`. This is what prevents a kernel panic on hot-unplug. |
 | L4 | **Signing:** ad-hoc only (`codesign -s -`). No paid Apple Developer account, no notarization. GUI ships DMG-only (never a Homebrew cask); CLI is a formula in the tap `khr898/ntfsmac` (never homebrew-core). |
 | L5 | **Every mount / unmount / pf / route action goes through the SMJobBless XPC helper.** Never a raw `sudo` shell-out from Swift/UI. |
@@ -87,7 +100,7 @@ Copied from `CLAUDE.md`. These bind every unit.
 | L8 | **Security & connection stability outrank speed.** Speed tuning (rsize/wsize/async export) is opt-in, documented as risk, never silently defaulted on. |
 |     | **Owner override (2026-08-02):** the near-zero-risk subset `rsize`/`wsize`/`readahead` is now **default-on** in `cli/lib/nfs-mount.sh` (`rsize=1048576,wsize=1048576,readahead=16`). Transfer-unit size + read prefetch only — no data-integrity surface, kernel auto-negotiates down — distinct from the `async` export data-loss class L8 protects. `async` export remains opt-in/absent. Both CLI and GUI inherit it via the shared mount layer; no GUI control added. |
 | L9 | **Vendored sources are exactly those in the `CLAUDE.md` table.** No forks/mirrors without an explicit maintainer sign-off. Drop `freebsd-bootstrap`, `vmproxy-bsd`, and never fetch `init-freebsd`. |
-| L10 | **Repo owner is `khr898`.** Repo `github.com/khr898/ntfsmac`; tap `khr898/ntfsmac`. No `YOURUSERNAME` literals. |
+| L10 | **Repository identities are explicit.** Development origin: `BinaryBearsLLC/ntfsmac`; original upstream and its existing tap/distribution: `khr898/ntfsmac`. No `YOURUSERNAME` literals and no silent substitution between the two. |
 
 > SMJobBless note (non-blocking): `SMJobBless` is legacy on macOS 13+; `SMAppService` is the modern
 > equivalent. `CLAUDE.md` mandates SMJobBless, so it stays. If the maintainer later approves `SMAppService`,
@@ -115,7 +128,7 @@ macOS host (Apple Silicon, arm64, macOS 13.0+)
           - NFS mount into /Volumes (soft)
                     │ spawns/supervises
                     ▼
-        vmnet-helper (Apple-signed)  ── host-only /30 bridge ──┐
+        vmnet-helper (Apple-signed)  ── private /30 link ──────┐
                     │                                          │
         libkrun microVM                              macOS NFS client (kernel)
           Alpine guest: ntfs-3g (or ntfs3)                     │
@@ -129,7 +142,7 @@ macOS host (Apple Silicon, arm64, macOS 13.0+)
 1. Resolve physical device (`diskNsM`) via `anylinuxfs list`.
 2. Request → helper over XPC. Helper **re-validates** the device name against `^disk[0-9]+s[0-9]+$`
    (it never trusts the caller).
-3. Helper starts vmnet-helper → host-only `/30` bridge (host IP + guest IP).
+3. Helper starts vmnet-helper → dedicated private `/30` link (host IP + guest IP).
 4. Helper launches the libkrun microVM (libkrunfw kernel + trimmed Alpine rootfs); passes the raw
    block device through.
 5. In-guest: `ntfs-3g` (default) or `ntfs3` (opt-in) mounts the device at `/mnt`; `rpc.nfsd` exports
@@ -374,7 +387,7 @@ sha256-checked downloads verified by checksum assertions, not unit tests).
 #### `1-pf-rules`
 - **Deps:** `v-integration` · **Tier:** medium
 - **Files:** `cli/lib/pf-anchor.sh`, `cli/pf/ntfsmac.anchor.tmpl`, `tests/cli/pf-rules.bats`
-- **Do:** generate a pf anchor scoping NFS to the host-only `/30` subnet only (deny-by-default, allow
+- **Do:** generate a pf anchor scoping NFS to the private `/30` subnet only (deny-by-default, allow
   bridge); template the subnet, don't hardcode it.
 - **Don't:** widen scope beyond the `/30`; hardcode an IP.
 - **Acceptance:** `pf-rules.bats` renders the template with a sample `/30` and asserts the emitted rules

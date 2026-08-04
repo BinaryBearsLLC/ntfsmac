@@ -2,7 +2,7 @@
   <img src="gui/Resources/AppIcon-source.png" alt="ntfsmac app icon" width="112">
   <h1>ntfsmac — BinaryBears Edition</h1>
   <p><strong>Read and write NTFS, ext2, ext3, and ext4 volumes on Apple Silicon macOS.</strong></p>
-  <p>A native menu-bar app and CLI powered by an isolated Linux microVM — no kernel extension and no SIP changes.</p>
+  <p>A native menu-bar app and CLI powered by a dedicated Linux microVM — no kernel extension and no SIP changes.</p>
 
   <p>
     <a href="https://github.com/BinaryBearsLLC/ntfsmac/actions/workflows/ci.yml"><img src="https://github.com/BinaryBearsLLC/ntfsmac/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
@@ -27,9 +27,9 @@
 
 ## Why ntfsmac
 
-macOS can read NTFS volumes but does not provide native NTFS write support. ntfsmac takes a virtualization-first approach: [`anylinuxfs`](https://github.com/nohajc/anylinuxfs) runs `ntfs-3g` inside a lightweight `libkrun` Linux microVM, then exposes the filesystem to macOS through NFS over a host-only `vmnet` bridge.
+macOS can read NTFS volumes but does not provide native NTFS write support. ntfsmac takes a virtualization-first approach: [`anylinuxfs`](https://github.com/nohajc/anylinuxfs) runs `ntfs-3g` inside a lightweight `libkrun` Linux microVM, then exposes the filesystem to macOS through NFS over a private `/30` `vmnet` link.
 
-The same isolated path supports ext2, ext3, and ext4. The guest kernel handles those filesystems using its built-in ext4 driver, with the actual type detected by `blkid`.
+The same microVM path supports ext2, ext3, and ext4. The guest kernel handles those filesystems using its built-in ext4 driver, with the actual type detected by `blkid`.
 
 - No kernel extension
 - No SIP modification
@@ -43,7 +43,7 @@ The same isolated path supports ext2, ext3, and ext4. The guest kernel handles t
 | --- | --- |
 | Mac | Apple Silicon (`arm64`) only |
 | macOS | 13.0 Ventura or newer |
-| Filesystems | NTFS, ext2, ext3, ext4 |
+| Filesystems | NTFS (`ntfs-3g` default; NTFS3 experimental CLI opt-in), ext2, ext3, ext4 |
 | Distribution | Ad-hoc signed; not notarized |
 
 ## BinaryBears improvements
@@ -128,6 +128,19 @@ ntfsmac help
 
 ntfsmac accepts partitions in `diskNsN` form, never a whole disk such as `disk4`. Device identifiers are independently validated in the CLI and privileged helper against `^disk[0-9]+s[0-9]+$` before they reach a shell command.
 
+The lower layers also expose an experimental NTFS3 choice for controlled testing:
+
+```sh
+ntfsmac mount --fs-driver ntfs3 disk4s1
+```
+
+`ntfs-3g` remains the default because it has the broader compatibility profile. NTFS3 can be
+faster, but it refuses some dirty, hibernated, or Windows Fast Startup volumes and has other
+documented tradeoffs. Read the
+[pinned anylinuxfs NTFS notes](https://github.com/nohajc/anylinuxfs/blob/8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3/docs/important-notes.md#ntfs)
+before using it. The BinaryBears fork has not yet completed its NTFS3 hardware qualification, and
+the current GUI deliberately does not present this choice.
+
 ### Developer diagnostics from the GUI
 
 - Click **Diagnose** for an inline, plain-language health summary.
@@ -143,8 +156,8 @@ flowchart LR
     UI["SwiftUI menu-bar app"]
     CLI["ntfsmac CLI"]
     Helper["Privileged XPC helper"]
-    VM["anylinuxfs + libkrun microVM"]
-    FS["ntfs-3g / ext4 driver"]
+    VM["Pinned anylinuxfs source + libkrun microVM"]
+    FS["ntfs-3g default / NTFS3 opt-in / ext4"]
     NFS["Soft NFS mount on macOS"]
     Disk["External partition"]
 
@@ -153,7 +166,7 @@ flowchart LR
     Helper -->|privileged host operations| VM
     VM --> FS
     FS --> Disk
-    VM -->|host-only vmnet export| NFS
+    VM -->|private /30 vmnet link| NFS
 ```
 
 Mount, unmount, packet-filter, and route operations initiated by the GUI go through the XPC helper; the app does not shell out to `sudo`. The NFS client uses a soft mount so a failed guest cannot block filesystem calls indefinitely. For the full design and invariants, read [docs/dev/PLAN.md](docs/dev/PLAN.md).
@@ -161,9 +174,10 @@ Mount, unmount, packet-filter, and route operations initiated by the GUI go thro
 ## Security model
 
 - Partition identifiers are allow-listed before shell invocation.
-- The Linux guest is reached through a host-only `vmnet` bridge.
+- The Linux guest uses a dedicated private `/30` `vmnet` link for the NFS path.
 - Privileged GUI operations are restricted to the helper's XPC protocol.
-- Dependency versions and source hashes are pinned and verified by the build system.
+- Vendored source revisions and build inputs are pinned and verified by the build system. The
+  remaining first-run Alpine runtime-pin gap is tracked explicitly in the roadmap.
 - SECURITY indicators use an explicit `unknown` state and never equate missing data with enforcement.
 
 The project is currently ad-hoc signed (`codesign -s -`) and is not notarized. macOS may therefore require the user to approve the app and its helper. Review [SECURITY.md](SECURITY.md) before installation or vulnerability reporting.
@@ -176,7 +190,12 @@ ntfsmac mounts partitions, not whole disks. In `diskutil list`, the external dev
 
 ### The first mount takes longer
 
-On first use, the pinned Linux environment is downloaded and initialized (typically about 50–150 MB). This needs an internet connection once; later mounts reuse the local environment.
+On first use, anylinuxfs downloads and initializes an Alpine Linux root filesystem (typically
+about 50–150 MB), then reuses the local environment on later mounts. The BinaryBears build pins
+and verifies its source and build-time Alpine inputs, but the currently shipped upstream runtime
+default still contains `alpine:latest`. Closing that reproducibility gap is the first P0 roadmap
+item; until then, a clean first initialization should be treated as a live upstream download, not
+as a byte-for-byte pinned runtime.
 
 ### Diagnose before filing a bug
 
@@ -189,14 +208,21 @@ Include the privacy-safe JSON report, macOS version, Mac model, and a reproducib
 
 ## Roadmap
 
-The following improvements are planned for the BinaryBears fork and are **not shipped yet**:
+The [canonical BinaryBears roadmap](docs/BINARYBEARS_ROADMAP.md) separates shipped work,
+lower-layer foundations, hardware validation, and future product decisions. Each deliverable is
+developed and reviewed in its own focused branch and pull request.
 
-1. **Modern privileged-helper lifecycle** — evaluate and implement a dedicated migration from deprecated `SMJobBless`/`SMJobCopyDictionary` APIs to `SMAppService`, including registration status, approval, upgrade, and uninstall behavior. The migration must preserve the current security boundary and pass clean-Mac installation tests with the project's ad-hoc signing model before it can replace the existing path.
-2. **Evidence-backed SECURITY telemetry** — derive host-only isolation, VPN route/bypass behavior, and packet-filter rule state from read-only runtime evidence. A green/enforced state must appear only when the corresponding condition has actually been measured.
-3. **Hide the SECURITY panel** — add a non-destructive **Hide** action, consistent with Diagnose, while preserving mount state and making the panel easy to reveal again.
-4. **Security-state test matrix** — validate mounted and unmounted drives, VPN on and off, unavailable tooling, stale state, malformed output, and helper reconnection so the UI never falls back to hardcoded claims.
+| Priority | Status | Direction |
+| --- | --- | --- |
+| Completed foundation | ✅ Shipped | Multi-drive NTFS/ext support, MBR detection, in-popover Settings, adaptive icon and help, privacy-safe CLI/GUI diagnostics, version reporting, and helper reinstall/uninstall lifecycle |
+| P0 | ⬜ Planned | Pin the first-run Alpine runtime, formalize audited anylinuxfs updates, and make PF/VPN hardening plus SECURITY status evidence-backed |
+| P1 | 🟡 Foundation exists | Add SHA-256 Verified Copy, qualify NTFS3 on real hardware, then expose it only as an explicit experimental driver choice |
+| P2 | ⬜ Planned | Migrate the deprecated privileged-helper lifecycle to `SMAppService` after its ad-hoc-signing and upgrade path are proven |
+| P3 | 🟡 Partial | Wire Open in Finder, decide the future of per-drive transfer telemetry, and add focused notifications/eject-all improvements |
 
-Roadmap work will be developed and reviewed in focused branches and pull requests.
+The roadmap records explicit A/B options where evidence is still missing. In particular,
+`ntfs-3g` remains the compatibility-first default; NTFS3 does not become the default without a
+documented, repeatable hardware and integrity test matrix.
 
 ## Contributing
 
