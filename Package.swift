@@ -65,6 +65,7 @@ let package = Package(
             exclude: ["App", "Resources", "Info.plist", "Tests"],
             sources: [
                 "Helper/HelperClient.swift", "Status/StatusIcon.swift", "State/AppState.swift",
+                "State/SingleInstanceGuard.swift",
                 "Drives/DriveScanner.swift", "Views/DriveRow.swift", "Actions/MountController.swift",
                 "Drives/ThroughputMonitor.swift", "Views/SpeedBar.swift",
                 "Actions/RemountController.swift", "Views/DirtyBanner.swift",
@@ -75,7 +76,7 @@ let package = Package(
                 "FirstRun/HelperUninstaller.swift", "FirstRun/CLIInstallChecker.swift", "Views/CLIMissingView.swift",
                 "Preferences/ProductVersion.swift", "Preferences/Settings.swift", "Preferences/PreferencesView.swift",
                 "Style/Colors.swift", "Style/GlassTheme.swift", "Style/Icons.swift", "Style/PillButtons.swift",
-                "State/PopoverNavigation.swift",
+                "Style/TooltipCopy.swift",
                 "Views/PopoverContentView.swift",
             ]
         ),

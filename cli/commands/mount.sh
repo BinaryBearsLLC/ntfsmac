@@ -80,7 +80,7 @@ cmd_mount() {
   local chosen_fstype=""
   if [[ -z "$device" ]]; then
     local -a idents=() fstypes=() menu_lines=()
-    local ident label size fstype
+    local ident label size fstype rest
     local drives_tmp
     drives_tmp="$(mktemp)"
     # Real exit status, not process substitution: list_mountable_drives() returns 1 (with its
@@ -91,7 +91,18 @@ cmd_mount() {
       rm -f "$drives_tmp"
       return 1
     fi
-    while IFS=$'\t' read -r ident label size fstype; do
+    # Split on tab manually, NOT `IFS=$'\t' read`: tab is a whitespace IFS char, so `read`
+    # collapses an empty label field (unlabeled ext drives emit `ident\t\t<size>\t<fstype>`),
+    # shifting size→label, fstype→size, fstype="". That made the picker lose fstype, so ext
+    # never got --ignore-permissions (no noowners → read-only). Swift's split(separator:) does
+    # NOT collapse empty fields — that's why the GUI worked and the CLI didn't. Parameter
+    # expansion preserves every field, empty or not. Same fix in list-drives.sh:fs_type_for_device.
+    while IFS= read -r line; do
+      [[ -z "$line" ]] && continue
+      rest="${line#*$'\t'}"; ident="${line%%$'\t'*}"
+      label="${rest%%$'\t'*}"; rest="${rest#*$'\t'}"
+      size="${rest%%$'\t'*}"; rest="${rest#*$'\t'}"
+      fstype="${rest%%$'\t'*}"
       [[ -n "$ident" ]] || continue
       idents+=("$ident")
       fstypes+=("$fstype")

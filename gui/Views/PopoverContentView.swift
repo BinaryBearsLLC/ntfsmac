@@ -52,6 +52,7 @@ private struct HeaderStatusDot: View {
                 guard isPulsing else { return }
                 withAnimation(.easeInOut(duration: 1.3).repeatForever(autoreverses: true)) { isDim = true }
             }
+            .accessibilityHidden(true)
     }
 }
 
@@ -72,7 +73,7 @@ public struct PopoverContentView: View {
     public let helperClient: HelperClient
 
     @Environment(\.colorScheme) private var colorScheme
-    @State private var showDiagnose = false
+    @State private var diagnosePresentation = DiagnosePanelPresentation()
     @State private var showFDAPrompt = false
 
     public init(
@@ -300,7 +301,7 @@ public struct PopoverContentView: View {
             }
 
             if showDiagnose {
-                DiagnosePanel(runner: diagnoseRunner)
+                DiagnosePanel(runner: diagnoseRunner, mountState: appState.state)
             }
 
             Divider()
@@ -335,6 +336,7 @@ public struct PopoverContentView: View {
             }
             Spacer()
             HeaderStatusDot(color: style.color, isPulsing: appState.state != .idle && appState.state != .error)
+                .help(TooltipCopy.status(for: appState.state))
         }
     }
 
@@ -391,6 +393,7 @@ public struct PopoverContentView: View {
                 }
             }
             .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+            .help(TooltipCopy.text(for: .refresh))
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
@@ -409,9 +412,11 @@ public struct PopoverContentView: View {
                 SettingsGearGlyph(color: .secondary)
             }
             .buttonStyle(.glassIcon(colorScheme: colorScheme))
+            .accessibilityLabel("Open Settings")
+            .help(TooltipCopy.text(for: .settings))
 
             Button {
-                showDiagnose = true
+                diagnosePresentation.show()
                 Task { await diagnoseRunner.run() }
             } label: {
                 HStack(spacing: 5) {
@@ -423,6 +428,7 @@ public struct PopoverContentView: View {
             }
             .buttonStyle(.glassFooter(colorScheme: colorScheme))
             .disabled(diagnoseRunner.isRunning)
+            .help(TooltipCopy.text(for: .diagnose))
 
             Button {
                 quit()
@@ -430,6 +436,7 @@ public struct PopoverContentView: View {
                 Text("Quit").frame(height: 28)
             }
             .buttonStyle(.glassFooter(colorScheme: colorScheme))
+            .help(TooltipCopy.text(for: .quit))
         }
     }
 

@@ -90,41 +90,24 @@ public struct PreferencesView: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                if let onBack {
-                    Button(action: onBack) {
-                        HStack(spacing: 5) {
-                            Image(systemName: "chevron.left")
-                            Text("Back")
-                        }
+        VStack(alignment: .leading, spacing: 6) {
+            row("Launch at login", launchAtLoginSubtitle) {
+                HStack(spacing: 8) {
+                    if settings.isUpdatingLaunchAtLogin {
+                        ProgressView().controlSize(.small)
                     }
-                    .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                    .accessibilityLabel("Back to drives")
-                } else {
-                    Color.clear.frame(width: 57, height: 1)
+                    Toggle(
+                        "Launch at login",
+                        isOn: Binding(
+                            get: { settings.launchAtLogin },
+                            set: { settings.setLaunchAtLogin($0) }
+                        )
+                    )
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .disabled(settings.isUpdatingLaunchAtLogin)
+                    .accessibilityLabel("Launch at login")
                 }
-
-                Spacer()
-                VStack(spacing: 1) {
-                    Text("Settings")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text(productVersion.settingsText)
-                        .font(.system(size: 9, weight: .regular))
-                        .foregroundStyle(.secondary.opacity(0.72))
-                        .accessibilityLabel("ntfsmac \(productVersion.settingsText)")
-                }
-                Spacer()
-
-                // Balance the Back pill so the title stays centered without adding a second
-                // action or a hidden duplicate Settings control.
-                Color.clear.frame(width: 57, height: 1)
-            }
-
-            Divider()
-
-            row("Launch at login", "Start ntfsmac automatically on login") {
-                Toggle("", isOn: $settings.launchAtLogin).labelsHidden()
             }
 
             Divider()
@@ -160,31 +143,16 @@ public struct PreferencesView: View {
                 inlineUninstallConfirmation
             }
         }
-        .padding(12)
-        .frame(width: 320)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private var inlineUninstallConfirmation: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Uninstall ntfsmac completely?")
-                .font(.system(size: 13, weight: .semibold))
-            Text("Removes the CLI, all vendored dependencies, and this privileged helper. Afterward, you can drag ntfsmac.app to the Trash. This can't be undone.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            HStack(spacing: 8) {
-                Spacer()
-                Button("Cancel") {
-                    uninstallConfirmation.cancel()
-                }
-                .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-
-                Button("Uninstall Everything", role: .destructive) {
-                    guard uninstallConfirmation.confirm() else { return }
-                    Task { await uninstaller.uninstallEverything() }
-                }
-                .buttonStyle(.glassDestructive(colorScheme: colorScheme))
+        .padding(16)
+        .frame(width: 360)
+        .windowGlassBackground()
+        .onAppear { settings.refreshLaunchAtLoginStatus() }
+        .confirmationDialog(
+            "Uninstall ntfsmac completely?",
+            isPresented: $isConfirmingUninstall
+        ) {
+            Button("Uninstall Everything", role: .destructive) {
+                Task { await uninstaller.uninstallEverything() }
             }
         }
         .glassCard()
@@ -207,9 +175,8 @@ public struct PreferencesView: View {
         }
     }
 
-    private var isUninstallComplete: Bool {
-        if case .done = uninstaller.state { return true }
-        return false
+    private var launchAtLoginSubtitle: String {
+        settings.launchAtLoginMessage ?? "Start ntfsmac automatically on login"
     }
 
     @ViewBuilder

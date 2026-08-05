@@ -20,11 +20,16 @@ separate system UI is the first-run helper authorization prompt.
 
 | Colour | Meaning |
 |--------|---------|
-| Grey | Idle, nothing mounted |
+| System-adaptive | Idle, nothing mounted |
 | Blue (pulsing) | Mounting |
 | Green | Mounted read/write |
 | Yellow | Mounted **read-only** (dirty journal) |
 | Red | Error |
+
+The idle SF Symbol is an AppKit template image, so macOS supplies the same contrasting tint used
+by native menu-bar apps. This keeps the icon visible across light and dark menu-bar backgrounds
+without adding a preference or first-run animation. Saturated colours remain reserved for real
+mounting, mounted, warning, and error states.
 
 ---
 
@@ -85,13 +90,16 @@ separate system UI is the first-run helper authorization prompt.
 | `Retry` | Re-attempt last action |
 | `Diagnose` | Jump to diagnostics |
 
-### Settings page
+### Diagnostic summary
 
-The gear replaces the main popover content with Settings. A keyboard-reachable `Back` action
-returns to the previous application content. Normal, first-run, and CLI-repair screens all use the
-same route and the same long-lived Settings/helper objects; navigation does not open an `NSWindow`
-or recreate in-flight state. The title includes the app release/build directly underneath in
-small secondary text; it is informative and never competes visually with the `Settings` heading.
+Diagnostic rows distinguish confirmed health, expected or transitional information, actionable
+warnings, and unavailable context. A stopped vmnet bridge is informational while ntfsmac is idle
+or starting a mount; it becomes a warning only when a drive is already mounted and the private NFS
+network is expected to be active. Unknown or malformed values are shown neutrally rather than as
+confirmed failures. Short explanations remain available through native help and accessibility
+text without widening the popover.
+
+### Preferences window
 
 | Control | Type | Default |
 |---------|------|---------|

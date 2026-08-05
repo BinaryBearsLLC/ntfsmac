@@ -17,7 +17,7 @@ public struct FirstRunView: View {
     public let onQuit: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
-    @State private var showDiagnose = false
+    @State private var diagnosePresentation = DiagnosePanelPresentation()
 
     public init(
         installer: HelperInstaller,
@@ -63,7 +63,7 @@ public struct FirstRunView: View {
                 .buttonStyle(.glassPrimary())
 
                 Button {
-                    showDiagnose = true
+                    diagnosePresentation.show()
                     Task { await diagnoseRunner.run() }
                 } label: {
                     HStack(spacing: 5) {
@@ -74,10 +74,13 @@ public struct FirstRunView: View {
                 }
                 .buttonStyle(.glassNeutral(colorScheme: colorScheme))
                 .disabled(diagnoseRunner.isRunning)
+                .help(TooltipCopy.text(for: .diagnose))
             }
 
-            if showDiagnose {
-                DiagnosePanel(runner: diagnoseRunner)
+            if diagnosePresentation.isVisible {
+                DiagnosePanel(runner: diagnoseRunner) {
+                    diagnosePresentation.hide()
+                }
             }
 
             Divider()
@@ -149,11 +152,14 @@ public struct FirstRunView: View {
                 SettingsGearGlyph(color: .secondary)
             }
             .buttonStyle(.glassIcon(colorScheme: colorScheme))
+            .accessibilityLabel("Open Settings")
+            .help(TooltipCopy.text(for: .settings))
             Spacer()
             Button(action: onQuit) {
                 Text("Quit").frame(height: 28)
             }
             .buttonStyle(.glassFooter(colorScheme: colorScheme))
+            .help(TooltipCopy.text(for: .quit))
         }
     }
 }
