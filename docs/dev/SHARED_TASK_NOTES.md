@@ -348,6 +348,12 @@ resolved.
       still SPM only, no Xcode project; actual `.app` bundle assembly (embedding this Info.plist,
       icon, code signing) is packaging work for a later script, not part of this unit's
       acceptance (compiles + tests pass).
+      **Adaptive idle-icon follow-up:** the idle SF Symbol is now rendered as an AppKit template
+      image, letting macOS select a contrasting tint for the current menu-bar background just as
+      it does for native menu extras. This fixes the icon disappearing against some light or dark
+      wallpapers without adding appearance preferences or first-launch animation state. Blue,
+      green, yellow, and red remain explicit non-template status colours; tests assert both sides
+      of that boundary and the macOS 13 deployment floor is unchanged.
 - [x] `3-drive-detect` — `gui/Drives/DriveScanner.swift`, `gui/Views/DriveRow.swift`,
       `gui/Tests/DriveScannerTests.swift`. **Real contract checked before coding:** `ListCmd`
       (`cli.rs`) has no `--json` flag (same finding `3-xpc-helper` already made) — output is
