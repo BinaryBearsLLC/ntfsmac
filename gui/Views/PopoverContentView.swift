@@ -52,6 +52,7 @@ private struct HeaderStatusDot: View {
                 guard isPulsing else { return }
                 withAnimation(.easeInOut(duration: 1.3).repeatForever(autoreverses: true)) { isDim = true }
             }
+            .accessibilityHidden(true)
     }
 }
 
@@ -277,6 +278,7 @@ public struct PopoverContentView: View {
             }
             Spacer()
             HeaderStatusDot(color: style.color, isPulsing: appState.state != .idle && appState.state != .error)
+                .help(TooltipCopy.status(for: appState.state))
         }
     }
 
@@ -333,6 +335,7 @@ public struct PopoverContentView: View {
                 }
             }
             .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+            .help(TooltipCopy.text(for: .refresh))
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
@@ -351,6 +354,8 @@ public struct PopoverContentView: View {
                 SettingsGearGlyph(color: .secondary)
             }
             .buttonStyle(.glassIcon(colorScheme: colorScheme))
+            .accessibilityLabel("Open Settings")
+            .help(TooltipCopy.text(for: .settings))
 
             Button {
                 diagnosePresentation.show()
@@ -365,6 +370,7 @@ public struct PopoverContentView: View {
             }
             .buttonStyle(.glassFooter(colorScheme: colorScheme))
             .disabled(diagnoseRunner.isRunning)
+            .help(TooltipCopy.text(for: .diagnose))
 
             Button {
                 quit()
@@ -372,6 +378,7 @@ public struct PopoverContentView: View {
                 Text("Quit").frame(height: 28)
             }
             .buttonStyle(.glassFooter(colorScheme: colorScheme))
+            .help(TooltipCopy.text(for: .quit))
         }
     }
 
