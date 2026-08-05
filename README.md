@@ -177,7 +177,7 @@ For security issues, see [SECURITY.md](SECURITY.md) — please don't file those 
 
 Menu-bar app (no Dock icon): pick a drive, mount it, get out of the way. Menu-bar icon color
 tells the whole story — grey idle, blue mounting, green mounted read/write, yellow mounted
-read-only (dirty journal), red error. Full button-level spec in [GUI-PLAN.md](GUI-PLAN.md).
+read-only (dirty journal), red error. Full button-level spec in [GUI-PLAN.md](docs/dev/GUI-PLAN.md).
 
 <div align="center">
   <table>

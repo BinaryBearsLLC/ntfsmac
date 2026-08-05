@@ -6,7 +6,7 @@
 
 NTFS read/write on Apple Silicon macOS, no kernel extension, no SIP modification. Wraps `anylinuxfs` (libkrun microVM running ntfs-3g, exported to macOS over NFS on a host-only vmnet bridge). CLI first, GUI second — build order is fixed, don't jump ahead.
 
-Full spec: **`docs/dev/PLAN.md`** (architecture, phases, build steps) and **`GUI-PLAN.md`** (SwiftUI menu-bar app, button-level spec). Read the relevant phase section before writing code for it — don't work from memory of what these say. `ui/prototype.html` (the original static HTML/SVG design comp) was removed 2026-07-13 — the already-built SwiftUI screens are now the visual source of truth for colors, radii, spacing, and the vibrancy/blur recipe. Match what's already built; don't re-design.
+Full spec: **`docs/dev/PLAN.md`** (architecture, phases, build steps) and **`docs/dev/GUI-PLAN.md`** (SwiftUI menu-bar app, button-level spec). Read the relevant phase section before writing code for it — don't work from memory of what these say. `ui/prototype.html` (the original static HTML/SVG design comp) was removed 2026-07-13 — the already-built SwiftUI screens are now the visual source of truth for colors, radii, spacing, and the vibrancy/blur recipe. Match what's already built; don't re-design.
 
 ## Non-negotiables (do not re-litigate)
 
