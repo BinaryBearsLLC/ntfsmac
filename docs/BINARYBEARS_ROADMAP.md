@@ -107,7 +107,8 @@ conflicts.
   from `build/sources.lock`.
 - [x] Add a packaging gate that rejects a shipped runtime containing an unapproved
   `alpine:latest` reference.
-- [x] Record the initialized rootfs version/digest in privacy-safe diagnostics.
+- [x] Record the approved and installed Alpine state plus guest package versions in privacy-safe
+  CLI text, CLI JSON, GUI summary, and Command-click export diagnostics.
 - [x] Define an explicit migration path for an existing `~/.anylinuxfs/alpine` cache; never
   silently destroy user data or force a download during an unrelated action.
 - [x] Test clean initialization, cached initialization, offline reuse, digest mismatch, interrupted

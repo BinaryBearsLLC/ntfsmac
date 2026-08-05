@@ -150,9 +150,10 @@ after it completes. The helper XPC connection is created lazily on the first pri
 not merely because the app launched.
 
 The diagnostic panel renders the same privacy-safe schema exported by Command-click Diagnose:
-release/build, macOS and architecture, helper presence, fixed runtime component failures, the
-approved Alpine tag/digest and cache state, kernel/bridge state, a yes/no VPN tunnel signal, and
-the active NFS mount count. It never displays
+release/build, macOS and architecture, helper presence, fixed runtime component failures,
+expected and detected host-runtime versions, audited source commits, the approved Alpine
+tag/digest, selected cache state, installed Alpine and guest-package versions, kernel/bridge
+state, a yes/no VPN tunnel signal, and the active NFS mount count. It never displays
 or exports usernames, serials, volume/device identity, local paths, VPN identity, addresses, DNS,
 or routes.
 

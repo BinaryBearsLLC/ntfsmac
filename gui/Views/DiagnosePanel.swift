@@ -81,12 +81,24 @@ public enum DiagnoseSummary {
             ),
             kernelRow(rawValue: report.kernelPin),
         ])
+        if let anylinuxfs = anylinuxfsRow(report) {
+            rows.append(anylinuxfs)
+        }
+        if let virtualization = virtualizationRow(report) {
+            rows.append(virtualization)
+        }
         if let alpine = alpineRuntimeRow(
             tag: report.alpineRuntimeTag,
             digest: report.alpineRuntimeDigest,
             state: report.alpineRuntimeState
         ) {
             rows.append(alpine)
+        }
+        if let guest = guestVersionsRow(report) {
+            rows.append(guest)
+        }
+        if let networking = networkToolsRow(report) {
+            rows.append(networking)
         }
         rows.append(bridgeRow(rawValue: report.bridge, mountState: mountState))
         if let helperInstalled = report.helperInstalled {
@@ -198,6 +210,106 @@ public enum DiagnoseSummary {
         default:
             return .init(id: "kernel", label: "Kernel pin", value: "Unknown", status: .unavailable, explanation: explanation)
         }
+    }
+
+    private static func versionStatus(_ rawValue: String?) -> DiagnoseStatus {
+        switch rawValue {
+        case "match": .healthy
+        case "mismatch", "not_installed", "quarantined": .warning
+        default: .unavailable
+        }
+    }
+
+    private static func displayVersion(_ rawValue: String?) -> String {
+        switch rawValue {
+        case nil, "", "unknown": "Unknown"
+        case "not_installed": "Not installed"
+        case "quarantined": "Quarantined"
+        case let value?: value
+        }
+    }
+
+    private static func shortCommit(_ rawValue: String?) -> String? {
+        guard let rawValue, rawValue.count == 40,
+              rawValue.allSatisfy({ $0.isHexDigit }) else { return nil }
+        return String(rawValue.prefix(12))
+    }
+
+    private static func anylinuxfsRow(_ report: DiagnoseReport) -> DiagnoseSummaryRow? {
+        guard report.anylinuxfsVersion != nil || report.anylinuxfsSourceCommit != nil else { return nil }
+        var value = displayVersion(report.anylinuxfsVersion)
+        if report.anylinuxfsVersionStatus == "mismatch",
+           let expected = report.anylinuxfsExpectedVersion {
+            value += " · expected \(expected)"
+        }
+        if let commit = shortCommit(report.anylinuxfsSourceCommit) {
+            value += " · \(commit)"
+        }
+        return .init(
+            id: "anylinuxfs",
+            label: "anylinuxfs",
+            value: value,
+            status: versionStatus(report.anylinuxfsVersionStatus),
+            explanation: "Detected host runtime version, compared with the version and audited source commit approved by this build."
+        )
+    }
+
+    private static func virtualizationRow(_ report: DiagnoseReport) -> DiagnoseSummaryRow? {
+        let values = [
+            report.vmproxySourceVersion.map { "vmproxy \($0)" },
+            report.libkrunVersion.map { "libkrun \($0)" },
+            report.libkrunfwVersion.map { "libkrunfw \($0)" },
+        ].compactMap { $0 }
+        guard !values.isEmpty else { return nil }
+        return .init(
+            id: "virtualization",
+            label: "VM runtime",
+            value: values.joined(separator: " · "),
+            status: values.contains(where: { $0.contains("unknown") }) ? .unavailable : .informational,
+            explanation: "Pinned guest-agent, hypervisor-library, and kernel/firmware versions used by the microVM. Binary presence and kernel hash are reported separately."
+        )
+    }
+
+    private static func guestVersionsRow(_ report: DiagnoseReport) -> DiagnoseSummaryRow? {
+        guard report.alpineInstalledVersion != nil || report.ntfs3gVersion != nil || report.nfsUtilsVersion != nil else { return nil }
+        let value = [
+            "Alpine \(displayVersion(report.alpineInstalledVersion))",
+            "ntfs-3g \(displayVersion(report.ntfs3gVersion))",
+            "nfs-utils \(displayVersion(report.nfsUtilsVersion))",
+        ].joined(separator: " · ")
+        let status: DiagnoseStatus
+        switch report.alpineInstalledCache {
+        case "pinned" where report.ntfs3gVersion != "not_installed" && report.nfsUtilsVersion != "not_installed":
+            status = .healthy
+        case "none", "legacy":
+            status = .informational
+        case "invalid", "pinned_unusable":
+            status = .warning
+        default:
+            status = .unavailable
+        }
+        return .init(
+            id: "guest_versions",
+            label: "Installed guest",
+            value: value,
+            status: status,
+            explanation: "Versions read from the selected Alpine cache and its local APK database. No VM is started and no package is downloaded."
+        )
+    }
+
+    private static func networkToolsRow(_ report: DiagnoseReport) -> DiagnoseSummaryRow? {
+        guard report.gvproxyVersion != nil || report.vmnetHelperVersion != nil else { return nil }
+        let statuses = [versionStatus(report.gvproxyVersionStatus), versionStatus(report.vmnetHelperVersionStatus)]
+        let status: DiagnoseStatus = statuses.contains(.warning)
+            ? .warning
+            : (statuses.allSatisfy { $0 == .healthy } ? .healthy : .unavailable)
+        return .init(
+            id: "network_tools",
+            label: "Network tools",
+            value: "gvproxy \(displayVersion(report.gvproxyVersion)) · vmnet-helper \(displayVersion(report.vmnetHelperVersion))",
+            status: status,
+            explanation: "Detected versions of the host networking tools, compared with the versions approved by this build."
+        )
     }
 
     private static func alpineRuntimeRow(
