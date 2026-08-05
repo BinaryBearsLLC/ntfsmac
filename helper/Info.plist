@@ -9,9 +9,11 @@
 	<key>CFBundleName</key>
 	<string>ntfsmac-helper</string>
 	<key>CFBundleDisplayName</key>
-	<string>ntfsmac helper</string>
-	<key>CFBundleIconFile</key>
-	<string>AppIcon</string>
+	<string>ntfsmac Helper</string>
+	<!-- SMJobBless installs this as one standalone TOOL executable, not as a resource bundle.
+	     CFBundleIconFile is therefore intentionally absent: macOS only resolves that key from a
+	     bundle's Resources directory and System Settings uses its generic tool icon here. Adding
+	     a pretend icon key cannot affect Full Disk Access and would misdocument the artifact. -->
 	<key>CFBundlePackageType</key>
 	<string>TOOL</string>
 	<key>CFBundleShortVersionString</key>

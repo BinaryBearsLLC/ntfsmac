@@ -16,6 +16,12 @@ setup() {
   export NTFSMAC_GVPROXY_BIN="$FIXTURE_DIR/gvproxy"
   export NTFSMAC_VMNET_HELPER_BIN="$FIXTURE_DIR/vmnet-helper"
   export NTFSMAC_VMPROXY_BIN="$FIXTURE_DIR/vmproxy"
+  export NTFSMAC_HELPER_PATH_OVERRIDE="$FIXTURE_DIR/ntfsmac-helper"
+  cp "$FIXTURE_DIR/anylinuxfs" "$NTFSMAC_HELPER_PATH_OVERRIDE"
+  export NTFSMAC_MACOS_VERSION_OVERRIDE="14.5"
+  export NTFSMAC_ARCHITECTURE_OVERRIDE="arm64"
+  export NTFSMAC_DEFAULT_INTERFACE_OVERRIDE="en0"
+  export NTFSMAC_NFS_MOUNT_COUNT_OVERRIDE="0"
 
   # Kernel pin fixture: a lock file + a modules.squashfs whose sha256 matches it.
   mkdir -p "$FIXTURE_DIR/kernel"
@@ -34,7 +40,12 @@ teardown() {
 @test "healthy: all binaries present, kernel pin matches, no quarantine" {
   run "$SCRIPT"
   [ "$status" -eq 0 ]
+  [[ "$output" == *"ntfsmac version: 1.0 (1)"* ]]
+  [[ "$output" == *"architecture: arm64"* ]]
+  [[ "$output" == *"privileged helper: installed"* ]]
   [[ "$output" == *"kernel pin: match"* ]]
+  [[ "$output" == *"VPN default route: not detected"* ]]
+  [[ "$output" == *"current NFS mount count: 0"* ]]
   [[ "$output" == *"overall: healthy"* ]]
 }
 
@@ -42,6 +53,7 @@ teardown() {
   rm "$FIXTURE_DIR/vmproxy"
   run "$SCRIPT"
   [ "$status" -ne 0 ]
+  [[ "$output" == *"missing components: vmproxy"* ]]
   [[ "$output" == *"overall: degraded"* ]]
 }
 
@@ -63,10 +75,41 @@ teardown() {
   run "$SCRIPT" --json
   [ "$status" -eq 0 ]
   [[ "$output" == \{*\} ]]
+  [[ "$output" == *'"diagnostic_schema":2'* ]]
   [[ "$output" == *'"healthy":true'* ]]
+  [[ "$output" == *'"ntfsmac_version":"1.0"'* ]]
+  [[ "$output" == *'"build_version":"1"'* ]]
+  [[ "$output" == *'"macos_version":"14.5"'* ]]
+  [[ "$output" == *'"architecture":"arm64"'* ]]
+  [[ "$output" == *'"helper_installed":true'* ]]
   [[ "$output" == *'"kernel_pin":"match"'* ]]
   [[ "$output" == *'"missing_binaries":0'* ]]
+  [[ "$output" == *'"missing_components":[]'* ]]
   [[ "$output" == *'"quarantined_binaries":0'* ]]
+  [[ "$output" == *'"quarantined_components":[]'* ]]
+  [[ "$output" == *'"vpn_default_route":false'* ]]
+  [[ "$output" == *'"nfs_mount_count":0'* ]]
+}
+
+@test "--json names failing components without exposing local paths or network identity" {
+  rm "$FIXTURE_DIR/vmproxy"
+  xattr -w com.apple.quarantine "0083;00000000;Safari;" "$FIXTURE_DIR/gvproxy"
+  export NTFSMAC_DEFAULT_INTERFACE_OVERRIDE="utun7"
+  export NTFSMAC_NFS_MOUNT_COUNT_OVERRIDE="2"
+
+  run "$SCRIPT" --json
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'"missing_components":["vmproxy"]'* ]]
+  [[ "$output" == *'"quarantined_components":["gvproxy"]'* ]]
+  [[ "$output" == *'"vpn_default_route":true'* ]]
+  [[ "$output" == *'"nfs_mount_count":2'* ]]
+  [[ "$output" != *"$FIXTURE_DIR"* ]]
+  [[ "$output" != *'"vpn_interface"'* ]]
+  [[ "$output" != *'"ip_address"'* ]]
+  [[ "$output" != *'"mount_paths"'* ]]
+  [[ "$output" != *'"volume_labels"'* ]]
+  [[ "$output" != *'"username"'* ]]
+  [[ "$output" != *'"serial"'* ]]
 }
 
 @test "reports a supported macOS version and stays healthy" {
@@ -82,6 +125,42 @@ teardown() {
   run "$SCRIPT" --json
   [ "$status" -eq 0 ]
   [[ "$output" == *'"macos_version":"14.5"'* ]]
+}
+
+@test "product version is resolved from project metadata rather than shell constants" {
+  local product_info="$FIXTURE_DIR/Info.plist"
+  cp "$REPO_ROOT/gui/Info.plist" "$product_info"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 9.8" "$product_info"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 765" "$product_info"
+  export NTFSMAC_PRODUCT_INFO_PLIST_OVERRIDE="$product_info"
+
+  run "$SCRIPT" --json
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"ntfsmac_version":"9.8"'* ]]
+  [[ "$output" == *'"build_version":"765"'* ]]
+}
+
+@test "degraded: non-arm64 architecture is unsupported" {
+  export NTFSMAC_ARCHITECTURE_OVERRIDE="x86_64"
+  run "$SCRIPT"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"architecture: x86_64"* ]]
+  [[ "$output" == *"requires Apple Silicon"* ]]
+}
+
+@test "helper absence is reported but remains valid for a CLI-only install" {
+  export NTFSMAC_HELPER_PATH_OVERRIDE=""
+  run "$SCRIPT" --json
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"helper_installed":false'* ]]
+  [[ "$output" == *'"healthy":true'* ]]
+}
+
+@test "helper presence does not depend on the unprivileged caller's execute permission" {
+  chmod 400 "$NTFSMAC_HELPER_PATH_OVERRIDE"
+  run "$SCRIPT" --json
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"helper_installed":true'* ]]
 }
 
 @test "degraded: macOS older than 13.0 is unsupported" {

@@ -32,7 +32,27 @@ plist_get() {
   /usr/libexec/PlistBuddy -c "Print :$2" "$1"
 }
 
+validate_product_versions() {
+  local product_info="${NTFSMAC_PRODUCT_INFO_PLIST_OVERRIDE:-$REPO_ROOT/gui/Info.plist}"
+  if [[ ! -r "$product_info" ]]; then
+    echo "package-app: HARD-STOP — product version source missing: $product_info" >&2
+    return 1
+  fi
+
+  local canonical_release canonical_build helper_release helper_build
+  canonical_release="$(plist_get "$product_info" CFBundleShortVersionString)" || return 1
+  canonical_build="$(plist_get "$product_info" CFBundleVersion)" || return 1
+  helper_release="$(plist_get "$REPO_ROOT/helper/Info.plist" CFBundleShortVersionString)" || return 1
+  helper_build="$(plist_get "$REPO_ROOT/helper/Info.plist" CFBundleVersion)" || return 1
+  if [[ "$helper_release" != "$canonical_release" || "$helper_build" != "$canonical_build" ]]; then
+    echo "package-app: HARD-STOP — helper version $helper_release ($helper_build) does not match app version $canonical_release ($canonical_build)" >&2
+    return 1
+  fi
+}
+
 main() {
+  validate_product_versions || exit 1
+
   local manifest_file="$REPO_ROOT/helper/GeneratedCLIManifest.swift"
   local restore_manifest=1
   [[ -n "${NTFSMAC_KEEP_GENERATED_MANIFEST:-}" ]] && restore_manifest=0
@@ -80,7 +100,7 @@ main() {
   # guaranteed to match exactly what the bundle actually contains.
   local cli_stage
   cli_stage="$(mktemp -d)"
-  mkdir -p "$cli_stage/vendor/bin" "$cli_stage/vendor/kernel" "$cli_stage/cli/commands" "$cli_stage/cli/lib" "$cli_stage/build/lib"
+  mkdir -p "$cli_stage/vendor/bin" "$cli_stage/vendor/kernel" "$cli_stage/cli/commands" "$cli_stage/cli/lib" "$cli_stage/build/lib" "$cli_stage/gui"
   if ! cp "$REPO_ROOT/install.sh" "$cli_stage/install.sh"; then
     echo "package-app: HARD-STOP — failed to stage install.sh" >&2
     exit 1
@@ -96,6 +116,10 @@ main() {
   fi
   if ! cp "$REPO_ROOT"/cli/lib/*.sh "$cli_stage/cli/lib/"; then
     echo "package-app: HARD-STOP — failed to stage cli/lib/*.sh" >&2
+    exit 1
+  fi
+  if ! cp "$REPO_ROOT/gui/Info.plist" "$cli_stage/gui/Info.plist"; then
+    echo "package-app: HARD-STOP — failed to stage canonical gui/Info.plist" >&2
     exit 1
   fi
   if ! cp "$REPO_ROOT/build/sources.lock" "$cli_stage/build/sources.lock"; then

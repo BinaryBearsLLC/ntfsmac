@@ -435,11 +435,13 @@ sha256-checked downloads verified by checksum assertions, not unit tests).
 #### `2-diagnose`
 - **Deps:** `2-device-validation` · **Tier:** medium
 - **Files:** `cli/commands/diagnose.sh`, `tests/cli/diagnose.bats`
-- **Do:** report vendor binaries present, vmnet-helper reachable, bridge up, kernel pin match,
-  quarantine xattr status, current mounts; provide `--json` output (consumed later by GUI feature 7);
-  exit code reflects health.
+- **Do:** report the canonical release/build and schema, macOS version, arm64 architecture,
+  privileged-helper presence, fixed runtime component names for missing/quarantined binaries,
+  bridge and kernel-pin state, a yes/no VPN tunnel signal, and active NFS mount count; provide
+  privacy-safe `--json` output (consumed later by GUI feature 7); exit code reflects health.
 - **Don't:** perform any privileged op (diagnose is read-only).
-- **Acceptance:** `diagnose.bats` covers healthy + each degraded branch and the JSON shape.
+- **Acceptance:** `diagnose.bats` covers healthy + each degraded branch, the versioned JSON shape,
+  and exclusion of local paths, user/device identity, and network details.
 
 #### `2-install-sh`
 - **Deps:** `2-mount`, `2-unmount`, `2-diagnose` · **Tier:** medium

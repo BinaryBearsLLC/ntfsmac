@@ -189,12 +189,17 @@ verify that path specifically), the write/read/remove round-trips, `diagnose --j
 
 ```
 $ NTFSMAC_PREFIX/bin/ntfsmac diagnose
+diagnose: ntfsmac version: 1.0 (1)
+diagnose: macOS version: <version>
+diagnose: architecture: arm64
+diagnose: privileged helper: installed
 diagnose: vendor binaries missing: 3
+diagnose:   missing components: gvproxy vmnet-helper vmproxy
 diagnose: quarantined binaries: 0
 diagnose: kernel pin: unknown
 diagnose: vmnet bridge: down
-diagnose: current NFS mounts:
-  (none)
+diagnose: VPN default route: not detected
+diagnose: current NFS mount count: 0
 diagnose: overall: degraded
 ```
 

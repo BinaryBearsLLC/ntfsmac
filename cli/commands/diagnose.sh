@@ -1,13 +1,24 @@
 #!/bin/bash
 # cli/commands/diagnose.sh — 2-diagnose (PLAN.md §6).
 #
-# Read-only health report: vendor binaries present, vmnet-helper reachable, bridge up,
-# kernel pin match, quarantine xattr status, current NFS mounts. No privileged op ever
-# runs here (diagnose never mounts/unmounts/touches pf/route).
+# Read-only health report: product/system metadata, helper and vendor presence, bridge state,
+# kernel pin, quarantine xattrs, a tunnel-default-route boolean, and NFS mount count. No privileged
+# op ever runs here (diagnose never mounts/unmounts/touches pf/route).
 set -u
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." &>/dev/null && pwd)"
+VERSION_LIB="$SCRIPT_DIR/../lib/version.sh"
+if [[ -r "$VERSION_LIB" ]]; then
+  # Runtime and installed layouts resolve this file from different roots.
+  # shellcheck disable=SC1090
+  source "$VERSION_LIB"
+  ntfsmac_load_product_version "$REPO_ROOT"
+else
+  NTFSMAC_VERSION="unknown"
+  NTFSMAC_BUILD_VERSION="unknown"
+  NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION="2"
+fi
 # Same two candidates helper/HelperProtocol.swift's resolveNtfsmacPrefix() checks (bash and
 # Swift can't share source — kept in sync deliberately, same pattern as list-drives.sh's own
 # comment about its Swift-side counterpart). NTFSMAC_PREFIX matches every other command's
@@ -70,15 +81,19 @@ resolve_bin() {
 check_vendor_binaries() {
   MISSING_BINS=0
   QUARANTINED_BINS=0
+  MISSING_COMPONENTS=""
+  QUARANTINED_COMPONENTS=""
   local name bin
   for name in anylinuxfs gvproxy vmnet-helper vmproxy; do
     bin="$(resolve_bin "$name")"
     if [[ -z "$bin" || ! -x "$bin" ]]; then
       MISSING_BINS=$((MISSING_BINS + 1))
+      MISSING_COMPONENTS="${MISSING_COMPONENTS}${MISSING_COMPONENTS:+ }$name"
       continue
     fi
     if xattr -p com.apple.quarantine "$bin" >/dev/null 2>&1; then
       QUARANTINED_BINS=$((QUARANTINED_BINS + 1))
+      QUARANTINED_COMPONENTS="${QUARANTINED_COMPONENTS}${QUARANTINED_COMPONENTS:+ }$name"
     fi
   done
 }
@@ -99,7 +114,8 @@ check_kernel_pin() {
     return
   fi
 
-  # shellcheck source=../../build/lib/lock.sh
+  # Runtime and installed layouts resolve this file from different roots.
+  # shellcheck disable=SC1090
   source "$lock_sh"
   local expected actual
   expected="$(lock_get LIBKRUNFW_MODULES_SHA256 2>/dev/null)" || { echo "unknown"; return; }
@@ -129,6 +145,52 @@ current_mounts() {
   mount -t nfs 2>/dev/null | awk '{print $1, "on", $3}'
 }
 
+check_architecture() {
+  printf '%s\n' "${NTFSMAC_ARCHITECTURE_OVERRIDE-$(uname -m 2>/dev/null)}"
+}
+
+check_helper_installed() {
+  local helper_path
+  helper_path="${NTFSMAC_HELPER_PATH_OVERRIDE-/Library/PrivilegedHelperTools/com.khr898.ntfsmac.helper}"
+  # The SMJobBless artifact is normally root:wheel 0544. An unprivileged caller therefore cannot
+  # use `-x` to infer whether launchd/root can execute it; presence as a regular file is the honest
+  # installation signal available to this read-only command.
+  [[ -n "$helper_path" && -f "$helper_path" ]]
+}
+
+# Reports only whether the default route is carried by a tunnel. It deliberately omits the
+# interface name, VPN provider, addresses, routes, and DNS details from both human and JSON output.
+check_vpn_default_route() {
+  local interface
+  interface="${NTFSMAC_DEFAULT_INTERFACE_OVERRIDE-$(route -n get default 2>/dev/null | awk '/interface:/{print $2; exit}')}"
+  case "$interface" in
+    utun* | ppp* | tun*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+count_mounts() {
+  local mounts="$1"
+  if [[ -n "${NTFSMAC_NFS_MOUNT_COUNT_OVERRIDE-}" ]]; then
+    printf '%s\n' "$NTFSMAC_NFS_MOUNT_COUNT_OVERRIDE"
+    return
+  fi
+  printf '%s\n' "$mounts" | awk 'NF { count++ } END { print count + 0 }'
+}
+
+# Component names are fixed internal tokens (never paths or user-provided values), so this small
+# Bash-3.2-compatible formatter can emit them without adding a jq/Python runtime dependency.
+component_json_array() {
+  local components="$1" component first=1
+  printf '['
+  for component in $components; do
+    [[ "$first" -eq 1 ]] || printf ','
+    printf '"%s"' "$component"
+    first=0
+  done
+  printf ']'
+}
+
 # check_macos_version — reports the macOS product version. Two reasons diagnose grew this:
 # (1) triage reports (see README "Troubleshooting" / the issue tracker) kept omitting the OS
 # version, so the first ask on every "installed but not working" report was "which macOS?";
@@ -148,16 +210,24 @@ check_macos_version() {
 }
 
 main() {
-  local kernel_pin bridge mounts healthy=1
+  local kernel_pin bridge mounts mount_count architecture healthy=1
   local macos_version macos_major macos_supported=1
+  local helper_installed=0 vpn_default_route=0
+  local helper_json vpn_json missing_json quarantined_json healthy_json
   MISSING_BINS=0
   QUARANTINED_BINS=0
+  MISSING_COMPONENTS=""
+  QUARANTINED_COMPONENTS=""
 
   macos_version="$(check_macos_version)"
+  architecture="$(check_architecture)"
   check_vendor_binaries
   kernel_pin="$(check_kernel_pin)"
   bridge="$(check_bridge_up)"
   mounts="$(current_mounts)"
+  mount_count="$(count_mounts "$mounts")"
+  check_helper_installed && helper_installed=1
+  check_vpn_default_route && vpn_default_route=1
 
   # ntfsmac requires macOS 13.0+ on Apple Silicon. Only a real, parseable major version
   # below 13 flips health; an unknown/undetected version is reported but left non-fatal.
@@ -173,24 +243,35 @@ main() {
 
   [[ "$MISSING_BINS" -gt 0 ]] && healthy=0
   [[ "$QUARANTINED_BINS" -gt 0 ]] && healthy=0
-  [[ "$kernel_pin" == "mismatch" ]] && healthy=0
+  [[ "$kernel_pin" == "mismatch" || "$kernel_pin" == "missing" ]] && healthy=0
+  [[ "$architecture" != "arm64" ]] && healthy=0
 
   if [[ $json_mode -eq 1 ]]; then
-    printf '{"healthy":%s,"macos_version":"%s","missing_binaries":%s,"quarantined_binaries":%s,"kernel_pin":"%s","bridge":"%s"}\n' \
-      "$([[ $healthy -eq 1 ]] && echo true || echo false)" "$macos_version" "$MISSING_BINS" "$QUARANTINED_BINS" "$kernel_pin" "$bridge"
+    [[ "$healthy" -eq 1 ]] && healthy_json=true || healthy_json=false
+    [[ "$helper_installed" -eq 1 ]] && helper_json=true || helper_json=false
+    [[ "$vpn_default_route" -eq 1 ]] && vpn_json=true || vpn_json=false
+    missing_json="$(component_json_array "$MISSING_COMPONENTS")"
+    quarantined_json="$(component_json_array "$QUARANTINED_COMPONENTS")"
+    printf '{"diagnostic_schema":%s,"healthy":%s,"ntfsmac_version":"%s","build_version":"%s","macos_version":"%s","architecture":"%s","helper_installed":%s,"missing_binaries":%s,"missing_components":%s,"quarantined_binaries":%s,"quarantined_components":%s,"kernel_pin":"%s","bridge":"%s","vpn_default_route":%s,"nfs_mount_count":%s}\n' \
+      "$NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION" "$healthy_json" "$NTFSMAC_VERSION" \
+      "$NTFSMAC_BUILD_VERSION" "$macos_version" "$architecture" "$helper_json" \
+      "$MISSING_BINS" "$missing_json" "$QUARANTINED_BINS" "$quarantined_json" \
+      "$kernel_pin" "$bridge" "$vpn_json" "$mount_count"
   else
+    echo "diagnose: ntfsmac version: $NTFSMAC_VERSION ($NTFSMAC_BUILD_VERSION)"
     echo "diagnose: macOS version: $macos_version"
     [[ "$macos_supported" -eq 0 ]] && echo "diagnose:   unsupported — ntfsmac requires macOS 13.0+"
+    echo "diagnose: architecture: $architecture"
+    [[ "$architecture" != "arm64" ]] && echo "diagnose:   unsupported — ntfsmac requires Apple Silicon"
+    echo "diagnose: privileged helper: $([[ "$helper_installed" -eq 1 ]] && echo installed || echo not installed)"
     echo "diagnose: vendor binaries missing: $MISSING_BINS"
+    [[ -n "$MISSING_COMPONENTS" ]] && echo "diagnose:   missing components: $MISSING_COMPONENTS"
     echo "diagnose: quarantined binaries: $QUARANTINED_BINS"
+    [[ -n "$QUARANTINED_COMPONENTS" ]] && echo "diagnose:   quarantined components: $QUARANTINED_COMPONENTS"
     echo "diagnose: kernel pin: $kernel_pin"
     echo "diagnose: vmnet bridge: $bridge"
-    echo "diagnose: current NFS mounts:"
-    if [[ -n "$mounts" ]]; then
-      echo "$mounts"
-    else
-      echo "  (none)"
-    fi
+    echo "diagnose: VPN default route: $([[ "$vpn_default_route" -eq 1 ]] && echo detected || echo not detected)"
+    echo "diagnose: current NFS mount count: $mount_count"
     echo "diagnose: overall: $([[ $healthy -eq 1 ]] && echo healthy || echo degraded)"
   fi
 
