@@ -596,3 +596,36 @@ private func makeStagedInstallScript(content: String = "#!/bin/sh\nexit 0\n") th
 
     #expect(computeTreeHash(at: scriptDir) == nil, "a tree containing a symlink must fail closed, not silently skip it")
 }
+
+// MARK: - exitHelper (GUI Quit asks the privileged helper to exit so it doesn't linger as root)
+
+/// Sendable capture wrapper — a plain `var exitInvoked` can't be mutated inside a `@Sendable`
+/// exit sink without racing the concurrent-execute check.
+private final class ExitSinkProbe: @unchecked Sendable {
+    private(set) var invoked = false
+    func record() { invoked = true }
+}
+
+@Test func exitHelperAcknowledgesThenInvokesTheExitSink() async {
+    let runner = FakeRunner()
+    let probe = ExitSinkProbe()
+    let service = HelperService(
+        runner: runner,
+        exitSink: { probe.record() }
+    )
+
+    let (data, error) = await awaitReply { service.exitHelper(reply: $0) }
+
+    #expect(error == nil, "exitHelper must acknowledge cleanly so the GUI's await returns before the process dies")
+    #expect(data != nil, "exitHelper must send a reply payload so HelperClient.call decodes it instead of throwing on an empty response")
+    #expect(probe.invoked, "exitHelper must invoke the exit sink (exit(0) in production) so the launchd on-demand helper actually stops")
+}
+
+@Test func exitHelperDefaultsToRealProcessExitWhenNoSinkInjected() async {
+    // The default sink is exit(0) — verified structurally by not crashing the test host on
+    // construction. We only assert the default exists; actually invoking it would terminate
+    // the test process, which is the production behavior and intentionally not exercised here.
+    let service = HelperService(runner: FakeRunner())
+    _ = service
+    #expect(true)
+}

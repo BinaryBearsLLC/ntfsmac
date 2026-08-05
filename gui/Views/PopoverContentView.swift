@@ -447,11 +447,17 @@ public struct PopoverContentView: View {
     // subsystem in one go (Package.swift source + ThroughputTests + this property + init param +
     // NtfsmacApp StateObject + renderPopover helper).
 
-    /// GUI-PLAN.md "Popover — idle": "Quit | Exit app, tear down network state". Best-effort —
-    /// terminates either way so a slow/failed teardown never blocks quitting.
+    /// GUI-PLAN.md "Popover — idle": "Quit | Exit app, tear down network state". Clean shutdown
+    /// per the maintainer's decision: unmount every active drive → teardown pf/route → ask the
+    /// privileged helper to `exit(0)` itself (it's a root launchd on-demand Mach service that
+    /// Activity Monitor can't kill without sudo, so it must exit via XPC) → terminate the app.
+    /// Best-effort throughout — every step is `try?` so a slow/failed unmount or a helper that's
+    /// already gone never blocks quitting. The mount does NOT survive a GUI restart by design.
     private func quit() {
         Task {
+            await mountController.unmount()
             _ = try? await helperClient.teardown()
+            _ = try? await helperClient.exitHelper()
             NSApp.terminate(nil)
         }
     }

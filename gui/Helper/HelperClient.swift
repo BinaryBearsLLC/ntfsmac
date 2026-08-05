@@ -160,6 +160,14 @@ public final class HelperClient: Sendable {
         try await call { proxy, reply in proxy.uninstallHelper(reply: reply) }
     }
 
+    /// GUI Quit's final call after `unmount`/`teardown`: asks the privileged launchd helper to
+    /// `exit(0)` itself so it doesn't linger as root after the app closes (Activity Monitor can't
+    /// kill it without sudo). The helper replies before self-terminating, so this await returns
+    /// cleanly — the connection dropping immediately after is expected, not an error.
+    public func exitHelper() async throws -> CommandResult {
+        try await call { proxy, reply in proxy.exitHelper(reply: reply) }
+    }
+
     public func stageCLI(installScriptPath: String) async throws -> CommandResult {
         try await call { proxy, reply in proxy.stageCLI(installScriptPath: installScriptPath, reply: reply) }
     }

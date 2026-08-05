@@ -245,6 +245,15 @@ public struct CommandResult: Codable, Sendable {
     /// build reports its own old hash (or, for a helper old enough to predate this method
     /// entirely, doesn't answer at all) — both read as stale to the caller.
     func version(reply: @escaping (String?) -> Void)
+
+    /// Self-termination path for GUI Quit. The GUI's Quit flow first calls `unmount`/`teardown`
+    /// for cleanup, then this so the privileged launchd on-demand helper doesn't linger as root
+    /// after the app closes (Activity Monitor can't kill it without sudo — it must exit itself
+    /// via XPC). Replies before `exit(0)`, same reason `uninstallHelper` does: a reply queued
+    /// after self-termination never reaches the client, and the GUI's `await` would hang.
+    /// Distinct from `uninstallHelper` (which un-blesses + bootouts the launchd job for removal);
+    /// this leaves registration intact so the next app launch re-uses the same blessed helper.
+    func exitHelper(reply: @escaping (Data?, String?) -> Void)
 }
 
 /// Seam for `HelperService` so unit tests can assert on the exact argv built for a request
@@ -372,6 +381,7 @@ public final class HelperService: NSObject, HelperXPCProtocol {
     private let runner: PrivilegedCommandRunning
     private let resolvePrefix: @Sendable () -> String
     private let expectedCLITreeHash: String
+    private let exitSink: @Sendable () -> Void
 
     /// `ntfsmacPrefix`, when passed (tests only), pins the CLI location instead of resolving it
     /// live. Production always passes `nil` so every privileged call below re-runs
@@ -391,7 +401,8 @@ public final class HelperService: NSObject, HelperXPCProtocol {
     public init(
         runner: PrivilegedCommandRunning,
         ntfsmacPrefix: String? = nil,
-        expectedCLITreeHash: String = GeneratedCLIManifest.expectedTreeHashHex
+        expectedCLITreeHash: String = GeneratedCLIManifest.expectedTreeHashHex,
+        exitSink: @Sendable @escaping () -> Void = { exit(0) }
     ) {
         self.runner = runner
         if let ntfsmacPrefix {
@@ -400,6 +411,7 @@ public final class HelperService: NSObject, HelperXPCProtocol {
             self.resolvePrefix = { resolveNtfsmacPrefix() }
         }
         self.expectedCLITreeHash = expectedCLITreeHash
+        self.exitSink = exitSink
     }
 
     private func encode(_ result: CommandResult, reply: (Data?, String?) -> Void) {
@@ -593,6 +605,15 @@ public final class HelperService: NSObject, HelperXPCProtocol {
         // those). Replying first, then self-terminating last, is the fix: nothing after this
         // point should assume the helper is still reachable.
         _ = runner.run("/bin/launchctl", ["bootout", "system/\(label)"])
+    }
+
+    public func exitHelper(reply: @escaping (Data?, String?) -> Void) {
+        // Reply first, then self-terminate — same ordering as `uninstallHelper`: a reply queued
+        // after `exit(0)` never reaches the client and the GUI's `await` hangs. `exitSink`
+        // defaults to `exit(0)` in production; tests inject a capturing closure so they can
+        // assert the call happened without terminating the test process.
+        reply(Data(), nil)
+        exitSink()
     }
 
     /// The GUI runs unprivileged as the real logged-in user; this helper runs as root under
