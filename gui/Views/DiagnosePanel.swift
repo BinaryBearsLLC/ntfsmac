@@ -60,37 +60,118 @@ public enum DiagnoseSummary {
     }
 
     public static func rows(for report: DiagnoseReport, mountState: MountState?) -> [DiagnoseSummaryRow] {
-        [
-            binariesRow(missingCount: report.missingBinaries),
-            quarantineRow(quarantinedCount: report.quarantinedBinaries),
+        var rows: [DiagnoseSummaryRow] = []
+        if let version = versionRow(release: report.ntfsmacVersion, build: report.buildVersion) {
+            rows.append(version)
+        }
+        if let system = systemRow(
+            macOSVersion: report.macosVersion,
+            architecture: report.architecture
+        ) {
+            rows.append(system)
+        }
+        rows.append(contentsOf: [
+            binariesRow(
+                missingCount: report.missingBinaries,
+                components: report.missingComponents
+            ),
+            quarantineRow(
+                quarantinedCount: report.quarantinedBinaries,
+                components: report.quarantinedComponents
+            ),
             kernelRow(rawValue: report.kernelPin),
             bridgeRow(rawValue: report.bridge, mountState: mountState),
-        ]
+        ])
+        if let helperInstalled = report.helperInstalled {
+            rows.append(helperRow(installed: helperInstalled))
+        }
+        if let vpnDefaultRoute = report.vpnDefaultRoute {
+            rows.append(vpnRow(detected: vpnDefaultRoute))
+        }
+        if let mountCount = report.nfsMountCount {
+            rows.append(mountCountRow(count: mountCount))
+        }
+        return rows
     }
 
-    private static func binariesRow(missingCount: Int) -> DiagnoseSummaryRow {
+    private static func versionRow(release: String?, build: String?) -> DiagnoseSummaryRow? {
+        guard let release, !release.isEmpty else { return nil }
+        let value = build.map {
+            $0.isEmpty || $0 == release ? release : "\(release) (\($0))"
+        } ?? release
+        return .init(
+            id: "version",
+            label: "ntfsmac",
+            value: value,
+            status: release == "unknown" ? .unavailable : .informational,
+            explanation: "The product and build versions that produced this diagnostic report."
+        )
+    }
+
+    private static func systemRow(
+        macOSVersion: String?,
+        architecture: String?
+    ) -> DiagnoseSummaryRow? {
+        guard macOSVersion != nil || architecture != nil else { return nil }
+        let os = macOSVersion ?? "unknown"
+        let arch = architecture ?? "unknown architecture"
+        let macOSMajor = macOSVersion.flatMap { Int($0.split(separator: ".").first ?? "") }
+        let status: DiagnoseStatus
+        if let architecture, architecture != "arm64" {
+            status = .warning
+        } else if let macOSMajor, macOSMajor < 13 {
+            status = .warning
+        } else if architecture == "arm64", let macOSMajor, macOSMajor >= 13 {
+            status = .healthy
+        } else {
+            status = .unavailable
+        }
+        return .init(
+            id: "system",
+            label: "System",
+            value: "macOS \(os) · \(arch)",
+            status: status,
+            explanation: "ntfsmac requires Apple Silicon and macOS 13.0 or newer."
+        )
+    }
+
+    private static func binariesRow(
+        missingCount: Int,
+        components: [String]?
+    ) -> DiagnoseSummaryRow {
         let explanation = "These are the four runtime components required by ntfsmac. Missing components require installation or repair."
         guard missingCount >= 0 else {
             return .init(id: "binaries", label: "Vendor binaries", value: "Unknown", status: .unavailable, explanation: explanation)
         }
+        let namedMissing = components?.filter { !$0.isEmpty } ?? []
+        let missingValue = namedMissing.isEmpty
+            ? "\(missingCount) missing"
+            : "Missing: \(namedMissing.joined(separator: ", "))"
         return .init(
             id: "binaries",
             label: "Vendor binaries",
-            value: missingCount == 0 ? "All present" : "\(missingCount) missing",
+            value: missingCount == 0 ? "All present" : missingValue,
             status: missingCount == 0 ? .healthy : .warning,
             explanation: explanation
         )
     }
 
-    private static func quarantineRow(quarantinedCount: Int) -> DiagnoseSummaryRow {
+    private static func quarantineRow(
+        quarantinedCount: Int,
+        components: [String]?
+    ) -> DiagnoseSummaryRow {
         let explanation = "macOS quarantine can prevent downloaded runtime components from executing."
         guard quarantinedCount >= 0 else {
             return .init(id: "quarantine", label: "Quarantine", value: "Unknown", status: .unavailable, explanation: explanation)
         }
+        let namedQuarantined = components?.filter { !$0.isEmpty } ?? []
+        let quarantinedValue = namedQuarantined.isEmpty
+            ? "\(quarantinedCount) quarantined"
+            : "Quarantined: \(namedQuarantined.joined(separator: ", "))"
         return .init(
             id: "quarantine",
             label: "Quarantine",
-            value: quarantinedCount == 0 ? "Clear" : "\(quarantinedCount) quarantined",
+            value: quarantinedCount == 0 ? "Clear" : quarantinedValue,
             status: quarantinedCount == 0 ? .healthy : .warning,
             explanation: explanation
         )
@@ -131,6 +212,46 @@ public enum DiagnoseSummary {
         case .error, .none:
             return .init(id: "bridge", label: "vmnet bridge", value: "Inactive — mount context unavailable", status: .unavailable, explanation: explanation)
         }
+    }
+
+    private static func helperRow(installed: Bool) -> DiagnoseSummaryRow {
+        .init(
+            id: "helper",
+            label: "Privileged helper",
+            value: installed ? "Installed" : "Not installed",
+            status: installed ? .healthy : .informational,
+            explanation: "The GUI uses its SMJobBless helper for mount, unmount, firewall, and route operations. A CLI-only installation may not need it."
+        )
+    }
+
+    private static func vpnRow(detected: Bool) -> DiagnoseSummaryRow {
+        .init(
+            id: "vpn",
+            label: "VPN routing",
+            value: detected ? "Default route uses a tunnel" : "No tunnel default route detected",
+            status: .informational,
+            explanation: "Only a yes/no tunnel signal is reported; ntfsmac never includes the VPN provider, interface name, addresses, DNS, or routes."
+        )
+    }
+
+    private static func mountCountRow(count: Int) -> DiagnoseSummaryRow {
+        let explanation = "Number of active NFS mounts, without device names, labels, or paths."
+        guard count >= 0 else {
+            return .init(
+                id: "mounts",
+                label: "NFS mounts",
+                value: "Unknown",
+                status: .unavailable,
+                explanation: explanation
+            )
+        }
+        return .init(
+            id: "mounts",
+            label: "NFS mounts",
+            value: count == 0 ? "None" : "\(count) active",
+            status: count == 0 ? .informational : .healthy,
+            explanation: explanation
+        )
     }
 }
 

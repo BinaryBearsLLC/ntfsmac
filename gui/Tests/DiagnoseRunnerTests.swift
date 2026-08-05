@@ -15,8 +15,12 @@ private let degradedJSON = """
 {"healthy":false,"missing_binaries":2,"quarantined_binaries":1,"kernel_pin":"mismatch","bridge":"down"}
 """
 
+private let expandedJSON = """
+{"diagnostic_schema":2,"healthy":true,"ntfsmac_version":"1.0","build_version":"1","macos_version":"26.6","architecture":"arm64","helper_installed":true,"missing_binaries":0,"missing_components":[],"quarantined_binaries":0,"quarantined_components":[],"kernel_pin":"match","bridge":"up","vpn_default_route":true,"nfs_mount_count":1}
+"""
+
 private let developerExportJSON = """
-{"healthy":false,"macos_version":"26.5","missing_binaries":0,"quarantined_binaries":0,"kernel_pin":"match","bridge":"down"}
+{"diagnostic_schema":2,"healthy":false,"ntfsmac_version":"1.0","build_version":"1","macos_version":"26.5","architecture":"arm64","helper_installed":true,"missing_binaries":1,"missing_components":["vmproxy"],"quarantined_binaries":0,"quarantined_components":[],"kernel_pin":"match","bridge":"down","vpn_default_route":false,"nfs_mount_count":0}
 """
 
 private final class FakeRunner: PrivilegedCommandRunning {
@@ -53,6 +57,51 @@ private final class FakeRunner: PrivilegedCommandRunning {
     #expect(rows.first(where: { $0.id == "quarantine" })?.value == "1 quarantined")
     #expect(rows.first(where: { $0.id == "kernel" })?.status == .warning)
     #expect(rows.first(where: { $0.id == "bridge" })?.status == .unavailable)
+}
+
+@Test func expandedReportProducesPrivacySafeDeveloperRows() throws {
+    let report = try JSONDecoder().decode(DiagnoseReport.self, from: Data(expandedJSON.utf8))
+    let rows = DiagnoseSummary.rows(for: report)
+
+    #expect(report.diagnosticSchema == 2)
+    #expect(rows.map(\.id) == [
+        "version", "system", "binaries", "quarantine", "kernel", "bridge", "helper", "vpn", "mounts",
+    ])
+    #expect(rows.first(where: { $0.id == "version" })?.value == "1.0 (1)")
+    #expect(rows.first(where: { $0.id == "system" })?.value == "macOS 26.6 · arm64")
+    #expect(rows.first(where: { $0.id == "helper" })?.value == "Installed")
+    #expect(rows.first(where: { $0.id == "vpn" })?.value == "Default route uses a tunnel")
+    #expect(rows.first(where: { $0.id == "mounts" })?.value == "1 active")
+}
+
+@Test func expandedReportNamesOnlyFixedFailingComponents() throws {
+    let report = try JSONDecoder().decode(DiagnoseReport.self, from: Data(developerExportJSON.utf8))
+    let rows = DiagnoseSummary.rows(for: report)
+
+    #expect(rows.first(where: { $0.id == "binaries" })?.value == "Missing: vmproxy")
+    #expect(rows.first(where: { $0.id == "quarantine" })?.value == "Clear")
+}
+
+@Test func expandedSystemRowWarnsForUnsupportedHost() {
+    let report = DiagnoseReport(
+        healthy: false,
+        missingBinaries: 0,
+        quarantinedBinaries: 0,
+        kernelPin: "match",
+        bridge: "down",
+        diagnosticSchema: 2,
+        ntfsmacVersion: "1.0",
+        buildVersion: "1",
+        macosVersion: "12.6",
+        architecture: "arm64",
+        helperInstalled: true,
+        missingComponents: [],
+        quarantinedComponents: [],
+        vpnDefaultRoute: false,
+        nfsMountCount: 0
+    )
+
+    #expect(DiagnoseSummary.rows(for: report).first(where: { $0.id == "system" })?.status == .warning)
 }
 
 @Test(arguments: ["match", "mismatch", "missing", "unknown", "malformed"])
@@ -127,7 +176,10 @@ func bridgeDownUsesMountContext(argument: (MountState, DiagnoseStatus, String)) 
     #expect(runner.errorMessage == nil)
     #expect(document != nil)
     let object = try JSONSerialization.jsonObject(with: document!.data) as? [String: Any]
+    #expect(object?["diagnostic_schema"] as? Int == 2)
+    #expect(object?["ntfsmac_version"] as? String == "1.0")
     #expect(object?["macos_version"] as? String == "26.5")
+    #expect(object?["missing_components"] as? [String] == ["vmproxy"])
 }
 
 @MainActor
