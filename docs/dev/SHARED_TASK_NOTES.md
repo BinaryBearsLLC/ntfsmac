@@ -3,6 +3,19 @@
 Cross-iteration memory for the autonomous ntfsmac build (PLAN.md §7.5). Read this file first,
 every session. Updated at the end of every unit.
 
+> [!WARNING]
+> **Retrospective status audit (2026-08-05):** this file is a historical execution ledger, not
+> the current BinaryBears product roadmap. A checked work unit means that its named files and
+> acceptance tests were completed at that point; it does not prove that a primitive was later
+> wired into the live product or validated on real hardware. Use
+> [`../BINARYBEARS_ROADMAP.md`](../BINARYBEARS_ROADMAP.md) for current status.
+>
+> In particular, the Phase 1 PF/route primitives below are implemented and unit-tested, but the
+> current mount flow does not apply and measure them as one live transaction. The GUI correctly
+> reports SECURITY state as `unknown`. “Phase 1 complete” below is therefore historical
+> **work-unit completion**, not current enforcement. Likewise, Phase 3 completion refers to the
+> original unit list; the roadmap records later GUI integration, removals, and remaining work.
+
 ## GATES
 
 - **GATE-CLI-BEFORE-GUI**: **still not fired.** the maintainer's decision (2026-07-10, this
@@ -195,9 +208,9 @@ every session. Updated at the end of every unit.
       (7/7 still green — the real, unprivileged, now-live `pfctl` call is a harmless no-op
       under test, caught by pf-teardown's own `|| true`). `teardown.bats` 5/5 green.
 
-**Phase 1 (pf/route hardening) complete**, though it remained non-blocking throughout —
+**Phase 1 (pf/route hardening) work units complete**, though it remained non-blocking throughout —
 built once Phase 2 was done and the entitlement HARD-STOP left no other unblocked CLI
-work. `NTFSMAC_PHASE_COMPLETE:phase-1`
+work. `NTFSMAC_PHASE_COMPLETE:phase-1` (historical unit signal; see the retrospective audit above)
 
 ### Phase 2 — CLI
 - [x] `2-device-validation` — `cli/lib/validate-device.sh`: `validate_device()`, one
@@ -659,11 +672,12 @@ resolved.
       literal palette, no new tests needed — this is a styling-only pass over already-tested pure
       logic, consistent with this repo's established "views aren't directly unit-tested" convention).
 
-**Phase 3 (GUI) all units complete.** `NTFSMAC_PHASE_COMPLETE:phase-3` — GATE-CLI-BEFORE-GUI was
+**Phase 3 (GUI) original units complete.** `NTFSMAC_PHASE_COMPLETE:phase-3` — GATE-CLI-BEFORE-GUI was
 deliberately overridden by the maintainer (2026-07-10, see GATES section above), so this doesn't reopen
 that question; the one remaining real gap for the maintainer is the visual sign-off just above, plus the
 still-unverified real VM boot (`kern.hv_support` sandbox limitation, also above). No further §6
-units remain in PLAN.md's task list for Phase 3.
+units remain in PLAN.md's task list for Phase 3. This statement predates the later product audit;
+the canonical roadmap is authoritative for the current GUI.
 
 ### Post-Phase-3 work (not §6 units, found/requested after "Phase 3 complete" above)
 

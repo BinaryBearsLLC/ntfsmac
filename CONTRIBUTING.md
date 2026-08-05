@@ -2,11 +2,14 @@
 
 ## Before you start
 
-Read [`docs/dev/PLAN.md`](docs/dev/PLAN.md) (architecture, phases, build order) and, for GUI work,
-[`GUI-PLAN.md`](GUI-PLAN.md) (button-level spec). Build order is fixed — CLI (Phase 0 → V →
-1 → 2) before any Phase 3 GUI work — don't jump ahead. [`CLAUDE.md`](CLAUDE.md) /
-[`AGENTS.md`](AGENTS.md) has the non-negotiables (driver default, transport, signing,
-privilege boundary) — don't re-litigate those in a PR without discussion first.
+Start with the canonical
+[`BinaryBears roadmap`](docs/BINARYBEARS_ROADMAP.md) and
+[`branch workflow`](docs/BRANCHING.md), then read
+[`docs/dev/PLAN.md`](docs/dev/PLAN.md) for the historical architecture/build plan and, for GUI
+work, [`docs/dev/GUI-PLAN.md`](docs/dev/GUI-PLAN.md) for the current behavior contract.
+[`CLAUDE.md`](CLAUDE.md) /
+[`AGENTS.md`](AGENTS.md) has the non-negotiables (driver default, transport, signing, privilege
+boundary) — don't re-litigate those in a PR without discussion first.
 
 ## Setup
 
@@ -31,8 +34,10 @@ privilege boundary) — don't re-litigate those in a PR without discussion first
 
 ## Making changes
 
-- Keep the CLI and GUI in sync with `PLAN.md`/`GUI-PLAN.md` — if a change drifts from what
+- Keep the CLI and GUI in sync with `PLAN.md`/`docs/dev/GUI-PLAN.md` — if a change drifts from what
   those docs specify, update the doc in the same PR, don't silently diverge.
+- Update roadmap status only when the implementation and its stated evidence are both present.
+  A lower-layer primitive or passing unit test is not automatically a shipped user-facing feature.
 - Every mount/unmount/pf/route control change must keep going through the SMJobBless XPC
   helper — see [`SECURITY.md`](SECURITY.md).
 - Device identifiers must stay validated against `^disk[0-9]+s[0-9]+$` in both CLI and
@@ -41,6 +46,12 @@ privilege boundary) — don't re-litigate those in a PR without discussion first
 ## Pull requests
 
 - Conventional commit-style messages (`feat:`, `fix:`, `refactor:`, …).
-- Note which `PLAN.md`/`GUI-PLAN.md` unit(s) the change addresses, if any.
+- Pull requests for BinaryBears roadmap work start from and target `BinaryBearsLLC/ntfsmac:dev`.
+  The fork's `main` intentionally mirrors current upstream. Upstream
+  submissions to `khr898/ntfsmac` are a separate maintainer decision and should preserve upstream
+  scope and attribution.
+- Keep one roadmap deliverable per focused branch/PR; include documentation and test evidence in
+  that same review unit.
+- Note which `PLAN.md`/`docs/dev/GUI-PLAN.md` unit(s) the change addresses, if any.
 - Security-sensitive changes (XPC helper, privilege boundary, pf/route handling) should call
   that out explicitly in the PR description.

@@ -1,9 +1,13 @@
 # Security Policy
 
 ntfsmac runs a privileged XPC helper (SMJobBless) that can mount/unmount filesystems and
-touch `pf`/route state, and drives a Linux microVM with a host-only network bridge. Treat
+touch `pf`/route state, and drives a Linux microVM over a dedicated private `/30` vmnet link. Treat
 anything in `helper/`, `gui/Helper/`, `gui/FirstRun/`, and the mount/unmount CLI paths as
 security-sensitive.
+
+The current GUI intentionally reports its three SECURITY indicators as `unknown`: PF/route
+primitives exist, but live enforcement and evidence-backed status are not yet integrated into the
+mount transaction. See the [BinaryBears security roadmap](docs/BINARYBEARS_ROADMAP.md#p0--trust-reproducibility-and-truthful-security).
 
 ## Reporting a vulnerability
 

@@ -1,5 +1,12 @@
 # GUI visual audit — resume plan
 
+> [!NOTE]
+> **Archived test-session record.** This file preserves what was observed and fixed during the
+> original GUI audit; it is not the current feature list or roadmap. Several approaches below were
+> later superseded, including the separate Settings window and speed preference. See
+> [`GUI-PLAN.md`](GUI-PLAN.md) for current behavior and
+> [`../BINARYBEARS_ROADMAP.md`](../BINARYBEARS_ROADMAP.md) for open work.
+
 Session 3: 2026-07-12 (continuation). All session-2 open items resolved and verified live via a
 properly *packaged* `.app` (session 2 tested the raw `.build/debug/ntfsmac-gui` binary, which
 structurally can never pass `SMJobBless` — see finding below). Two new real bugs found and fixed
@@ -197,7 +204,11 @@ icons" — every button in the real app must be wired to a real action; a contro
 but the app has no real behavior for gets flagged for a decision, never a silently-wired no-op.
 (This is exactly the class of bug the "Show speed in menu bar" fake setting was.)
 
-## Next steps, in order
+## Historical next steps (superseded as a current roadmap)
+
+The list below records what remained at the end of that session. Do not treat unchecked or
+imperative wording here as current priority; reconcile it against the canonical roadmap and live
+code before starting work.
 
 1. **Get a `security-reviewer` pass on `HelperService.stageCLI`** before this ships — new
    privileged root-exec surface, per this repo's own mandatory trigger for filesystem/privileged
