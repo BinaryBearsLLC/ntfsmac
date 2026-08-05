@@ -13,15 +13,26 @@ import AppKit
 public struct FirstRunView: View {
     @ObservedObject public var installer: HelperInstaller
     @ObservedObject public var diagnoseRunner: DiagnoseRunner
+    public let onOpenSettings: () -> Void
     public let onQuit: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var diagnosePresentation = DiagnosePanelPresentation()
 
-    public init(installer: HelperInstaller, diagnoseRunner: DiagnoseRunner, onQuit: @escaping () -> Void) {
+    public init(
+        installer: HelperInstaller,
+        diagnoseRunner: DiagnoseRunner,
+        onOpenSettings: @escaping () -> Void,
+        onQuit: @escaping () -> Void
+    ) {
         self.installer = installer
         self.diagnoseRunner = diagnoseRunner
+        self.onOpenSettings = onOpenSettings
         self.onQuit = onQuit
+    }
+
+    public init(installer: HelperInstaller, diagnoseRunner: DiagnoseRunner, onQuit: @escaping () -> Void) {
+        self.init(installer: installer, diagnoseRunner: diagnoseRunner, onOpenSettings: {}, onQuit: onQuit)
     }
 
     public var body: some View {
@@ -136,7 +147,7 @@ public struct FirstRunView: View {
     private var footer: some View {
         HStack {
             Button {
-                PreferencesOpener.open()
+                onOpenSettings()
             } label: {
                 SettingsGearGlyph(color: .secondary)
             }

@@ -23,10 +23,9 @@ wires them in — reviewed (`ecc:swift-reviewer`, approve), 77/77 tests still gr
   indicators (currently `.unknown`/`.unknown` — Phase 1 pf/route hardening state isn't surfaced
   by `diagnose.sh` yet, a separate, already-documented gap, not new here), Open in Finder,
   Diagnose panel, Refresh, and Quit (which tears down pf/route state via the helper first).
-- A `Settings { PreferencesView(...) }` scene is now registered — the gear button in the popover
-  footer opens it via `NSApp.sendAction(Selector(("showSettingsWindow:")), ...)` (the standard
-  macOS-13-compatible way to open a `Settings` scene; `@Environment(\.openSettings)` needs
-  macOS 14+, which this project's floor doesn't allow).
+- The gear button replaces the current popover content with the in-popover Settings page. `Back`
+  returns to the previous app content; no separate Preferences `NSWindow` or private selector is
+  used.
 
 **Known, deliberately out-of-scope limitations that remain** (don't report these as new bugs):
 `Settings.defaultMountMode`/`defaultMountPoint` are stored but not yet threaded into the actual
@@ -67,7 +66,7 @@ been through every state at least once:
   unmount → (if you can trigger a dirty journal — see below) mounted read-only (yellow, banner
   visible) → unplug the helper's launchd job or rename a vendor binary to force an error state
   (red) — real repro, not required, only if you want full color coverage.
-- **Preferences window**: open via the gear button, compare against the Preferences screen
+- **Settings page**: open via the gear button, compare against the Settings screen, then use Back
   (light isn't separately specified — not a gap, only one appearance is defined for this screen).
 - Known approximation, not a bug: the popover's drop shadow collapses the original two-layer
   box-shadow + inset rim-light into one `.shadow()` call (SwiftUI has no multi-shadow primitive)
@@ -275,10 +274,15 @@ The menu-bar icon itself uses a placeholder SF Symbol for now — see "app icon"
 5. Click `Diagnose` in the footer, then the `Diagnose` button inside the panel that appears —
    should match Part A's `diagnose --json` output in plain language.
 6. Click `Unmount` — icon returns to grey/idle, drive drops off the mounted row.
-7. Click the gear icon — Preferences window opens (compare against Gap 2's screen). Toggle
-   settings, close, reopen — confirm they persisted (backed by `UserDefaults`, should survive
+7. Click the gear icon — Settings replaces the popover content. Confirm the current app
+   release/build appears directly below `Settings` as small secondary text. Toggle settings, use
+   Back, reopen Settings — confirm they persisted (backed by `UserDefaults`, should survive
    without even restarting the app).
-8. Click `Quit` — app should exit; `mount | grep nfs` back in Terminal should show nothing
+8. As the final cleanup check, click `Uninstall…` in Settings. Confirm the destructive prompt stays
+   inside the popover; cancel once, reopen it, then confirm. A freshly installed helper must uninstall
+   on the first confirmed attempt, the UI must reach `Uninstalled`, and the uninstall action must
+   remain disabled afterward.
+9. Click `Quit` — app should exit; `mount | grep nfs` back in Terminal should show nothing
    ntfsmac-related left mounted.
 
 ### Force a dirty-journal (read-only) test, optional

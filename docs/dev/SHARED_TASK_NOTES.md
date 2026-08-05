@@ -736,6 +736,13 @@ still-open VM-boot gate and an end-to-end "connect a real NTFS drive" walkthroug
   Anything not yet built that still needed a literal-CSS lookup from the prototype (remaining
   `3-liquid-glass` polish, any un-walked states in `docs/dev/UITest.md`) now has to go off the
   running app + the maintainer's direction — flag if a specific value can't be recovered that way.
+- **In-popover Settings follow-up (2026-08-03)** — the gear now navigates within the existing
+  `MenuBarExtra` instead of opening a second `NSWindow`. Normal, first-run, and CLI-repair screens
+  share one `PopoverNavigation` route; Back restores the app content, while the app-owned
+  `Settings`, `HelperInstaller`, and `HelperUninstaller` instances survive navigation. The
+  runtime `PreferencesOpener` window implementation was removed; deprecated source-compatible
+  adapters remain for downstream callers, but the app does not use them. No mount, helper
+  privilege, signing, or deployment-target behavior changed.
 
 ## DECISIONS
 

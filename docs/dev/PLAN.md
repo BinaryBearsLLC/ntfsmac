@@ -566,11 +566,14 @@ sha256-checked downloads verified by checksum assertions, not unit tests).
 #### `3-preferences`
 - **Deps:** `3-menubar-shell`, `3-first-run-install` · **Tier:** medium
 - **Files:** `gui/Preferences/PreferencesView.swift`, `gui/Preferences/Settings.swift`, `gui/Tests/SettingsTests.swift`
-- **Do:** controls with GUI-PLAN defaults — Launch at login (off), Default mount mode (Read-write),
+- **Do:** show the release/build below the Settings title as small secondary text; controls with
+  GUI-PLAN defaults — Launch at login (off), Default mount mode (Read-write),
   Default mount point (`/Volumes/<label>`), Show speed in menu bar (off), Reinstall privileged helper
   (button → `3-first-run-install`); persist via `@AppStorage`/UserDefaults.
 - **Don't:** add controls beyond the GUI-PLAN table.
-- **Acceptance:** `SettingsTests` assert defaults + persistence round-trip.
+- **Acceptance:** `SettingsTests` assert defaults + persistence round-trip; `ProductVersionTests`
+  assert bundle metadata formatting; `PreferencesUninstallTests` assert inline confirmation and
+  one-shot destructive action; `HelperClientTests` assert no XPC connection is created at launch.
 
 #### `3-liquid-glass`  ← styling pass, last, solo
 - **Deps:** all Phase 3 feature units · **Tier:** medium

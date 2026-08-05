@@ -61,11 +61,8 @@ struct PopoverGlassBackground: ViewModifier {
     }
 }
 
-/// Preferences window content background — the comp's "Prefs content" recipe
-/// (`rgba(18,18,24,0.72)` over a blurred base, dark only shown). The window titlebar (traffic
-/// lights, its own blur) is real native `NSWindow` chrome in the actual app — the comp fakes it
-/// in static HTML because it's a mockup; nothing to translate there, faking it here would
-/// duplicate what AppKit already draws for free.
+/// Retained for public source compatibility with earlier embeddings. The production Settings
+/// page no longer uses this window-only treatment because it lives inside the popover.
 struct WindowGlassBackground: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
 
@@ -81,7 +78,7 @@ struct WindowGlassBackground: ViewModifier {
     }
 }
 
-/// Preferences row card — `ui/prototype.html`'s "Row:" comps: `rgba(255,255,255,0.05)` fill,
+/// Settings row card — `ui/prototype.html`'s "Row:" comps: `rgba(255,255,255,0.05)` fill,
 /// `rgba(255,255,255,0.08)` border, 10pt radius (dark only shown in the comp; light follows the
 /// same white-alpha→black-alpha substitution the mounted-state dark/light pair already
 /// establishes throughout the rest of the comp, not a new invented value).
@@ -106,8 +103,9 @@ struct GlassCard: ViewModifier {
 public extension View {
     /// Menu-bar popover container glass — apply once at the popover content root.
     func popoverGlassBackground() -> some View { modifier(PopoverGlassBackground()) }
-    /// Preferences window content glass — apply once at the window's root view.
+    /// Compatibility-only window treatment; ntfsmac itself no longer opens a Settings window.
+    @available(*, deprecated, message: "Settings is now presented inside the popover")
     func windowGlassBackground() -> some View { modifier(WindowGlassBackground()) }
-    /// One Preferences row's card chrome.
+    /// One Settings row's card chrome.
     func glassCard() -> some View { modifier(GlassCard()) }
 }
