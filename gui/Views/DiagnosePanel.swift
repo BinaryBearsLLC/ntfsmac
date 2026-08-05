@@ -133,23 +133,19 @@ public struct DiagnosePanel: View {
                             .help(row.explanation)
                             .accessibilityHint(row.explanation)
                     }
+                } else if let errorMessage = runner.errorMessage {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(Color.ntfsRed.opacity(0.95))
+                } else if runner.isRunning {
+                    ProgressView().frame(maxWidth: .infinity)
                 }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.secondary.opacity(0.08)))
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.secondary.opacity(0.12)))
-            } else if let errorMessage = runner.errorMessage {
-                Text(errorMessage)
-                    .font(.caption)
-                    .foregroundStyle(Color.ntfsRed.opacity(0.95))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.ntfsRed.opacity(0.09)))
-                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.ntfsRed.opacity(0.2)))
-            } else if runner.isRunning {
-                ProgressView().frame(maxWidth: .infinity)
             }
         }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(panelBackgroundColor))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(panelBorderColor))
         .padding(.top, 4)
     }
 
