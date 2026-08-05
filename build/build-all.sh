@@ -18,6 +18,10 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 # shellcheck source=lib/lock.sh
 source "$SCRIPT_DIR/lib/lock.sh"
+# shellcheck source=../cli/lib/runtime-alpine.sh
+source "$REPO_ROOT/cli/lib/runtime-alpine.sh"
+# shellcheck source=lib/patch-runtime-alpine.sh
+source "$SCRIPT_DIR/lib/patch-runtime-alpine.sh"
 
 # Same space-free-outside-repo fix as init-rootfs.sh — see build/AUDIT.md.
 CACHE_DIR="${NTFSMAC_ANYLINUXFS_CACHE_DIR:-${TMPDIR:-/tmp}/ntfsmac-build/anylinuxfs-build}"
@@ -30,14 +34,20 @@ export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
 
 prepare_build_copy() {
   mkdir -p "$CACHE_DIR"
+  # Clear every copied source subtree, including share/etc. Leaving those two in place caused a
+  # second build to reuse the prior run's already-patched Alpine config and nest a fresh copy under
+  # it, making the deterministic marker check fail (and risking stale embedded defaults).
+  for subtree in common-utils anylinuxfs vmproxy share etc init-rootfs; do
+    rm -rf "${CACHE_DIR:?}/$subtree"
+  done
   for crate in common-utils anylinuxfs vmproxy; do
-    rm -rf "${CACHE_DIR:?}/$crate"
     cp -R "$REPO_ROOT/vendor/src/anylinuxfs/$crate" "$CACHE_DIR/$crate"
   done
 
   # anylinuxfs/src/{cmd_mount,vm_image,main}.rs embed several sibling files via
   # include_str!("../../...") — real, found by a failed build attempt, not guessed.
-  # share/ and etc/ are copied verbatim (version files, default config, not audited).
+  # share/ and etc/ start as exact submodule copies, then the runtime Alpine patch below replaces
+  # only the audited default image/cache/version fields.
   # init-rootfs/default-alpine-packages.txt is anylinuxfs's OWN embedded copy of the
   # default package list (independent of the Go init-rootfs tool's embed) — swapped
   # for our trimmed list too, for consistency with build/init-rootfs.sh's audit.
@@ -46,6 +56,8 @@ prepare_build_copy() {
   mkdir -p "$CACHE_DIR/init-rootfs"
   cp "$REPO_ROOT/build/alpine-packages.trimmed.txt" "$CACHE_DIR/init-rootfs/default-alpine-packages.txt"
 
+  runtime_alpine_load || return 1
+  patch_anylinuxfs_runtime_alpine "$CACHE_DIR" || return 1
   patch_vmproxy_mount_tmpfs
 }
 

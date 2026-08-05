@@ -3,13 +3,17 @@
 # Every value here was read from the real upstream source (GitHub API / Docker Hub API) at pin
 # time — never invented. Re-run the fetch commands in each unit's script to re-pin.
 
-# anylinuxfs (submodule) — https://github.com/nohajc/anylinuxfs — pinned to HEAD of default
-# branch at audit time (no upstream release tags exist for this project).
+# anylinuxfs (submodule) — https://github.com/nohajc/anylinuxfs — pinned to the audited commit
+# below (26 commits after v0.18.0). Release tags now exist upstream; updates still require the
+# dedicated audit workflow in docs/BINARYBEARS_ROADMAP.md rather than following a floating tag.
+ANYLINUXFS_VERSION=0.18.0
 ANYLINUXFS_COMMIT=8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3
+VMPROXY_VERSION=0.18.0
 
 # libkrun (Cargo dependency of anylinuxfs + vmrunner-sys), branch stable-1.19.x.
 # Per PLAN.md §1/CLAUDE.md: exact commit comes from Cargo.lock, not hand-edited here.
 LIBKRUN_BRANCH=stable-1.19.x
+LIBKRUN_VERSION=1.19.3
 LIBKRUN_COMMIT=SEE_CARGO_LOCK
 
 # libkrunfw — nohajc's fork release (NOT containers/libkrunfw upstream).

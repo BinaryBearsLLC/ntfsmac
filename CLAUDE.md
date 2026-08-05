@@ -76,7 +76,7 @@ Everything vendored/built comes from these. Use these exact repos — don't subs
 | libkrunfw (kernel image + modules, vendored prebuilt) | `https://github.com/nohajc/libkrunfw/releases` — this is nohajc's fork, NOT `containers/libkrunfw` upstream | version + sha256 in `build/sources.lock` |
 | vmnet-helper (Apple-signed, vendored prebuilt) | `https://github.com/nirs/vmnet-helper/releases` | version + sha256 in `build/sources.lock` |
 | gvproxy (built from source, pure Go) | `https://github.com/containers/gvisor-tap-vsock`, tag `v0.8.9` (verify against anylinuxfs's `download-dependencies.sh` for drift before building) | commit in `build/sources.lock` |
-| Alpine rootfs base (pulled by init-rootfs via umoci) | Docker Hub `alpine` image | build input is pinned to a specific tag + digest in `build/sources.lock`; the shipped runtime's remaining `alpine:latest` default is a P0 roadmap gap and must not be described as solved |
+| Alpine rootfs base (pulled by init-rootfs via umoci) | Docker Hub `alpine` image | exact tag + linux/arm64 digest in `build/sources.lock`; the tag is verified to resolve to that digest, scratch-build patches embed the immutable digest-only pull reference in both runtime binaries, and packaging rejects a floating default |
 
 Don't fetch: `init-freebsd` (containers/libkrun releases) — FreeBSD guest init, not needed for NTFS, do not add to `sources.lock` or `fetch-prebuilt.sh`.
 

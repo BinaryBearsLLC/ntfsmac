@@ -58,9 +58,9 @@ The BinaryBears fork builds on the original project with a more complete, verifi
 
 | Area | Improvements over the initial base version |
 | --- | --- |
-| UI and UX | Settings live inside the menu-bar popover; the icon adapts correctly to the menu bar; contextual tooltips clarify actions; Diagnose has an inline **Hide** action; the app prevents duplicate instances; version and build appear directly in Settings. |
+| UI and UX | Settings live inside the menu-bar popover; the icon adapts correctly to the menu bar; contextual tooltips clarify actions; Diagnose and SECURITY have presentation-only **Hide** controls; the app prevents duplicate instances; version and build appear directly in Settings. |
 | Drive handling | NTFS detection also recognizes MBR `Windows_NTFS` volumes; ext2/3/4 are supported through the shared mount path; multiple drives can be mounted concurrently with per-drive status. |
-| Diagnostics | Text and JSON reports use the same canonical fields; **Command-click Diagnose** opens a save panel for a developer-oriented JSON report; output includes app/build, OS, architecture, helper state, runtime health, a privacy-safe VPN boolean, and active NFS mount count. |
+| Diagnostics | Text and JSON reports use the same canonical fields; **Command-click Diagnose** opens a save panel for the same developer-oriented JSON report. It identifies expected and detected host-runtime versions, audited source commits, the installed Alpine/cache version and guest `ntfs-3g`/`nfs-utils` packages, plus app/build, system, helper, kernel, network, and mount health. |
 | Helper lifecycle | Friendlier Full Disk Access guidance; a lazy XPC connection avoids stale startup state; helper reinstall and confirmed uninstall stay inside the popover and report success or actionable failure. |
 | Build and release | The interactive [`build.command`](build.command) verifies prerequisites, builds CLI and/or GUI, runs relevant tests, packages artifacts under `dist/`, and validates bundle structure, architecture, and ad-hoc signatures. |
 | Security honesty | SECURITY indicators never manufacture a green success state. Until live evidence is wired, the UI displays **unknown** rather than claiming a protection is active. |
@@ -151,6 +151,8 @@ the current GUI deliberately does not present this choice.
 
 - Click **Diagnose** for an inline, plain-language health summary.
 - Hold **Command (⌘)** while clicking **Diagnose** to run the same read-only JSON diagnosis and choose where to save it.
+- The report separates versions approved by the build from versions actually detected on the Mac,
+  and explicitly marks components or guest packages that are not installed or cannot be read.
 - Review the file, then attach it manually to a bug report if appropriate. ntfsmac never uploads it.
 
 Reports intentionally omit usernames, serial numbers, volume labels, device identifiers, mount paths, IP addresses, DNS servers, route tables, and VPN provider or interface names. See [SECURITY.md](SECURITY.md) for the reporting policy.
@@ -182,8 +184,9 @@ Mount, unmount, packet-filter, and route operations initiated by the GUI go thro
 - Partition identifiers are allow-listed before shell invocation.
 - The Linux guest uses a dedicated private `/30` `vmnet` link for the NFS path.
 - Privileged GUI operations are restricted to the helper's XPC protocol.
-- Vendored source revisions and build inputs are pinned and verified by the build system. The
-  remaining first-run Alpine runtime-pin gap is tracked explicitly in the roadmap.
+- Vendored source revisions and runtime inputs are pinned and verified by the build system. The
+  Alpine tag is verified against its arm64 digest, and both packaged runtime binaries must contain
+  the immutable digest-only pull reference.
 - SECURITY indicators use an explicit `unknown` state and never equate missing data with enforcement.
 
 The project is currently ad-hoc signed (`codesign -s -`) and is not notarized. macOS may therefore require the user to approve the app and its helper. Review [SECURITY.md](SECURITY.md) before installation or vulnerability reporting.
@@ -196,12 +199,12 @@ ntfsmac mounts partitions, not whole disks. In `diskutil list`, the external dev
 
 ### The first mount takes longer
 
-On first use, anylinuxfs downloads and initializes an Alpine Linux root filesystem (typically
-about 50–150 MB), then reuses the local environment on later mounts. The BinaryBears build pins
-and verifies its source and build-time Alpine inputs, but the currently shipped upstream runtime
-default still contains `alpine:latest`. Closing that reproducibility gap is the first P0 roadmap
-item; until then, a clean first initialization should be treated as a live upstream download, not
-as a byte-for-byte pinned runtime.
+On first use, anylinuxfs downloads and initializes the exact Alpine Linux arm64 image identified by
+the tag and SHA-256 digest in `build/sources.lock` (typically about 50–150 MB), then reuses that
+versioned local environment on later mounts. An older `~/.anylinuxfs/alpine` cache is preserved and
+the pinned cache is initialized beside it; upgrades likewise use a new directory, so rollback data
+is never silently removed. A download happens only when a mount actually needs a missing or safely
+reinitialized runtime, not while installing, diagnosing, or opening Settings.
 
 ### Diagnose before filing a bug
 
@@ -221,7 +224,7 @@ developed from `dev` and reviewed back into `dev` through its own focused branch
 | Priority | Status | Direction |
 | --- | --- | --- |
 | Completed foundation | ✅ Shipped | Multi-drive NTFS/ext support, MBR detection, in-popover Settings, adaptive icon and help, privacy-safe CLI/GUI diagnostics, version reporting, and helper reinstall/uninstall lifecycle |
-| P0 | ⬜ Planned | Pin the first-run Alpine runtime, formalize audited anylinuxfs updates, and make PF/VPN hardening plus SECURITY status evidence-backed |
+| P0 | 🟡 Partial | Alpine first-run runtime pinning and SECURITY Hide are shipped; audited anylinuxfs updates and evidence-backed PF/VPN status remain |
 | P1 | 🟡 Foundation exists | Add SHA-256 Verified Copy, qualify NTFS3 on real hardware, then expose it only as an explicit experimental driver choice |
 | P2 | ⬜ Planned | Migrate the deprecated privileged-helper lifecycle to `SMAppService` after its ad-hoc-signing and upgrade path are proven |
 | P3 | 🟡 Partial | Wire Open in Finder, decide the future of per-drive transfer telemetry, and add focused notifications/eject-all improvements |

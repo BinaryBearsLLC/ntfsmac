@@ -14,6 +14,7 @@ setup() {
   SYMLINK_DIR="$(mktemp -d)/bin"
   export NTFSMAC_PATH_SYMLINK="$SYMLINK_DIR/ntfsmac"
   export NTFSMAC_SKIP_ROOT_CHECK=1
+  export NTFSMAC_RUNTIME_HOME_OVERRIDE="$PREFIX_DIR/runtime-home"
   EXPECTED_RELEASE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$REPO_ROOT/gui/Info.plist")"
   EXPECTED_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$REPO_ROOT/gui/Info.plist")"
 }
@@ -115,7 +116,7 @@ STUB
   [ "$status" -eq 0 ]
   run "$PREFIX_DIR/bin/ntfsmac" diagnose --json
   [[ "$output" == \{*\} ]]
-  [[ "$output" == *'"diagnostic_schema":2'* ]]
+  [[ "$output" == *'"diagnostic_schema":4'* ]]
   [[ "$output" == *"\"ntfsmac_version\":\"$EXPECTED_RELEASE\""* ]]
 }
 

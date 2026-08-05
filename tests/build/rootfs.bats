@@ -21,7 +21,7 @@ setup() {
 @test "init-rootfs.sh HARD-STOPs on an unresolved TODO-UNRESOLVED pin" {
   local lock
   lock="$(mktemp)"
-  printf 'ALPINE_TAG=TODO-UNRESOLVED\nALPINE_DIGEST=TODO-UNRESOLVED\n' > "$lock"
+  sed 's/^ALPINE_TAG=.*/ALPINE_TAG=TODO-UNRESOLVED/' "$REPO_ROOT/build/sources.lock" > "$lock"
   NTFSMAC_SOURCES_LOCK="$lock" run "$SCRIPT"
   rm -f "$lock"
   [ "$status" -ne 0 ]

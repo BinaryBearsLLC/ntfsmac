@@ -74,6 +74,7 @@ public struct PopoverContentView: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var diagnosePresentation = DiagnosePanelPresentation()
+    @State private var securityPresentation = SecurityIndicatorsPresentation()
     @State private var showFDAPrompt = false
 
     public init(
@@ -293,7 +294,17 @@ public struct PopoverContentView: View {
                 // `diagnose.sh` doesn't currently surface its state at all
                 // (confirmed by `3-security-indicators`) — `.unknown` for both is the only
                 // honest value available today, never a fabricated `.enforced`.
-                SecurityIndicatorsView(isolatedNetwork: .unknown, vpnBypass: .unknown)
+                if securityPresentation.isVisible {
+                    SecurityIndicatorsView(
+                        isolatedNetwork: .unknown,
+                        vpnBypass: .unknown,
+                        onHide: { securityPresentation.hide() }
+                    )
+                } else {
+                    HiddenSecurityIndicatorsView {
+                        securityPresentation.show()
+                    }
+                }
             }
 
             if let errorMessage = mountController.errorMessage ?? remountController.errorMessage, errorMessage != "FDA_REQUIRED" {

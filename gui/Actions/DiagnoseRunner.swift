@@ -2,9 +2,8 @@ import Foundation
 import HelperShared
 
 /// Summary fields decoded from `ntfsmac diagnose --json` (`cli/commands/diagnose.sh`'s `main()`,
-/// `json_mode` branch). The CLI also emits `macos_version`; Swift's decoder deliberately ignores
-/// that extra field for the four-row UI summary, while `DeveloperDiagnoseDocument` preserves the
-/// complete raw JSON for support reports.
+/// `json_mode` branch). Fixed runtime identifiers are privacy-safe; paths and cache contents are
+/// deliberately absent. `DeveloperDiagnoseDocument` preserves the complete raw JSON for support.
 public struct DiagnoseReport: Codable, Equatable, Sendable {
     public let diagnosticSchema: Int?
     public let healthy: Bool
@@ -18,6 +17,28 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
     public let quarantinedBinaries: Int
     public let quarantinedComponents: [String]?
     public let kernelPin: String
+    public let anylinuxfsVersion: String?
+    public let anylinuxfsExpectedVersion: String?
+    public let anylinuxfsVersionStatus: String?
+    public let anylinuxfsSourceCommit: String?
+    public let vmproxySourceVersion: String?
+    public let libkrunVersion: String?
+    public let libkrunfwVersion: String?
+    public let gvproxyVersion: String?
+    public let gvproxyExpectedVersion: String?
+    public let gvproxyVersionStatus: String?
+    public let gvproxySourceCommit: String?
+    public let vmnetHelperVersion: String?
+    public let vmnetHelperExpectedVersion: String?
+    public let vmnetHelperVersionStatus: String?
+    public let vmnetHelperSourceCommit: String?
+    public let alpineRuntimeTag: String?
+    public let alpineRuntimeDigest: String?
+    public let alpineRuntimeState: String?
+    public let alpineInstalledCache: String?
+    public let alpineInstalledVersion: String?
+    public let ntfs3gVersion: String?
+    public let nfsUtilsVersion: String?
     public let bridge: String
     public let vpnDefaultRoute: Bool?
     public let nfsMountCount: Int?
@@ -35,6 +56,28 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
         case quarantinedBinaries = "quarantined_binaries"
         case quarantinedComponents = "quarantined_components"
         case kernelPin = "kernel_pin"
+        case anylinuxfsVersion = "anylinuxfs_version"
+        case anylinuxfsExpectedVersion = "anylinuxfs_expected_version"
+        case anylinuxfsVersionStatus = "anylinuxfs_version_status"
+        case anylinuxfsSourceCommit = "anylinuxfs_source_commit"
+        case vmproxySourceVersion = "vmproxy_source_version"
+        case libkrunVersion = "libkrun_version"
+        case libkrunfwVersion = "libkrunfw_version"
+        case gvproxyVersion = "gvproxy_version"
+        case gvproxyExpectedVersion = "gvproxy_expected_version"
+        case gvproxyVersionStatus = "gvproxy_version_status"
+        case gvproxySourceCommit = "gvproxy_source_commit"
+        case vmnetHelperVersion = "vmnet_helper_version"
+        case vmnetHelperExpectedVersion = "vmnet_helper_expected_version"
+        case vmnetHelperVersionStatus = "vmnet_helper_version_status"
+        case vmnetHelperSourceCommit = "vmnet_helper_source_commit"
+        case alpineRuntimeTag = "alpine_runtime_tag"
+        case alpineRuntimeDigest = "alpine_runtime_digest"
+        case alpineRuntimeState = "alpine_runtime_state"
+        case alpineInstalledCache = "alpine_installed_cache"
+        case alpineInstalledVersion = "alpine_installed_version"
+        case ntfs3gVersion = "ntfs_3g_version"
+        case nfsUtilsVersion = "nfs_utils_version"
         case bridge
         case vpnDefaultRoute = "vpn_default_route"
         case nfsMountCount = "nfs_mount_count"
@@ -62,7 +105,29 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
             missingComponents: nil,
             quarantinedComponents: nil,
             vpnDefaultRoute: nil,
-            nfsMountCount: nil
+            nfsMountCount: nil,
+            anylinuxfsVersion: nil,
+            anylinuxfsExpectedVersion: nil,
+            anylinuxfsVersionStatus: nil,
+            anylinuxfsSourceCommit: nil,
+            vmproxySourceVersion: nil,
+            libkrunVersion: nil,
+            libkrunfwVersion: nil,
+            gvproxyVersion: nil,
+            gvproxyExpectedVersion: nil,
+            gvproxyVersionStatus: nil,
+            gvproxySourceCommit: nil,
+            vmnetHelperVersion: nil,
+            vmnetHelperExpectedVersion: nil,
+            vmnetHelperVersionStatus: nil,
+            vmnetHelperSourceCommit: nil,
+            alpineRuntimeTag: nil,
+            alpineRuntimeDigest: nil,
+            alpineRuntimeState: nil,
+            alpineInstalledCache: nil,
+            alpineInstalledVersion: nil,
+            ntfs3gVersion: nil,
+            nfsUtilsVersion: nil
         )
     }
 
@@ -81,7 +146,29 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
         missingComponents: [String]?,
         quarantinedComponents: [String]?,
         vpnDefaultRoute: Bool?,
-        nfsMountCount: Int?
+        nfsMountCount: Int?,
+        anylinuxfsVersion: String? = nil,
+        anylinuxfsExpectedVersion: String? = nil,
+        anylinuxfsVersionStatus: String? = nil,
+        anylinuxfsSourceCommit: String? = nil,
+        vmproxySourceVersion: String? = nil,
+        libkrunVersion: String? = nil,
+        libkrunfwVersion: String? = nil,
+        gvproxyVersion: String? = nil,
+        gvproxyExpectedVersion: String? = nil,
+        gvproxyVersionStatus: String? = nil,
+        gvproxySourceCommit: String? = nil,
+        vmnetHelperVersion: String? = nil,
+        vmnetHelperExpectedVersion: String? = nil,
+        vmnetHelperVersionStatus: String? = nil,
+        vmnetHelperSourceCommit: String? = nil,
+        alpineRuntimeTag: String? = nil,
+        alpineRuntimeDigest: String? = nil,
+        alpineRuntimeState: String? = nil,
+        alpineInstalledCache: String? = nil,
+        alpineInstalledVersion: String? = nil,
+        ntfs3gVersion: String? = nil,
+        nfsUtilsVersion: String? = nil
     ) {
         self.diagnosticSchema = diagnosticSchema
         self.healthy = healthy
@@ -95,6 +182,28 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
         self.quarantinedBinaries = quarantinedBinaries
         self.quarantinedComponents = quarantinedComponents
         self.kernelPin = kernelPin
+        self.anylinuxfsVersion = anylinuxfsVersion
+        self.anylinuxfsExpectedVersion = anylinuxfsExpectedVersion
+        self.anylinuxfsVersionStatus = anylinuxfsVersionStatus
+        self.anylinuxfsSourceCommit = anylinuxfsSourceCommit
+        self.vmproxySourceVersion = vmproxySourceVersion
+        self.libkrunVersion = libkrunVersion
+        self.libkrunfwVersion = libkrunfwVersion
+        self.gvproxyVersion = gvproxyVersion
+        self.gvproxyExpectedVersion = gvproxyExpectedVersion
+        self.gvproxyVersionStatus = gvproxyVersionStatus
+        self.gvproxySourceCommit = gvproxySourceCommit
+        self.vmnetHelperVersion = vmnetHelperVersion
+        self.vmnetHelperExpectedVersion = vmnetHelperExpectedVersion
+        self.vmnetHelperVersionStatus = vmnetHelperVersionStatus
+        self.vmnetHelperSourceCommit = vmnetHelperSourceCommit
+        self.alpineRuntimeTag = alpineRuntimeTag
+        self.alpineRuntimeDigest = alpineRuntimeDigest
+        self.alpineRuntimeState = alpineRuntimeState
+        self.alpineInstalledCache = alpineInstalledCache
+        self.alpineInstalledVersion = alpineInstalledVersion
+        self.ntfs3gVersion = ntfs3gVersion
+        self.nfsUtilsVersion = nfsUtilsVersion
         self.bridge = bridge
         self.vpnDefaultRoute = vpnDefaultRoute
         self.nfsMountCount = nfsMountCount

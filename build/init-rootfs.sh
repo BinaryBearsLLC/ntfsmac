@@ -25,6 +25,10 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 # shellcheck source=lib/lock.sh
 source "$SCRIPT_DIR/lib/lock.sh"
+# shellcheck source=../cli/lib/runtime-alpine.sh
+source "$REPO_ROOT/cli/lib/runtime-alpine.sh"
+# shellcheck source=lib/patch-runtime-alpine.sh
+source "$SCRIPT_DIR/lib/patch-runtime-alpine.sh"
 
 # NOTE: deliberately NOT under $REPO_ROOT. This repo's own path can contain spaces
 # (e.g. when checked out on a "Windows Shared Folder" network volume), and
@@ -47,16 +51,6 @@ CACHE_DIR="${NTFSMAC_ROOTFS_CACHE_DIR:-${TMPDIR:-/tmp}/ntfsmac-build/init-rootfs
 ROOTFS_HOME="${NTFSMAC_VENDOR_ROOTFS_DIR:-${TMPDIR:-/tmp}/ntfsmac-build/rootfs-home}"
 TRIMMED_LIST="$REPO_ROOT/build/alpine-packages.trimmed.txt"
 BIN_DIR="${NTFSMAC_VENDOR_BIN_DIR:-$REPO_ROOT/vendor/bin}"
-
-require_pin() {
-  local key="$1" val
-  val="$(lock_get "$key")" || { echo "init-rootfs: HARD-STOP — pin '$key' missing from sources.lock" >&2; exit 1; }
-  if [[ "$val" == "TODO-UNRESOLVED" || -z "$val" ]]; then
-    echo "init-rootfs: HARD-STOP — pin '$key' is unresolved (TODO-UNRESOLVED)" >&2
-    exit 1
-  fi
-  printf '%s\n' "$val"
-}
 
 # verify_alpine_digest <tag> <expected_digest>
 # ALPINE_DIGEST is pinned to the linux/arm64 PLATFORM manifest digest (not the
@@ -110,6 +104,7 @@ prepare_build_copy() {
   cp "$REPO_ROOT/vendor/src/anylinuxfs/anylinuxfs/cc_linux" "$CACHE_DIR/anylinuxfs/cc_linux"
   chmod +x "$CACHE_DIR/anylinuxfs/cc_linux"
   cp "$TRIMMED_LIST" "$CACHE_DIR/init-rootfs/default-alpine-packages.txt"
+  patch_init_rootfs_runtime_alpine "$CACHE_DIR/init-rootfs"
 }
 
 # build_vmrunner_sys — settled PLAN.md decision: try without -F freebsd first.
@@ -147,7 +142,7 @@ vendor_init_rootfs_bin() {
   echo "init-rootfs: vendored $BIN_DIR/init-rootfs"
 }
 
-# run_init_rootfs <tag> — stages a libexec/ layout (binary + kernel Image, matching
+# run_init_rootfs <reference> <base-dir> — stages a libexec/ layout (binary + kernel Image, matching
 # upstream's PrefixDir/libexec/Image expectation) and runs the real tool with $HOME
 # redirected into vendor/rootfs/ so pull+unpack+setup-script land inside the repo.
 # The pull/unpack/setup-script-write happen before the VM boot step, so even if the
@@ -155,7 +150,7 @@ vendor_init_rootfs_bin() {
 # with a manual timeout (no coreutils `timeout` dependency) so an autonomous run can't
 # hang forever on a Hypervisor.framework boot that never completes.
 run_init_rootfs() {
-  local tag="$1"
+  local reference="$1" base_dir="$2"
   local run_dir="$CACHE_DIR/run"
   mkdir -p "$run_dir/libexec" "$ROOTFS_HOME"
   cp "$CACHE_DIR/init-rootfs/bin/init-rootfs" "$run_dir/libexec/init-rootfs"
@@ -191,14 +186,16 @@ run_init_rootfs() {
   # be caught by the caller's own process/tool timeout. Revisit with a proper
   # setsid-based watchdog once vmproxy is available and VM boot is actually reachable.
   echo "init-rootfs: running (HOME=$ROOTFS_HOME)"
-  (cd "$run_dir/libexec" && HOME="$ROOTFS_HOME" ./init-rootfs -docker-ref "alpine:${tag}") || true
+  (cd "$run_dir/libexec" && HOME="$ROOTFS_HOME" ./init-rootfs \
+    -docker-ref "$reference" -base-dir "$base_dir") || true
   return 0
 }
 
 main() {
   local tag digest
-  tag="$(require_pin ALPINE_TAG)"
-  digest="$(require_pin ALPINE_DIGEST)"
+  runtime_alpine_load || exit 1
+  tag="$ALPINE_RUNTIME_TAG"
+  digest="$ALPINE_RUNTIME_DIGEST"
 
   verify_alpine_digest "$tag" "$digest" || exit 1
 
@@ -206,7 +203,7 @@ main() {
   build_vmrunner_sys || exit 1
   build_init_rootfs_bin
   vendor_init_rootfs_bin
-  run_init_rootfs "$tag"
+  run_init_rootfs "$ALPINE_RUNTIME_REF" "$ALPINE_RUNTIME_BASE_DIR"
 
   echo "init-rootfs: done — inspect $ROOTFS_HOME for the generated rootfs and vm-setup.sh"
   echo "init-rootfs: NTFSMAC_ROOTFS_HOME=$ROOTFS_HOME"

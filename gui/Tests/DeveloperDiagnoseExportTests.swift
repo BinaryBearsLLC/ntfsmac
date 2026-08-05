@@ -3,7 +3,7 @@ import Testing
 @testable import NtfsmacGUI
 
 private let developerJSON = """
-{"diagnostic_schema":2,"healthy":false,"ntfsmac_version":"1.0","build_version":"1","macos_version":"26.5","architecture":"arm64","helper_installed":true,"missing_binaries":1,"missing_components":["vmproxy"],"quarantined_binaries":0,"quarantined_components":[],"kernel_pin":"match","bridge":"down","vpn_default_route":true,"nfs_mount_count":2}
+{"diagnostic_schema":4,"healthy":false,"ntfsmac_version":"1.0","build_version":"1","macos_version":"26.5","architecture":"arm64","helper_installed":true,"missing_binaries":1,"missing_components":["vmproxy"],"quarantined_binaries":0,"quarantined_components":[],"kernel_pin":"match","anylinuxfs_version":"0.18.0","anylinuxfs_expected_version":"0.18.0","anylinuxfs_version_status":"match","anylinuxfs_source_commit":"8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3","vmproxy_source_version":"0.18.0","libkrun_version":"1.19.3","libkrunfw_version":"v6.12.62-rev1","gvproxy_version":"v0.8.9","gvproxy_expected_version":"v0.8.9","gvproxy_version_status":"match","gvproxy_source_commit":"9cfc86f66679ef0feed0f20ba1df558fe2bef5c6","vmnet_helper_version":"v0.12.0","vmnet_helper_expected_version":"v0.12.0","vmnet_helper_version_status":"match","vmnet_helper_source_commit":"0caef043005c7d9f03422a9914bc9d3d4637dc84","alpine_runtime_tag":"3.23.5","alpine_runtime_digest":"sha256:d858bb5442632a31bd4bca6c5e601dbe6b536fd7942092ea6a08a0a95805693c","alpine_runtime_state":"migration_available","alpine_installed_cache":"legacy","alpine_installed_version":"3.24.1","ntfs_3g_version":"2026.2.25-r0","nfs_utils_version":"2.6.4-r6","bridge":"down","vpn_default_route":true,"nfs_mount_count":2}
 """
 
 @Test func commandModifierSelectsDeveloperExportWithoutChangingNormalClick() {
@@ -16,7 +16,7 @@ private let developerJSON = """
     #expect(document.data.last == 0x0A)
 
     let object = try JSONSerialization.jsonObject(with: document.data) as? [String: Any]
-    #expect(object?["diagnostic_schema"] as? Int == 2)
+    #expect(object?["diagnostic_schema"] as? Int == 4)
     #expect(object?["healthy"] as? Bool == false)
     #expect(object?["ntfsmac_version"] as? String == "1.0")
     #expect(object?["build_version"] as? String == "1")
@@ -28,6 +28,10 @@ private let developerJSON = """
     #expect(object?["quarantined_binaries"] as? Int == 0)
     #expect(object?["quarantined_components"] as? [String] == [])
     #expect(object?["kernel_pin"] as? String == "match")
+    #expect(object?["anylinuxfs_source_commit"] as? String == "8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3")
+    #expect(object?["alpine_installed_version"] as? String == "3.24.1")
+    #expect(object?["ntfs_3g_version"] as? String == "2026.2.25-r0")
+    #expect(object?["nfs_utils_version"] as? String == "2.6.4-r6")
     #expect(object?["bridge"] as? String == "down")
     #expect(object?["vpn_default_route"] as? Bool == true)
     #expect(object?["nfs_mount_count"] as? Int == 2)

@@ -1,9 +1,10 @@
 #!/bin/bash
 # cli/commands/diagnose.sh — 2-diagnose (PLAN.md §6).
 #
-# Read-only health report: product/system metadata, helper and vendor presence, bridge state,
-# kernel pin, quarantine xattrs, a tunnel-default-route boolean, and NFS mount count. No privileged
-# op ever runs here (diagnose never mounts/unmounts/touches pf/route).
+# Read-only health report: product/system metadata, expected and detected runtime versions,
+# helper/vendor presence, Alpine guest packages, bridge state, kernel pin, quarantine xattrs, a
+# tunnel-default-route boolean, and NFS mount count. No privileged op ever runs here (diagnose
+# never mounts/unmounts/touches pf/route).
 set -u
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
@@ -17,7 +18,7 @@ if [[ -r "$VERSION_LIB" ]]; then
 else
   NTFSMAC_VERSION="unknown"
   NTFSMAC_BUILD_VERSION="unknown"
-  NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION="2"
+  NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION="4"
 fi
 # Same two candidates helper/HelperProtocol.swift's resolveNtfsmacPrefix() checks (bash and
 # Swift can't share source — kept in sync deliberately, same pattern as list-drives.sh's own
@@ -98,6 +99,171 @@ check_vendor_binaries() {
   done
 }
 
+# Version strings enter JSON and the GUI, so accept only the conservative token alphabet used by
+# the pinned projects/package managers. Unexpected output becomes "unknown" rather than being
+# echoed verbatim or allowed to break JSON. Paths and free-form command output are never emitted.
+safe_version_token() {
+  local value="$1"
+  case "$value" in
+    ''|*[!A-Za-z0-9._+~:-]*) printf 'unknown\n' ;;
+    *) printf '%s\n' "$value" ;;
+  esac
+}
+
+lock_value_or_unknown() {
+  local key="$1" value
+  value="$(lock_get "$key" 2>/dev/null)" || { printf 'unknown\n'; return; }
+  safe_version_token "$value"
+}
+
+apk_package_version() {
+  local database="$1" package="$2" value
+  if [[ ! -f "$database" ]]; then
+    printf 'unknown\n'
+    return
+  fi
+  value="$(awk -v wanted="$package" '
+    BEGIN { RS=""; FS="\n" }
+    {
+      name=""; version=""
+      for (i = 1; i <= NF; i++) {
+        if ($i ~ /^P:/) name=substr($i, 3)
+        else if ($i ~ /^V:/) version=substr($i, 3)
+      }
+      if (name == wanted) { print version; exit }
+    }
+  ' "$database" 2>/dev/null)"
+  if [[ -z "$value" ]]; then
+    printf 'not_installed\n'
+  else
+    safe_version_token "$value"
+  fi
+}
+
+inspect_alpine_installation() {
+  local runtime_home="$1" state="$2" rootfs="" base release_file apk_database value
+  ALPINE_INSTALLED_CACHE="none"
+  ALPINE_INSTALLED_VERSION="not_installed"
+  NTFS_3G_VERSION="not_installed"
+  NFS_UTILS_VERSION="not_installed"
+
+  base="$(runtime_alpine_cache_path "$runtime_home")"
+  case "$state" in
+    initialized)
+      ALPINE_INSTALLED_CACHE="pinned"
+      rootfs="$base/rootfs"
+      ;;
+    migration_available)
+      ALPINE_INSTALLED_CACHE="legacy"
+      rootfs="$runtime_home/.anylinuxfs/alpine/rootfs"
+      ;;
+    mismatch|incomplete)
+      ALPINE_INSTALLED_CACHE="pinned_unusable"
+      rootfs="$base/rootfs"
+      ;;
+    invalid)
+      ALPINE_INSTALLED_CACHE="invalid"
+      return
+      ;;
+    not_initialized)
+      return
+      ;;
+    *)
+      ALPINE_INSTALLED_CACHE="unknown"
+      ALPINE_INSTALLED_VERSION="unknown"
+      NTFS_3G_VERSION="unknown"
+      NFS_UTILS_VERSION="unknown"
+      return
+      ;;
+  esac
+
+  # Refuse symlinked cache roots: diagnostics are read-only and must not follow an attacker-chosen
+  # path merely to collect a version. Missing/incomplete files remain explicit fixed tokens.
+  if [[ -L "$runtime_home/.anylinuxfs" || -L "$runtime_home/.anylinuxfs/alpine" ||
+        -L "$base" || -L "$rootfs" || ! -d "$rootfs" ]]; then
+    ALPINE_INSTALLED_VERSION="unknown"
+    NTFS_3G_VERSION="unknown"
+    NFS_UTILS_VERSION="unknown"
+    return
+  fi
+
+  release_file="$rootfs/etc/alpine-release"
+  if [[ -f "$release_file" && ! -L "$release_file" ]]; then
+    value="$(sed -n '1p' "$release_file" 2>/dev/null)"
+    ALPINE_INSTALLED_VERSION="$(safe_version_token "$value")"
+  else
+    ALPINE_INSTALLED_VERSION="unknown"
+  fi
+
+  apk_database="$rootfs/lib/apk/db/installed"
+  if [[ -L "$apk_database" ]]; then
+    NTFS_3G_VERSION="unknown"
+    NFS_UTILS_VERSION="unknown"
+  else
+    NTFS_3G_VERSION="$(apk_package_version "$apk_database" ntfs-3g)"
+    NFS_UTILS_VERSION="$(apk_package_version "$apk_database" nfs-utils)"
+  fi
+}
+
+component_version() {
+  local name="$1" bin output value
+  bin="$(resolve_bin "$name")"
+  if [[ -z "$bin" || ! -x "$bin" ]]; then
+    printf 'not_installed\n'
+    return
+  fi
+  if xattr -p com.apple.quarantine "$bin" >/dev/null 2>&1; then
+    printf 'quarantined\n'
+    return
+  fi
+
+  output="$("$bin" --version 2>&1)" || true
+  case "$name" in
+    anylinuxfs) value="$(printf '%s\n' "$output" | awk '$1 == "anylinuxfs" { print $2; exit }')" ;;
+    gvproxy) value="$(printf '%s\n' "$output" | awk '$1 == "gvproxy" && $2 == "version" { print $3; exit }')" ;;
+    vmnet-helper) value="$(printf '%s\n' "$output" | awk -F': *' '$1 == "version" { print $2; exit }')" ;;
+    *) value="" ;;
+  esac
+  safe_version_token "$value"
+}
+
+vmnet_helper_commit() {
+  local bin output value
+  bin="$(resolve_bin vmnet-helper)"
+  if [[ -z "$bin" || ! -x "$bin" ]]; then
+    printf 'not_installed\n'
+    return
+  fi
+  if xattr -p com.apple.quarantine "$bin" >/dev/null 2>&1; then
+    printf 'quarantined\n'
+    return
+  fi
+  output="$("$bin" --version 2>&1)" || true
+  value="$(printf '%s\n' "$output" | awk -F': *' '$1 == "commit" { print $2; exit }')"
+  if [[ ${#value} -eq 40 && "$value" != *[!0-9a-f]* ]]; then
+    printf '%s\n' "$value"
+  else
+    printf 'unknown\n'
+  fi
+}
+
+version_status() {
+  local actual="$1" expected="$2"
+  case "$actual" in
+    not_installed|quarantined) printf '%s\n' "$actual" ;;
+    unknown) printf 'unknown\n' ;;
+    *)
+      if [[ "$expected" == "unknown" ]]; then
+        printf 'unknown\n'
+      elif [[ "$actual" == "$expected" ]]; then
+        printf 'match\n'
+      else
+        printf 'mismatch\n'
+      fi
+      ;;
+  esac
+}
+
 check_kernel_pin() {
   local lock_sh="$REPO_ROOT/build/lib/lock.sh"
   if [[ ! -x "$lock_sh" ]]; then
@@ -128,6 +294,67 @@ check_kernel_pin() {
   [[ -f "$squashfs_file" ]] || { echo "missing"; return; }
   actual="$(shasum -a 256 "$squashfs_file" | awk '{print $1}')"
   [[ "$actual" == "$expected" ]] && echo "match" || echo "mismatch"
+}
+
+# Loads the same sources.lock-derived runtime contract used by the build and mount path, then
+# reports only fixed tokens plus the approved tag/digest. No home path or cache content is emitted.
+check_alpine_runtime() {
+  local runtime_lib="$SCRIPT_DIR/../lib/runtime-alpine.sh"
+  local lock_lib
+  if [[ -r "$SCRIPT_DIR/../lib/lock.sh" ]]; then
+    lock_lib="$SCRIPT_DIR/../lib/lock.sh"
+  else
+    lock_lib="$REPO_ROOT/build/lib/lock.sh"
+  fi
+
+  ALPINE_RUNTIME_TAG="unknown"
+  ALPINE_RUNTIME_DIGEST="unknown"
+  ALPINE_RUNTIME_STATE="unknown"
+  ALPINE_INSTALLED_CACHE="unknown"
+  ALPINE_INSTALLED_VERSION="unknown"
+  NTFS_3G_VERSION="unknown"
+  NFS_UTILS_VERSION="unknown"
+  ANYLINUXFS_EXPECTED_VERSION="unknown"
+  ANYLINUXFS_SOURCE_COMMIT="unknown"
+  VMPROXY_SOURCE_VERSION="unknown"
+  LIBKRUN_VERSION="unknown"
+  LIBKRUNFW_VERSION="unknown"
+  GVPROXY_EXPECTED_VERSION="unknown"
+  GVPROXY_SOURCE_COMMIT="unknown"
+  VMNET_HELPER_EXPECTED_VERSION="unknown"
+  if [[ ! -r "$lock_lib" || ! -r "$runtime_lib" ]]; then
+    return 1
+  fi
+
+  # Installed and source-tree layouts resolve the same libraries from different roots.
+  # shellcheck disable=SC1090
+  source "$lock_lib"
+  # shellcheck disable=SC1090
+  source "$runtime_lib"
+  runtime_alpine_load || return 1
+
+  ANYLINUXFS_EXPECTED_VERSION="$(lock_value_or_unknown ANYLINUXFS_VERSION)"
+  ANYLINUXFS_SOURCE_COMMIT="$(lock_value_or_unknown ANYLINUXFS_COMMIT)"
+  VMPROXY_SOURCE_VERSION="$(lock_value_or_unknown VMPROXY_VERSION)"
+  LIBKRUN_VERSION="$(lock_value_or_unknown LIBKRUN_VERSION)"
+  LIBKRUNFW_VERSION="$(lock_value_or_unknown LIBKRUNFW_VERSION)"
+  GVPROXY_EXPECTED_VERSION="$(lock_value_or_unknown GVPROXY_VERSION)"
+  GVPROXY_SOURCE_COMMIT="$(lock_value_or_unknown GVPROXY_COMMIT)"
+  VMNET_HELPER_EXPECTED_VERSION="$(lock_value_or_unknown VMNET_HELPER_VERSION)"
+
+  local runtime_home
+  runtime_home="${NTFSMAC_RUNTIME_HOME_OVERRIDE-${HOME:-}}"
+  if [[ -z "$runtime_home" ]]; then
+    runtime_home="$(cd ~ 2>/dev/null && pwd)"
+  fi
+  [[ -n "$runtime_home" ]] || return 1
+
+  ALPINE_RUNTIME_STATE="$(runtime_alpine_cache_state "$runtime_home")" || {
+    ALPINE_RUNTIME_STATE="unknown"
+    return 1
+  }
+  inspect_alpine_installation "$runtime_home" "$ALPINE_RUNTIME_STATE"
+  return 0
 }
 
 check_bridge_up() {
@@ -214,6 +441,9 @@ main() {
   local macos_version macos_major macos_supported=1
   local helper_installed=0 vpn_default_route=0
   local helper_json vpn_json missing_json quarantined_json healthy_json
+  local anylinuxfs_version anylinuxfs_version_status
+  local gvproxy_version gvproxy_version_status
+  local vmnet_helper_version vmnet_helper_version_status vmnet_helper_source_commit
   MISSING_BINS=0
   QUARANTINED_BINS=0
   MISSING_COMPONENTS=""
@@ -228,6 +458,14 @@ main() {
   mount_count="$(count_mounts "$mounts")"
   check_helper_installed && helper_installed=1
   check_vpn_default_route && vpn_default_route=1
+  check_alpine_runtime || true
+  anylinuxfs_version="$(component_version anylinuxfs)"
+  anylinuxfs_version_status="$(version_status "$anylinuxfs_version" "$ANYLINUXFS_EXPECTED_VERSION")"
+  gvproxy_version="$(component_version gvproxy)"
+  gvproxy_version_status="$(version_status "$gvproxy_version" "$GVPROXY_EXPECTED_VERSION")"
+  vmnet_helper_version="$(component_version vmnet-helper)"
+  vmnet_helper_version_status="$(version_status "$vmnet_helper_version" "$VMNET_HELPER_EXPECTED_VERSION")"
+  vmnet_helper_source_commit="$(vmnet_helper_commit)"
 
   # ntfsmac requires macOS 13.0+ on Apple Silicon. Only a real, parseable major version
   # below 13 flips health; an unknown/undetected version is reported but left non-fatal.
@@ -245,6 +483,13 @@ main() {
   [[ "$QUARANTINED_BINS" -gt 0 ]] && healthy=0
   [[ "$kernel_pin" == "mismatch" || "$kernel_pin" == "missing" ]] && healthy=0
   [[ "$architecture" != "arm64" ]] && healthy=0
+  case "$ALPINE_RUNTIME_STATE" in
+    initialized|not_initialized|migration_available) ;;
+    *) healthy=0 ;;
+  esac
+  [[ "$anylinuxfs_version_status" == "mismatch" ]] && healthy=0
+  [[ "$gvproxy_version_status" == "mismatch" ]] && healthy=0
+  [[ "$vmnet_helper_version_status" == "mismatch" ]] && healthy=0
 
   if [[ $json_mode -eq 1 ]]; then
     [[ "$healthy" -eq 1 ]] && healthy_json=true || healthy_json=false
@@ -252,11 +497,19 @@ main() {
     [[ "$vpn_default_route" -eq 1 ]] && vpn_json=true || vpn_json=false
     missing_json="$(component_json_array "$MISSING_COMPONENTS")"
     quarantined_json="$(component_json_array "$QUARANTINED_COMPONENTS")"
-    printf '{"diagnostic_schema":%s,"healthy":%s,"ntfsmac_version":"%s","build_version":"%s","macos_version":"%s","architecture":"%s","helper_installed":%s,"missing_binaries":%s,"missing_components":%s,"quarantined_binaries":%s,"quarantined_components":%s,"kernel_pin":"%s","bridge":"%s","vpn_default_route":%s,"nfs_mount_count":%s}\n' \
+    printf '{"diagnostic_schema":%s,"healthy":%s,"ntfsmac_version":"%s","build_version":"%s","macos_version":"%s","architecture":"%s","helper_installed":%s,"missing_binaries":%s,"missing_components":%s,"quarantined_binaries":%s,"quarantined_components":%s,"kernel_pin":"%s","anylinuxfs_version":"%s","anylinuxfs_expected_version":"%s","anylinuxfs_version_status":"%s","anylinuxfs_source_commit":"%s","vmproxy_source_version":"%s","libkrun_version":"%s","libkrunfw_version":"%s","gvproxy_version":"%s","gvproxy_expected_version":"%s","gvproxy_version_status":"%s","gvproxy_source_commit":"%s","vmnet_helper_version":"%s","vmnet_helper_expected_version":"%s","vmnet_helper_version_status":"%s","vmnet_helper_source_commit":"%s","alpine_runtime_tag":"%s","alpine_runtime_digest":"%s","alpine_runtime_state":"%s","alpine_installed_cache":"%s","alpine_installed_version":"%s","ntfs_3g_version":"%s","nfs_utils_version":"%s","bridge":"%s","vpn_default_route":%s,"nfs_mount_count":%s}\n' \
       "$NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION" "$healthy_json" "$NTFSMAC_VERSION" \
       "$NTFSMAC_BUILD_VERSION" "$macos_version" "$architecture" "$helper_json" \
       "$MISSING_BINS" "$missing_json" "$QUARANTINED_BINS" "$quarantined_json" \
-      "$kernel_pin" "$bridge" "$vpn_json" "$mount_count"
+      "$kernel_pin" "$anylinuxfs_version" "$ANYLINUXFS_EXPECTED_VERSION" \
+      "$anylinuxfs_version_status" "$ANYLINUXFS_SOURCE_COMMIT" "$VMPROXY_SOURCE_VERSION" \
+      "$LIBKRUN_VERSION" "$LIBKRUNFW_VERSION" "$gvproxy_version" \
+      "$GVPROXY_EXPECTED_VERSION" "$gvproxy_version_status" "$GVPROXY_SOURCE_COMMIT" \
+      "$vmnet_helper_version" "$VMNET_HELPER_EXPECTED_VERSION" \
+      "$vmnet_helper_version_status" "$vmnet_helper_source_commit" \
+      "$ALPINE_RUNTIME_TAG" "$ALPINE_RUNTIME_DIGEST" "$ALPINE_RUNTIME_STATE" \
+      "$ALPINE_INSTALLED_CACHE" "$ALPINE_INSTALLED_VERSION" "$NTFS_3G_VERSION" \
+      "$NFS_UTILS_VERSION" "$bridge" "$vpn_json" "$mount_count"
   else
     echo "diagnose: ntfsmac version: $NTFSMAC_VERSION ($NTFSMAC_BUILD_VERSION)"
     echo "diagnose: macOS version: $macos_version"
@@ -269,6 +522,17 @@ main() {
     echo "diagnose: quarantined binaries: $QUARANTINED_BINS"
     [[ -n "$QUARANTINED_COMPONENTS" ]] && echo "diagnose:   quarantined components: $QUARANTINED_COMPONENTS"
     echo "diagnose: kernel pin: $kernel_pin"
+    echo "diagnose: anylinuxfs: $anylinuxfs_version (expected $ANYLINUXFS_EXPECTED_VERSION, $anylinuxfs_version_status; source $ANYLINUXFS_SOURCE_COMMIT)"
+    echo "diagnose: vmproxy source version: $VMPROXY_SOURCE_VERSION"
+    echo "diagnose: libkrun: $LIBKRUN_VERSION"
+    echo "diagnose: libkrunfw: $LIBKRUNFW_VERSION"
+    echo "diagnose: gvproxy: $gvproxy_version (expected $GVPROXY_EXPECTED_VERSION, $gvproxy_version_status; source $GVPROXY_SOURCE_COMMIT)"
+    echo "diagnose: vmnet-helper: $vmnet_helper_version (expected $VMNET_HELPER_EXPECTED_VERSION, $vmnet_helper_version_status; source $vmnet_helper_source_commit)"
+    echo "diagnose: Alpine approved runtime: $ALPINE_RUNTIME_TAG ($ALPINE_RUNTIME_DIGEST)"
+    echo "diagnose: Alpine runtime state: $ALPINE_RUNTIME_STATE"
+    echo "diagnose: Alpine installed: $ALPINE_INSTALLED_VERSION ($ALPINE_INSTALLED_CACHE cache)"
+    echo "diagnose: ntfs-3g installed: $NTFS_3G_VERSION"
+    echo "diagnose: nfs-utils installed: $NFS_UTILS_VERSION"
     echo "diagnose: vmnet bridge: $bridge"
     echo "diagnose: VPN default route: $([[ "$vpn_default_route" -eq 1 ]] && echo detected || echo not detected)"
     echo "diagnose: current NFS mount count: $mount_count"

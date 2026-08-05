@@ -83,6 +83,8 @@ conflicts.
 - [x] Lazy XPC connection and helper lifecycle recovery improvements.
 - [x] Real Service Management state for Launch at login.
 - [x] SECURITY rows default to `unknown` instead of manufacturing a successful state.
+- [x] SECURITY Hide/Show changes presentation only and leaves mount/helper state untouched.
+- [x] Runtime Alpine tag/digest pinning, versioned cache migration, diagnostics, and package gate.
 
 ### Foundations that are not complete product features
 
@@ -94,9 +96,6 @@ conflicts.
   multi-drive popover does not expose a corresponding control.
 - [-] **Transfer telemetry:** the sampling subsystem and tests remain in the codebase, but the
   current multi-drive UI deliberately does not present a speed row.
-- [-] **Alpine reproducibility:** build-time code verifies a pinned Alpine tag and arm64 digest,
-  but the shipped anylinuxfs/init-rootfs defaults still contain `alpine:latest`. A first-run
-  initialization can therefore fetch runtime content that is newer than the reviewed build pins.
 
 ## Prioritized roadmap
 
@@ -104,18 +103,21 @@ conflicts.
 
 #### 1. Pin the runtime Alpine environment
 
-- [ ] Replace the shipped `alpine:latest` defaults with an exact tag and platform digest derived
+- [x] Replace the shipped `alpine:latest` defaults with an exact tag and platform digest derived
   from `build/sources.lock`.
-- [ ] Add a packaging gate that rejects a shipped runtime containing an unapproved
+- [x] Add a packaging gate that rejects a shipped runtime containing an unapproved
   `alpine:latest` reference.
-- [ ] Record the initialized rootfs version/digest in privacy-safe diagnostics.
-- [ ] Define an explicit migration path for an existing `~/.anylinuxfs/alpine` cache; never
+- [x] Record the approved and installed Alpine state plus guest package versions in privacy-safe
+  CLI text, CLI JSON, GUI summary, and Command-click export diagnostics.
+- [x] Define an explicit migration path for an existing `~/.anylinuxfs/alpine` cache; never
   silently destroy user data or force a download during an unrelated action.
-- [ ] Test clean initialization, cached initialization, offline reuse, digest mismatch, interrupted
+- [x] Test clean initialization, cached initialization, offline reuse, digest mismatch, interrupted
   download, and upgrade/rollback behavior.
 
-This closes the difference between a pinned source/build input and the image actually downloaded
-on a user's first mount.
+The immutable digest-only pull reference, cache directory, and rootfs version marker are derived
+from the same locked tag, arm64 digest, and anylinuxfs commit; the build independently proves the
+tag resolves to that digest. Legacy, incomplete, or mismatched caches are preserved
+side-by-side; initialization is triggered only by a mount that needs the pinned environment.
 
 #### 2. Establish an anylinuxfs update policy
 
@@ -159,7 +161,7 @@ exact submodule revision recorded by this repository; the current audited pin is
 
 - [ ] Replace generic promises with narrowly measured labels such as **Private VM link**,
   **VPN-safe route**, and **PF policy enforced**.
-- [ ] Add the requested **Hide** action without changing mount or helper state.
+- [x] Add the requested **Hide** action without changing mount or helper state.
 - [ ] Feed the same state and privacy-safe reason codes to CLI text, CLI JSON, and GUI diagnostics.
 - [ ] Test mounted/unmounted, VPN on/off, multiple mounts, missing tools, stale state, malformed
   output, helper reconnect, and teardown. No missing result may become a green check.
@@ -183,6 +185,27 @@ described only as a later verification, not as transparent protection for all Fi
 - [ ] Add a GUI **Verified Copy** flow only after the CLI/core behavior is complete.
 - [ ] State the limit honestly: a successful comparison validates the bytes read at that time; it
   cannot guarantee against later media failure or preserve every platform-specific metadata field.
+
+##### Media-copy integrity investigation
+
+Track the reported case where a video copied through ntfsmac showed deterministic-looking playback
+artifacts, glitches, and intermittent lag on an LG webOS TV, while a Windows-mediated copy made
+with different USB media played correctly. The original comparison is not conclusive because the
+USB devices differed.
+
+- [ ] Reproduce both copy paths with the same source file, same NTFS USB device, same port, and same
+  TV; repeat each path enough times to expose intermittent failures.
+- [ ] Record source size/SHA-256 before copying, then safely unmount, physically reconnect, reread
+  the destination, and compare size/SHA-256. Prefer an additional Windows-side hash so verification
+  bypasses the ntfsmac/NFS read path.
+- [ ] Verify that an ntfsmac unmount cannot report success while its NFS mount is still present;
+  treat a failed or incomplete host unmount as an error before the user removes the device.
+- [ ] Exercise normal copies and controlled disposable-data fault cases over the required NFS
+  `soft` mount; confirm RPC/VM interruptions surface as explicit copy failures, never silent success.
+- [ ] Preserve anylinuxfs, kernel, and helper logs for every run and correlate errors with the first
+  mismatching byte range and with repeatable versus playback-dependent artifact timestamps.
+- [ ] If hashes match after physical reconnect, move the investigation to USB sustained-read speed,
+  flash/controller health, fragmentation, power/port behavior, and TV codec/container limits.
 
 MD5 is not proposed for new integrity work. SHA-256 is widely available, collision-resistant for
 this purpose, and suitable for one canonical manifest format.

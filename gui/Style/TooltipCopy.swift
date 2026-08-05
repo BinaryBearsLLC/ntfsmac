@@ -9,6 +9,8 @@ public enum TooltipCopy {
         case mount
         case unmount
         case mountReadWriteAnyway
+        case hideSecurity
+        case showSecurity
         case quit
     }
 
@@ -28,6 +30,10 @@ public enum TooltipCopy {
             "Safely unmount this drive and tear down its private network"
         case .mountReadWriteAnyway:
             "Retry read/write mounting despite the unclean journal warning"
+        case .hideSecurity:
+            "Hide security status without changing the mount or helper"
+        case .showSecurity:
+            "Show security status"
         case .quit:
             "Quit ntfsmac and tear down its private network"
         }

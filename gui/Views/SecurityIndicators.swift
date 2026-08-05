@@ -10,6 +10,15 @@ public enum SecurityIndicatorStatus: Equatable, Sendable {
     case unknown
 }
 
+/// Presentation-only state. Hiding SECURITY never mutates a mount, helper, or measured status.
+public struct SecurityIndicatorsPresentation: Equatable, Sendable {
+    public private(set) var isVisible = true
+
+    public init() {}
+    public mutating func hide() { isVisible = false }
+    public mutating func show() { isVisible = true }
+}
+
 public struct SecurityIndicatorStyle: Equatable {
     public let symbolName: String
     public let color: Color
@@ -57,25 +66,39 @@ public struct SecurityIndicatorsView: View {
     public let isolatedNetwork: SecurityIndicatorStatus
     public let vpnBypass: SecurityIndicatorStatus
     public let pfRulesLoaded: SecurityIndicatorStatus
+    public let onHide: (() -> Void)?
 
     public init(
         isolatedNetwork: SecurityIndicatorStatus,
         vpnBypass: SecurityIndicatorStatus,
-        pfRulesLoaded: SecurityIndicatorStatus = .unknown
+        pfRulesLoaded: SecurityIndicatorStatus = .unknown,
+        onHide: (() -> Void)? = nil
     ) {
         self.isolatedNetwork = isolatedNetwork
         self.vpnBypass = vpnBypass
         self.pfRulesLoaded = pfRulesLoaded
+        self.onHide = onHide
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             // `ui/prototype.html` comp lines 202-203/376-377 — same uppercase-tracked title
             // style `SpeedBar`'s "TRANSFER SPEED" uses. Missing entirely before this pass.
-            Text("SECURITY")
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(1.1)
-                .foregroundStyle(.secondary.opacity(0.7))
+            HStack {
+                Text("SECURITY")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.1)
+                    .foregroundStyle(.secondary.opacity(0.7))
+                Spacer()
+                if let onHide {
+                    Button("Hide") { onHide() }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Hide Security")
+                        .help(TooltipCopy.text(for: .hideSecurity))
+                }
+            }
             VStack(alignment: .leading, spacing: 6) {
                 row("Network isolated", isolatedNetwork)
                 row("VPN bypass active", vpnBypass)
@@ -105,5 +128,30 @@ public struct SecurityIndicatorsView: View {
                 .foregroundStyle(.secondary)
         }
         .accessibilityLabel(style.text)
+    }
+}
+
+/// Compact re-entry point retained after SECURITY is hidden. It owns no operational state.
+public struct HiddenSecurityIndicatorsView: View {
+    public let onShow: () -> Void
+
+    public init(onShow: @escaping () -> Void) {
+        self.onShow = onShow
+    }
+
+    public var body: some View {
+        HStack {
+            Text("SECURITY")
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(1.1)
+                .foregroundStyle(.secondary.opacity(0.7))
+            Spacer()
+            Button("Show") { onShow() }
+                .buttonStyle(.plain)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("Show Security")
+                .help(TooltipCopy.text(for: .showSecurity))
+        }
     }
 }

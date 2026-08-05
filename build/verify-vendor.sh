@@ -132,6 +132,7 @@ main() {
   check_no_freebsd_artifacts || failed=1
   check_no_quarantine_xattr || failed=1
   check_kernel_pin_match || failed=1
+  NTFSMAC_VENDOR_BIN_DIR="$BIN_DIR" "$SCRIPT_DIR/verify-runtime-alpine.sh" || failed=1
   check_anylinuxfs_runs || failed=1
 
   if [[ $failed -ne 0 ]]; then
