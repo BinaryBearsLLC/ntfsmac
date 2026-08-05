@@ -479,7 +479,7 @@ public struct PopoverContentView: View {
 
 enum FDAPromptCopy {
     static let helperServiceName = "com.khr898.ntfsmac.helper"
-    static let instructions = "macOS lists the ntfsmac Helper under its technical service name, \(helperServiceName). Enable that entry in Full Disk Access. If it is not listed, add it with the '+' button."
+    static let instructions = "macOS lists ntfsmac Helper under its technical service name, \(helperServiceName), and may show a generic executable icon because the helper is a standalone privileged tool. Enable that exact entry in Full Disk Access. If it is not listed, add it with the '+' button."
 }
 
 /// A modal prompt guiding the user to grant Full Disk Access to the privileged helper daemon.
