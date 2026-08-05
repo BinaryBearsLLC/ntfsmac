@@ -91,6 +91,28 @@ public struct PreferencesView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            if let onBack {
+                HStack(spacing: 8) {
+                    Button {
+                        onBack()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                            Text("Back")
+                        }
+                    }
+                    .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                    .accessibilityLabel("Back")
+                    .help(TooltipCopy.text(for: .back))
+
+                    Spacer()
+                    Text("Settings")
+                        .font(.system(size: 13, weight: .semibold))
+                    Spacer()
+                }
+                Divider()
+            }
+
             row("Launch at login", launchAtLoginSubtitle) {
                 HStack(spacing: 8) {
                     if settings.isUpdatingLaunchAtLogin {

@@ -2,6 +2,7 @@
 /// prevents tooltips from becoming the only explanation available to VoiceOver users.
 public enum TooltipCopy {
     public enum Control: CaseIterable, Sendable {
+        case back
         case settings
         case refresh
         case diagnose
@@ -13,6 +14,8 @@ public enum TooltipCopy {
 
     public static func text(for control: Control) -> String {
         switch control {
+        case .back:
+            "Return to the main popover"
         case .settings:
             "Open Settings"
         case .refresh:
