@@ -11,6 +11,9 @@ of treating implementation plans, test-session notes, and private scratch files 
 feature list. The status below was reconciled on 2026-08-05 against upstream/BinaryBears `main`
 at `d2b151d` (`v2.0.050826`) and the preserved pre-sync BinaryBears `dev` at `e9f85e5`.
 
+The post-sync wiring audit and its focused recovery branches are recorded in
+[BinaryBears Upstream Regression Audit — 2026-08-05](audits/UPSTREAM_REGRESSION_AUDIT_2026-08-05.md).
+
 ## Status legend
 
 | Marker | Meaning |
