@@ -301,7 +301,9 @@ public struct PopoverContentView: View {
             }
 
             if diagnosePresentation.isVisible {
-                DiagnosePanel(runner: diagnoseRunner, mountState: appState.state)
+                DiagnosePanel(runner: diagnoseRunner, mountState: appState.state) {
+                    diagnosePresentation.hide()
+                }
             }
 
             Divider()
@@ -416,8 +418,20 @@ public struct PopoverContentView: View {
             .help(TooltipCopy.text(for: .settings))
 
             Button {
+                let mode = DiagnoseActionMode.resolve(
+                    commandPressed: NSEvent.modifierFlags.contains(.command)
+                )
                 diagnosePresentation.show()
-                Task { await diagnoseRunner.run() }
+                Task {
+                    switch mode {
+                    case .summary:
+                        await diagnoseRunner.run()
+                    case .developerJSONExport:
+                        if let document = await diagnoseRunner.runForDeveloperExport() {
+                            DeveloperDiagnoseSavePanel.present(document: document)
+                        }
+                    }
+                }
             } label: {
                 HStack(spacing: 5) {
                     DiagnoseGlyph()
