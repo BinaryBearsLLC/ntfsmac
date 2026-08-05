@@ -185,17 +185,18 @@ STUB
   [ ! -f "$CALL_LOG" ]
 }
 
-@test "first run: prints a one-time-setup notice when ~/.anylinuxfs/alpine doesn't exist yet" {
+@test "first run: prints a one-time-setup notice when no Alpine cache exists" {
   rm -rf "$HOME/.anylinuxfs"
   run "$SCRIPT" disk2s1
   [ "$status" -eq 0 ]
   [[ "$output" == *"first run"* ]]
 }
 
-@test "not first run: no setup notice once ~/.anylinuxfs/alpine already exists" {
+@test "legacy cache: prints the side-by-side migration notice rather than a first-run notice" {
   run "$SCRIPT" disk2s1
   [ "$status" -eq 0 ]
   [[ "$output" != *"first run"* ]]
+  [[ "$output" == *"legacy Alpine cache detected and preserved"* ]]
 }
 
 @test "treats a false 'success' as failure when anylinuxfs exits 0 but no NFS mount actually exists" {

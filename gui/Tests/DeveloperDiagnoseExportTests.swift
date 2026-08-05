@@ -3,7 +3,7 @@ import Testing
 @testable import NtfsmacGUI
 
 private let developerJSON = """
-{"diagnostic_schema":2,"healthy":false,"ntfsmac_version":"1.0","build_version":"1","macos_version":"26.5","architecture":"arm64","helper_installed":true,"missing_binaries":1,"missing_components":["vmproxy"],"quarantined_binaries":0,"quarantined_components":[],"kernel_pin":"match","bridge":"down","vpn_default_route":true,"nfs_mount_count":2}
+{"diagnostic_schema":3,"healthy":false,"ntfsmac_version":"1.0","build_version":"1","macos_version":"26.5","architecture":"arm64","helper_installed":true,"missing_binaries":1,"missing_components":["vmproxy"],"quarantined_binaries":0,"quarantined_components":[],"kernel_pin":"match","alpine_runtime_tag":"3.23.5","alpine_runtime_digest":"sha256:d858bb5442632a31bd4bca6c5e601dbe6b536fd7942092ea6a08a0a95805693c","alpine_runtime_state":"initialized","bridge":"down","vpn_default_route":true,"nfs_mount_count":2}
 """
 
 @Test func commandModifierSelectsDeveloperExportWithoutChangingNormalClick() {
@@ -16,7 +16,7 @@ private let developerJSON = """
     #expect(document.data.last == 0x0A)
 
     let object = try JSONSerialization.jsonObject(with: document.data) as? [String: Any]
-    #expect(object?["diagnostic_schema"] as? Int == 2)
+    #expect(object?["diagnostic_schema"] as? Int == 3)
     #expect(object?["healthy"] as? Bool == false)
     #expect(object?["ntfsmac_version"] as? String == "1.0")
     #expect(object?["build_version"] as? String == "1")

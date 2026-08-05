@@ -6,6 +6,25 @@ Every package/feature decision below is backed by evidence read from the real
 for every non-obvious call. Scope test: {ntfs-3g mount, rpc.nfsd export, blkid device
 detection} per PLAN.md §6 `v-audit`.
 
+## Runtime Alpine pin and cache migration (P0.1, 2026-08-05)
+
+- `ALPINE_TAG`, the linux/arm64 `ALPINE_DIGEST`, and `ANYLINUXFS_COMMIT` remain the only inputs.
+  `cli/lib/runtime-alpine.sh` derives one immutable `docker.io/library/alpine@<digest>` pull
+  reference, a tag-aware versioned cache directory, and a rootfs marker from them. The tag is kept
+  separately because containers/image rejects Docker references that combine a tag and digest.
+- The pinned anylinuxfs submodule is not edited. `build/lib/patch-runtime-alpine.sh` transforms only
+  scratch build copies of Rust/config/Go sources and hard-stops if the audited markers drift.
+- The init-rootfs patch preserves the full digest reference for the registry pull while using a
+  deterministic digest-derived local OCI tag. `build/init-rootfs.sh` still independently checks
+  Docker Hub's arm64 manifest digest before building or pulling.
+- Runtime caches migrate side-by-side. Legacy, mismatched, invalid, and interrupted directories are
+  retained; no install, Diagnose, or Settings action downloads or removes a rootfs. A mount either
+  reuses a complete matching cache or initializes the pinned cache after preserving incompatible
+  state.
+- `build/verify-runtime-alpine.sh` inspects both shipped binaries and the exact staged package tree.
+  Packaging fails before hashing/signing if a floating reference survives or the approved
+  reference, versioned base directory, or marker is absent.
+
 ## ext2/3/4 mount support (added 2026-08-01) — no package, no vendored source
 
 Scope expansion from NTFS-only to NTFS + ext2/3/4. Recorded here because it is a feature

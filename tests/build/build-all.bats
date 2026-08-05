@@ -25,6 +25,21 @@ setup() {
   [ "$status" -ne 0 ]
 }
 
+@test "runtime source patch is idempotent across repeated clean preparations" {
+  local cache_dir
+  cache_dir="$(mktemp -d)"
+  NTFSMAC_ANYLINUXFS_CACHE_DIR="$cache_dir" run bash -c '
+    source build/build-all.sh
+    prepare_build_copy
+    prepare_build_copy
+    test ! -d "$CACHE_DIR/etc/etc"
+    test ! -d "$CACHE_DIR/share/share"
+    test "$(grep -c "docker_ref = \\\"$ALPINE_RUNTIME_REF\\\"" "$CACHE_DIR/etc/anylinuxfs.toml")" -eq 1
+  '
+  rm -rf "$cache_dir"
+  [ "$status" -eq 0 ]
+}
+
 @test "full build: anylinuxfs + vmproxy compile, cargo test passes for all three crates" {
   run "$SCRIPT"
   [ "$status" -eq 0 ]

@@ -29,8 +29,12 @@ setup() {
   local sha
   sha="$(shasum -a 256 "$FIXTURE_DIR/kernel/modules.squashfs" | awk '{print $1}')"
   printf 'LIBKRUNFW_MODULES_SHA256=%s\n' "$sha" > "$FIXTURE_DIR/sources.lock"
+  printf 'ALPINE_TAG=3.23.5\n' >> "$FIXTURE_DIR/sources.lock"
+  printf 'ALPINE_DIGEST=sha256:d858bb5442632a31bd4bca6c5e601dbe6b536fd7942092ea6a08a0a95805693c\n' >> "$FIXTURE_DIR/sources.lock"
+  printf 'ANYLINUXFS_COMMIT=8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3\n' >> "$FIXTURE_DIR/sources.lock"
   export NTFSMAC_SOURCES_LOCK="$FIXTURE_DIR/sources.lock"
   export NTFSMAC_VENDOR_KERNEL_DIR="$FIXTURE_DIR/kernel"
+  export NTFSMAC_RUNTIME_HOME_OVERRIDE="$FIXTURE_DIR/runtime-home"
 }
 
 teardown() {
@@ -75,7 +79,7 @@ teardown() {
   run "$SCRIPT" --json
   [ "$status" -eq 0 ]
   [[ "$output" == \{*\} ]]
-  [[ "$output" == *'"diagnostic_schema":2'* ]]
+  [[ "$output" == *'"diagnostic_schema":3'* ]]
   [[ "$output" == *'"healthy":true'* ]]
   [[ "$output" == *'"ntfsmac_version":"1.0"'* ]]
   [[ "$output" == *'"build_version":"1"'* ]]
@@ -83,12 +87,42 @@ teardown() {
   [[ "$output" == *'"architecture":"arm64"'* ]]
   [[ "$output" == *'"helper_installed":true'* ]]
   [[ "$output" == *'"kernel_pin":"match"'* ]]
+  [[ "$output" == *'"alpine_runtime_tag":"3.23.5"'* ]]
+  [[ "$output" == *'"alpine_runtime_digest":"sha256:d858bb5442632a31bd4bca6c5e601dbe6b536fd7942092ea6a08a0a95805693c"'* ]]
+  [[ "$output" == *'"alpine_runtime_state":"not_initialized"'* ]]
   [[ "$output" == *'"missing_binaries":0'* ]]
   [[ "$output" == *'"missing_components":[]'* ]]
   [[ "$output" == *'"quarantined_binaries":0'* ]]
   [[ "$output" == *'"quarantined_components":[]'* ]]
   [[ "$output" == *'"vpn_default_route":false'* ]]
   [[ "$output" == *'"nfs_mount_count":0'* ]]
+}
+
+@test "a legacy Alpine cache is reported without exposing its path" {
+  mkdir -p "$NTFSMAC_RUNTIME_HOME_OVERRIDE/.anylinuxfs/alpine/rootfs"
+  run "$SCRIPT" --json
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"alpine_runtime_state":"migration_available"'* ]]
+  [[ "$output" != *"$NTFSMAC_RUNTIME_HOME_OVERRIDE"* ]]
+}
+
+@test "a mismatched pinned cache degrades health without exposing marker contents" {
+  # shellcheck source=../../build/lib/lock.sh
+  source "$REPO_ROOT/build/lib/lock.sh"
+  # shellcheck source=../../cli/lib/runtime-alpine.sh
+  source "$REPO_ROOT/cli/lib/runtime-alpine.sh"
+  runtime_alpine_load
+  local base
+  base="$(runtime_alpine_cache_path "$NTFSMAC_RUNTIME_HOME_OVERRIDE")"
+  mkdir -p "$base/rootfs"
+  printf 'private-unapproved-marker' > "$base/rootfs.ver"
+
+  run "$SCRIPT" --json
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'"alpine_runtime_state":"mismatch"'* ]]
+  [[ "$output" == *'"healthy":false'* ]]
+  [[ "$output" != *"private-unapproved-marker"* ]]
+  [[ "$output" != *"$base"* ]]
 }
 
 @test "--json names failing components without exposing local paths or network identity" {

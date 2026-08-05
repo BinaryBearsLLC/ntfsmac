@@ -36,3 +36,12 @@ import Testing
     #expect(SecurityIndicator.style(for: .enforced, label: "Isolated network").text == "Isolated network: enforced")
     #expect(SecurityIndicator.style(for: .enforced, label: "VPN bypass").text == "VPN bypass: enforced")
 }
+
+@Test func securityHideAndShowChangePresentationOnly() {
+    var presentation = SecurityIndicatorsPresentation()
+    #expect(presentation.isVisible)
+    presentation.hide()
+    #expect(!presentation.isVisible)
+    presentation.show()
+    #expect(presentation.isVisible)
+}

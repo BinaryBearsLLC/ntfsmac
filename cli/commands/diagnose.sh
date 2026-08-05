@@ -17,7 +17,7 @@ if [[ -r "$VERSION_LIB" ]]; then
 else
   NTFSMAC_VERSION="unknown"
   NTFSMAC_BUILD_VERSION="unknown"
-  NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION="2"
+  NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION="3"
 fi
 # Same two candidates helper/HelperProtocol.swift's resolveNtfsmacPrefix() checks (bash and
 # Swift can't share source — kept in sync deliberately, same pattern as list-drives.sh's own
@@ -130,6 +130,45 @@ check_kernel_pin() {
   [[ "$actual" == "$expected" ]] && echo "match" || echo "mismatch"
 }
 
+# Loads the same sources.lock-derived runtime contract used by the build and mount path, then
+# reports only fixed tokens plus the approved tag/digest. No home path or cache content is emitted.
+check_alpine_runtime() {
+  local runtime_lib="$SCRIPT_DIR/../lib/runtime-alpine.sh"
+  local lock_lib
+  if [[ -r "$SCRIPT_DIR/../lib/lock.sh" ]]; then
+    lock_lib="$SCRIPT_DIR/../lib/lock.sh"
+  else
+    lock_lib="$REPO_ROOT/build/lib/lock.sh"
+  fi
+
+  ALPINE_RUNTIME_TAG="unknown"
+  ALPINE_RUNTIME_DIGEST="unknown"
+  ALPINE_RUNTIME_STATE="unknown"
+  if [[ ! -r "$lock_lib" || ! -r "$runtime_lib" ]]; then
+    return 1
+  fi
+
+  # Installed and source-tree layouts resolve the same libraries from different roots.
+  # shellcheck disable=SC1090
+  source "$lock_lib"
+  # shellcheck disable=SC1090
+  source "$runtime_lib"
+  runtime_alpine_load || return 1
+
+  local runtime_home
+  runtime_home="${NTFSMAC_RUNTIME_HOME_OVERRIDE-${HOME:-}}"
+  if [[ -z "$runtime_home" ]]; then
+    runtime_home="$(cd ~ 2>/dev/null && pwd)"
+  fi
+  [[ -n "$runtime_home" ]] || return 1
+
+  ALPINE_RUNTIME_STATE="$(runtime_alpine_cache_state "$runtime_home")" || {
+    ALPINE_RUNTIME_STATE="unknown"
+    return 1
+  }
+  return 0
+}
+
 check_bridge_up() {
   if pgrep 'vmnet-helper' >/dev/null 2>&1 || \
      pgrep 'gvproxy' >/dev/null 2>&1 || \
@@ -228,6 +267,7 @@ main() {
   mount_count="$(count_mounts "$mounts")"
   check_helper_installed && helper_installed=1
   check_vpn_default_route && vpn_default_route=1
+  check_alpine_runtime || true
 
   # ntfsmac requires macOS 13.0+ on Apple Silicon. Only a real, parseable major version
   # below 13 flips health; an unknown/undetected version is reported but left non-fatal.
@@ -245,6 +285,10 @@ main() {
   [[ "$QUARANTINED_BINS" -gt 0 ]] && healthy=0
   [[ "$kernel_pin" == "mismatch" || "$kernel_pin" == "missing" ]] && healthy=0
   [[ "$architecture" != "arm64" ]] && healthy=0
+  case "$ALPINE_RUNTIME_STATE" in
+    initialized|not_initialized|migration_available) ;;
+    *) healthy=0 ;;
+  esac
 
   if [[ $json_mode -eq 1 ]]; then
     [[ "$healthy" -eq 1 ]] && healthy_json=true || healthy_json=false
@@ -252,11 +296,12 @@ main() {
     [[ "$vpn_default_route" -eq 1 ]] && vpn_json=true || vpn_json=false
     missing_json="$(component_json_array "$MISSING_COMPONENTS")"
     quarantined_json="$(component_json_array "$QUARANTINED_COMPONENTS")"
-    printf '{"diagnostic_schema":%s,"healthy":%s,"ntfsmac_version":"%s","build_version":"%s","macos_version":"%s","architecture":"%s","helper_installed":%s,"missing_binaries":%s,"missing_components":%s,"quarantined_binaries":%s,"quarantined_components":%s,"kernel_pin":"%s","bridge":"%s","vpn_default_route":%s,"nfs_mount_count":%s}\n' \
+    printf '{"diagnostic_schema":%s,"healthy":%s,"ntfsmac_version":"%s","build_version":"%s","macos_version":"%s","architecture":"%s","helper_installed":%s,"missing_binaries":%s,"missing_components":%s,"quarantined_binaries":%s,"quarantined_components":%s,"kernel_pin":"%s","alpine_runtime_tag":"%s","alpine_runtime_digest":"%s","alpine_runtime_state":"%s","bridge":"%s","vpn_default_route":%s,"nfs_mount_count":%s}\n' \
       "$NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION" "$healthy_json" "$NTFSMAC_VERSION" \
       "$NTFSMAC_BUILD_VERSION" "$macos_version" "$architecture" "$helper_json" \
       "$MISSING_BINS" "$missing_json" "$QUARANTINED_BINS" "$quarantined_json" \
-      "$kernel_pin" "$bridge" "$vpn_json" "$mount_count"
+      "$kernel_pin" "$ALPINE_RUNTIME_TAG" "$ALPINE_RUNTIME_DIGEST" \
+      "$ALPINE_RUNTIME_STATE" "$bridge" "$vpn_json" "$mount_count"
   else
     echo "diagnose: ntfsmac version: $NTFSMAC_VERSION ($NTFSMAC_BUILD_VERSION)"
     echo "diagnose: macOS version: $macos_version"
@@ -269,6 +314,8 @@ main() {
     echo "diagnose: quarantined binaries: $QUARANTINED_BINS"
     [[ -n "$QUARANTINED_COMPONENTS" ]] && echo "diagnose:   quarantined components: $QUARANTINED_COMPONENTS"
     echo "diagnose: kernel pin: $kernel_pin"
+    echo "diagnose: Alpine runtime: $ALPINE_RUNTIME_TAG ($ALPINE_RUNTIME_DIGEST)"
+    echo "diagnose: Alpine runtime state: $ALPINE_RUNTIME_STATE"
     echo "diagnose: vmnet bridge: $bridge"
     echo "diagnose: VPN default route: $([[ "$vpn_default_route" -eq 1 ]] && echo detected || echo not detected)"
     echo "diagnose: current NFS mount count: $mount_count"

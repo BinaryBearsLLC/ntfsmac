@@ -22,6 +22,25 @@ source "$NFS_MOUNT_LIB_DIR/run-with-progress.sh"
 # shellcheck source=resolve-vendor-bin.sh
 source "$NFS_MOUNT_LIB_DIR/resolve-vendor-bin.sh"
 
+load_runtime_alpine_contract() {
+  local lock_lib
+  if [[ -r "$NFS_MOUNT_LIB_DIR/lock.sh" ]]; then
+    lock_lib="$NFS_MOUNT_LIB_DIR/lock.sh"
+  else
+    lock_lib="$NFS_MOUNT_LIB_DIR/../../build/lib/lock.sh"
+  fi
+  if [[ ! -r "$lock_lib" || ! -r "$NFS_MOUNT_LIB_DIR/runtime-alpine.sh" ]]; then
+    echo "mount: FATAL — pinned Alpine runtime metadata is missing; reinstall ntfsmac" >&2
+    return 1
+  fi
+  # Runtime and source-tree layouts resolve lock.sh from different locations.
+  # shellcheck disable=SC1090
+  source "$lock_lib"
+  # shellcheck source=runtime-alpine.sh
+  source "$NFS_MOUNT_LIB_DIR/runtime-alpine.sh"
+  runtime_alpine_load
+}
+
 # Resolved via resolve_vendor_bin (PATH, then $PREFIX/bin, then the homebrew-tap prefix) —
 # never a bare "anylinuxfs" name. That relied on $PATH containing $PREFIX/bin, which the
 # GUI's privileged helper (launchd daemon, minimal system PATH) never has, and which an
@@ -62,6 +81,12 @@ run_anylinuxfs_mount() {
   local device="$1" fs_driver="${2:-}" mount_point="${3:-}" read_only="${4:-}" ignore_perms="${5:-}"
   local disk_ident="/dev/${device}"
 
+  # Validate the exact runtime contract before changing the host's current mount state.
+  # Upgrades use a versioned directory; legacy, mismatched, and interrupted caches are preserved
+  # side-by-side so a mount never silently destroys rollback data.
+  load_runtime_alpine_contract || return 1
+  runtime_alpine_prepare_cache "$HOME" || return 1
+
   # Auto-eject: if macOS already auto-mounted this partition with its own (read-only) NTFS
   # driver, the raw block device is held and anylinuxfs/ntfs-3g can't probe it ("Insufficient
   # permissions?" is this exact symptom misreported by the probe layer). `diskutil unmount`
@@ -70,15 +95,6 @@ run_anylinuxfs_mount() {
   # here are swallowed on purpose: "wasn't mounted by macOS to begin with" is the common case,
   # and a real failure still surfaces from the `anylinuxfs mount` call right below.
   diskutil unmount "$disk_ident" >/dev/null 2>&1 || true
-
-  # First-run notice: anylinuxfs downloads+unpacks the Alpine rootfs into ~/.anylinuxfs/alpine
-  # (confirmed path, matches anylinuxfs's own "Image base path:" log line) only when that
-  # directory doesn't exist yet — every mount after this one reuses it and skips straight to
-  # booting the VM. Surfaced here so the one-time download/init wall of text doesn't read like
-  # a hang or a bug on the very first real mount.
-  if [[ ! -d "$HOME/.anylinuxfs/alpine" ]]; then
-    echo "mount: first run — downloading and initializing the Linux environment (one-time, ~1-2 min)..." >&2
-  fi
 
   local -a args=(mount "$disk_ident")
   [[ -n "$mount_point" ]] && args+=("$mount_point")

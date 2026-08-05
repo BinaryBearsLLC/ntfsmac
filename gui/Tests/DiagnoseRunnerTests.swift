@@ -16,11 +16,11 @@ private let degradedJSON = """
 """
 
 private let expandedJSON = """
-{"diagnostic_schema":2,"healthy":true,"ntfsmac_version":"1.0","build_version":"1","macos_version":"26.6","architecture":"arm64","helper_installed":true,"missing_binaries":0,"missing_components":[],"quarantined_binaries":0,"quarantined_components":[],"kernel_pin":"match","bridge":"up","vpn_default_route":true,"nfs_mount_count":1}
+{"diagnostic_schema":3,"healthy":true,"ntfsmac_version":"1.0","build_version":"1","macos_version":"26.6","architecture":"arm64","helper_installed":true,"missing_binaries":0,"missing_components":[],"quarantined_binaries":0,"quarantined_components":[],"kernel_pin":"match","alpine_runtime_tag":"3.23.5","alpine_runtime_digest":"sha256:d858bb5442632a31bd4bca6c5e601dbe6b536fd7942092ea6a08a0a95805693c","alpine_runtime_state":"initialized","bridge":"up","vpn_default_route":true,"nfs_mount_count":1}
 """
 
 private let developerExportJSON = """
-{"diagnostic_schema":2,"healthy":false,"ntfsmac_version":"1.0","build_version":"1","macos_version":"26.5","architecture":"arm64","helper_installed":true,"missing_binaries":1,"missing_components":["vmproxy"],"quarantined_binaries":0,"quarantined_components":[],"kernel_pin":"match","bridge":"down","vpn_default_route":false,"nfs_mount_count":0}
+{"diagnostic_schema":3,"healthy":false,"ntfsmac_version":"1.0","build_version":"1","macos_version":"26.5","architecture":"arm64","helper_installed":true,"missing_binaries":1,"missing_components":["vmproxy"],"quarantined_binaries":0,"quarantined_components":[],"kernel_pin":"match","alpine_runtime_tag":"3.23.5","alpine_runtime_digest":"sha256:d858bb5442632a31bd4bca6c5e601dbe6b536fd7942092ea6a08a0a95805693c","alpine_runtime_state":"not_initialized","bridge":"down","vpn_default_route":false,"nfs_mount_count":0}
 """
 
 private final class FakeRunner: PrivilegedCommandRunning {
@@ -63,13 +63,14 @@ private final class FakeRunner: PrivilegedCommandRunning {
     let report = try JSONDecoder().decode(DiagnoseReport.self, from: Data(expandedJSON.utf8))
     let rows = DiagnoseSummary.rows(for: report)
 
-    #expect(report.diagnosticSchema == 2)
+    #expect(report.diagnosticSchema == 3)
     #expect(rows.map(\.id) == [
-        "version", "system", "binaries", "quarantine", "kernel", "bridge", "helper", "vpn", "mounts",
+        "version", "system", "binaries", "quarantine", "kernel", "alpine", "bridge", "helper", "vpn", "mounts",
     ])
     #expect(rows.first(where: { $0.id == "version" })?.value == "1.0 (1)")
     #expect(rows.first(where: { $0.id == "system" })?.value == "macOS 26.6 · arm64")
     #expect(rows.first(where: { $0.id == "helper" })?.value == "Installed")
+    #expect(rows.first(where: { $0.id == "alpine" })?.value == "3.23.5 · sha256:d858bb544263…")
     #expect(rows.first(where: { $0.id == "vpn" })?.value == "Default route uses a tunnel")
     #expect(rows.first(where: { $0.id == "mounts" })?.value == "1 active")
 }
@@ -176,7 +177,7 @@ func bridgeDownUsesMountContext(argument: (MountState, DiagnoseStatus, String)) 
     #expect(runner.errorMessage == nil)
     #expect(document != nil)
     let object = try JSONSerialization.jsonObject(with: document!.data) as? [String: Any]
-    #expect(object?["diagnostic_schema"] as? Int == 2)
+    #expect(object?["diagnostic_schema"] as? Int == 3)
     #expect(object?["ntfsmac_version"] as? String == "1.0")
     #expect(object?["macos_version"] as? String == "26.5")
     #expect(object?["missing_components"] as? [String] == ["vmproxy"])

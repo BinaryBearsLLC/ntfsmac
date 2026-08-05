@@ -47,11 +47,11 @@ This table describes the current integrated GUI, not the original aspirational p
 | Shipped | Diagnose summary, inline Hide, and Command-click privacy-safe JSON export |
 | Shipped | First-run helper/CLI staging, helper reinstall, and confirmed complete uninstall |
 | Shipped | In-popover Settings with Back, canonical version/build, Launch at login, contextual help, and adaptive menu-bar icon |
-| Partial | Three SECURITY rows render honestly as `unknown`; live PF/route evidence is not wired yet |
+| Partial | Three SECURITY rows render honestly as `unknown` and provide Hide/Show; live PF/route evidence is not wired yet |
 | Partial | `FinderOpener` is implemented and tested, but no current multi-drive row exposes Open in Finder |
 | Partial | `ThroughputMonitor` and `SpeedBar` exist, but transfer speed is not presented by the current multi-drive UI |
 | Partial | NTFS3 is supported by CLI/helper internals, but has no GUI choice or completed hardware qualification |
-| Planned | Verified Copy, evidence-backed SECURITY state plus Hide, notifications, and Eject All |
+| Planned | Verified Copy, evidence-backed SECURITY state, notifications, and Eject All |
 
 ---
 
@@ -75,7 +75,8 @@ This table describes the current integrated GUI, not the original aspirational p
 | Per-drive `Unmount` | Safely unmount that drive | That drive is mounted |
 | Other-device `Mount` | Mount another compatible partition | Another compatible drive is detected |
 | Refresh (↻) | Re-scan while preserving mounted rows | Always |
-| SECURITY rows | Display measured state; currently `unknown` because live evidence is not wired | One or more drives mounted |
+| SECURITY rows | Display current state; currently `unknown` because live evidence is not wired | One or more drives mounted |
+| SECURITY `Hide` / `Show` | Collapse or restore only the SECURITY presentation | One or more drives mounted |
 | ⚙ / `Quit` | As above | Always |
 
 `Open in Finder` and transfer speed are intentionally recorded as partial rather than shipped:
@@ -114,6 +115,10 @@ visibility: it does not clear the last result, cancel an in-progress run, or tou
 state. Selecting `Diagnose` again always reopens the box and starts one fresh diagnostic run.
 `Hide` remains keyboard-reachable and available for result, error, and running states.
 
+The mounted SECURITY section follows the same presentation-only rule. `Hide` collapses its three
+rows to a compact `SECURITY · Show` header; `Show` restores the unchanged statuses. Neither action
+mounts, unmounts, reconnects the helper, or changes any measured security state.
+
 ### Contextual help
 
 Controls and statuses whose purpose is not immediately obvious expose concise native macOS help
@@ -145,14 +150,14 @@ after it completes. The helper XPC connection is created lazily on the first pri
 not merely because the app launched.
 
 The diagnostic panel renders the same privacy-safe schema exported by Command-click Diagnose:
-release/build, macOS and architecture, helper presence, fixed runtime component failures,
-kernel/bridge state, a yes/no VPN tunnel signal, and the active NFS mount count. It never displays
+release/build, macOS and architecture, helper presence, fixed runtime component failures, the
+approved Alpine tag/digest and cache state, kernel/bridge state, a yes/no VPN tunnel signal, and
+the active NFS mount count. It never displays
 or exports usernames, serials, volume/device identity, local paths, VPN identity, addresses, DNS,
 or routes.
 
 ### Planned controls
 
-- **SECURITY Hide** — hides only the presentation and must not change mount/helper state.
 - **Experimental NTFS3 driver choice** — one-mount opt-in with explicit compatibility warnings,
   shipped only after the roadmap hardware gate passes.
 - **Verified Copy** — app-managed, SHA-256-verified copy after the CLI/core contract is stable.

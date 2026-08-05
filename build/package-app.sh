@@ -134,6 +134,16 @@ main() {
     cp "$REPO_ROOT"/vendor/kernel/* "$cli_stage/vendor/kernel/" 2>/dev/null || true
   fi
 
+  # P0 trust gate: inspect the exact binaries/tree about to be hashed and bundled. A release
+  # carrying a floating alpine:latest fallback is rejected before the helper manifest is baked.
+  if ! NTFSMAC_SOURCES_LOCK="$cli_stage/build/sources.lock" \
+    NTFSMAC_VENDOR_BIN_DIR="$cli_stage/vendor/bin" \
+    NTFSMAC_SHIPPED_TREE="$cli_stage" "$REPO_ROOT/build/verify-runtime-alpine.sh"; then
+    echo "package-app: HARD-STOP — staged runtime Alpine pin verification failed" >&2
+    rm -rf "$cli_stage"
+    exit 1
+  fi
+
   echo "package-app: computing cli-src content hash (pass-1 helper binary as a hashing tool)"
   local tree_hash
   tree_hash="$("$helper_bin" --print-tree-hash "$cli_stage")" || {

@@ -2,9 +2,8 @@ import Foundation
 import HelperShared
 
 /// Summary fields decoded from `ntfsmac diagnose --json` (`cli/commands/diagnose.sh`'s `main()`,
-/// `json_mode` branch). The CLI also emits `macos_version`; Swift's decoder deliberately ignores
-/// that extra field for the four-row UI summary, while `DeveloperDiagnoseDocument` preserves the
-/// complete raw JSON for support reports.
+/// `json_mode` branch). Fixed runtime identifiers are privacy-safe; paths and cache contents are
+/// deliberately absent. `DeveloperDiagnoseDocument` preserves the complete raw JSON for support.
 public struct DiagnoseReport: Codable, Equatable, Sendable {
     public let diagnosticSchema: Int?
     public let healthy: Bool
@@ -18,6 +17,9 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
     public let quarantinedBinaries: Int
     public let quarantinedComponents: [String]?
     public let kernelPin: String
+    public let alpineRuntimeTag: String?
+    public let alpineRuntimeDigest: String?
+    public let alpineRuntimeState: String?
     public let bridge: String
     public let vpnDefaultRoute: Bool?
     public let nfsMountCount: Int?
@@ -35,6 +37,9 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
         case quarantinedBinaries = "quarantined_binaries"
         case quarantinedComponents = "quarantined_components"
         case kernelPin = "kernel_pin"
+        case alpineRuntimeTag = "alpine_runtime_tag"
+        case alpineRuntimeDigest = "alpine_runtime_digest"
+        case alpineRuntimeState = "alpine_runtime_state"
         case bridge
         case vpnDefaultRoute = "vpn_default_route"
         case nfsMountCount = "nfs_mount_count"
@@ -62,7 +67,10 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
             missingComponents: nil,
             quarantinedComponents: nil,
             vpnDefaultRoute: nil,
-            nfsMountCount: nil
+            nfsMountCount: nil,
+            alpineRuntimeTag: nil,
+            alpineRuntimeDigest: nil,
+            alpineRuntimeState: nil
         )
     }
 
@@ -81,7 +89,10 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
         missingComponents: [String]?,
         quarantinedComponents: [String]?,
         vpnDefaultRoute: Bool?,
-        nfsMountCount: Int?
+        nfsMountCount: Int?,
+        alpineRuntimeTag: String? = nil,
+        alpineRuntimeDigest: String? = nil,
+        alpineRuntimeState: String? = nil
     ) {
         self.diagnosticSchema = diagnosticSchema
         self.healthy = healthy
@@ -95,6 +106,9 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
         self.quarantinedBinaries = quarantinedBinaries
         self.quarantinedComponents = quarantinedComponents
         self.kernelPin = kernelPin
+        self.alpineRuntimeTag = alpineRuntimeTag
+        self.alpineRuntimeDigest = alpineRuntimeDigest
+        self.alpineRuntimeState = alpineRuntimeState
         self.bridge = bridge
         self.vpnDefaultRoute = vpnDefaultRoute
         self.nfsMountCount = nfsMountCount

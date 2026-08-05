@@ -80,8 +80,15 @@ public enum DiagnoseSummary {
                 components: report.quarantinedComponents
             ),
             kernelRow(rawValue: report.kernelPin),
-            bridgeRow(rawValue: report.bridge, mountState: mountState),
         ])
+        if let alpine = alpineRuntimeRow(
+            tag: report.alpineRuntimeTag,
+            digest: report.alpineRuntimeDigest,
+            state: report.alpineRuntimeState
+        ) {
+            rows.append(alpine)
+        }
+        rows.append(bridgeRow(rawValue: report.bridge, mountState: mountState))
         if let helperInstalled = report.helperInstalled {
             rows.append(helperRow(installed: helperInstalled))
         }
@@ -190,6 +197,33 @@ public enum DiagnoseSummary {
             return .init(id: "kernel", label: "Kernel pin", value: "Unknown", status: .unavailable, explanation: explanation)
         default:
             return .init(id: "kernel", label: "Kernel pin", value: "Unknown", status: .unavailable, explanation: explanation)
+        }
+    }
+
+    private static func alpineRuntimeRow(
+        tag: String?,
+        digest: String?,
+        state: String?
+    ) -> DiagnoseSummaryRow? {
+        guard tag != nil || digest != nil || state != nil else { return nil }
+        let explanation = "The Linux runtime is pinned to the exact Alpine tag and arm64 image digest approved by this build. Upgrades keep earlier caches for rollback."
+        let safeTag = tag.flatMap { $0.isEmpty ? nil : $0 } ?? "unknown"
+        let digestPrefix: String = {
+            guard let digest, digest.hasPrefix("sha256:"), digest.count >= 19 else { return "unknown digest" }
+            return "sha256:\(digest.dropFirst(7).prefix(12))…"
+        }()
+
+        switch state {
+        case "initialized":
+            return .init(id: "alpine", label: "Alpine runtime", value: "\(safeTag) · \(digestPrefix)", status: .healthy, explanation: explanation)
+        case "not_initialized":
+            return .init(id: "alpine", label: "Alpine runtime", value: "\(safeTag) · not initialized", status: .informational, explanation: explanation)
+        case "migration_available":
+            return .init(id: "alpine", label: "Alpine runtime", value: "\(safeTag) · safe migration on next mount", status: .informational, explanation: explanation)
+        case "mismatch", "incomplete", "invalid":
+            return .init(id: "alpine", label: "Alpine runtime", value: "Needs safe reinitialization", status: .warning, explanation: explanation)
+        default:
+            return .init(id: "alpine", label: "Alpine runtime", value: "Unknown", status: .unavailable, explanation: explanation)
         }
     }
 
