@@ -96,8 +96,14 @@ public struct PreferencesView: View {
                 // Spacers would center it in the *remaining* space after the Back button, sitting
                 // right-of-true-center. The title is the visual anchor; Back is overlaid leading.
                 ZStack {
-                    Text("Settings")
-                        .font(.system(size: 13, weight: .semibold))
+                    VStack(spacing: 1) {
+                        Text("Settings")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(productVersion.settingsText)
+                            .font(.system(size: 9, weight: .regular))
+                            .foregroundStyle(.secondary.opacity(0.72))
+                            .accessibilityLabel("ntfsmac \(productVersion.settingsText)")
+                    }
                     HStack {
                         Button {
                             onBack()
@@ -170,9 +176,8 @@ public struct PreferencesView: View {
         }
         .padding(16)
         .frame(width: 320)
+        .fixedSize(horizontal: false, vertical: true)
         .onAppear { settings.refreshLaunchAtLoginStatus() }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Confirm complete ntfsmac uninstall")
     }
 
     private var uninstallSubtitle: String {
@@ -220,6 +225,9 @@ public struct PreferencesView: View {
                 .buttonStyle(.glassDestructive(colorScheme: colorScheme))
             }
         }
+        .glassCard()
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Confirm complete ntfsmac uninstall")
     }
 
     private var isUninstallComplete: Bool {
