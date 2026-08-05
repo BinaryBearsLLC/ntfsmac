@@ -18,7 +18,9 @@ jobs:
         run: brew install shellcheck bats-core
       - name: shellcheck
         run: |
-          find . -name '*.sh' -not -path './vendor/src/*' -print0 \
+          # *.command (build.command, PR #14's interactive release builder) is bash too —
+          # security-relevant (codesign, xattr), so lint it alongside the .sh scripts.
+          find . \( -name '*.sh' -o -name '*.command' \) -not -path './vendor/src/*' -print0 \
             | xargs -0 shellcheck -S warning
       - name: Install build dependencies
         run: |
