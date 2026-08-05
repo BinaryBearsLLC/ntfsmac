@@ -241,10 +241,8 @@ public struct PopoverContentView: View {
                 Text(errorMessage).font(.caption).foregroundStyle(Color.ntfsRed)
             }
 
-            if diagnosePresentation.isVisible {
-                DiagnosePanel(runner: diagnoseRunner) {
-                    diagnosePresentation.hide()
-                }
+            if showDiagnose {
+                DiagnosePanel(runner: diagnoseRunner, mountState: appState.state)
             }
 
             Divider()

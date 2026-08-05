@@ -1,11 +1,36 @@
-import SwiftUI
+import AppKit
 import NtfsmacGUI
+import SwiftUI
+import os.log
+
+private let lifecycleLog = Logger(subsystem: "com.khr898.ntfsmac", category: "Lifecycle")
+
+final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
+    private var singleInstanceGuard: SingleInstanceGuard?
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        do {
+            singleInstanceGuard = try SingleInstanceGuard()
+        } catch SingleInstanceGuardError.alreadyRunning {
+            lifecycleLog.notice("A second GUI instance was blocked")
+            NSApplication.shared.terminate(nil)
+        } catch {
+            // Fail closed: two active GUI workflows are riskier than declining to launch when
+            // the per-user lock cannot be acquired.
+            lifecycleLog.error(
+                "Unable to acquire the GUI instance lock: \(error.localizedDescription, privacy: .public)"
+            )
+            NSApplication.shared.terminate(nil)
+        }
+    }
+}
 
 /// Menu-bar agent (LSUIElement=true in Info.plist — no Dock icon, no main window). `MenuBarExtra`
 /// (macOS 13+, native) covers the icon+popover shell. Feature content is `PopoverContentView`
 /// (`gui/Views/PopoverContentView.swift`), which composes every Phase 3 feature unit into one view.
 @main
 struct NtfsmacApp: App {
+    @NSApplicationDelegateAdaptor(NtfsmacApplicationDelegate.self) private var applicationDelegate
     @StateObject private var appState: AppState
     @StateObject private var driveScanner: DriveScanner
     @StateObject private var mountController: MountController
@@ -91,17 +116,16 @@ struct NtfsmacApp: App {
             // `ui/prototype.html`'s red menu-bar icon ("Error — Helper Missing", comp lines
             // 636-657) is driven by the helper install outcome, not `AppState.state` — these were
             // previously fully decoupled, so a denied/failed helper install left the icon grey.
-            HStack(spacing: 3) {
-                StatusIconView(state: helperInstaller.state.isDeniedOrFailed ? .error : appState.state)
-            }
-            .task { driveScanner.startPolling() }
-            .task(id: helperInstaller.state) {
-                if helperInstaller.state == .installing || helperInstaller.state == .notChecked {
-                    cliAutoStager.reset()
+            StatusIconView(state: helperInstaller.state.isDeniedOrFailed ? .error : appState.state)
+                .accessibilityLabel("ntfsmac")
+                .task { driveScanner.startPolling() }
+                .task(id: helperInstaller.state) {
+                    if helperInstaller.state == .installing || helperInstaller.state == .notChecked {
+                        cliAutoStager.reset()
+                    }
+                    guard helperInstaller.state == .installed else { return }
+                    await cliAutoStager.stageIfNeeded()
                 }
-                guard helperInstaller.state == .installed else { return }
-                await cliAutoStager.stageIfNeeded()
-            }
         }
         .menuBarExtraStyle(.window)
     }

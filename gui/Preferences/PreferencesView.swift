@@ -19,8 +19,23 @@ public struct PreferencesView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            row("Launch at login", "Start ntfsmac automatically on login") {
-                Toggle("", isOn: $settings.launchAtLogin).labelsHidden()
+            row("Launch at login", launchAtLoginSubtitle) {
+                HStack(spacing: 8) {
+                    if settings.isUpdatingLaunchAtLogin {
+                        ProgressView().controlSize(.small)
+                    }
+                    Toggle(
+                        "Launch at login",
+                        isOn: Binding(
+                            get: { settings.launchAtLogin },
+                            set: { settings.setLaunchAtLogin($0) }
+                        )
+                    )
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .disabled(settings.isUpdatingLaunchAtLogin)
+                    .accessibilityLabel("Launch at login")
+                }
             }
 
             Divider()
@@ -51,6 +66,7 @@ public struct PreferencesView: View {
         .padding(16)
         .frame(width: 360)
         .windowGlassBackground()
+        .onAppear { settings.refreshLaunchAtLoginStatus() }
         .confirmationDialog(
             "Uninstall ntfsmac completely?",
             isPresented: $isConfirmingUninstall
@@ -73,6 +89,10 @@ public struct PreferencesView: View {
         case .failed(let message):
             return "Failed: \(message)"
         }
+    }
+
+    private var launchAtLoginSubtitle: String {
+        settings.launchAtLoginMessage ?? "Start ntfsmac automatically on login"
     }
 
     @ViewBuilder
