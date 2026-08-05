@@ -92,23 +92,26 @@ public struct PreferencesView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             if let onBack {
-                HStack(spacing: 8) {
-                    Button {
-                        onBack()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                            Text("Back")
-                        }
-                    }
-                    .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                    .accessibilityLabel("Back")
-                    .help(TooltipCopy.text(for: .back))
-
-                    Spacer()
+                // ZStack so "Settings" centers over the full popover width — an HStack with two
+                // Spacers would center it in the *remaining* space after the Back button, sitting
+                // right-of-true-center. The title is the visual anchor; Back is overlaid leading.
+                ZStack {
                     Text("Settings")
                         .font(.system(size: 13, weight: .semibold))
-                    Spacer()
+                    HStack {
+                        Button {
+                            onBack()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "chevron.left")
+                                Text("Back")
+                            }
+                        }
+                        .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                        .accessibilityLabel("Back")
+                        .help(TooltipCopy.text(for: .back))
+                        Spacer()
+                    }
                 }
                 Divider()
             }
