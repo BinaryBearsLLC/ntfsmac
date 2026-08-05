@@ -605,6 +605,13 @@ resolved.
       every other Phase 3 unit so far, confirmed deliberate, not a gap.
       Real `swift build`/`swift test`: clean, zero warnings beyond the two pre-existing
       `SMJobCopyDictionary`/`SMJobBless` deprecation warnings, 77/77 (4 new).
+      **Launch-at-login follow-up:** the existing writable `launchAtLogin` API and the original
+      `LaunchAtLoginService.setEnabled(_:)` requirement remain source-compatible. A separate,
+      optional status protocol now reconciles the switch with `SMAppService.mainApp.status`, shows
+      pending System Settings approval or registration failures instead of persisting a false
+      success, and refreshes when Preferences opens. The control uses the current macOS switch
+      style and is disabled only while registration is in flight; legacy injected services retain
+      the prior UserDefaults-backed behavior.
 - [x] `3-liquid-glass` — `gui/Style/Colors.swift`, `gui/Style/GlassTheme.swift`, plus color/wiring
       edits across `gui/Status/StatusIcon.swift`, `gui/Views/SecurityIndicators.swift`,
       `gui/Views/FirstRunView.swift`, `gui/App/NtfsmacApp.swift`, `gui/Preferences/
