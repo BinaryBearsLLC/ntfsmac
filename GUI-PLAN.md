@@ -19,11 +19,16 @@ Menu-bar agent → click icon → popover. No windows except Preferences and the
 
 | Colour | Meaning |
 |--------|---------|
-| Grey | Idle, nothing mounted |
+| System-adaptive | Idle, nothing mounted |
 | Blue (pulsing) | Mounting |
 | Green | Mounted read/write |
 | Yellow | Mounted **read-only** (dirty journal) |
 | Red | Error |
+
+The idle SF Symbol is an AppKit template image, so macOS supplies the same contrasting tint used
+by native menu-bar apps. This keeps the icon visible across light and dark menu-bar backgrounds
+without adding a preference or first-run animation. Saturated colours remain reserved for real
+mounting, mounted, warning, and error states.
 
 ---
 
@@ -84,11 +89,14 @@ Menu-bar agent → click icon → popover. No windows except Preferences and the
 | `Retry` | Re-attempt last action |
 | `Diagnose` | Jump to diagnostics |
 
-### Contextual help
+### Diagnostic summary
 
-Controls and statuses whose purpose is not immediately obvious expose concise native macOS help
-on hover. Tooltip copy does not replace accessibility labels or hints, does not duplicate long
-paragraphs across views, and must not change layout, focus order, or the macOS 13.0 target.
+Diagnostic rows distinguish confirmed health, expected or transitional information, actionable
+warnings, and unavailable context. A stopped vmnet bridge is informational while ntfsmac is idle
+or starting a mount; it becomes a warning only when a drive is already mounted and the private NFS
+network is expected to be active. Unknown or malformed values are shown neutrally rather than as
+confirmed failures. Short explanations remain available through native help and accessibility
+text without widening the popover.
 
 ### Preferences window
 

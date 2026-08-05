@@ -2,11 +2,9 @@ import SwiftUI
 import Testing
 @testable import NtfsmacGUI
 
-// GUI-PLAN.md "Menu-bar icon states": grey=idle, blue(pulsing)=mounting, green=rw,
-// yellow=ro-dirty, red=error. Asserts all five, per this unit's acceptance clause.
-// Colors are `3-liquid-glass`'s literal hex values (`Colors.swift`) — idle uses `.ntfsIdleGray`
-// (secondary-label gray in light mode, pure white in dark mode — `.secondary` alone read too
-// faint against a dark desktop background).
+// GUI-PLAN.md "Menu-bar icon states": system-adaptive=idle, blue(pulsing)=mounting,
+// green=rw, yellow=ro-dirty, red=error. The pure style mapping retains `.ntfsIdleGray` as a
+// fallback; the rendered idle glyph is a template so AppKit chooses its real menu-bar tint.
 
 @Test func idleIsGrayAndNotPulsing() {
     let style = StatusIcon.style(for: .idle)
@@ -42,4 +40,20 @@ import Testing
     let style = StatusIcon.style(for: .error)
     #expect(style.color == .ntfsRed)
     #expect(!style.isPulsing)
+}
+
+@MainActor
+@Test func idleGlyphUsesTheSystemMenuBarTint() {
+    let image = StatusIconView.renderedGlyph(for: StatusIcon.style(for: .idle))
+
+    #expect(image.isTemplate)
+    #expect(image.size.width > 0)
+    #expect(image.size.height > 0)
+}
+
+@MainActor
+@Test func colouredStatusGlyphIsNotConvertedToATemplate() {
+    let image = StatusIconView.renderedGlyph(for: StatusIcon.style(for: .error))
+
+    #expect(!image.isTemplate)
 }

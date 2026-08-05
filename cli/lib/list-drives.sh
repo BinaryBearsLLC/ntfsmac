@@ -125,11 +125,18 @@ list_mountable_drives() {
 # call below will surface the real error); the cost is that an ext drive whose probe timed out
 # won't auto-get --ignore-permissions, fixable by passing --ignore-permissions explicitly.
 fs_type_for_device() {
-  local device="$1" ident label size fstype
+  local device="$1" ident label size fstype rest line
   local tmp
   tmp="$(mktemp)"
   if list_mountable_drives > "$tmp" 2>/dev/null; then
-    while IFS=$'\t' read -r ident label size fstype; do
+    # Manual tab split (not `IFS=$'\t' read`): an empty label field makes `read` collapse
+    # fields and lose fstype — see mount.sh's picker loop for the same fix + rationale.
+    while IFS= read -r line; do
+      [[ -z "$line" ]] && continue
+      rest="${line#*$'\t'}"; ident="${line%%$'\t'*}"
+      label="${rest%%$'\t'*}"; rest="${rest#*$'\t'}"
+      size="${rest%%$'\t'*}"; rest="${rest#*$'\t'}"
+      fstype="${rest%%$'\t'*}"
       if [[ "$ident" == "$device" ]]; then
         rm -f "$tmp"
         printf '%s' "$fstype"
