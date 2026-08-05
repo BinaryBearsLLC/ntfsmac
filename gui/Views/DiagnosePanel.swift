@@ -1,5 +1,33 @@
 import SwiftUI
 
+public enum DiagnosePanelPhase: Equatable, Sendable {
+    case hidden
+    case running
+    case result
+    case error
+    case empty
+}
+
+/// Visibility is independent from diagnostic data: hiding the panel must never clear a result,
+/// cancel work, or change helper/mount state. Keeping this as a small value type also makes every
+/// visibility transition testable without coupling tests to SwiftUI internals.
+public struct DiagnosePanelPresentation: Equatable, Sendable {
+    public private(set) var isVisible = false
+
+    public init() {}
+
+    public mutating func show() { isVisible = true }
+    public mutating func hide() { isVisible = false }
+
+    public func phase(report: DiagnoseReport?, errorMessage: String?, isRunning: Bool) -> DiagnosePanelPhase {
+        guard isVisible else { return .hidden }
+        if isRunning { return .running }
+        if report != nil { return .result }
+        if errorMessage != nil { return .error }
+        return .empty
+    }
+}
+
 /// Diagnostics need more than a healthy/unhealthy Boolean. In particular, a stopped vmnet
 /// bridge is expected while ntfsmac is idle, while an unknown raw value must not be presented as
 /// a confirmed failure.
@@ -111,27 +139,52 @@ public enum DiagnoseSummary {
 public struct DiagnosePanel: View {
     @ObservedObject public var runner: DiagnoseRunner
     public let mountState: MountState?
+    public let onHide: (() -> Void)?
 
     public init(runner: DiagnoseRunner) {
         self.runner = runner
         self.mountState = nil
+        self.onHide = nil
     }
 
-    public init(runner: DiagnoseRunner, mountState: MountState?) {
+    public init(runner: DiagnoseRunner, onHide: @escaping () -> Void) {
+        self.runner = runner
+        self.mountState = nil
+        self.onHide = onHide
+    }
+
+    public init(runner: DiagnoseRunner, mountState: MountState?, onHide: (() -> Void)? = nil) {
         self.runner = runner
         self.mountState = mountState
+        self.onHide = onHide
     }
 
     public var body: some View {
-        Group {
-            if let report = runner.report {
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(DiagnoseSummary.rows(for: report, mountState: mountState)) { row in
-                        Label("\(row.label): \(row.value)", systemImage: iconName(for: row.status))
-                            .foregroundStyle(color(for: row.status))
-                            .font(.caption)
-                            .help(row.explanation)
-                            .accessibilityHint(row.explanation)
+        VStack(alignment: .leading, spacing: 8) {
+            if let onHide {
+                HStack(spacing: 8) {
+                    Text("Diagnostics")
+                        .font(.caption.weight(.semibold))
+                    Spacer()
+                    Button("Hide", action: onHide)
+                        .buttonStyle(.plain)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Hide diagnostics")
+                        .help("Hide the diagnostic panel")
+                }
+            }
+
+            Group {
+                if let report = runner.report {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(DiagnoseSummary.rows(for: report, mountState: mountState)) { row in
+                            Label("\(row.label): \(row.value)", systemImage: iconName(for: row.status))
+                                .foregroundStyle(color(for: row.status))
+                                .font(.caption)
+                                .help(row.explanation)
+                                .accessibilityHint(row.explanation)
+                        }
                     }
                 } else if let errorMessage = runner.errorMessage {
                     Text(errorMessage)
@@ -147,6 +200,14 @@ public struct DiagnosePanel: View {
         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(panelBackgroundColor))
         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(panelBorderColor))
         .padding(.top, 4)
+    }
+
+    private var panelBackgroundColor: Color {
+        runner.errorMessage == nil ? Color.secondary.opacity(0.08) : Color.ntfsRed.opacity(0.09)
+    }
+
+    private var panelBorderColor: Color {
+        runner.errorMessage == nil ? Color.secondary.opacity(0.12) : Color.ntfsRed.opacity(0.2)
     }
 
     private func iconName(for status: DiagnoseStatus) -> String {

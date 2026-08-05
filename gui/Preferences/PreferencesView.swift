@@ -144,18 +144,8 @@ public struct PreferencesView: View {
             }
         }
         .padding(16)
-        .frame(width: 360)
-        .windowGlassBackground()
+        .frame(width: 320)
         .onAppear { settings.refreshLaunchAtLoginStatus() }
-        .confirmationDialog(
-            "Uninstall ntfsmac completely?",
-            isPresented: $isConfirmingUninstall
-        ) {
-            Button("Uninstall Everything", role: .destructive) {
-                Task { await uninstaller.uninstallEverything() }
-            }
-        }
-        .glassCard()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Confirm complete ntfsmac uninstall")
     }
@@ -177,6 +167,39 @@ public struct PreferencesView: View {
 
     private var launchAtLoginSubtitle: String {
         settings.launchAtLoginMessage ?? "Start ntfsmac automatically on login"
+    }
+
+    /// Inline (in-popover) two-step confirmation — a native `confirmationDialog` would dismiss
+    /// MenuBarExtra's transient window before the destructive action reliably reached the helper
+    /// (per PR #10). `uninstallConfirmation.confirm()` consumes one explicit tap so a stale/double
+    /// action can never start two uninstalls.
+    private var inlineUninstallConfirmation: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Uninstall ntfsmac completely?")
+                .font(.system(size: 13, weight: .semibold))
+            Text("Removes the CLI, all vendored dependencies, and this privileged helper. Afterward, you can drag ntfsmac.app to the Trash. This can't be undone.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 8) {
+                Spacer()
+                Button("Cancel") {
+                    uninstallConfirmation.cancel()
+                }
+                .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+
+                Button("Uninstall Everything", role: .destructive) {
+                    guard uninstallConfirmation.confirm() else { return }
+                    Task { await uninstaller.uninstallEverything() }
+                }
+                .buttonStyle(.glassDestructive(colorScheme: colorScheme))
+            }
+        }
+    }
+
+    private var isUninstallComplete: Bool {
+        if case .done = uninstaller.state { return true }
+        return false
     }
 
     @ViewBuilder
