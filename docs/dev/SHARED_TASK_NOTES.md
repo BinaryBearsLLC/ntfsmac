@@ -348,6 +348,12 @@ resolved.
       still SPM only, no Xcode project; actual `.app` bundle assembly (embedding this Info.plist,
       icon, code signing) is packaging work for a later script, not part of this unit's
       acceptance (compiles + tests pass).
+      **Adaptive idle-icon follow-up:** the idle SF Symbol is now rendered as an AppKit template
+      image, letting macOS select a contrasting tint for the current menu-bar background just as
+      it does for native menu extras. This fixes the icon disappearing against some light or dark
+      wallpapers without adding appearance preferences or first-launch animation state. Blue,
+      green, yellow, and red remain explicit non-template status colours; tests assert both sides
+      of that boundary and the macOS 13 deployment floor is unchanged.
 - [x] `3-drive-detect` — `gui/Drives/DriveScanner.swift`, `gui/Views/DriveRow.swift`,
       `gui/Tests/DriveScannerTests.swift`. **Real contract checked before coding:** `ListCmd`
       (`cli.rs`) has no `--json` flag (same finding `3-xpc-helper` already made) — output is
@@ -605,6 +611,13 @@ resolved.
       every other Phase 3 unit so far, confirmed deliberate, not a gap.
       Real `swift build`/`swift test`: clean, zero warnings beyond the two pre-existing
       `SMJobCopyDictionary`/`SMJobBless` deprecation warnings, 77/77 (4 new).
+      **Launch-at-login follow-up:** the existing writable `launchAtLogin` API and the original
+      `LaunchAtLoginService.setEnabled(_:)` requirement remain source-compatible. A separate,
+      optional status protocol now reconciles the switch with `SMAppService.mainApp.status`, shows
+      pending System Settings approval or registration failures instead of persisting a false
+      success, and refreshes when Preferences opens. The control uses the current macOS switch
+      style and is disabled only while registration is in flight; legacy injected services retain
+      the prior UserDefaults-backed behavior.
 - [x] `3-liquid-glass` — `gui/Style/Colors.swift`, `gui/Style/GlassTheme.swift`, plus color/wiring
       edits across `gui/Status/StatusIcon.swift`, `gui/Views/SecurityIndicators.swift`,
       `gui/Views/FirstRunView.swift`, `gui/App/NtfsmacApp.swift`, `gui/Preferences/
@@ -676,6 +689,14 @@ units remain in PLAN.md's task list for Phase 3.
   auto-mount-on-detect, only the manual button, which always mounts read-write via ntfs-3g) —
   pre-existing gap in `MountController`'s own public API from `3-mount-unmount`, not this
   changeset's job to fix; flagging again so it isn't lost.
+- **Single-instance GUI guard** — the app delegate now acquires an atomic per-user open-file-
+  description lock before the SwiftUI scene starts running its polling and menu-bar tasks. A
+  forced second launch exits before it can start a concurrent GUI workflow; an unavailable lock
+  fails closed. The implementation uses the public `fcntl(F_OFD_SETLK)` interface available on
+  macOS 13, keeps the lock descriptor close-on-exec, and never touches the helper/XPC privilege
+  boundary. Swift Testing covers lock contention, deterministic/idempotent release, filesystem
+  failures, default path construction, and user-facing errors; line coverage for
+  `SingleInstanceGuard.swift` is 88.46%.
 - **App icon** — `gui/Resources/AppIcon.icns` (+ `AppIcon-source.png`, `gen_icon.py`), wired via
   `Info.plist`'s `CFBundleIconFile`. White external-drive + connect-arrow glyph (reuses this
   project's own already-established icon language — same motif as `ui/prototype.html`'s SVGs and
@@ -715,12 +736,13 @@ still-open VM-boot gate and an end-to-end "connect a real NTFS drive" walkthroug
   Anything not yet built that still needed a literal-CSS lookup from the prototype (remaining
   `3-liquid-glass` polish, any un-walked states in `docs/dev/UITest.md`) now has to go off the
   running app + the maintainer's direction — flag if a specific value can't be recovered that way.
-- **GUI developer diagnostic export follow-up (2026-08-03)** — a normal Diagnose click remains
-  unchanged; Command-click runs the same unprivileged `ntfsmac diagnose --json`, keeps the normal
-  summary visible, validates and pretty-prints the CLI output, then presents an `NSSavePanel` for a
-  user-selected `.json` destination. Cancellation writes nothing and ntfsmac never uploads the
-  report. The JSON contains the existing CLI health fields, including `macos_version`; no mount,
-  helper, XPC, signing, network-policy, or deployment-target behavior changed.
+- **In-popover Settings follow-up (2026-08-03)** — the gear now navigates within the existing
+  `MenuBarExtra` instead of opening a second `NSWindow`. Normal, first-run, and CLI-repair screens
+  share one `PopoverNavigation` route; Back restores the app content, while the app-owned
+  `Settings`, `HelperInstaller`, and `HelperUninstaller` instances survive navigation. The
+  runtime `PreferencesOpener` window implementation was removed; deprecated source-compatible
+  adapters remain for downstream callers, but the app does not use them. No mount, helper
+  privilege, signing, or deployment-target behavior changed.
 
 ## DECISIONS
 

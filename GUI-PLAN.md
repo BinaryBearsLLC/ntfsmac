@@ -13,17 +13,23 @@
 
 ## App shape
 
-Menu-bar agent → click icon → popover. No windows except Preferences and the first-run helper prompt.
+Menu-bar agent → click icon → popover. Settings is a page inside that same popover; the only
+separate system UI is the first-run helper authorization prompt.
 
 ### Menu-bar icon states
 
 | Colour | Meaning |
 |--------|---------|
-| Grey | Idle, nothing mounted |
+| System-adaptive | Idle, nothing mounted |
 | Blue (pulsing) | Mounting |
 | Green | Mounted read/write |
 | Yellow | Mounted **read-only** (dirty journal) |
 | Red | Error |
+
+The idle SF Symbol is an AppKit template image, so macOS supplies the same contrasting tint used
+by native menu-bar apps. This keeps the icon visible across light and dark menu-bar backgrounds
+without adding a preference or first-run animation. Saturated colours remain reserved for real
+mounting, mounted, warning, and error states.
 
 ---
 
@@ -57,8 +63,7 @@ Menu-bar agent → click icon → popover. No windows except Preferences and the
 | Drive row `[Mount]` | Mount that drive r/w via XPC helper | A compatible drive is detected |
 | Refresh (↻) | Re-scan drives now | Always |
 | `Diagnose` | Run CLI diagnostic, show summary | Always |
-| `⌘`-click `Diagnose` | Run the same read-only diagnostic and save its JSON for developer support | Always |
-| ⚙ (gear) | Open Preferences | Always |
+| ⚙ (gear) | Navigate to Settings in the popover | Always |
 | `Quit` | Exit app, tear down network state | Always |
 
 ### Popover — mounted
@@ -86,6 +91,15 @@ Menu-bar agent → click icon → popover. No windows except Preferences and the
 | `Diagnose` | Jump to diagnostics |
 | `⌘`-click `Diagnose` | Save the same read-only diagnostic JSON for developer support |
 
+### Diagnostic summary
+
+Diagnostic rows distinguish confirmed health, expected or transitional information, actionable
+warnings, and unavailable context. A stopped vmnet bridge is informational while ntfsmac is idle
+or starting a mount; it becomes a warning only when a drive is already mounted and the private NFS
+network is expected to be active. Unknown or malformed values are shown neutrally rather than as
+confirmed failures. Short explanations remain available through native help and accessibility
+text without widening the popover.
+
 ### Preferences window
 
 | Control | Type | Default |
@@ -95,6 +109,12 @@ Menu-bar agent → click icon → popover. No windows except Preferences and the
 | Default mount point | Path picker | `/Volumes/<label>` |
 | Show speed in menu bar | Toggle | Off |
 | Reinstall privileged helper | Button | — |
+
+The destructive uninstall confirmation is rendered inside the Settings page so selecting it does
+not dismiss the transient menu-bar popover before the operation starts. Cancel consumes no action;
+confirm can start the flow only once, and the control remains disabled while removal is active or
+after it completes. The helper XPC connection is created lazily on the first privileged request,
+not merely because the app launched.
 
 ---
 

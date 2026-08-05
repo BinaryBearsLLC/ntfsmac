@@ -34,13 +34,13 @@ public struct Drive: Identifiable, Equatable, Sendable {
 /// scheme line) and the header line never end in a `diskNsM` identifier, so anchoring on
 /// `validateDevice` for the trailing token naturally excludes them without special-casing.
 ///
-/// The TYPE column is NOT always a single blkid fstype token: for NTFS, blkid's fs_type is
-/// empty in this build, so `augment_line` falls back to the raw GPT type name "Microsoft Basic
-/// Data" (darwin.rs: `fs_type.unwrap_or(part_type)`). The regex captures the TYPE+NAME columns
-/// as one blob and `deriveFsTypeAndLabel` splits fstype from its prefix — "Microsoft Basic Data"
-/// is exactly what the server's `--microsoft` filter keys on (WINDOWS_FS_TYPES in mod.rs), so
-/// matching it client-side replicates `--microsoft`'s reliability without a second `anylinuxfs`
-/// call. The fstype is display-only — mount validates `--fs-driver` itself, never the picker.
+/// The TYPE column is NOT always a single blkid fstype token: for NTFS, blkid's fs_type can be
+/// empty, so `augment_line` falls back to the raw partition type. GPT then reports "Microsoft
+/// Basic Data", while MBR reports "Windows_NTFS". The regex captures the TYPE+NAME columns as
+/// one blob and `deriveFsTypeAndLabel` maps both prefixes to ntfs. Both names are part of the
+/// server's WINDOWS_FS_TYPES set, so matching them client-side replicates `--microsoft`'s
+/// reliability without a second `anylinuxfs` call. The fstype is display-only — mount validates
+/// `--fs-driver` itself, never the picker.
 ///
 /// Scope filter: bare `anylinuxfs list` returns every Linux FS type (btrfs/xfs/zfs/LUKS/LVM/...).
 /// ntfsmac mounts only NTFS + BitLocker + ext2/3/4 (exFAT is excluded — macOS already reads/writes
@@ -82,14 +82,18 @@ public enum DriveListParser {
     /// Splits the TYPE+NAME blob into (fstype, label). "Microsoft Basic Data" is the GPT type
     /// for ntfs (and exfat, but exfat is out of scope — when blkid resolves exfat it surfaces as
     /// "exfat" and is dropped by `allowedFsTypes`; the rare GPT-fallback case can't distinguish
-    /// ntfs from exfat, same limitation as the server's `--microsoft` filter). Match it as a
-    /// prefix, same key the server filter uses, so NTFS survives even when blkid's fs_type is
-    /// empty. "BitLocker" is its own GPT type. Everything else is a blkid single-token fstype
-    /// (ext2/3/4, sometimes ntfs) followed by the label.
+    /// ntfs from exfat, same limitation as the server's `--microsoft` filter). "Windows_NTFS"
+    /// is the corresponding MBR type emitted by real external disks. Match both as prefixes so
+    /// NTFS survives even when blkid's fs_type is empty. "BitLocker" is its own partition type.
+    /// Everything else is a blkid single-token fstype (ext2/3/4, sometimes ntfs) plus the label.
     private static func deriveFsTypeAndLabel(_ blob: String) -> (fsType: String, label: String) {
         let trimmed = blob.trimmingCharacters(in: .whitespaces)
         if trimmed.hasPrefix("Microsoft Basic Data") {
             let label = trimmed.dropFirst("Microsoft Basic Data".count).trimmingCharacters(in: .whitespaces)
+            return ("ntfs", label)
+        }
+        if trimmed.hasPrefix("Windows_NTFS") {
+            let label = trimmed.dropFirst("Windows_NTFS".count).trimmingCharacters(in: .whitespaces)
             return ("ntfs", label)
         }
         if trimmed.hasPrefix("BitLocker") {

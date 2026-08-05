@@ -69,6 +69,33 @@ STUB
   [[ "$output" == *"disk4s4"* ]]
 }
 
+@test "list_mountable_drives surfaces unlabeled MBR NTFS with real Windows_NTFS TYPE column" {
+  # Captured from a real 248 GB external MBR disk. Windows_NTFS is the partition type, not an
+  # allow-listed blkid token; it must be normalized to ntfs rather than dropped.
+  cat > "$STUB_DIR/anylinuxfs" <<STUB
+#!/bin/bash
+printf '%s\n' '   1:               Windows_NTFS                         248.0 GB   disk4s1'
+exit 0
+STUB
+  chmod +x "$STUB_DIR/anylinuxfs"
+  run list_mountable_drives
+  [ "$status" -eq 0 ]
+  [ "$output" = $'disk4s1\t\t248.0 GB\tntfs' ]
+}
+
+@test "list_mountable_drives preserves label from real MBR Windows_NTFS TYPE column" {
+  # Captured from a second real 8.1 GB USB stick.
+  cat > "$STUB_DIR/anylinuxfs" <<STUB
+#!/bin/bash
+printf '%s\n' '   1:               Windows_NTFS USB_8GB                 8.1 GB     disk5s1'
+exit 0
+STUB
+  chmod +x "$STUB_DIR/anylinuxfs"
+  run list_mountable_drives
+  [ "$status" -eq 0 ]
+  [ "$output" = $'disk5s1\tUSB_8GB\t8.1 GB\tntfs' ]
+}
+
 @test "list_mountable_drives calls anylinuxfs list without --microsoft" {
   CALL_LOG="$STUB_DIR/list.calls"
   cat > "$STUB_DIR/anylinuxfs" <<STUB
@@ -131,6 +158,30 @@ STUB
   run fs_type_for_device disk2s1
   [ "$status" -eq 0 ]
   [ "$output" == "ntfs" ]
+}
+
+@test "fs_type_for_device returns ext4 for an UNLABELED ext4 drive (empty label field not collapsed)" {
+  # Regression guard: an unlabeled ext4 partition (mkfs.ext4 without -L) makes anylinuxfs list
+  # emit a TYPE column of "ext4" with NO volume label, so list_mountable_drives prints
+  # `disk4s1\t\t31.5 GB\text4` — an EMPTY label field (two consecutive tabs). Parsing that with
+  # `IFS=$'\t' read` collapses the empty field (tab is whitespace IFS), shifting size->label,
+  # fstype->size, and fstype becomes "". The probe then returns empty, mount.sh never sets
+  # --ignore-permissions, the NFS mount gets no noowners, and ext is read-only — the bug that
+  # made CLI ext mounts unwritable while the GUI (Swift split(separator:), no collapse) worked.
+  # Manual parameter-expansion split preserves the empty field. Must return ext4, not "".
+  cat > "$STUB_DIR/anylinuxfs" <<STUB
+#!/bin/bash
+printf '%s\n' '   1:                        ext4                         31.5 GB    disk4s1'
+exit 0
+STUB
+  chmod +x "$STUB_DIR/anylinuxfs"
+  run fs_type_for_device disk4s1
+  [ "$status" -eq 0 ]
+  [ "$output" == "ext4" ]
+  # And list_mountable_drives must report ext4 as the fstype (4th tab column), not drop it.
+  run list_mountable_drives
+  [ "$status" -eq 0 ]
+  grep -q $'\text4$' <<<"$output"
 }
 
 @test "fs_type_for_device returns empty for an unknown device" {
