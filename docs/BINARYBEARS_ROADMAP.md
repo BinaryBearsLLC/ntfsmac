@@ -185,6 +185,27 @@ described only as a later verification, not as transparent protection for all Fi
 - [ ] State the limit honestly: a successful comparison validates the bytes read at that time; it
   cannot guarantee against later media failure or preserve every platform-specific metadata field.
 
+##### Media-copy integrity investigation
+
+Track the reported case where a video copied through ntfsmac showed deterministic-looking playback
+artifacts, glitches, and intermittent lag on an LG webOS TV, while a Windows-mediated copy made
+with different USB media played correctly. The original comparison is not conclusive because the
+USB devices differed.
+
+- [ ] Reproduce both copy paths with the same source file, same NTFS USB device, same port, and same
+  TV; repeat each path enough times to expose intermittent failures.
+- [ ] Record source size/SHA-256 before copying, then safely unmount, physically reconnect, reread
+  the destination, and compare size/SHA-256. Prefer an additional Windows-side hash so verification
+  bypasses the ntfsmac/NFS read path.
+- [ ] Verify that an ntfsmac unmount cannot report success while its NFS mount is still present;
+  treat a failed or incomplete host unmount as an error before the user removes the device.
+- [ ] Exercise normal copies and controlled disposable-data fault cases over the required NFS
+  `soft` mount; confirm RPC/VM interruptions surface as explicit copy failures, never silent success.
+- [ ] Preserve anylinuxfs, kernel, and helper logs for every run and correlate errors with the first
+  mismatching byte range and with repeatable versus playback-dependent artifact timestamps.
+- [ ] If hashes match after physical reconnect, move the investigation to USB sustained-read speed,
+  flash/controller health, fragmentation, power/port behavior, and TV codec/container limits.
+
 MD5 is not proposed for new integrity work. SHA-256 is widely available, collision-resistant for
 this purpose, and suitable for one canonical manifest format.
 
