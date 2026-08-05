@@ -89,6 +89,7 @@ mounting, mounted, warning, and error states.
 | Error message | Plain-language cause (helper not installed, binary missing, mount failed) |
 | `Retry` | Re-attempt last action |
 | `Diagnose` | Jump to diagnostics |
+| `⌘`-click `Diagnose` | Save the same read-only diagnostic JSON for developer support |
 
 ### Diagnostic summary
 

@@ -69,6 +69,12 @@ ntfsmac diagnose          # human-readable
 ntfsmac diagnose --json   # same data on one line, handy for bug reports
 ```
 
+From the GUI, a normal click on **Diagnose** shows the plain-language summary. For a developer
+report, hold **Command (⌘)** while clicking **Diagnose**: ntfsmac runs the same read-only
+`diagnose --json` command and opens a save panel for a formatted `.json` file. You choose where
+the file is written; ntfsmac never uploads or sends it automatically. Review it if desired, then
+attach it manually to a bug report.
+
 What each line means:
 
 | `diagnose` line | Meaning / fix |
@@ -150,7 +156,7 @@ lists it. (Whole-disk NTFS drives hit the same wall; they're just usually pre-pa
 
 Filing a bug? Please include:
 
-- the `ntfsmac diagnose --json` output,
+- the `ntfsmac diagnose --json` output, or the JSON file saved with **⌘-click Diagnose** in the GUI,
 - your macOS version (`sw_vers -productVersion`) and Mac model,
 - the disk identifier you used, in `diskNsN` form (e.g. `disk4s1` — a partition, not the whole `disk4`).
 

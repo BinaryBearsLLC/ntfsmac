@@ -71,7 +71,7 @@ let package = Package(
                 "Actions/RemountController.swift", "Views/DirtyBanner.swift",
                 "Actions/FinderOpener.swift", "Views/SecurityIndicators.swift",
                 "Actions/PreferencesOpener.swift", "Actions/CLIAutoStager.swift",
-                "Actions/DiagnoseRunner.swift", "Views/DiagnosePanel.swift",
+                "Actions/DiagnoseRunner.swift", "Actions/DeveloperDiagnoseExport.swift", "Views/DiagnosePanel.swift",
                 "FirstRun/HelperInstaller.swift", "Views/FirstRunView.swift",
                 "FirstRun/HelperUninstaller.swift", "FirstRun/CLIInstallChecker.swift", "Views/CLIMissingView.swift",
                 "Preferences/ProductVersion.swift", "Preferences/Settings.swift", "Preferences/PreferencesView.swift",

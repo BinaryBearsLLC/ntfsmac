@@ -549,10 +549,15 @@ sha256-checked downloads verified by checksum assertions, not unit tests).
 
 #### `3-diagnose-ui` (GUI feature 7)
 - **Deps:** `3-menubar-shell` · **Tier:** small
-- **Files:** `gui/Views/DiagnosePanel.swift`, `gui/Actions/DiagnoseRunner.swift`, `gui/Tests/DiagnoseRunnerTests.swift`
+- **Files:** `gui/Views/DiagnosePanel.swift`, `gui/Actions/DiagnoseRunner.swift`,
+  `gui/Actions/DeveloperDiagnoseExport.swift`, `gui/Tests/DiagnoseRunnerTests.swift`,
+  `gui/Tests/DeveloperDiagnoseExportTests.swift`
 - **Do:** run `ntfsmac diagnose --json`, render a plain-language summary; reachable from idle + error
-  states; non-privileged.
-- **Acceptance:** `DiagnoseRunnerTests` parse sample diagnose JSON (healthy + degraded) into summary rows.
+  states; non-privileged. A Command-click on Diagnose may save that same JSON to a user-selected
+  local file for developer support; it must never upload the report automatically.
+- **Acceptance:** `DiagnoseRunnerTests` parse sample diagnose JSON (healthy + degraded) into summary
+  rows; developer-export tests preserve the CLI fields, reject invalid JSON, and write only to the
+  explicitly selected destination.
 
 #### `3-first-run-install` (GUI feature 8)
 - **Deps:** `3-xpc-helper` · **Tier:** large

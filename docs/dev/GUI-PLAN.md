@@ -84,6 +84,7 @@ separate system UI is the first-run helper authorization prompt.
 | Error message | Plain-language cause (helper not installed, binary missing, mount failed) |
 | `Retry` | Re-attempt last action |
 | `Diagnose` | Jump to diagnostics |
+| `⌘`-click `Diagnose` | Save the same read-only diagnostic JSON for developer support |
 
 ### Settings page
 
