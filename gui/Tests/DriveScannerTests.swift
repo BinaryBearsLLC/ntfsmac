@@ -118,6 +118,33 @@ private let sampleExtOutput = """
     #expect(drives[0].identifier == "disk4s4")
 }
 
+@Test func parsesUnlabeledNtfsWithRealMbrWindowsNtfsTypeColumn() {
+    // Captured from a real 248 GB external MBR disk. With no blkid fstype/volume label,
+    // anylinuxfs preserves diskutil's "Windows_NTFS" partition type. Treating the first token
+    // as an allow-listed fstype used to drop this row entirely from the GUI.
+    let realMbrNtfsOutput = """
+    /dev/disk4 (external, physical):
+       #:                       TYPE NAME                    SIZE       IDENTIFIER
+       0:     FDisk_partition_scheme                        *248.0 GB   disk4
+       1:               Windows_NTFS                         248.0 GB   disk4s1
+    """
+    let drives = DriveListParser.parse(realMbrNtfsOutput)
+    #expect(drives == [Drive(identifier: "disk4s1", fsType: "ntfs", label: "", size: "248.0 GB")])
+}
+
+@Test func parsesLabeledNtfsWithRealMbrWindowsNtfsTypeColumn() {
+    // Captured from a second real MBR USB stick. Text after the partition-type prefix is the
+    // volume label and must remain visible to the picker.
+    let realMbrNtfsOutput = """
+    /dev/disk5 (external, physical):
+       #:                       TYPE NAME                    SIZE       IDENTIFIER
+       0:     FDisk_partition_scheme                        *8.1 GB     disk5
+       1:               Windows_NTFS USB_8GB                 8.1 GB     disk5s1
+    """
+    let drives = DriveListParser.parse(realMbrNtfsOutput)
+    #expect(drives == [Drive(identifier: "disk5s1", fsType: "ntfs", label: "USB_8GB", size: "8.1 GB")])
+}
+
 @Test func parsesExtWithRealLinuxFilesystemTypeColumn() {
     // Real anylinuxfs list output for ext when blkid can't resolve the superblock: blkid fs_type
     // is empty, so darwin::augment_line falls back to the raw GPT type name "Linux Filesystem" for

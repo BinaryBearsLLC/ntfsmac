@@ -71,6 +71,7 @@ public struct DriveRow: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.glassDestructive(colorScheme: colorScheme))
+                    .help(TooltipCopy.text(for: .unmount))
                 }
 
                 if isDirty, let onMountAnyway {
@@ -84,6 +85,7 @@ public struct DriveRow: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.glassWarning())
+                    .help(TooltipCopy.text(for: .mountReadWriteAnyway))
                 }
             } else {
                 Button {
@@ -93,6 +95,7 @@ public struct DriveRow: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                .help(TooltipCopy.text(for: .mount))
             }
         }
         .padding(.vertical, 2)

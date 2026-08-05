@@ -24,6 +24,12 @@ via live testing that unit tests couldn't catch (no real XPC/process exercise in
    opens with all 5 GUI-PLAN.md controls. The `Settings { }` scene declaration was removed
    (dead code — it never worked).
 
+   **Superseded 2026-08-03:** Settings now replaces the content inside the existing menu-bar
+   popover and provides a Back action. The temporary `PreferencesOpener`/`NSWindow` runtime
+   workaround described above was removed; deprecated source-compatible adapters remain, but
+   the app no longer uses them to create a window. The same app-owned Settings/helper objects
+   remain in use.
+
 3. **SF Symbols swap** — all custom `Canvas`-drawn icons (`Icons.swift`) replaced with SF Symbols
    (`gearshape.fill`, `stethoscope`, `eject.fill`, `exclamationmark.triangle.fill`, etc.), except
    `DriveGlyph.menuBar` — kept as the literal comp transcription per explicit instruction ("keep
@@ -121,14 +127,8 @@ is installed"), built a real, tested pipeline:
 | 3 | CLI missing / "Setup incomplete" | Yes | Live-verified for real this session (triggered naturally after a real `removeDependencies()` uninstall) — red warning icon, plain-language copy, "Check Again" button. Correct fallback. |
 | 4 | Idle, no drives / with drive | Yes | Icons, Mount, Diagnose, gear, Quit all confirmed real and working |
 | 5–9 | Mounting / mounted (rw/ro/dirty) / error | Yes | Unblocked this session via the `DemoScaffold` mock-`MountState` harness (`NTFSMAC_UI_DEMO=clean\|dirty\|error`). All 5 states walked live: mounting (blue pulsing), mounted read-write (green), mounted read-only-dirty (yellow, unclean-journal banner, "Mount read/write anyway…"), error (red, plain-language message). Menu-bar icon color confirmed correct for every state (see bug fix below). |
-| 10 | Preferences window | Yes | Real `NSWindow`, 4 controls (not GUI-PLAN's 5 — "Default mount mode"/"Default mount point" aren't implemented as separate controls in the current build). Reinstall and Uninstall buttons both live-tested for real (see below), not just unit-tested. |
-| 11 | Diagnose panel | Yes | Single button, styled output card. The 2026-08-03 Command-click export path is covered by automated action-routing, JSON-validation, degraded-result, and exact-destination write tests; the packaged menu-bar app was launched successfully, but the native save-panel click-through remains an explicit manual gate because the closed `LSUIElement` popover is not exposed to Computer Use. |
-
-2026-08-03 diagnostic/version polish: automated coverage verifies the secondary Settings version,
-schema-2 decode/render/export, forbidden privacy keys, helper-presence semantics for root-owned mode
-`0544`, and backward decoding of the previous six-field JSON. The packaged branch build launches,
-but Computer Use still cannot open the closed `LSUIElement` menu-bar popover; visual confirmation of
-`Version 1.0 (1)` and the expanded Diagnose rows remains part of the maintainer's final manual pass.
+| 10 | In-popover Settings page | Yes | Packaged app verified live on 2026-08-03: gear replaced the popover content with Settings; Back restored the drive list; Launch at login, Reinstall…, and Uninstall… controls were visible; no separate window opened. |
+| 11 | Diagnose panel | Yes | Single button, styled output card |
 
 Light/dark appearance toggle still not walked for any state — deferred, not done this session (budget).
 

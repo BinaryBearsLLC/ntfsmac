@@ -13,7 +13,8 @@
 
 ## App shape
 
-Menu-bar agent → click icon → popover. No windows except Preferences and the first-run helper prompt.
+Menu-bar agent → click icon → popover. Settings is a page inside that same popover; the only
+separate system UI is the first-run helper authorization prompt.
 
 ### Menu-bar icon states
 
@@ -57,8 +58,7 @@ Menu-bar agent → click icon → popover. No windows except Preferences and the
 | Drive row `[Mount]` | Mount that drive r/w via XPC helper | A compatible drive is detected |
 | Refresh (↻) | Re-scan drives now | Always |
 | `Diagnose` | Run CLI diagnostic, show summary | Always |
-| `⌘`-click `Diagnose` | Run the same read-only diagnostic and save its JSON for developer support | Always |
-| ⚙ (gear) | Open Preferences | Always |
+| ⚙ (gear) | Navigate to Settings in the popover | Always |
 | `Quit` | Exit app, tear down network state | Always |
 
 ### Popover — mounted
@@ -86,7 +86,13 @@ Menu-bar agent → click icon → popover. No windows except Preferences and the
 | `Diagnose` | Jump to diagnostics |
 | `⌘`-click `Diagnose` | Save the same read-only diagnostic JSON for developer support |
 
-### Preferences window
+### Settings page
+
+The gear replaces the main popover content with Settings. A keyboard-reachable `Back` action
+returns to the previous application content. Normal, first-run, and CLI-repair screens all use the
+same route and the same long-lived Settings/helper objects; navigation does not open an `NSWindow`
+or recreate in-flight state. The title includes the app release/build directly underneath in
+small secondary text; it is informative and never competes visually with the `Settings` heading.
 
 | Control | Type | Default |
 |---------|------|---------|
@@ -96,11 +102,11 @@ Menu-bar agent → click icon → popover. No windows except Preferences and the
 | Show speed in menu bar | Toggle | Off |
 | Reinstall privileged helper | Button | — |
 
-The diagnostic panel renders the same privacy-safe schema exported by Command-click Diagnose:
-release/build, macOS and architecture, helper presence, fixed runtime component failures,
-kernel/bridge state, a yes/no VPN tunnel signal, and the active NFS mount count. It never displays
-or exports usernames, serials, volume/device identity, local paths, VPN identity, addresses, DNS,
-or routes.
+The destructive uninstall confirmation is rendered inside the Settings page so selecting it does
+not dismiss the transient menu-bar popover before the operation starts. Cancel consumes no action;
+confirm can start the flow only once, and the control remains disabled while removal is active or
+after it completes. The helper XPC connection is created lazily on the first privileged request,
+not merely because the app launched.
 
 ---
 

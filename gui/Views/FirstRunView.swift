@@ -13,15 +13,26 @@ import AppKit
 public struct FirstRunView: View {
     @ObservedObject public var installer: HelperInstaller
     @ObservedObject public var diagnoseRunner: DiagnoseRunner
+    public let onOpenSettings: () -> Void
     public let onQuit: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
-    @State private var showDiagnose = false
+    @State private var diagnosePresentation = DiagnosePanelPresentation()
 
-    public init(installer: HelperInstaller, diagnoseRunner: DiagnoseRunner, onQuit: @escaping () -> Void) {
+    public init(
+        installer: HelperInstaller,
+        diagnoseRunner: DiagnoseRunner,
+        onOpenSettings: @escaping () -> Void,
+        onQuit: @escaping () -> Void
+    ) {
         self.installer = installer
         self.diagnoseRunner = diagnoseRunner
+        self.onOpenSettings = onOpenSettings
         self.onQuit = onQuit
+    }
+
+    public init(installer: HelperInstaller, diagnoseRunner: DiagnoseRunner, onQuit: @escaping () -> Void) {
+        self.init(installer: installer, diagnoseRunner: diagnoseRunner, onOpenSettings: {}, onQuit: onQuit)
     }
 
     public var body: some View {
@@ -52,20 +63,8 @@ public struct FirstRunView: View {
                 .buttonStyle(.glassPrimary())
 
                 Button {
-                    let mode = DiagnoseActionMode.resolve(
-                        commandPressed: NSEvent.modifierFlags.contains(.command)
-                    )
-                    showDiagnose = true
-                    Task {
-                        switch mode {
-                        case .summary:
-                            await diagnoseRunner.run()
-                        case .developerJSONExport:
-                            if let document = await diagnoseRunner.runForDeveloperExport() {
-                                DeveloperDiagnoseSavePanel.present(document: document)
-                            }
-                        }
-                    }
+                    diagnosePresentation.show()
+                    Task { await diagnoseRunner.run() }
                 } label: {
                     HStack(spacing: 5) {
                         DiagnoseGlyph()
@@ -75,10 +74,13 @@ public struct FirstRunView: View {
                 }
                 .buttonStyle(.glassNeutral(colorScheme: colorScheme))
                 .disabled(diagnoseRunner.isRunning)
+                .help(TooltipCopy.text(for: .diagnose))
             }
 
-            if showDiagnose {
-                DiagnosePanel(runner: diagnoseRunner)
+            if diagnosePresentation.isVisible {
+                DiagnosePanel(runner: diagnoseRunner) {
+                    diagnosePresentation.hide()
+                }
             }
 
             Divider()
@@ -145,16 +147,19 @@ public struct FirstRunView: View {
     private var footer: some View {
         HStack {
             Button {
-                PreferencesOpener.open()
+                onOpenSettings()
             } label: {
                 SettingsGearGlyph(color: .secondary)
             }
             .buttonStyle(.glassIcon(colorScheme: colorScheme))
+            .accessibilityLabel("Open Settings")
+            .help(TooltipCopy.text(for: .settings))
             Spacer()
             Button(action: onQuit) {
                 Text("Quit").frame(height: 28)
             }
             .buttonStyle(.glassFooter(colorScheme: colorScheme))
+            .help(TooltipCopy.text(for: .quit))
         }
     }
 }

@@ -77,11 +77,6 @@ report, hold **Command (⌘)** while clicking **Diagnose**: ntfsmac runs the sam
 the file is written; ntfsmac never uploads or sends it automatically. Review it if desired, then
 attach it manually to a bug report.
 
-The report is intentionally narrow. It does **not** include usernames, device identifiers,
-serial numbers, volume labels, mount paths, VPN provider/interface names, IP addresses, DNS
-servers, or routing tables. Component names such as `vmproxy` are fixed ntfsmac runtime names,
-not values taken from your Mac.
-
 What each line means:
 
 | `diagnose` line | Meaning / fix |
@@ -110,6 +105,33 @@ unpacks it into `~/.anylinuxfs/alpine`. This needs an internet connection and ta
 environment…` so it doesn't look like a hang. Every mount after that reuses the cached
 rootfs and starts the microVM directly, with no network needed. If the first mount fails
 offline, get online once, let it finish, then subsequent mounts work on a cold start.
+
+**Can't write to an ext volume / `Operation not permitted`.** ext2/3/4 are real
+Unix filesystems with their own ownership bits, so ntfsmac auto-passes
+`--ignore-permissions` for any ext-family drive (the NFS export gets
+`all_squash,anonuid=0,anongid=0` and the macOS mount gets `noowners` — files appear
+owned by you and are writable). You should not need to pass `--ignore-permissions`
+yourself for ext; if an ext mount is read-only, reinstall (older CLI builds had a bug
+that skipped the flag for unlabeled ext drives). Verify the flag reached the mount:
+
+```sh
+mount | grep nfs     # expect "noowners" in the options for an ext volume
+```
+
+If `noowners` is present but `ls`/`cp` on the mounted volume still says
+`Operation not permitted`, the volume is writable but **macOS is blocking the
+app's access to the mount point** — a privacy/TCC gate, not an NFS permission
+issue. This only affects access *from that app*:
+
+- **GUI** — the ntfsmac app needs Full Disk Access, which it prompts for on
+  first mount (`FDA_REQUIRED`). Grant it once and the GUI reads/writes fine.
+- **CLI** — Terminal needs Full Disk Access **only if you want to write from
+  the Terminal** (e.g. `cp`, `tee`, shell redirects into `/Volumes/<vol>`).
+  With Terminal FDA off, the mount is still writable — Finder and other
+  FDA-granted apps can read/write it — but Terminal itself gets
+  `Operation not permitted`. To use the CLI for writes, grant it: **System
+  Settings → Privacy & Security → Full Disk Access → add Terminal**, restart
+  Terminal. Readers who only ever write via Finder can leave Terminal FDA off.
 
 **A drive doesn't show up / macOS says "unidentifiable."** ntfsmac mounts
 **partitions** (`diskNsN`, e.g. `disk4s1`), never a whole disk (`disk4`) — the device

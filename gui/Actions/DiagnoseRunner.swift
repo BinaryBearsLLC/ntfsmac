@@ -1,9 +1,10 @@
 import Foundation
 import HelperShared
 
-/// Privacy-safe fields decoded from `ntfsmac diagnose --json`. Optional fields preserve
-/// compatibility with an older CLI during the brief app-update/staging window; the original
-/// health fields remain required.
+/// Summary fields decoded from `ntfsmac diagnose --json` (`cli/commands/diagnose.sh`'s `main()`,
+/// `json_mode` branch). The CLI also emits `macos_version`; Swift's decoder deliberately ignores
+/// that extra field for the four-row UI summary, while `DeveloperDiagnoseDocument` preserves the
+/// complete raw JSON for support reports.
 public struct DiagnoseReport: Codable, Equatable, Sendable {
     public let diagnosticSchema: Int?
     public let healthy: Bool
