@@ -103,13 +103,18 @@ mount | grep nfs     # expect "noowners" in the options for an ext volume
 
 If `noowners` is present but `ls`/`cp` on the mounted volume still says
 `Operation not permitted`, the volume is writable but **macOS is blocking the
-app's access to the mount point** — this is a privacy/TCC gate, not an NFS
-permission issue. Grant Full Disk Access: **System Settings → Privacy & Security
-→ Full Disk Access**, add **Terminal** (for the CLI) and/or the **ntfsmac** app
-(for the GUI), then restart that app. The GUI prompts for this on first mount;
-the CLI does not, so grant it manually the first time. This is required for
-proper operation — without it macOS refuses the app access to `/Volumes/*`
-mounts even though the NFS export itself is read/write.
+app's access to the mount point** — a privacy/TCC gate, not an NFS permission
+issue. This only affects access *from that app*:
+
+- **GUI** — the ntfsmac app needs Full Disk Access, which it prompts for on
+  first mount (`FDA_REQUIRED`). Grant it once and the GUI reads/writes fine.
+- **CLI** — Terminal needs Full Disk Access **only if you want to write from
+  the Terminal** (e.g. `cp`, `tee`, shell redirects into `/Volumes/<vol>`).
+  With Terminal FDA off, the mount is still writable — Finder and other
+  FDA-granted apps can read/write it — but Terminal itself gets
+  `Operation not permitted`. To use the CLI for writes, grant it: **System
+  Settings → Privacy & Security → Full Disk Access → add Terminal**, restart
+  Terminal. Readers who only ever write via Finder can leave Terminal FDA off.
 
 **A drive doesn't show up / macOS says "unidentifiable."** ntfsmac mounts
 **partitions** (`diskNsN`, e.g. `disk4s1`), never a whole disk (`disk4`) — the device
