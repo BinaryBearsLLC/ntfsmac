@@ -236,6 +236,38 @@ private let sampleExtOutput = """
     await scanTask.value
 }
 
+@MainActor
+@Test func productionDriveScanTerminatesAStalledProbe() async throws {
+    let tempDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(
+        at: tempDirectory,
+        withIntermediateDirectories: true
+    )
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    let stalledList = tempDirectory.appendingPathComponent("stalled-list")
+    try "#!/bin/sh\nwhile :; do :; done\n".write(
+        to: stalledList,
+        atomically: true,
+        encoding: .utf8
+    )
+    try FileManager.default.setAttributes(
+        [.posixPermissions: 0o755],
+        ofItemAtPath: stalledList.path
+    )
+
+    let scanner = DriveScanner(anylinuxfsPath: stalledList.path, scanTimeout: 0.05)
+    let clock = ContinuousClock()
+    let startedAt = clock.now
+
+    await scanner.refresh()
+
+    #expect(startedAt.duration(to: clock.now) < .seconds(1))
+    #expect(scanner.drives.isEmpty)
+    #expect(scanner.lastError?.contains("timed out") == true)
+}
+
 private struct ListCall: Equatable {
     let path: String
     let args: [String]

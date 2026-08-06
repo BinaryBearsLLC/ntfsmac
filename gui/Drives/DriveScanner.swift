@@ -140,14 +140,17 @@ public final class DriveScanner: ObservableObject {
     // concrete value inside the detached operation, so no non-Sendable instance crosses actors.
     private let runner: (any PrivilegedCommandRunning)?
     private let anylinuxfsPath: String
+    private let scanTimeout: TimeInterval
     private var pollTask: Task<Void, Never>?
 
     public init(
         runner: (any PrivilegedCommandRunning)? = nil,
-        anylinuxfsPath: String = "\(installPrefix)/bin/anylinuxfs"
+        anylinuxfsPath: String = "\(installPrefix)/bin/anylinuxfs",
+        scanTimeout: TimeInterval = 10
     ) {
         self.runner = runner
         self.anylinuxfsPath = anylinuxfsPath
+        self.scanTimeout = scanTimeout
     }
 
     deinit {
@@ -176,7 +179,7 @@ public final class DriveScanner: ObservableObject {
         if let runner {
             result = runner.run(anylinuxfsPath, ["list"])
         } else {
-            result = await Self.runOffMain(anylinuxfsPath, ["list"])
+            result = await Self.runOffMain(anylinuxfsPath, ["list"], timeout: scanTimeout)
         }
 
         if result.exitCode == 0 {
@@ -189,10 +192,11 @@ public final class DriveScanner: ObservableObject {
 
     private nonisolated static func runOffMain(
         _ executablePath: String,
-        _ arguments: [String]
+        _ arguments: [String],
+        timeout: TimeInterval
     ) async -> CommandResult {
         await Task.detached(priority: .userInitiated) {
-            RealCommandRunner().run(executablePath, arguments)
+            RealCommandRunner().run(executablePath, arguments, timeout: timeout)
         }.value
     }
 }

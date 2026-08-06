@@ -286,6 +286,8 @@ private final class DataBox: @unchecked Sendable {
 }
 
 public struct RealCommandRunner: PrivilegedCommandRunning {
+    public static let timeoutExitCode: Int32 = 124
+
     public init() {}
 
     /// Drains both pipes concurrently on background queues, started *before* `waitUntilExit()`
@@ -347,6 +349,72 @@ public struct RealCommandRunner: PrivilegedCommandRunning {
         }
         let combined = captureOutput(process, outPipe, errPipe)
         return CommandResult(output: combined, exitCode: process.terminationStatus)
+    }
+
+    /// Runs an unprivileged or otherwise bounded command. The protocol requirement above stays
+    /// unbounded because helper mount/install operations have their own lifecycle contracts; the
+    /// GUI drive scanner opts into this overload so a wedged raw-device probe cannot live forever.
+    /// A temporary file avoids pipe-buffer and inherited-pipe EOF traps if the child spawns its
+    /// own short-lived probe subprocess before the timeout fires.
+    public func run(
+        _ executablePath: String,
+        _ arguments: [String],
+        timeout: TimeInterval
+    ) -> CommandResult {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executablePath)
+        process.arguments = arguments
+        configureEnvironment(for: process)
+
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ntfsmac-command-\(UUID().uuidString)")
+        guard FileManager.default.createFile(atPath: outputURL.path, contents: nil),
+              let outputHandle = try? FileHandle(forWritingTo: outputURL)
+        else {
+            return CommandResult(output: "helper: failed to create command output file", exitCode: -1)
+        }
+        defer {
+            try? outputHandle.close()
+            try? FileManager.default.removeItem(at: outputURL)
+        }
+        process.standardOutput = outputHandle
+        process.standardError = outputHandle
+
+        do {
+            try process.run()
+        } catch {
+            return CommandResult(output: "helper: failed to launch \(executablePath): \(error)", exitCode: -1)
+        }
+
+        let processGroup = DispatchGroup()
+        processGroup.enter()
+        DispatchQueue.global(qos: .utility).async {
+            process.waitUntilExit()
+            processGroup.leave()
+        }
+
+        var timedOut = false
+        let timeoutMilliseconds = max(1, Int(timeout * 1_000))
+        if processGroup.wait(timeout: .now() + .milliseconds(timeoutMilliseconds)) == .timedOut {
+            timedOut = true
+            process.terminate()
+            // A process stuck in a kernel-backed device operation may ignore SIGTERM. Keep the
+            // caller bounded and escalate only that exact child after a short grace period.
+            if processGroup.wait(timeout: .now() + .milliseconds(250)) == .timedOut {
+                if process.isRunning {
+                    _ = Darwin.kill(process.processIdentifier, SIGKILL)
+                }
+                processGroup.wait()
+            }
+        }
+
+        try? outputHandle.synchronize()
+        let output = (try? String(contentsOf: outputURL, encoding: .utf8)) ?? ""
+        if timedOut {
+            let suffix = output.isEmpty ? "" : "\n\(output)"
+            return CommandResult(output: "command timed out\(suffix)", exitCode: Self.timeoutExitCode)
+        }
+        return CommandResult(output: output, exitCode: process.terminationStatus)
     }
 
     public func runPipingStdin(_ input: String, to executablePath: String, _ arguments: [String]) -> CommandResult {
