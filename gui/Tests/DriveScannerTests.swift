@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import HelperShared
 @testable import NtfsmacGUI
@@ -197,6 +198,42 @@ private let sampleExtOutput = """
     #expect(runner.calls.count == 1)
     #expect(runner.calls[0].path == "/stub/anylinuxfs")
     #expect(runner.calls[0].args == ["list"])
+}
+
+@MainActor
+@Test func productionDriveScanDoesNotBlockMainActor() async throws {
+    let tempDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(
+        at: tempDirectory,
+        withIntermediateDirectories: true
+    )
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    let slowList = tempDirectory.appendingPathComponent("slow-list")
+    try "#!/bin/sh\nsleep 0.5\nexit 0\n".write(
+        to: slowList,
+        atomically: true,
+        encoding: .utf8
+    )
+    try FileManager.default.setAttributes(
+        [.posixPermissions: 0o755],
+        ofItemAtPath: slowList.path
+    )
+
+    let scanner = DriveScanner(anylinuxfsPath: slowList.path)
+    let clock = ContinuousClock()
+    let startedAt = clock.now
+    let scanTask = Task { await scanner.refresh() }
+
+    try await Task.sleep(for: .milliseconds(50))
+    let mainActorDelay = startedAt.duration(to: clock.now)
+    #expect(
+        mainActorDelay < .milliseconds(350),
+        "the synchronous list subprocess blocked the menu-bar main actor"
+    )
+
+    await scanTask.value
 }
 
 private struct ListCall: Equatable {

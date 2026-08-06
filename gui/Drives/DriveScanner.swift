@@ -128,23 +128,22 @@ public enum DriveListParser {
 /// filters to ntfsmac's mount scope (NTFS-family + ext2/3/4) client-side. Reuses `HelperShared`'s
 /// `PrivilegedCommandRunning`/`RealCommandRunner` seam (already used by `HelperService`) instead
 /// of a second process-spawn helper — this call itself is unprivileged, only the runner shape
-/// is reused.
+/// is reused. Production scans run away from the main actor because the first VM-backed list can
+/// take long enough to make the menu-bar popover appear hung.
 @MainActor
 public final class DriveScanner: ObservableObject {
     @Published public private(set) var drives: [Drive] = []
     @Published public private(set) var lastError: String?
 
-    // ponytail: same non-Sendable `any PrivilegedCommandRunning` typing `HelperService` already
-    // uses — matches the existing seam instead of adding a `Sendable` conformance to the shared
-    // protocol (that's `3-xpc-helper`'s file, out of this unit's scope). Trade-off: `runner.run`
-    // blocks this actor for the subprocess's duration; acceptable for a background popover poll,
-    // revisit with a detached hop if a slow `anylinuxfs list` is ever felt in the UI.
-    private let runner: any PrivilegedCommandRunning
+    // An explicit runner is the deterministic test/demo seam and remains actor-bound because the
+    // shared protocol is intentionally not Sendable. Production leaves this nil and creates the
+    // concrete value inside the detached operation, so no non-Sendable instance crosses actors.
+    private let runner: (any PrivilegedCommandRunning)?
     private let anylinuxfsPath: String
     private var pollTask: Task<Void, Never>?
 
     public init(
-        runner: any PrivilegedCommandRunning = RealCommandRunner(),
+        runner: (any PrivilegedCommandRunning)? = nil,
         anylinuxfsPath: String = "\(installPrefix)/bin/anylinuxfs"
     ) {
         self.runner = runner
@@ -173,7 +172,12 @@ public final class DriveScanner: ObservableObject {
     }
 
     public func refresh() async {
-        let result = runner.run(anylinuxfsPath, ["list"])
+        let result: CommandResult
+        if let runner {
+            result = runner.run(anylinuxfsPath, ["list"])
+        } else {
+            result = await Self.runOffMain(anylinuxfsPath, ["list"])
+        }
 
         if result.exitCode == 0 {
             drives = DriveListParser.parse(result.output)
@@ -181,5 +185,14 @@ public final class DriveScanner: ObservableObject {
         } else {
             lastError = result.output
         }
+    }
+
+    private nonisolated static func runOffMain(
+        _ executablePath: String,
+        _ arguments: [String]
+    ) async -> CommandResult {
+        await Task.detached(priority: .userInitiated) {
+            RealCommandRunner().run(executablePath, arguments)
+        }.value
     }
 }
