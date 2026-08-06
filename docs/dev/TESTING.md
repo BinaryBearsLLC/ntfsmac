@@ -192,6 +192,37 @@ which case it should land read-only — see "force a dirty-journal test" below i
 verify that path specifically), the write/read/remove round-trips, `diagnose --json` reports
 `"healthy": true`, and unmount is clean.
 
+### P0 gate — mount truth and private NFS transport
+
+Run this against the packaged candidate while the NTFS drive is mounted:
+
+```bash
+/usr/local/ntfsmac/bin/ntfsmac diagnose --json | python3 -m json.tool
+./tests/live/verify-nfs-transport.sh
+```
+
+Diagnostic schema 5 must report `"network_helper": "vmnet"` and
+`"nfs_transport_contract": "expected_vmnet"`. The live gate must pass; it independently rejects
+gvproxy, a loopback port-2049 listener, an endpoint outside the anylinuxfs vmnet pool, a route that
+does not use the private bridge, or an NFS mount without `soft`. Its output is privacy-safe and
+contains only a mount count plus fixed contract tokens.
+
+With the GUI kept open, also exercise the cross-surface matrix:
+
+1. Mount in the GUI, unmount with the CLI, and confirm the green row disappears within five
+   seconds without pressing Refresh.
+2. Mount with the CLI and confirm the already-running GUI discovers that device and its real
+   read-only/read-write state within five seconds.
+3. Repeat both directions using Refresh, then perform a safe external unmount/hot-unplug and
+   confirm the GUI never remains green when host evidence disappears.
+4. With two test drives mounted, remove only one and confirm the surviving row stays verified.
+5. If either evidence source is intentionally made unavailable, confirm the affected state is
+   yellow/unknown with a reason code, never green.
+
+Record packaged-app results separately from unit-test results. Do not mark the roadmap hardware
+gate complete until VPN off/on, teardown, helper recovery, restart recovery, and concurrent mounts
+have all passed on the release artifact.
+
 ```
 $ NTFSMAC_PREFIX/bin/ntfsmac diagnose
 diagnose: ntfsmac version: 1.0 (1)

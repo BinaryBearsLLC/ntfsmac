@@ -51,6 +51,7 @@ This table describes the current integrated GUI, not the original aspirational p
 | Partial | `FinderOpener` is implemented and tested, but no current multi-drive row exposes Open in Finder |
 | Partial | `ThroughputMonitor` and `SpeedBar` exist, but transfer speed is not presented by the current multi-drive UI |
 | Partial | NTFS3 is supported by CLI/helper internals, but has no GUI choice or completed hardware qualification |
+| Implemented — packaged validation pending | Live mount-state reconciliation pairs anylinuxfs session evidence with the host NFS mount table, polls every five seconds, refreshes on lifecycle actions, and fails closed to yellow/unknown on disagreement; see the 2026-08-06 live audit. |
 | Planned | Verified Copy, evidence-backed SECURITY state, notifications, and Eject All |
 
 ---
@@ -74,7 +75,7 @@ This table describes the current integrated GUI, not the original aspirational p
 |---------|--------|--------------|
 | Per-drive `Unmount` | Safely unmount that drive | That drive is mounted |
 | Other-device `Mount` | Mount another compatible partition | Another compatible drive is detected |
-| Refresh (↻) | Re-scan while preserving mounted rows | Always |
+| Refresh (↻) | Re-scan drives and reconcile mounted rows against host truth | Always |
 | SECURITY rows | Display current state; currently `unknown` because live evidence is not wired | One or more drives mounted |
 | SECURITY `Hide` / `Show` | Collapse or restore only the SECURITY presentation | One or more drives mounted |
 | ⚙ / `Quit` | As above | Always |
@@ -82,6 +83,33 @@ This table describes the current integrated GUI, not the original aspirational p
 `Open in Finder` and transfer speed are intentionally recorded as partial rather than shipped:
 their implementation foundations remain in the tree, but the current popover does not expose
 those controls. Wiring or removing them is a focused roadmap decision, not documentation fiction.
+
+### Mount-state truth contract
+
+The GUI and CLI are two controls over one real host mount state. The macOS mount table plus
+ntfsmac-owned anylinuxfs session evidence are authoritative; `MountController.mountedDrives` is a
+cache for presentation, never proof by itself.
+
+The packaged 2.0 (050826) build violates this contract: after a successful CLI unmount, the GUI
+continued to show a green `Mounted read/write` row and `Unmount` button. Refresh did not converge
+it, while the GUI's own Diagnose panel reported an inactive bridge and zero NFS mounts.
+
+The P0 remediation implements this contract in source: helper success is provisional, the app
+reconciles at launch/popover open/every five seconds/Refresh/after helper completion, and an
+incomplete or inconsistent snapshot preserves recovery controls in yellow `unknown` rather than
+publishing green. The packaged-app hardware matrix remains required before this gate is closed.
+
+Required behavior:
+
+- reconcile on launch, popover open, periodic poll, Refresh, and after helper completion;
+- discover CLI-created mounts and remove CLI/external-unmounted rows within a bounded interval;
+- verify observed read/write state per mount point before publishing green;
+- represent disagreement explicitly as warning/unknown, never as mounted read/write;
+- keep multiple mount rows independent across partial failure and teardown;
+- derive header, icon, controls, and Diagnose context from the same reconciled snapshot.
+
+The detailed live evidence and acceptance matrix are in
+[`../audits/LIVE_MOUNT_STATE_AND_NFS_TRANSPORT_AUDIT_2026-08-06.md`](../audits/LIVE_MOUNT_STATE_AND_NFS_TRANSPORT_AUDIT_2026-08-06.md).
 
 ### Read-only (dirty) state — extra
 

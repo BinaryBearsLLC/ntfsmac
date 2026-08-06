@@ -60,7 +60,7 @@ The BinaryBears fork builds on the original project with a more complete, verifi
 | --- | --- |
 | UI and UX | Settings live inside the menu-bar popover; the icon adapts correctly to the menu bar; contextual tooltips clarify actions; Diagnose and SECURITY have presentation-only **Hide** controls; the app prevents duplicate instances; version and build appear directly in Settings. |
 | Drive handling | NTFS detection also recognizes MBR `Windows_NTFS` volumes; ext2/3/4 are supported through the shared mount path; multiple drives can be mounted concurrently with per-drive status. |
-| Diagnostics | Text and JSON reports use the same canonical fields; **Command-click Diagnose** opens a save panel for the same developer-oriented JSON report. It identifies expected and detected host-runtime versions, audited source commits, the installed Alpine/cache version and guest `ntfs-3g`/`nfs-utils` packages, plus app/build, system, helper, kernel, network, and mount health. |
+| Diagnostics | Text and JSON reports use the same canonical fields; **Command-click Diagnose** opens a save panel for the same developer-oriented JSON report. It identifies expected and detected host-runtime versions, audited source commits, the installed Alpine/cache version and guest `ntfs-3g`/`nfs-utils` packages, plus app/build, system, helper, kernel, mount health, and a privacy-safe vmnet transport-contract result. |
 | Helper lifecycle | Friendlier Full Disk Access guidance; a lazy XPC connection avoids stale startup state; helper reinstall and confirmed uninstall stay inside the popover and report success or actionable failure. |
 | Build and release | The interactive [`build.command`](build.command) verifies prerequisites, builds CLI and/or GUI, runs relevant tests, packages artifacts under `dist/`, and validates bundle structure, architecture, and ad-hoc signatures. |
 | Security honesty | SECURITY indicators never manufacture a green success state. Until live evidence is wired, the UI displays **unknown** rather than claiming a protection is active. |
@@ -153,6 +153,9 @@ the current GUI deliberately does not present this choice.
 - Hold **Command (⌘)** while clicking **Diagnose** to run the same read-only JSON diagnosis and choose where to save it.
 - The report separates versions approved by the build from versions actually detected on the Mac,
   and explicitly marks components or guest packages that are not installed or cannot be read.
+- When an ntfsmac NFS mount is active, the report fails closed unless its synthetic endpoint
+  resolves inside the private vmnet pool, routes through the bridge, remains `soft`, and no
+  loopback helper/listener is detected.
 - Review the file, then attach it manually to a bug report if appropriate. ntfsmac never uploads it.
 
 Reports intentionally omit usernames, serial numbers, volume labels, device identifiers, mount paths, IP addresses, DNS servers, route tables, and VPN provider or interface names. See [SECURITY.md](SECURITY.md) for the reporting policy.

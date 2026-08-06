@@ -8,8 +8,11 @@
 
 This is the canonical product roadmap for the BinaryBears fork. It replaces the older practice
 of treating implementation plans, test-session notes, and private scratch files as a current
-feature list. The status below was reconciled on 2026-08-05 against upstream/BinaryBears `main`
-at `d2b151d` (`v2.0.050826`) and the preserved pre-sync BinaryBears `dev` at `e9f85e5`.
+feature list. The code status below was reconciled on 2026-08-05 against upstream/BinaryBears
+`main` at `d2b151d` (`v2.0.050826`) and the preserved pre-sync BinaryBears `dev` at `e9f85e5`.
+Live hardware findings from 2026-08-06 are recorded separately in
+[Live Mount-State and NFS Transport Audit — 2026-08-06](audits/LIVE_MOUNT_STATE_AND_NFS_TRANSPORT_AUDIT_2026-08-06.md)
+and are release-blocking until the acceptance criteria below pass.
 
 The post-sync wiring audit and its focused recovery branches are recorded in
 [BinaryBears Upstream Regression Audit — 2026-08-05](audits/UPSTREAM_REGRESSION_AUDIT_2026-08-05.md).
@@ -69,7 +72,7 @@ conflicts.
 - [x] ext2, ext3, and ext4 discovery and mounting through the shared microVM/NFS path.
 - [x] NTFS discovery for GPT and MBR `Windows_NTFS` partitions.
 - [x] Partition-only device validation in both the unprivileged and privileged layers.
-- [x] Multiple concurrent drive entries and per-drive mount/unmount state.
+- [x] Multiple concurrent GUI-owned drive entries and per-drive mount/unmount actions.
 - [x] Soft NFS mounts retained as the hot-unplug safety policy.
 
 ### GUI, diagnostics, and lifecycle
@@ -96,8 +99,75 @@ conflicts.
   multi-drive popover does not expose a corresponding control.
 - [-] **Transfer telemetry:** the sampling subsystem and tests remain in the codebase, but the
   current multi-drive UI deliberately does not present a speed row.
+- [-] **Authoritative mount-state synchronization:** implemented with paired anylinuxfs-session
+  and host NFS-mount evidence, bounded polling, and a fail-closed unknown state. Unit/state tests
+  pass; the packaged-app hardware matrix below is still a release gate.
+- [-] **NFS transport contract:** ntfsmac now pins anylinuxfs to `--net-helper vmnet`, reports a
+  privacy-safe transport-contract token, and includes a fail-closed live route/listener gate.
+  Packaged-app listener/route evidence with real hardware is still required.
 
 ## Prioritized roadmap
+
+### P0.0 — Live-hardware release blockers
+
+These two findings override lower-priority feature work. They are not data-corruption findings:
+the 2026-08-06 SHA-256 suite passed before and after a safe unmount/remount. They are nevertheless
+trust-boundary failures because the UI can publish a false mounted state and the observed NFS
+endpoint does not match the documented architecture without further explanation and proof.
+
+#### A. Reconcile GUI, CLI, and macOS mount truth
+
+The packaged 2.0 (050826) GUI retained the test NTFS volume as `Mounted read/write` after
+`ntfsmac unmount <partition>` succeeded. At the same time, `diskutil` reported `Mounted: No`, the host
+mount table contained no matching NFS mount, and `ntfsmac diagnose --json` reported
+`bridge=down` and `nfs_mount_count=0`. Clicking GUI Refresh did not repair the state; GUI Diagnose
+then displayed `NFS mounts: None` inside the still-mounted presentation.
+
+- [x] Introduce one read-only authoritative mount snapshot aligned with the same anylinuxfs
+  session and host NFS-mount sources used by CLI diagnostics. It identifies ntfsmac-owned mounts
+  per device and mount point without relying only on `MountController.mountedDrives`.
+- [x] Reconcile at app launch, popover open, periodic poll, Refresh, and after every helper
+  mount/unmount response. A successful command response is provisional until the observed host
+  state agrees.
+- [x] Detect CLI mount/unmount, external unmount, helper/VM exit, and hot-unplug while the GUI is
+  open. Remove stale rows and green status; surface a reason-coded warning when state is ambiguous.
+- [x] Preserve correct independent state for multiple mounts. One disappearing mount must not
+  erase or misclassify surviving mounts.
+- [x] Reconcile the header/icon/controls from the authoritative snapshot and publish an explicit
+  reason-coded warning/unknown state whenever the sources cannot prove green mounted state.
+- [x] Add parser and state-machine coverage for CLI-created mounts, external teardown, source
+  failure, provisional helper responses, and independent concurrent mounts.
+- [ ] Complete packaged-app hardware tests for GUI→CLI, CLI→GUI, external teardown, crash
+  recovery, restart recovery, Refresh, hot-unplug, and multiple drives.
+
+Acceptance: no UI control, icon, diagnostic row, or CLI output may claim a drive is mounted or
+writable after the corresponding host mount disappears. A CLI-created mount must also appear in
+the already-running GUI within the bounded reconciliation interval.
+
+#### B. Prove or remediate the NFS endpoint architecture
+
+Two consecutive live sessions logged `vmproxy ... -b 127.0.0.1`, checked the NFS server at
+`127.0.0.1:2049`, and mounted a share as `diskNsN.local:/mnt/<label>`. Source tracing identifies
+that sequence as anylinuxfs's gvproxy transport, not its direct vmnet-helper transport. The old
+diagnostic's broad process check incorrectly reported `bridge=up` for this loopback session.
+
+- [x] Trace both vendored paths: gvproxy binds/checks the loopback proxy, while vmnet-helper
+  assigns a private `/30`, publishes the VM endpoint through the synthetic `.local` name, and
+  routes the host NFS client over the private bridge.
+- [ ] Resolve `diskNsN.local` during a live mount and prove which endpoint the kernel actually
+  uses. Confirm that no NFS listener is exposed on non-loopback or unrelated interfaces.
+- [x] Select the direct private-`/30` path and force `--net-helper vmnet` on every ntfsmac mount,
+  so a stale per-user anylinuxfs configuration cannot silently re-enable gvproxy.
+- [x] Add privacy-safe diagnostics for transport topology and enforcement state without exporting
+  addresses, interface names, volume labels, or device identifiers.
+- [x] Add a read-only packaged-app gate that fails on gvproxy, a loopback NFS listener, a
+  non-private endpoint/route, or a non-`soft` ntfsmac mount.
+- [ ] Execute that gate with the packaged app on real hardware for VPN off/on, concurrent mounts,
+  teardown, and helper recovery, retaining only privacy-safe results in the repository.
+
+Acceptance: packet/listener/route evidence must match one documented architecture, NFS must remain
+`soft`, teardown must remove every listener and route owned by the session, and neither README nor
+GUI may claim a dedicated private path more strongly than the measured evidence supports.
 
 ### P0 — Trust, reproducibility, and truthful security
 
@@ -311,16 +381,18 @@ that proposal independently from current `upstream/main`.
 
 | Order | Deliverable | Suggested branch topic | Required evidence before merge |
 | --- | --- | --- | --- |
-| 1 | Runtime Alpine digest pin | `supply-chain/runtime-alpine-pin` | Clean/cached/offline init tests; packaged-binary scan |
-| 2 | anylinuxfs update audit workflow | `docs/anylinuxfs-update-policy` | Dry-run audit against the next candidate pin |
-| 3 | Live mount security transaction | `security/live-hardening` | PF/route inspection; VPN and multi-mount tests |
-| 4 | Security telemetry and Hide | `feat/security-status-ui` | CLI/JSON/GUI parity; no-false-green matrix |
-| 5 | Verified Copy core/CLI | `feat/verified-copy-cli` | Failure injection and SHA-256 fixture matrix |
-| 6 | Verified Copy GUI | `feat/verified-copy-gui` | Packaged-app UI and cancellation tests |
-| 7 | NTFS3 hardware qualification | `test/ntfs3-qualification` | Both-driver hardware report and manifests |
-| 8 | Experimental NTFS3 GUI choice | `feat/ntfs3-driver-choice` | Preflight, diagnostics, rollback/error tests |
-| 9 | SMAppService migration | `refactor/smappservice-helper` | Clean/upgrade/uninstall matrix on supported macOS |
-| 10 | Remaining focused UX items | one branch per item | Automated tests plus packaged-app validation |
+| 1 | GUI/CLI authoritative mount reconciliation | `fix/mount-state-reconciliation` | Cross-surface and external-teardown hardware matrix |
+| 2 | NFS endpoint proof or remediation | `security/nfs-transport-contract` | Listener/route/packet evidence; VPN and multi-mount teardown |
+| 3 | Runtime Alpine digest pin | `supply-chain/runtime-alpine-pin` | Clean/cached/offline init tests; packaged-binary scan |
+| 4 | anylinuxfs update audit workflow | `docs/anylinuxfs-update-policy` | Dry-run audit against the next candidate pin |
+| 5 | Live mount security transaction | `security/live-hardening` | PF/route inspection; VPN and multi-mount tests |
+| 6 | Security telemetry and Hide | `feat/security-status-ui` | CLI/JSON/GUI parity; no-false-green matrix |
+| 7 | Verified Copy core/CLI | `feat/verified-copy-cli` | Failure injection and SHA-256 fixture matrix |
+| 8 | Verified Copy GUI | `feat/verified-copy-gui` | Packaged-app UI and cancellation tests |
+| 9 | NTFS3 hardware qualification | `test/ntfs3-qualification` | Both-driver hardware report and manifests |
+| 10 | Experimental NTFS3 GUI choice | `feat/ntfs3-driver-choice` | Preflight, diagnostics, rollback/error tests |
+| 11 | SMAppService migration | `refactor/smappservice-helper` | Clean/upgrade/uninstall matrix on supported macOS |
+| 12 | Remaining focused UX items | one branch per item | Automated tests plus packaged-app validation |
 
 ## Documentation ownership
 
