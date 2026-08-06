@@ -19,7 +19,7 @@ public struct SpeedBar: View {
         // Exhaustive switch, not a boolean OR chain: a new `MountState` case must force a
         // decision here rather than silently falling through to "hidden".
         switch appState.state {
-        case .mounting, .mountedReadWrite, .mountedReadOnly, .mountedReadOnlyDirty:
+        case .mounting, .mountedReadWrite, .mountedReadOnly, .mountedReadOnlyDirty, .mountedUnknown:
             VStack(alignment: .leading, spacing: 10) {
                 Text("TRANSFER SPEED")
                     .font(.system(size: 10, weight: .semibold))

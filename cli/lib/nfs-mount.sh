@@ -96,7 +96,10 @@ run_anylinuxfs_mount() {
   # and a real failure still surfaces from the `anylinuxfs mount` call right below.
   diskutil unmount "$disk_ident" >/dev/null 2>&1 || true
 
-  local -a args=(mount "$disk_ident")
+  # ntfsmac's transport contract is vmnet-only. Pass the choice explicitly so a stale or
+  # user-edited anylinuxfs config cannot silently switch this product to gvproxy's loopback
+  # frontend while the UI/docs continue claiming a dedicated private /30 path.
+  local -a args=(mount "$disk_ident" --net-helper vmnet)
   [[ -n "$mount_point" ]] && args+=("$mount_point")
   local nfs_opts="soft"
   [[ -n "$read_only" ]] && nfs_opts="soft,ro"

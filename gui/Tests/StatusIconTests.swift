@@ -36,6 +36,12 @@ import Testing
     #expect(!style.isPulsing)
 }
 
+@Test func mountedUnknownIsYellowAndNotPulsing() {
+    let style = StatusIcon.style(for: .mountedUnknown)
+    #expect(style.color == .ntfsYellow)
+    #expect(!style.isPulsing)
+}
+
 @Test func errorIsRedAndNotPulsing() {
     let style = StatusIcon.style(for: .error)
     #expect(style.color == .ntfsRed)

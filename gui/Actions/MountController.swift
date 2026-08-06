@@ -24,7 +24,22 @@ public struct MountedDrive: Identifiable, Equatable, Sendable {
     public var mountPoint: String?
     public var isReadOnly: Bool
     public var isDirty: Bool
+    public var isVerified: Bool
     public var id: String { drive.id }
+
+    public init(
+        drive: Drive,
+        mountPoint: String?,
+        isReadOnly: Bool,
+        isDirty: Bool,
+        isVerified: Bool = true
+    ) {
+        self.drive = drive
+        self.mountPoint = mountPoint
+        self.isReadOnly = isReadOnly
+        self.isDirty = isDirty
+        self.isVerified = isVerified
+    }
 }
 
 /// `[Mount]`/`Unmount` (GUI-PLAN.md "Popover — idle"/"Popover — mounted") always route through
@@ -38,19 +53,30 @@ public struct MountedDrive: Identifiable, Equatable, Sendable {
 public final class MountController: ObservableObject {
     @Published public private(set) var mountedDrives: [MountedDrive] = []
     @Published public internal(set) var errorMessage: String?
+    @Published public private(set) var reconciliationWarning: String?
 
     private let helper: any HelperMounting
     private let readOnlyChecker: any MountReadOnlyChecking
+    private let snapshotProvider: any MountSnapshotProviding
     private let appState: AppState
+    private var pollTask: Task<Void, Never>?
 
     public init(
         helper: any HelperMounting = HelperClient(),
         readOnlyChecker: any MountReadOnlyChecking = RealMountOptionsChecker(),
+        snapshotProvider: (any MountSnapshotProviding)? = nil,
         appState: AppState
     ) {
         self.helper = helper
         self.readOnlyChecker = readOnlyChecker
+        self.snapshotProvider = snapshotProvider
+            ?? (helper as? any MountSnapshotProviding)
+            ?? RealMountSnapshotProvider()
         self.appState = appState
+    }
+
+    deinit {
+        pollTask?.cancel()
     }
 
     /// Derive the helper driver from the parsed fstype when the caller didn't pin one. ext-family
@@ -75,6 +101,37 @@ public final class MountController: ObservableObject {
     /// Identifiers of every currently mounted drive — used by `DriveListView` to mark rows.
     public var mountedDriveIDs: Set<String> { Set(mountedDrives.map(\.id)) }
 
+    /// Reconcile on launch and every bounded polling interval. The closure is evaluated on the
+    /// main actor so the scanner's latest `@Published` drive metadata can be reused safely.
+    public func startPolling(
+        knownDrives: @escaping @MainActor () -> [Drive],
+        interval: Duration = .seconds(5)
+    ) {
+        pollTask?.cancel()
+        pollTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                await self.reconcile(knownDrives: knownDrives())
+                try? await Task.sleep(for: interval)
+            }
+        }
+    }
+
+    public func stopPolling() {
+        pollTask?.cancel()
+        pollTask = nil
+    }
+
+    /// Refreshes GUI state from two independent host sources. An authoritative empty snapshot
+    /// clears stale rows after CLI/external unmounts; incomplete evidence preserves rows but marks
+    /// them unverified so the UI can never remain falsely green.
+    @discardableResult
+    public func reconcile(knownDrives: [Drive]) async -> MountSnapshot {
+        let snapshot = await snapshotProvider.snapshot()
+        apply(snapshot, knownDrives: knownDrives)
+        return snapshot
+    }
+
     /// `mountPoint`: real, caller-resolved path (e.g. `Settings.defaultMountPoint` with
     /// `<label>` substituted) — `nil` lets anylinuxfs pick its own default under `/Volumes/`.
     /// `readOnly`: threads through to the helper's `--read-only` flag (`HelperMounting`'s real
@@ -95,6 +152,7 @@ public final class MountController: ObservableObject {
         }
 
         errorMessage = nil
+        reconciliationWarning = nil
         appState.state = .mounting
         do {
             let resolvedDriver = driver ?? Self.driverFor(drive.fsType)
@@ -116,29 +174,39 @@ public final class MountController: ObservableObject {
                         resolvedMountPoint = "/Volumes/\(drive.label.isEmpty ? drive.identifier : drive.label)"
                     }
                 }
-                // A `readOnly: false` request can still land read-only: ntfs-3g silently falls
-                // back to read-only on a dirty/unclean NTFS journal (same real-mount-options
-                // check `RemountController.confirmRemount` already relies on — `exitCode == 0`
-                // alone doesn't mean "mounted the way you asked"). Without this, a dirty landing
-                // was reported as a healthy `.mountedReadWrite`, and `.mountedReadOnlyDirty` was
-                // never reachable from a real mount at all — only from `RemountController`, which
-                // itself is only reachable from the banner this state is supposed to trigger.
-                // ponytail: known ceiling — `isAnyNfsMountReadOnly()` is global, so with a sibling
-                // dirty drive already mounted, a clean 2nd mount could be mis-flagged dirty.
-                // Per-mount-point disambiguation is the upgrade path; acceptable while N is small.
-                let isReadOnly: Bool
-                let isDirty: Bool
-                if readOnly {
-                    isReadOnly = true
-                    isDirty = false
-                } else if await readOnlyChecker.isAnyNfsMountReadOnly() {
-                    isReadOnly = true
-                    isDirty = true
-                } else {
-                    isReadOnly = false
-                    isDirty = false
+                // The helper response is provisional. Do not publish green until the host mount
+                // table and anylinuxfs runtime independently observe this exact device.
+                let snapshot = await snapshotProvider.snapshot()
+                apply(snapshot, knownDrives: [drive])
+                let observed = snapshot.mounts.first { $0.deviceIdentifier == drive.identifier }
+                if snapshot.isAuthoritative && observed == nil {
+                    mountedDrives.removeAll { $0.id == drive.identifier }
+                    fail("MOUNT_NOT_OBSERVED — the helper returned success but no matching host mount exists")
+                    return
                 }
-                mountedDrives.append(MountedDrive(drive: drive, mountPoint: resolvedMountPoint, isReadOnly: isReadOnly, isDirty: isDirty))
+
+                // A read/write request can still land read-only on an unclean NTFS journal.
+                // Prefer the per-mount host option; retain the existing checker as a conservative
+                // fallback when the snapshot could not pair the status and mount-table rows.
+                let fallbackReadOnly = observed?.isReadOnly == nil
+                    ? await readOnlyChecker.isAnyNfsMountReadOnly()
+                    : false
+                let landedReadOnly = readOnly || (observed?.isReadOnly ?? fallbackReadOnly)
+                if let index = mountedDrives.firstIndex(where: { $0.id == drive.identifier }) {
+                    mountedDrives[index].mountPoint = observed?.mountPoint ?? resolvedMountPoint
+                    mountedDrives[index].isReadOnly = landedReadOnly
+                    mountedDrives[index].isDirty = landedReadOnly && !readOnly
+                    mountedDrives[index].isVerified = snapshot.isAuthoritative && observed?.isReadOnly != nil
+                } else {
+                    mountedDrives.append(MountedDrive(
+                        drive: drive,
+                        mountPoint: resolvedMountPoint,
+                        isReadOnly: landedReadOnly,
+                        isDirty: landedReadOnly && !readOnly,
+                        isVerified: false
+                    ))
+                    reconciliationWarning = warningMessage(for: snapshot.warningCode ?? "MOUNT_STATE_SOURCE_UNAVAILABLE")
+                }
                 recomputeAggregateState()
             } else {
                 fail(result.output)
@@ -152,6 +220,7 @@ public final class MountController: ObservableObject {
     /// independent `helper.unmount(target:)` call (one anylinuxfs session per drive).
     public func unmount(driveID: String? = nil) async {
         errorMessage = nil
+        reconciliationWarning = nil
         let targets: [String]
         if let driveID {
             guard mountedDrives.contains(where: { $0.id == driveID }) else { return }
@@ -163,9 +232,7 @@ public final class MountController: ObservableObject {
         for target in targets {
             do {
                 let result = try await helper.unmount(target: target)
-                if result.exitCode == 0 {
-                    mountedDrives.removeAll { $0.id == target }
-                } else {
+                if result.exitCode != 0 {
                     fail(result.output)
                     recomputeAggregateState()
                     return
@@ -176,11 +243,79 @@ public final class MountController: ObservableObject {
                 return
             }
         }
-        recomputeAggregateState()
+        let snapshot = await snapshotProvider.snapshot()
+        apply(snapshot, knownDrives: mountedDrives.map(\.drive))
+        let stillMounted = Set(targets).intersection(mountedDriveIDs)
+        if !stillMounted.isEmpty {
+            for index in mountedDrives.indices where stillMounted.contains(mountedDrives[index].id) {
+                mountedDrives[index].isVerified = false
+            }
+            reconciliationWarning = warningMessage(for: "UNMOUNT_NOT_OBSERVED")
+            recomputeAggregateState()
+        }
     }
 
     public func clearError() {
         errorMessage = nil
+    }
+
+    private func apply(_ snapshot: MountSnapshot, knownDrives: [Drive]) {
+        let previous = Dictionary(uniqueKeysWithValues: mountedDrives.map { ($0.id, $0) })
+        let known = Dictionary(uniqueKeysWithValues: knownDrives.map { ($0.id, $0) })
+        var updated = snapshot.mounts.map { observed -> MountedDrive in
+            let prior = previous[observed.deviceIdentifier]
+            let drive = known[observed.deviceIdentifier]
+                ?? prior?.drive
+                ?? fallbackDrive(for: observed)
+            return MountedDrive(
+                drive: drive,
+                mountPoint: observed.mountPoint,
+                isReadOnly: observed.isReadOnly ?? prior?.isReadOnly ?? true,
+                isDirty: prior?.isDirty ?? false,
+                isVerified: observed.isReadOnly != nil && snapshot.isAuthoritative
+            )
+        }
+
+        if !snapshot.isAuthoritative {
+            let observedIDs = Set(updated.map(\.id))
+            for var cached in mountedDrives where !observedIDs.contains(cached.id) {
+                cached.isVerified = false
+                updated.append(cached)
+            }
+        }
+
+        mountedDrives = updated.sorted { $0.id < $1.id }
+        reconciliationWarning = mountedDrives.isEmpty
+            ? nil
+            : snapshot.warningCode.map { warningMessage(for: $0) }
+        recomputeAggregateState()
+    }
+
+    private func fallbackDrive(for observed: ObservedMount) -> Drive {
+        let fsType: String
+        switch observed.fsDriver {
+        case "ntfs-3g", "ntfs3": fsType = "ntfs"
+        case let driver? where driver.hasPrefix("ext"): fsType = driver
+        default: fsType = "unknown"
+        }
+        let label = URL(fileURLWithPath: observed.mountPoint).lastPathComponent
+        return Drive(
+            identifier: observed.deviceIdentifier,
+            fsType: fsType,
+            label: label,
+            size: ""
+        )
+    }
+
+    private func warningMessage(for code: String) -> String {
+        switch code {
+        case "MOUNT_STATE_INCONSISTENT":
+            return "MOUNT_STATE_INCONSISTENT — runtime and host mount table disagree"
+        case "UNMOUNT_NOT_OBSERVED":
+            return "UNMOUNT_NOT_OBSERVED — the drive is still present in the host mount table"
+        default:
+            return "MOUNT_STATE_SOURCE_UNAVAILABLE — mounted state could not be independently verified"
+        }
     }
 
     /// Derive the shared icon/banner state from the full mounted set. The icon reflects the
@@ -190,6 +325,8 @@ public final class MountController: ObservableObject {
     private func recomputeAggregateState() {
         if mountedDrives.isEmpty {
             appState.state = .idle
+        } else if mountedDrives.contains(where: { !$0.isVerified }) {
+            appState.state = .mountedUnknown
         } else if mountedDrives.contains(where: { $0.isDirty }) {
             appState.state = .mountedReadOnlyDirty
         } else if mountedDrives.contains(where: { $0.isReadOnly }) {

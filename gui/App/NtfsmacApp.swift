@@ -117,7 +117,10 @@ struct NtfsmacApp: App {
             // previously fully decoupled, so a denied/failed helper install left the icon grey.
             StatusIconView(state: helperInstaller.state.isDeniedOrFailed ? .error : appState.state)
                 .accessibilityLabel("ntfsmac")
-                .task { driveScanner.startPolling() }
+                .task {
+                    driveScanner.startPolling()
+                    mountController.startPolling { driveScanner.drives }
+                }
                 .task(id: helperInstaller.state) {
                     if helperInstaller.state == .installing || helperInstaller.state == .notChecked {
                         cliAutoStager.reset()

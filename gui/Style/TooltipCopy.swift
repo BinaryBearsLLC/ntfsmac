@@ -46,6 +46,7 @@ public enum TooltipCopy {
         case .mountedReadWrite: "All mounted drives are read/write"
         case .mountedReadOnly: "At least one mounted drive is read-only"
         case .mountedReadOnlyDirty: "At least one mounted NTFS drive has an unclean journal"
+        case .mountedUnknown: "Mounted state needs independent host verification"
         case .error: "ntfsmac needs attention"
         }
     }
@@ -60,6 +61,8 @@ public enum TooltipCopy {
             "Whether the installed kernel bundle matches the version tested by the project"
         case "bridge":
             "The private host-only network used for NFS traffic to the microVM"
+        case "transport":
+            "Whether active NFS traffic matches the required private vmnet path"
         default:
             "Diagnostic status"
         }

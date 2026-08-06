@@ -101,6 +101,12 @@ public enum DiagnoseSummary {
             rows.append(networking)
         }
         rows.append(bridgeRow(rawValue: report.bridge, mountState: mountState))
+        if let transport = transportRow(
+            helper: report.networkHelper,
+            contract: report.nfsTransportContract
+        ) {
+            rows.append(transport)
+        }
         if let helperInstalled = report.helperInstalled {
             rows.append(helperRow(installed: helperInstalled))
         }
@@ -353,10 +359,32 @@ public enum DiagnoseSummary {
             return .init(id: "bridge", label: "vmnet bridge", value: "Idle — starts when a drive is mounted", status: .informational, explanation: explanation)
         case .mounting:
             return .init(id: "bridge", label: "vmnet bridge", value: "Starting with the mount", status: .informational, explanation: explanation)
-        case .mountedReadWrite, .mountedReadOnly, .mountedReadOnlyDirty:
+        case .mountedReadWrite, .mountedReadOnly, .mountedReadOnlyDirty, .mountedUnknown:
             return .init(id: "bridge", label: "vmnet bridge", value: "Inactive while a drive is mounted", status: .warning, explanation: explanation)
         case .error, .none:
             return .init(id: "bridge", label: "vmnet bridge", value: "Inactive — mount context unavailable", status: .unavailable, explanation: explanation)
+        }
+    }
+
+    private static func transportRow(
+        helper: String?,
+        contract: String?
+    ) -> DiagnoseSummaryRow? {
+        guard helper != nil || contract != nil else { return nil }
+        let explanation = "Whether an active NFS mount uses ntfsmac's required vmnet private transport. Values are fixed privacy-safe tokens; addresses and interface names are omitted."
+        switch contract {
+        case "expected_vmnet":
+            return .init(id: "transport", label: "NFS transport", value: "Private vmnet path", status: .healthy, explanation: explanation)
+        case "inactive":
+            return .init(id: "transport", label: "NFS transport", value: "Idle", status: .informational, explanation: explanation)
+        case "loopback_proxy":
+            return .init(id: "transport", label: "NFS transport", value: "Unexpected loopback proxy", status: .warning, explanation: explanation)
+        case "ambiguous":
+            return .init(id: "transport", label: "NFS transport", value: "Ambiguous helpers", status: .warning, explanation: explanation)
+        case "unverified":
+            return .init(id: "transport", label: "NFS transport", value: "Unverified", status: .warning, explanation: explanation)
+        default:
+            return .init(id: "transport", label: "NFS transport", value: "Unknown", status: .unavailable, explanation: explanation)
         }
     }
 

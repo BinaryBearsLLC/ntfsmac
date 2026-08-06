@@ -4,7 +4,7 @@
 # truth in a source/package tree; install.sh copies that exact plist beside this script as
 # product-info.plist so a standalone installed CLI reports the same build without hard-coded
 # shell constants or requiring the .app to remain installed.
-NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION="4"
+NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION="5"
 
 ntfsmac_load_product_version() {
   local repo_root="$1"

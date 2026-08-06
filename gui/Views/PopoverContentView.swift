@@ -199,6 +199,9 @@ public struct PopoverContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .ntfsmacOpenSettings)) { _ in
             navigation.showSettings()
         }
+        .task {
+            await refreshAll()
+        }
     }
 
     private var mainContent: some View {
@@ -237,7 +240,7 @@ public struct PopoverContentView: View {
                 HStack(spacing: 6) {
                     Spacer()
                     Button {
-                        Task { await driveScanner.refresh() }
+                        Task { await refreshAll() }
                     } label: {
                         HStack(spacing: 6) {
                             RefreshGlyph()
@@ -267,7 +270,7 @@ public struct PopoverContentView: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                     Button {
-                        Task { await driveScanner.refresh() }
+                        Task { await refreshAll() }
                     } label: {
                         RefreshGlyph()
                     }
@@ -309,6 +312,10 @@ public struct PopoverContentView: View {
 
             if let errorMessage = mountController.errorMessage ?? remountController.errorMessage, errorMessage != "FDA_REQUIRED" {
                 Text(errorMessage).font(.caption).foregroundStyle(Color.ntfsRed)
+            }
+
+            if let warning = mountController.reconciliationWarning {
+                Text(warning).font(.caption).foregroundStyle(Color.ntfsYellow)
             }
 
             if diagnosePresentation.isVisible {
@@ -364,6 +371,11 @@ public struct PopoverContentView: View {
         Task { await mountController.mount(drive, mountPoint: nil, readOnly: false) }
     }
 
+    private func refreshAll() async {
+        await driveScanner.refresh()
+        await mountController.reconcile(knownDrives: driveScanner.drives)
+    }
+
     private var headerSubtitle: String {
         switch appState.state {
         case .idle:
@@ -371,6 +383,7 @@ public struct PopoverContentView: View {
         case .mounting: "Mounting…"
         case .mountedReadWrite: "Mounted read/write"
         case .mountedReadOnly, .mountedReadOnlyDirty: "Mounted read-only"
+        case .mountedUnknown: "Mount state needs verification"
         case .error: "Error"
         }
     }
@@ -398,7 +411,7 @@ public struct PopoverContentView: View {
             }
 
             Button {
-                Task { await driveScanner.refresh() }
+                Task { await refreshAll() }
             } label: {
                 HStack(spacing: 6) {
                     RefreshGlyph()

@@ -52,6 +52,7 @@ teardown() {
   [[ "$output" == *"soft"* ]]
   [[ "$output" != *"hard"* ]]
   [[ "$output" == *"/dev/disk2s1"* ]]
+  [[ "$output" == *"--net-helper vmnet"* ]]
 }
 
 @test "rejects invalid device before ever invoking anylinuxfs" {

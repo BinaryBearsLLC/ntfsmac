@@ -15,6 +15,9 @@ public enum MountState: Equatable, Sendable {
     /// by review before it shipped).
     case mountedReadOnly
     case mountedReadOnlyDirty
+    /// A mount was observed or a mount command succeeded, but the independent host snapshot was
+    /// incomplete or contradictory. Never use green or claim read/write while in this state.
+    case mountedUnknown
     case error
 }
 

@@ -40,6 +40,8 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
     public let ntfs3gVersion: String?
     public let nfsUtilsVersion: String?
     public let bridge: String
+    public let networkHelper: String?
+    public let nfsTransportContract: String?
     public let vpnDefaultRoute: Bool?
     public let nfsMountCount: Int?
 
@@ -79,6 +81,8 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
         case ntfs3gVersion = "ntfs_3g_version"
         case nfsUtilsVersion = "nfs_utils_version"
         case bridge
+        case networkHelper = "network_helper"
+        case nfsTransportContract = "nfs_transport_contract"
         case vpnDefaultRoute = "vpn_default_route"
         case nfsMountCount = "nfs_mount_count"
     }
@@ -104,6 +108,8 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
             helperInstalled: nil,
             missingComponents: nil,
             quarantinedComponents: nil,
+            networkHelper: nil,
+            nfsTransportContract: nil,
             vpnDefaultRoute: nil,
             nfsMountCount: nil,
             anylinuxfsVersion: nil,
@@ -145,6 +151,8 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
         helperInstalled: Bool?,
         missingComponents: [String]?,
         quarantinedComponents: [String]?,
+        networkHelper: String? = nil,
+        nfsTransportContract: String? = nil,
         vpnDefaultRoute: Bool?,
         nfsMountCount: Int?,
         anylinuxfsVersion: String? = nil,
@@ -205,6 +213,8 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
         self.ntfs3gVersion = ntfs3gVersion
         self.nfsUtilsVersion = nfsUtilsVersion
         self.bridge = bridge
+        self.networkHelper = networkHelper
+        self.nfsTransportContract = nfsTransportContract
         self.vpnDefaultRoute = vpnDefaultRoute
         self.nfsMountCount = nfsMountCount
     }

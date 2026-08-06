@@ -23,6 +23,12 @@ setup() {
   export NTFSMAC_ARCHITECTURE_OVERRIDE="arm64"
   export NTFSMAC_DEFAULT_INTERFACE_OVERRIDE="en0"
   export NTFSMAC_NFS_MOUNT_COUNT_OVERRIDE="0"
+  export NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE=""
+  export NTFSMAC_BRIDGE_OVERRIDE="down"
+  export NTFSMAC_NETWORK_HELPER_OVERRIDE="none"
+  export NTFSMAC_RESOLVED_IP_OVERRIDE=""
+  export NTFSMAC_ROUTE_INTERFACE_OVERRIDE=""
+  export NTFSMAC_LOOPBACK_LISTENER_COUNT_OVERRIDE="0"
 
   # Kernel pin fixture: a lock file + a modules.squashfs whose sha256 matches it.
   mkdir -p "$FIXTURE_DIR/kernel"
@@ -94,7 +100,7 @@ write_guest_versions() {
   run "$SCRIPT" --json
   [ "$status" -eq 0 ]
   [[ "$output" == \{*\} ]]
-  [[ "$output" == *'"diagnostic_schema":4'* ]]
+  [[ "$output" == *'"diagnostic_schema":5'* ]]
   [[ "$output" == *'"healthy":true'* ]]
   [[ "$output" == *'"ntfsmac_version":"1.0"'* ]]
   [[ "$output" == *'"build_version":"1"'* ]]
@@ -127,6 +133,96 @@ write_guest_versions() {
   [[ "$output" == *'"quarantined_components":[]'* ]]
   [[ "$output" == *'"vpn_default_route":false'* ]]
   [[ "$output" == *'"nfs_mount_count":0'* ]]
+  [[ "$output" == *'"network_helper":"none"'* ]]
+  [[ "$output" == *'"nfs_transport_contract":"inactive"'* ]]
+}
+
+@test "an active vmnet mount satisfies the transport contract" {
+  export NTFSMAC_NFS_MOUNT_COUNT_OVERRIDE="1"
+  export NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE="disk4s2.local:/mnt/Test on /Volumes/Test (nfs, soft)"
+  export NTFSMAC_BRIDGE_OVERRIDE="up"
+  export NTFSMAC_NETWORK_HELPER_OVERRIDE="vmnet"
+  export NTFSMAC_RESOLVED_IP_OVERRIDE="172.16.0.2"
+  export NTFSMAC_ROUTE_INTERFACE_OVERRIDE="bridge100"
+
+  run "$SCRIPT" --json
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"network_helper":"vmnet"'* ]]
+  [[ "$output" == *'"nfs_transport_contract":"expected_vmnet"'* ]]
+  [[ "$output" == *'"healthy":true'* ]]
+}
+
+@test "a loopback gvproxy mount violates the vmnet-only transport contract" {
+  export NTFSMAC_NFS_MOUNT_COUNT_OVERRIDE="1"
+  export NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE="disk4s2.local:/mnt/Test on /Volumes/Test (nfs, soft)"
+  export NTFSMAC_BRIDGE_OVERRIDE="down"
+  export NTFSMAC_NETWORK_HELPER_OVERRIDE="gvproxy"
+
+  run "$SCRIPT" --json
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'"network_helper":"gvproxy"'* ]]
+  [[ "$output" == *'"nfs_transport_contract":"loopback_proxy"'* ]]
+  [[ "$output" == *'"healthy":false'* ]]
+}
+
+@test "an unrelated NFS mount does not violate the ntfsmac transport contract" {
+  export NTFSMAC_NFS_MOUNT_COUNT_OVERRIDE="1"
+  export NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE="nas.example:/share on /Volumes/Share (nfs, soft)"
+
+  run "$SCRIPT" --json
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"nfs_mount_count":1'* ]]
+  [[ "$output" == *'"nfs_transport_contract":"inactive"'* ]]
+  [[ "$output" == *'"healthy":true'* ]]
+}
+
+@test "a loopback-resolved ntfsmac endpoint fails closed even when vmnet is running" {
+  export NTFSMAC_NFS_MOUNT_COUNT_OVERRIDE="1"
+  export NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE="disk4s2.local:/mnt/Test on /Volumes/Test (nfs, soft)"
+  export NTFSMAC_BRIDGE_OVERRIDE="up"
+  export NTFSMAC_NETWORK_HELPER_OVERRIDE="vmnet"
+  export NTFSMAC_RESOLVED_IP_OVERRIDE="127.0.0.1"
+  export NTFSMAC_ROUTE_INTERFACE_OVERRIDE="bridge100"
+
+  run "$SCRIPT" --json
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'"nfs_transport_contract":"loopback_proxy"'* ]]
+  [[ "$output" == *'"healthy":false'* ]]
+}
+
+@test "a loopback NFS listener fails closed even when the endpoint is private" {
+  export NTFSMAC_NFS_MOUNT_COUNT_OVERRIDE="1"
+  export NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE="disk4s2.local:/mnt/Test on /Volumes/Test (nfs, soft)"
+  export NTFSMAC_BRIDGE_OVERRIDE="up"
+  export NTFSMAC_NETWORK_HELPER_OVERRIDE="vmnet"
+  export NTFSMAC_RESOLVED_IP_OVERRIDE="172.16.0.2"
+  export NTFSMAC_ROUTE_INTERFACE_OVERRIDE="bridge100"
+  export NTFSMAC_LOOPBACK_LISTENER_COUNT_OVERRIDE="1"
+
+  run "$SCRIPT" --json
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'"nfs_transport_contract":"loopback_proxy"'* ]]
+  [[ "$output" == *'"healthy":false'* ]]
+}
+
+@test "a non-soft ntfsmac mount fails closed" {
+  export NTFSMAC_NFS_MOUNT_COUNT_OVERRIDE="1"
+  export NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE="disk4s2.local:/mnt/Test on /Volumes/Test (nfs, hard)"
+  export NTFSMAC_BRIDGE_OVERRIDE="up"
+  export NTFSMAC_NETWORK_HELPER_OVERRIDE="vmnet"
+  export NTFSMAC_RESOLVED_IP_OVERRIDE="172.16.0.2"
+  export NTFSMAC_ROUTE_INTERFACE_OVERRIDE="bridge100"
+
+  run "$SCRIPT" --json
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'"nfs_transport_contract":"unverified"'* ]]
+  [[ "$output" == *'"healthy":false'* ]]
 }
 
 @test "a legacy Alpine cache is reported without exposing its path" {
@@ -226,6 +322,8 @@ write_guest_versions() {
   [[ "$output" != *'"volume_labels"'* ]]
   [[ "$output" != *'"username"'* ]]
   [[ "$output" != *'"serial"'* ]]
+  [[ "$output" != *'"network_interface"'* ]]
+  [[ "$output" != *'"nfs_endpoint"'* ]]
 }
 
 @test "reports a supported macOS version and stays healthy" {

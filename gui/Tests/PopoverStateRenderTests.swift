@@ -18,12 +18,28 @@ import HelperShared
 
 private let sampleDrive = Drive(identifier: "disk4s2", fsType: "ntfs", label: "My Drive", size: "500.0 GB")
 
-private final class FakeHelper: HelperMounting {
+private final class FakeHelper: HelperMounting, MountSnapshotProviding {
     var mountResult: Result<CommandResult, Error> = .success(CommandResult(output: "mounted", exitCode: 0))
+    private var mounted: [String: ObservedMount] = [:]
     func mount(device: String, driver: FsDriver, mountPoint: String?, readOnly: Bool) async throws -> CommandResult {
-        try mountResult.get()
+        let result = try mountResult.get()
+        if result.exitCode == 0 {
+            mounted[device] = ObservedMount(
+                deviceIdentifier: device,
+                mountPoint: mountPoint ?? "/Volumes/\(device)",
+                fsDriver: driver.rawValue,
+                isReadOnly: readOnly
+            )
+        }
+        return result
     }
-    func unmount(target: String) async throws -> CommandResult { CommandResult(output: "", exitCode: 0) }
+    func unmount(target: String) async throws -> CommandResult {
+        mounted.removeValue(forKey: target)
+        return CommandResult(output: "", exitCode: 0)
+    }
+    func snapshot() async -> MountSnapshot {
+        MountSnapshot(mounts: mounted.values.sorted { $0.deviceIdentifier < $1.deviceIdentifier })
+    }
 }
 
 private final class InstalledService: HelperInstallService {

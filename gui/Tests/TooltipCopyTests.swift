@@ -16,6 +16,7 @@ func everyTooltipControlHasConciseCopy(control: TooltipCopy.Control) {
     (.mountedReadWrite, "All mounted drives are read/write"),
     (.mountedReadOnly, "At least one mounted drive is read-only"),
     (.mountedReadOnlyDirty, "At least one mounted NTFS drive has an unclean journal"),
+    (.mountedUnknown, "Mounted state needs independent host verification"),
     (.error, "ntfsmac needs attention"),
 ])
 func everyMountStateHasDistinctStatusHelp(argument: (MountState, String)) {

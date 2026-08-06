@@ -116,7 +116,7 @@ STUB
   [ "$status" -eq 0 ]
   run "$PREFIX_DIR/bin/ntfsmac" diagnose --json
   [[ "$output" == \{*\} ]]
-  [[ "$output" == *'"diagnostic_schema":4'* ]]
+  [[ "$output" == *'"diagnostic_schema":5'* ]]
   [[ "$output" == *"\"ntfsmac_version\":\"$EXPECTED_RELEASE\""* ]]
 }
 

@@ -8,11 +8,12 @@ import HelperShared
 
 private let sampleDrive = Drive(identifier: "disk4s2", fsType: "ntfs", label: "My Drive", size: "500.0 GB")
 
-private final class FakeHelper: HelperMounting {
+private final class FakeHelper: HelperMounting, MountSnapshotProviding {
     private(set) var mountCalls: [(device: String, driver: FsDriver, mountPoint: String?, readOnly: Bool)] = []
     private(set) var unmountCalls: [String] = []
     var mountResult: Result<CommandResult, Error> = .success(CommandResult(output: "mounted", exitCode: 0))
     var unmountResult: Result<CommandResult, Error> = .success(CommandResult(output: "unmounted", exitCode: 0))
+    var snapshotReadOnlyOverride: Bool?
 
     func mount(device: String, driver: FsDriver, mountPoint: String?, readOnly: Bool) async throws -> CommandResult {
         mountCalls.append((device, driver, mountPoint, readOnly))
@@ -22,6 +23,23 @@ private final class FakeHelper: HelperMounting {
     func unmount(target: String) async throws -> CommandResult {
         unmountCalls.append(target)
         return try unmountResult.get()
+    }
+
+    func snapshot() async -> MountSnapshot {
+        let unmounted = Set(unmountCalls)
+        var latest: [String: (device: String, driver: FsDriver, mountPoint: String?, readOnly: Bool)] = [:]
+        for call in mountCalls where !unmounted.contains(call.device) {
+            latest[call.device] = call
+        }
+        let mounts = latest.values.map { call in
+            ObservedMount(
+                deviceIdentifier: call.device,
+                mountPoint: call.mountPoint ?? "/Volumes/\(call.device)",
+                fsDriver: call.driver.rawValue,
+                isReadOnly: snapshotReadOnlyOverride ?? call.readOnly
+            )
+        }.sorted { $0.deviceIdentifier < $1.deviceIdentifier }
+        return MountSnapshot(mounts: mounts)
     }
 }
 
@@ -176,6 +194,7 @@ private struct FakeReadOnlyChecker: MountReadOnlyChecking {
     // journal. Without checking the real mount options, this was reported as a healthy
     // `.mountedReadWrite` and `.mountedReadOnlyDirty` was unreachable from any real mount.
     let fake = FakeHelper()
+    fake.snapshotReadOnlyOverride = true
     let appState = AppState()
     let controller = MountController(helper: fake, readOnlyChecker: FakeReadOnlyChecker(isReadOnly: true), appState: appState)
 

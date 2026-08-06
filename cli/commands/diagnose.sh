@@ -18,7 +18,7 @@ if [[ -r "$VERSION_LIB" ]]; then
 else
   NTFSMAC_VERSION="unknown"
   NTFSMAC_BUILD_VERSION="unknown"
-  NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION="4"
+  NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION="5"
 fi
 # Same two candidates helper/HelperProtocol.swift's resolveNtfsmacPrefix() checks (bash and
 # Swift can't share source — kept in sync deliberately, same pattern as list-drives.sh's own
@@ -358,18 +358,149 @@ check_alpine_runtime() {
 }
 
 check_bridge_up() {
-  if pgrep 'vmnet-helper' >/dev/null 2>&1 || \
-     pgrep 'gvproxy' >/dev/null 2>&1 || \
-     pgrep 'anylinuxfs' >/dev/null 2>&1 || \
-     ifconfig | grep -E "inet 172\.(1[6-9]|2[0-9]|3[0-1])\." >/dev/null 2>&1; then
+  if [[ -n "${NTFSMAC_BRIDGE_OVERRIDE-}" ]]; then
+    case "$NTFSMAC_BRIDGE_OVERRIDE" in
+      up|down) printf '%s\n' "$NTFSMAC_BRIDGE_OVERRIDE" ;;
+      *) printf 'unknown\n' ;;
+    esac
+    return
+  fi
+  # A gvproxy/anylinuxfs process is not a vmnet bridge. The previous broad pgrep made a
+  # loopback-backed mount look like the documented private transport, creating the exact false
+  # green found by the live audit. Require vmnet-helper or an interface in its configured pool.
+  if pgrep -x 'vmnet-helper' >/dev/null 2>&1 || \
+     /sbin/ifconfig | awk '
+       /^[^[:space:]]/ { interface=$1; sub(/:$/, "", interface) }
+       interface ~ /^bridge/ && $1 == "inet" && $2 ~ /^172\.(1[6-9]|2[0-9]|3[0-1])\./ { found=1 }
+       END { exit(found ? 0 : 1) }
+     '; then
     echo "up"
   else
     echo "down"
   fi
 }
 
+# Fixed privacy-safe tokens only: no PID, interface, hostname, address, route, or provider name is
+# emitted. `mixed` is fail-closed because the active mount cannot be attributed confidently.
+check_network_helper() {
+  if [[ -n "${NTFSMAC_NETWORK_HELPER_OVERRIDE-}" ]]; then
+    case "$NTFSMAC_NETWORK_HELPER_OVERRIDE" in
+      vmnet|gvproxy|mixed|none|unknown) printf '%s\n' "$NTFSMAC_NETWORK_HELPER_OVERRIDE" ;;
+      *) printf 'unknown\n' ;;
+    esac
+    return
+  fi
+
+  local vmnet_running=0 gvproxy_running=0
+  pgrep -x 'vmnet-helper' >/dev/null 2>&1 && vmnet_running=1
+  pgrep -x 'gvproxy' >/dev/null 2>&1 && gvproxy_running=1
+  if [[ "$vmnet_running" -eq 1 && "$gvproxy_running" -eq 1 ]]; then
+    printf 'mixed\n'
+  elif [[ "$vmnet_running" -eq 1 ]]; then
+    printf 'vmnet\n'
+  elif [[ "$gvproxy_running" -eq 1 ]]; then
+    printf 'gvproxy\n'
+  else
+    printf 'none\n'
+  fi
+}
+
+check_nfs_transport_contract() {
+  local helper="$1" bridge="$2" mounts="$3"
+  local line source host options resolved route_interface listener_count identified=0
+
+  # Classify only ntfsmac's stable synthetic hostnames. An unrelated NAS mount must not degrade
+  # ntfsmac health merely because it also uses NFS.
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    source="${line%% on *}"
+    [[ "$source" != "$line" ]] || continue
+    host="${source%%:*}"
+    if [[ "$host" =~ ^disk[0-9]+s[0-9]+(-[0-9]+)?\.local$ ]]; then
+      :
+    elif [[ "$helper" == "vmnet" && "$host" =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\.[0-9]+\.[0-9]+$ ]]; then
+      :
+    elif [[ "$helper" == "gvproxy" && "$host" =~ ^127\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      :
+    else
+      continue
+    fi
+    identified=$((identified + 1))
+
+    if [[ "$helper" == "gvproxy" ]]; then
+      printf 'loopback_proxy\n'
+      return
+    elif [[ "$helper" == "mixed" ]]; then
+      printf 'ambiguous\n'
+      return
+    elif [[ "$helper" != "vmnet" || "$bridge" != "up" ]]; then
+      printf 'unverified\n'
+      return
+    fi
+
+    options="${line##* (}"
+    options="${options%)}"
+    options="${options// /}"
+    case ",$options," in
+      *,soft,*) ;;
+      *) printf 'unverified\n'; return ;;
+    esac
+
+    resolved="${NTFSMAC_RESOLVED_IP_OVERRIDE-}"
+    if [[ -z "$resolved" ]]; then
+      if [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        resolved="$host"
+      else
+        resolved="$(/usr/bin/dscacheutil -q host -a name "$host" 2>/dev/null \
+          | awk '/^ip_address: / { print $2 }')"
+      fi
+    fi
+    if printf '%s\n' "$resolved" | grep -E '^127\.' >/dev/null 2>&1; then
+      printf 'loopback_proxy\n'
+      return
+    fi
+    resolved="$(printf '%s\n' "$resolved" \
+      | grep -E '^172\.(1[6-9]|2[0-9]|3[0-1])\.[0-9]+\.[0-9]+$' \
+      | sed -n '1p')"
+    [[ -n "$resolved" ]] || { printf 'unverified\n'; return; }
+
+    route_interface="${NTFSMAC_ROUTE_INTERFACE_OVERRIDE-}"
+    if [[ -z "$route_interface" ]]; then
+      route_interface="$(/sbin/route -n get "$resolved" 2>/dev/null \
+        | awk '/interface:/{print $2; exit}')"
+    fi
+    [[ "$route_interface" == bridge* ]] || { printf 'unverified\n'; return; }
+  done <<< "$mounts"
+
+  if [[ "$identified" -eq 0 ]]; then
+    printf 'inactive\n'
+    return
+  fi
+
+  listener_count="${NTFSMAC_LOOPBACK_LISTENER_COUNT_OVERRIDE-}"
+  if [[ -z "$listener_count" ]]; then
+    if /usr/sbin/lsof -nP -iTCP@127.0.0.1:2049 -sTCP:LISTEN >/dev/null 2>&1 || \
+       /usr/sbin/lsof -nP -iUDP@127.0.0.1:2049 >/dev/null 2>&1; then
+      listener_count=1
+    else
+      listener_count=0
+    fi
+  fi
+  if [[ "$listener_count" != "0" ]]; then
+    printf 'loopback_proxy\n'
+  elif [[ "$identified" -gt 0 ]]; then
+    printf 'expected_vmnet\n'
+  else
+    printf 'unverified\n'
+  fi
+}
+
 current_mounts() {
-  mount -t nfs 2>/dev/null | awk '{print $1, "on", $3}'
+  if [[ -n "${NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE+x}" ]]; then
+    printf '%s\n' "$NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE"
+  else
+    /sbin/mount -t nfs 2>/dev/null
+  fi
 }
 
 check_architecture() {
@@ -437,7 +568,7 @@ check_macos_version() {
 }
 
 main() {
-  local kernel_pin bridge mounts mount_count architecture healthy=1
+  local kernel_pin bridge mounts mount_count network_helper nfs_transport_contract architecture healthy=1
   local macos_version macos_major macos_supported=1
   local helper_installed=0 vpn_default_route=0
   local helper_json vpn_json missing_json quarantined_json healthy_json
@@ -456,6 +587,8 @@ main() {
   bridge="$(check_bridge_up)"
   mounts="$(current_mounts)"
   mount_count="$(count_mounts "$mounts")"
+  network_helper="$(check_network_helper)"
+  nfs_transport_contract="$(check_nfs_transport_contract "$network_helper" "$bridge" "$mounts")"
   check_helper_installed && helper_installed=1
   check_vpn_default_route && vpn_default_route=1
   check_alpine_runtime || true
@@ -490,6 +623,9 @@ main() {
   [[ "$anylinuxfs_version_status" == "mismatch" ]] && healthy=0
   [[ "$gvproxy_version_status" == "mismatch" ]] && healthy=0
   [[ "$vmnet_helper_version_status" == "mismatch" ]] && healthy=0
+  case "$nfs_transport_contract" in
+    loopback_proxy|ambiguous|unverified) healthy=0 ;;
+  esac
 
   if [[ $json_mode -eq 1 ]]; then
     [[ "$healthy" -eq 1 ]] && healthy_json=true || healthy_json=false
@@ -497,7 +633,7 @@ main() {
     [[ "$vpn_default_route" -eq 1 ]] && vpn_json=true || vpn_json=false
     missing_json="$(component_json_array "$MISSING_COMPONENTS")"
     quarantined_json="$(component_json_array "$QUARANTINED_COMPONENTS")"
-    printf '{"diagnostic_schema":%s,"healthy":%s,"ntfsmac_version":"%s","build_version":"%s","macos_version":"%s","architecture":"%s","helper_installed":%s,"missing_binaries":%s,"missing_components":%s,"quarantined_binaries":%s,"quarantined_components":%s,"kernel_pin":"%s","anylinuxfs_version":"%s","anylinuxfs_expected_version":"%s","anylinuxfs_version_status":"%s","anylinuxfs_source_commit":"%s","vmproxy_source_version":"%s","libkrun_version":"%s","libkrunfw_version":"%s","gvproxy_version":"%s","gvproxy_expected_version":"%s","gvproxy_version_status":"%s","gvproxy_source_commit":"%s","vmnet_helper_version":"%s","vmnet_helper_expected_version":"%s","vmnet_helper_version_status":"%s","vmnet_helper_source_commit":"%s","alpine_runtime_tag":"%s","alpine_runtime_digest":"%s","alpine_runtime_state":"%s","alpine_installed_cache":"%s","alpine_installed_version":"%s","ntfs_3g_version":"%s","nfs_utils_version":"%s","bridge":"%s","vpn_default_route":%s,"nfs_mount_count":%s}\n' \
+    printf '{"diagnostic_schema":%s,"healthy":%s,"ntfsmac_version":"%s","build_version":"%s","macos_version":"%s","architecture":"%s","helper_installed":%s,"missing_binaries":%s,"missing_components":%s,"quarantined_binaries":%s,"quarantined_components":%s,"kernel_pin":"%s","anylinuxfs_version":"%s","anylinuxfs_expected_version":"%s","anylinuxfs_version_status":"%s","anylinuxfs_source_commit":"%s","vmproxy_source_version":"%s","libkrun_version":"%s","libkrunfw_version":"%s","gvproxy_version":"%s","gvproxy_expected_version":"%s","gvproxy_version_status":"%s","gvproxy_source_commit":"%s","vmnet_helper_version":"%s","vmnet_helper_expected_version":"%s","vmnet_helper_version_status":"%s","vmnet_helper_source_commit":"%s","alpine_runtime_tag":"%s","alpine_runtime_digest":"%s","alpine_runtime_state":"%s","alpine_installed_cache":"%s","alpine_installed_version":"%s","ntfs_3g_version":"%s","nfs_utils_version":"%s","bridge":"%s","network_helper":"%s","nfs_transport_contract":"%s","vpn_default_route":%s,"nfs_mount_count":%s}\n' \
       "$NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION" "$healthy_json" "$NTFSMAC_VERSION" \
       "$NTFSMAC_BUILD_VERSION" "$macos_version" "$architecture" "$helper_json" \
       "$MISSING_BINS" "$missing_json" "$QUARANTINED_BINS" "$quarantined_json" \
@@ -509,7 +645,8 @@ main() {
       "$vmnet_helper_version_status" "$vmnet_helper_source_commit" \
       "$ALPINE_RUNTIME_TAG" "$ALPINE_RUNTIME_DIGEST" "$ALPINE_RUNTIME_STATE" \
       "$ALPINE_INSTALLED_CACHE" "$ALPINE_INSTALLED_VERSION" "$NTFS_3G_VERSION" \
-      "$NFS_UTILS_VERSION" "$bridge" "$vpn_json" "$mount_count"
+      "$NFS_UTILS_VERSION" "$bridge" "$network_helper" "$nfs_transport_contract" \
+      "$vpn_json" "$mount_count"
   else
     echo "diagnose: ntfsmac version: $NTFSMAC_VERSION ($NTFSMAC_BUILD_VERSION)"
     echo "diagnose: macOS version: $macos_version"
@@ -534,6 +671,8 @@ main() {
     echo "diagnose: ntfs-3g installed: $NTFS_3G_VERSION"
     echo "diagnose: nfs-utils installed: $NFS_UTILS_VERSION"
     echo "diagnose: vmnet bridge: $bridge"
+    echo "diagnose: active network helper: $network_helper"
+    echo "diagnose: NFS transport contract: $nfs_transport_contract"
     echo "diagnose: VPN default route: $([[ "$vpn_default_route" -eq 1 ]] && echo detected || echo not detected)"
     echo "diagnose: current NFS mount count: $mount_count"
     echo "diagnose: overall: $([[ $healthy -eq 1 ]] && echo healthy || echo degraded)"

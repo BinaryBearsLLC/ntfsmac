@@ -27,6 +27,8 @@ public enum StatusIcon {
             return StatusIconStyle(color: .ntfsGreen, isIdle: false, isPulsing: false)
         case .mountedReadOnlyDirty:
             return StatusIconStyle(color: .ntfsYellow, isIdle: false, isPulsing: false)
+        case .mountedUnknown:
+            return StatusIconStyle(color: .ntfsYellow, isIdle: false, isPulsing: false)
         case .error:
             return StatusIconStyle(color: .ntfsRed, isIdle: false, isPulsing: false)
         }

@@ -66,7 +66,8 @@ let package = Package(
             sources: [
                 "Helper/HelperClient.swift", "Status/StatusIcon.swift", "State/AppState.swift",
                 "State/SingleInstanceGuard.swift", "State/PopoverNavigation.swift",
-                "Drives/DriveScanner.swift", "Views/DriveRow.swift", "Actions/MountController.swift",
+                "Drives/DriveScanner.swift", "Views/DriveRow.swift", "Actions/MountSnapshot.swift",
+                "Actions/MountController.swift",
                 "Drives/ThroughputMonitor.swift", "Views/SpeedBar.swift",
                 "Actions/RemountController.swift", "Views/DirtyBanner.swift",
                 "Actions/FinderOpener.swift", "Views/SecurityIndicators.swift",
