@@ -406,8 +406,8 @@ check_network_helper() {
 }
 
 check_nfs_transport_contract() {
-  local helper="$1" bridge="$2" mounts="$3"
-  local line source host options resolved route_interface listener_count identified=0
+  local helper="$1" bridge="$2" mounts="$3" nfs_parameters="$4"
+  local line source host mount_point resolved route_interface listener_count identified=0
 
   # Classify only ntfsmac's stable synthetic hostnames. An unrelated NAS mount must not degrade
   # ntfsmac health merely because it also uses NFS.
@@ -438,13 +438,12 @@ check_nfs_transport_contract() {
       return
     fi
 
-    options="${line##* (}"
-    options="${options%)}"
-    options="${options// /}"
-    case ",$options," in
-      *,soft,*) ;;
-      *) printf 'unverified\n'; return ;;
-    esac
+    mount_point="${line#* on }"
+    mount_point="${mount_point%% (nfs*}"
+    if ! nfs_mount_is_soft "$source" "$mount_point" "$nfs_parameters"; then
+      printf 'unverified\n'
+      return
+    fi
 
     resolved="${NTFSMAC_RESOLVED_IP_OVERRIDE-}"
     if [[ -z "$resolved" ]]; then
@@ -495,11 +494,37 @@ check_nfs_transport_contract() {
   fi
 }
 
+# `/sbin/mount -t nfs` on current macOS releases reports only generic VFS flags and can omit
+# NFS-specific parameters such as `soft`, even when the kernel mount is demonstrably soft.
+# `nfsstat -m` is the authoritative effective-parameter view. Match the exact mount header so a
+# soft unrelated NAS mount cannot accidentally validate an ntfsmac mount.
+nfs_mount_is_soft() {
+  local source="$1" mount_point="$2" nfs_parameters="$3"
+  awk -v header="$mount_point from $source" '
+    $0 == header { in_mount = 1; next }
+    in_mount && $0 !~ /^[[:space:]]/ { exit }
+    in_mount && /NFS parameters:/ {
+      parameters = $0
+      gsub(/[[:space:]]/, "", parameters)
+      if (parameters ~ /(^|,)soft(,|$)/) soft = 1
+    }
+    END { exit soft ? 0 : 1 }
+  ' <<< "$nfs_parameters"
+}
+
 current_mounts() {
   if [[ -n "${NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE+x}" ]]; then
     printf '%s\n' "$NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE"
   else
     /sbin/mount -t nfs 2>/dev/null
+  fi
+}
+
+current_nfs_parameters() {
+  if [[ -n "${NTFSMAC_NFSSTAT_OUTPUT_OVERRIDE+x}" ]]; then
+    printf '%s\n' "$NTFSMAC_NFSSTAT_OUTPUT_OVERRIDE"
+  else
+    /usr/bin/nfsstat -m 2>/dev/null
   fi
 }
 
@@ -568,7 +593,7 @@ check_macos_version() {
 }
 
 main() {
-  local kernel_pin bridge mounts mount_count network_helper nfs_transport_contract architecture healthy=1
+  local kernel_pin bridge mounts nfs_parameters mount_count network_helper nfs_transport_contract architecture healthy=1
   local macos_version macos_major macos_supported=1
   local helper_installed=0 vpn_default_route=0
   local helper_json vpn_json missing_json quarantined_json healthy_json
@@ -586,9 +611,10 @@ main() {
   kernel_pin="$(check_kernel_pin)"
   bridge="$(check_bridge_up)"
   mounts="$(current_mounts)"
+  nfs_parameters="$(current_nfs_parameters)"
   mount_count="$(count_mounts "$mounts")"
   network_helper="$(check_network_helper)"
-  nfs_transport_contract="$(check_nfs_transport_contract "$network_helper" "$bridge" "$mounts")"
+  nfs_transport_contract="$(check_nfs_transport_contract "$network_helper" "$bridge" "$mounts" "$nfs_parameters")"
   check_helper_installed && helper_installed=1
   check_vpn_default_route && vpn_default_route=1
   check_alpine_runtime || true

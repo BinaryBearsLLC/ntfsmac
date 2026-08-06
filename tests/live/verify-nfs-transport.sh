@@ -14,6 +14,7 @@ fi
 
 mount_output="${NTFSMAC_LIVE_MOUNT_OUTPUT-$(/sbin/mount -t nfs 2>/dev/null)}"
 [[ -n "$mount_output" ]] || fail "no active NFS mounts"
+nfsstat_output="${NTFSMAC_LIVE_NFSSTAT_OUTPUT-$(/usr/bin/nfsstat -m 2>/dev/null)}"
 
 vmnet_running="${NTFSMAC_LIVE_VMNET_RUNNING_OVERRIDE-}"
 if [[ -z "$vmnet_running" ]]; then
@@ -56,13 +57,20 @@ while IFS= read -r line; do
   fi
   [[ "$is_ntfsmac" -eq 1 ]] || continue
 
-  options="${line##* (}"
-  options="${options%)}"
-  options="${options// /}"
-  case ",$options," in
-    *,soft,*) ;;
-    *) fail "an ntfsmac NFS mount is not soft" ;;
-  esac
+  mount_point="${line#* on }"
+  mount_point="${mount_point%% (nfs*}"
+  if ! awk -v header="$mount_point from $source" '
+    $0 == header { in_mount = 1; next }
+    in_mount && $0 !~ /^[[:space:]]/ { exit }
+    in_mount && /NFS parameters:/ {
+      parameters = $0
+      gsub(/[[:space:]]/, "", parameters)
+      if (parameters ~ /(^|,)soft(,|$)/) soft = 1
+    }
+    END { exit soft ? 0 : 1 }
+  ' <<< "$nfsstat_output"; then
+    fail "an ntfsmac NFS mount is not soft"
+  fi
 
   resolved="${NTFSMAC_LIVE_RESOLVED_IP_OVERRIDE-}"
   if [[ -z "$resolved" ]]; then

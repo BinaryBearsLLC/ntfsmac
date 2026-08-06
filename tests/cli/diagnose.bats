@@ -24,6 +24,7 @@ setup() {
   export NTFSMAC_DEFAULT_INTERFACE_OVERRIDE="en0"
   export NTFSMAC_NFS_MOUNT_COUNT_OVERRIDE="0"
   export NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE=""
+  export NTFSMAC_NFSSTAT_OUTPUT_OVERRIDE=""
   export NTFSMAC_BRIDGE_OVERRIDE="down"
   export NTFSMAC_NETWORK_HELPER_OVERRIDE="none"
   export NTFSMAC_RESOLVED_IP_OVERRIDE=""
@@ -49,6 +50,13 @@ setup() {
   export NTFSMAC_SOURCES_LOCK="$FIXTURE_DIR/sources.lock"
   export NTFSMAC_VENDOR_KERNEL_DIR="$FIXTURE_DIR/kernel"
   export NTFSMAC_RUNTIME_HOME_OVERRIDE="$FIXTURE_DIR/runtime-home"
+}
+
+set_nfs_parameters() {
+  local mount_point="$1" source="$2" mode="$3"
+  export NTFSMAC_NFSSTAT_OUTPUT_OVERRIDE="$mount_point from $source
+  -- Current mount parameters:
+     NFS parameters: vers=3,tcp,$mode,intr,nolocks"
 }
 
 teardown() {
@@ -139,7 +147,9 @@ write_guest_versions() {
 
 @test "an active vmnet mount satisfies the transport contract" {
   export NTFSMAC_NFS_MOUNT_COUNT_OVERRIDE="1"
-  export NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE="disk4s2.local:/mnt/Test on /Volumes/Test (nfs, soft)"
+  # macOS 26.6 omits NFS-specific options from `mount`; `nfsstat -m` is authoritative.
+  export NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE="disk4s2.local:/mnt/Test on /Volumes/Test (nfs, nodev, nosuid)"
+  set_nfs_parameters "/Volumes/Test" "disk4s2.local:/mnt/Test" "soft"
   export NTFSMAC_BRIDGE_OVERRIDE="up"
   export NTFSMAC_NETWORK_HELPER_OVERRIDE="vmnet"
   export NTFSMAC_RESOLVED_IP_OVERRIDE="172.16.0.2"
@@ -182,6 +192,7 @@ write_guest_versions() {
 @test "a loopback-resolved ntfsmac endpoint fails closed even when vmnet is running" {
   export NTFSMAC_NFS_MOUNT_COUNT_OVERRIDE="1"
   export NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE="disk4s2.local:/mnt/Test on /Volumes/Test (nfs, soft)"
+  set_nfs_parameters "/Volumes/Test" "disk4s2.local:/mnt/Test" "soft"
   export NTFSMAC_BRIDGE_OVERRIDE="up"
   export NTFSMAC_NETWORK_HELPER_OVERRIDE="vmnet"
   export NTFSMAC_RESOLVED_IP_OVERRIDE="127.0.0.1"
@@ -197,6 +208,7 @@ write_guest_versions() {
 @test "a loopback NFS listener fails closed even when the endpoint is private" {
   export NTFSMAC_NFS_MOUNT_COUNT_OVERRIDE="1"
   export NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE="disk4s2.local:/mnt/Test on /Volumes/Test (nfs, soft)"
+  set_nfs_parameters "/Volumes/Test" "disk4s2.local:/mnt/Test" "soft"
   export NTFSMAC_BRIDGE_OVERRIDE="up"
   export NTFSMAC_NETWORK_HELPER_OVERRIDE="vmnet"
   export NTFSMAC_RESOLVED_IP_OVERRIDE="172.16.0.2"
@@ -213,6 +225,29 @@ write_guest_versions() {
 @test "a non-soft ntfsmac mount fails closed" {
   export NTFSMAC_NFS_MOUNT_COUNT_OVERRIDE="1"
   export NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE="disk4s2.local:/mnt/Test on /Volumes/Test (nfs, hard)"
+  set_nfs_parameters "/Volumes/Test" "disk4s2.local:/mnt/Test" "hard"
+  export NTFSMAC_BRIDGE_OVERRIDE="up"
+  export NTFSMAC_NETWORK_HELPER_OVERRIDE="vmnet"
+  export NTFSMAC_RESOLVED_IP_OVERRIDE="172.16.0.2"
+  export NTFSMAC_ROUTE_INTERFACE_OVERRIDE="bridge100"
+
+  run "$SCRIPT" --json
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'"nfs_transport_contract":"unverified"'* ]]
+  [[ "$output" == *'"healthy":false'* ]]
+}
+
+@test "a soft unrelated NFS mount cannot validate a hard ntfsmac mount" {
+  export NTFSMAC_NFS_MOUNT_COUNT_OVERRIDE="2"
+  export NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE="disk4s2.local:/mnt/Test on /Volumes/Test (nfs, nodev, nosuid)
+nas.example:/share on /Volumes/Share (nfs, nodev, nosuid)"
+  export NTFSMAC_NFSSTAT_OUTPUT_OVERRIDE="/Volumes/Test from disk4s2.local:/mnt/Test
+  -- Current mount parameters:
+     NFS parameters: vers=3,tcp,hard,intr,nolocks
+/Volumes/Share from nas.example:/share
+  -- Current mount parameters:
+     NFS parameters: vers=3,tcp,soft,intr,nolocks"
   export NTFSMAC_BRIDGE_OVERRIDE="up"
   export NTFSMAC_NETWORK_HELPER_OVERRIDE="vmnet"
   export NTFSMAC_RESOLVED_IP_OVERRIDE="172.16.0.2"
