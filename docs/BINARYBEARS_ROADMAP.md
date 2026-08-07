@@ -195,10 +195,15 @@ The fork does **not** retrieve the newest anylinuxfs source on every build. Git 
 exact submodule revision recorded by this repository; the current audited pin is
 `8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3`. This is deliberate and should remain visible.
 
-- [ ] Add a repeatable audit checklist covering upstream commits, release notes, dependency-lock
+- [x] Add a repeatable audit checklist covering upstream commits, release notes, dependency-lock
   changes, local patches, filesystem behavior, packaging, and hardware regression tests.
-- [ ] Record every accepted pin change in `build/AUDIT.md` and the pull request.
-- [ ] Never auto-merge a source update that changes the privileged, VM, NFS, or filesystem path.
+- [x] Require every accepted pin change to be recorded in `build/AUDIT.md` and the pull request.
+- [x] Never auto-merge a source update that changes the privileged, VM, NFS, or filesystem path.
+
+The selected policy is **Option A**. The read-only workflow and complete review gates live in
+[`docs/dev/ANYLINUXFS_UPDATE_POLICY.md`](dev/ANYLINUXFS_UPDATE_POLICY.md). Its 2026-08-08 dry-run
+against upstream `v0.19.0` passed ancestry/delta/local-patch checks but deliberately deferred the
+pin change pending dependency, build, and hardware evidence.
 
 **Decision A/B**
 
@@ -405,6 +410,7 @@ that proposal independently from current `upstream/main`.
 | [`docs/dev/PLAN.md`](dev/PLAN.md) | Historical architecture/build implementation plan |
 | [`docs/dev/SHARED_TASK_NOTES.md`](dev/SHARED_TASK_NOTES.md) | Historical execution ledger, not a product-status source |
 | [`docs/dev/TESTING.md`](dev/TESTING.md) | Manual real-hardware validation procedure |
+| [`docs/dev/ANYLINUXFS_UPDATE_POLICY.md`](dev/ANYLINUXFS_UPDATE_POLICY.md) | Mandatory review and evidence gates for anylinuxfs pin changes |
 | [`build/AUDIT.md`](../build/AUDIT.md) | Vendored-source and build-input audit evidence |
 
 When code behavior changes, update the smallest authoritative document in the same pull request.

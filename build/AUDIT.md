@@ -6,6 +6,32 @@ Every package/feature decision below is backed by evidence read from the real
 for every non-obvious call. Scope test: {ntfs-3g mount, rpc.nfsd export, blkid device
 detection} per PLAN.md §6 `v-audit`.
 
+## anylinuxfs update-policy dry-run (2026-08-08)
+
+The repeatable workflow is documented in
+`docs/dev/ANYLINUXFS_UPDATE_POLICY.md` and enforced by
+`build/audit-anylinuxfs-update.sh`. The preflight is deliberately read-only: it requires a clean
+submodule at `ANYLINUXFS_COMMIT`, accepts only an explicitly fetched descendant from the exact
+`nohajc/anylinuxfs` remote, reports the commit/file delta, and tests ntfsmac's source
+transformations against a disposable archive. A pass leaves the decision pending; it cannot
+change the submodule or `sources.lock`.
+
+Dry-run evidence for upstream `v0.19.0`:
+
+- Candidate `28d308bb9ed15611118fa51d998b988b3ee62459` is four commits after the current
+  `8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3` pin. The current pin itself is already 26
+  commits after upstream `v0.18.0`, so the v0.19.0 release notes describe more behavior than the
+  actual BinaryBears pin-to-candidate delta.
+- The official `anylinuxfs-0.19.0` release was published 2026-07-20. The remaining four commits
+  bump package versions to `0.19.0`, update `serde_with`, update Go `x/crypto` and its related
+  `x/*` modules, and refresh twelve Cargo/Go manifest or lock files.
+- The exact four-commit delta changes no Rust/Go implementation source, Alpine package manifest,
+  dependency-download script, mount/NFS/vmnet path, or local patch marker. Both immutable-Alpine
+  transformations apply successfully to the candidate archive.
+- This is **not an accepted pin change**. Dependency-advisory review, candidate build/package
+  gates, and real-hardware validation remain outstanding, so `sources.lock` and the submodule stay
+  on the audited `0.18.0`/`8aa9ccd` state.
+
 ## Runtime Alpine pin and cache migration (P0.1, 2026-08-05)
 
 - `ALPINE_TAG`, the linux/arm64 `ALPINE_DIGEST`, and `ANYLINUXFS_COMMIT` remain the only inputs.
