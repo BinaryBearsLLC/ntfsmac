@@ -2,8 +2,11 @@
 # install.sh — 2-install-sh (PLAN.md §6, L4, L7, L10).
 #
 # Installs the CLI + vendored binaries from this repo tree into a stable prefix.
-# Refuses non-arm64 (L7). Strips com.apple.quarantine on every copied binary. Verifies
-# anylinuxfs's ad-hoc signature before enabling it (build-all.sh already `codesign -s -`
+# Refuses non-arm64 (L7). Runtime files are staged to a fresh inode, checked when Mach-O, and
+# atomically renamed into place. This avoids executing a partially overwritten binary and avoids
+# macOS retaining stale code-signature state on an in-place update. It does not change Gatekeeper,
+# SIP, provenance, or any system-wide policy. Verifies anylinuxfs's ad-hoc signature before
+# enabling it (build-all.sh already `codesign -s -`
 # signs anylinuxfs; gvproxy/vmnet-helper/vmproxy get formally signed by 2-signing, the
 # next unit — not duplicated here). NTFSMAC_REPO defaults to khr898/ntfsmac (L10 — the
 # repo owner placeholder must never appear literally in this file).
@@ -38,20 +41,35 @@ strip_quarantine() {
   xattr -d com.apple.quarantine "$1" >/dev/null 2>&1 || true
 }
 
+# Never overwrite a running/signed executable in place. On macOS 26.6.1 that left the old vnode's
+# signature state attached to new bytes: `codesign --verify` passed, but the kernel logged
+# `load code signature error 2` and killed the process. A same-directory rename is atomic and
+# gives the installed payload a fresh inode. Mach-O payloads are verified before publication;
+# the guest-only Linux vmproxy is copied through the same atomic path but is not code-signed.
+install_runtime_file() {
+  local source="$1" destination="$2" staged
+  staged="$(mktemp "${destination}.new.XXXXXX")" || return 1
+  if ! /bin/cp -X "$source" "$staged"; then
+    rm -f "$staged"
+    return 1
+  fi
+  chmod 755 "$staged" || { rm -f "$staged"; return 1; }
+  strip_quarantine "$staged"
+  if /usr/bin/file "$staged" | grep -q 'Mach-O'; then
+    verify_signature "$staged" || { rm -f "$staged"; return 1; }
+  fi
+  /bin/mv -f "$staged" "$destination" || { rm -f "$staged"; return 1; }
+}
+
 install_binaries() {
   mkdir -p "$PREFIX/bin" "$PREFIX/libexec"
 
-  cp "$REPO_ROOT/vendor/bin/anylinuxfs" "$PREFIX/bin/anylinuxfs" || return 1
-  chmod +x "$PREFIX/bin/anylinuxfs" || return 1
-  strip_quarantine "$PREFIX/bin/anylinuxfs"
-  verify_signature "$PREFIX/bin/anylinuxfs" || return 1
+  install_runtime_file "$REPO_ROOT/vendor/bin/anylinuxfs" "$PREFIX/bin/anylinuxfs" || return 1
 
   local bin
   for bin in gvproxy vmnet-helper vmproxy init-rootfs; do
     [[ -f "$REPO_ROOT/vendor/bin/$bin" ]] || continue
-    cp "$REPO_ROOT/vendor/bin/$bin" "$PREFIX/libexec/$bin" || return 1
-    chmod +x "$PREFIX/libexec/$bin" || return 1
-    strip_quarantine "$PREFIX/libexec/$bin"
+    install_runtime_file "$REPO_ROOT/vendor/bin/$bin" "$PREFIX/libexec/$bin" || return 1
   done
 
   local kf
@@ -71,9 +89,10 @@ install_binaries() {
 }
 
 install_cli() {
-  mkdir -p "$PREFIX/libexec/ntfsmac/commands" "$PREFIX/libexec/ntfsmac/lib"
+  mkdir -p "$PREFIX/libexec/ntfsmac/commands" "$PREFIX/libexec/ntfsmac/lib" "$PREFIX/libexec/ntfsmac/pf"
   cp "$REPO_ROOT"/cli/commands/*.sh "$PREFIX/libexec/ntfsmac/commands/" || return 1
   cp "$REPO_ROOT"/cli/lib/*.sh "$PREFIX/libexec/ntfsmac/lib/" || return 1
+  cp "$REPO_ROOT"/cli/pf/*.tmpl "$PREFIX/libexec/ntfsmac/pf/" || return 1
 
   # gui/Info.plist is the single product-version source. Keep an exact snapshot beside the
   # installed resolver so CLI-only/Homebrew installs do not depend on an app bundle or duplicate

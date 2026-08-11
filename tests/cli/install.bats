@@ -35,6 +35,7 @@ teardown() {
   [ -f "$PREFIX_DIR/lib/modules.squashfs" ]
   [ -x "$PREFIX_DIR/libexec/ntfsmac/commands/mount.sh" ]
   [ -f "$PREFIX_DIR/libexec/ntfsmac/lib/version.sh" ]
+  [ -f "$PREFIX_DIR/libexec/ntfsmac/pf/ntfsmac.anchor.tmpl" ]
   [ -f "$PREFIX_DIR/libexec/ntfsmac/lib/product-info.plist" ]
 }
 
@@ -80,6 +81,24 @@ STUB
   [ "$status" -eq 0 ]
   run ! xattr -p com.apple.quarantine "$PREFIX_DIR/bin/anylinuxfs" >/dev/null 2>&1
   run ! xattr -p com.apple.quarantine "$PREFIX_DIR/libexec/gvproxy" >/dev/null 2>&1
+}
+
+@test "runtime update atomically replaces the signed executable inode" {
+  run "$SCRIPT"
+  [ "$status" -eq 0 ]
+  local old_inode
+  old_inode="$(stat -f %i "$PREFIX_DIR/bin/anylinuxfs")"
+
+  run "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [ "$(stat -f %i "$PREFIX_DIR/bin/anylinuxfs")" != "$old_inode" ]
+  run cmp "$REPO_ROOT/vendor/bin/anylinuxfs" "$PREFIX_DIR/bin/anylinuxfs"
+  [ "$status" -eq 0 ]
+  run codesign --verify --strict "$PREFIX_DIR/bin/anylinuxfs"
+  [ "$status" -eq 0 ]
+  run "$PREFIX_DIR/bin/anylinuxfs" --version
+  [ "$status" -eq 0 ]
+  [[ "$output" == anylinuxfs* ]]
 }
 
 @test "NTFSMAC_REPO defaults to khr898/ntfsmac (no YOURUSERNAME literal)" {
