@@ -68,8 +68,8 @@ private let sampleMultiDiskOutput = """
     #expect(view.drives.isEmpty)
 }
 
-// ext2/3/4 list support — plan: widen from `anylinuxfs list --microsoft` (ntfs/exfat/BitLocker)
-// to bare `anylinuxfs list` + a client-side allow-set {ntfs,exfat,BitLocker,ext2,ext3,ext4}.
+// ext2/3/4 list support — combine the family-specific anylinuxfs probes and retain a client-side
+// allow-set {ntfs,BitLocker,ext2,ext3,ext4}.
 // Surfaces ext partitions, keeps out-of-scope Linux FS (btrfs/xfs/zfs/LUKS/LVM) hidden. Mirrors
 // tests/cli/list-drives.bats — bash and Swift can't share source, two impls kept in sync
 // deliberately (per cli/lib/list-drives.sh header comment).
@@ -187,17 +187,20 @@ private let sampleExtOutput = """
 }
 
 @MainActor
-@Test func driveScannerCallsBareListWithoutMicrosoftFilter() async {
-    // Acceptance: the scanner must poll `anylinuxfs list` (all types, per GUI-PLAN.md line 33),
-    // not the `--microsoft` subset — otherwise ext partitions never surface. Currently RED:
-    // DriveScanner.refresh calls `["list", "--microsoft"]`.
+@Test func driveScannerCombinesMicrosoftAndLinuxProbes() async {
+    // Live anylinuxfs 0.18.0 evidence on macOS 26.6.1: bare `list` can return no rows while
+    // `--microsoft` finds the connected NTFS disk. Query both mutually-exclusive families so
+    // NTFS reliability does not regress while ext partitions remain visible.
     let runner = FakeListRunner()
     let scanner = DriveScanner(runner: runner, anylinuxfsPath: "/stub/anylinuxfs")
     await scanner.refresh()
     // Tuples aren't Equatable; compare element-wise.
-    #expect(runner.calls.count == 1)
+    #expect(runner.calls.count == 2)
     #expect(runner.calls[0].path == "/stub/anylinuxfs")
-    #expect(runner.calls[0].args == ["list"])
+    #expect(runner.calls[0].args == ["list", "--microsoft"])
+    #expect(runner.calls[1].path == "/stub/anylinuxfs")
+    #expect(runner.calls[1].args == ["list", "--linux"])
+    #expect(scanner.drives.map(\.identifier) == ["disk4s2", "disk4s3"])
 }
 
 @MainActor

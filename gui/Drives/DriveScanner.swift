@@ -38,13 +38,11 @@ public struct Drive: Identifiable, Equatable, Sendable {
 /// empty, so `augment_line` falls back to the raw partition type. GPT then reports "Microsoft
 /// Basic Data", while MBR reports "Windows_NTFS". The regex captures the TYPE+NAME columns as
 /// one blob and `deriveFsTypeAndLabel` maps both prefixes to ntfs. Both names are part of the
-/// server's WINDOWS_FS_TYPES set, so matching them client-side replicates `--microsoft`'s
-/// reliability without a second `anylinuxfs` call. The fstype is display-only — mount validates
-/// `--fs-driver` itself, never the picker.
+/// server's WINDOWS_FS_TYPES set. The fstype is display-only — mount validates `--fs-driver`
+/// itself, never the picker.
 ///
-/// Scope filter: bare `anylinuxfs list` returns every Linux FS type (btrfs/xfs/zfs/LUKS/LVM/...).
-/// ntfsmac mounts only NTFS + BitLocker + ext2/3/4 (exFAT is excluded — macOS already reads/writes
-/// it natively), so `allowedFsTypes` drops the rest client-side. Mirrors
+/// Scope filter: ntfsmac mounts only NTFS + BitLocker + ext2/3/4 (exFAT is excluded — macOS
+/// already reads/writes it natively), so `allowedFsTypes` drops the rest client-side. Mirrors
 /// `NTFSMAC_ALLOWED_FS_TYPES` in cli/lib/list-drives.sh — bash and Swift can't share source,
 /// two impls kept in sync deliberately.
 public enum DriveListParser {
@@ -124,8 +122,10 @@ public enum DriveListParser {
 }
 
 /// Polls `anylinuxfs list` on an interval plus on-demand (Refresh ↻ button,
-/// GUI-PLAN.md "Popover — idle"). Bare `list` (all types) — `DriveListParser.allowedFsTypes`
-/// filters to ntfsmac's mount scope (NTFS-family + ext2/3/4) client-side. Reuses `HelperShared`'s
+/// GUI-PLAN.md "Popover — idle"). anylinuxfs 0.18.0 can return no rows for an unfiltered `list`
+/// on macOS even though each family-specific probe finds the disk, so production combines
+/// `list --microsoft` and `list --linux`. `DriveListParser.allowedFsTypes` then filters to
+/// ntfsmac's narrower scope (NTFS-family + ext2/3/4) client-side. Reuses `HelperShared`'s
 /// `PrivilegedCommandRunning`/`RealCommandRunner` seam (already used by `HelperService`) instead
 /// of a second process-spawn helper — this call itself is unprivileged, only the runner shape
 /// is reused. Production scans run away from the main actor because the first VM-backed list can
@@ -175,18 +175,43 @@ public final class DriveScanner: ObservableObject {
     }
 
     public func refresh() async {
-        let result: CommandResult
+        let microsoft: CommandResult
+        let linux: CommandResult
         if let runner {
-            result = runner.run(anylinuxfsPath, ["list"])
+            microsoft = runner.run(anylinuxfsPath, ["list", "--microsoft"])
+            linux = runner.run(anylinuxfsPath, ["list", "--linux"])
         } else {
-            result = await Self.runOffMain(anylinuxfsPath, ["list"], timeout: scanTimeout)
+            async let microsoftProbe = Self.runOffMain(
+                anylinuxfsPath,
+                ["list", "--microsoft"],
+                timeout: scanTimeout
+            )
+            async let linuxProbe = Self.runOffMain(
+                anylinuxfsPath,
+                ["list", "--linux"],
+                timeout: scanTimeout
+            )
+            (microsoft, linux) = await (microsoftProbe, linuxProbe)
         }
 
-        if result.exitCode == 0 {
-            drives = DriveListParser.parse(result.output)
+        let successfulResults = [microsoft, linux].filter { $0.exitCode == 0 }
+        if !successfulResults.isEmpty {
+            // A future anylinuxfs version may report a partition in both families. Preserve the
+            // Microsoft-then-Linux display order while ensuring a stable one-row-per-device list.
+            var seenIdentifiers = Set<String>()
+            drives = successfulResults
+                .flatMap { DriveListParser.parse($0.output) }
+                .filter { seenIdentifiers.insert($0.identifier).inserted }
+        }
+
+        let failedResults = [microsoft, linux].filter { $0.exitCode != 0 }
+        if failedResults.isEmpty {
             lastError = nil
         } else {
-            lastError = result.output
+            lastError = failedResults
+                .map(\.output)
+                .filter { !$0.isEmpty }
+                .joined(separator: "\n")
         }
     }
 
