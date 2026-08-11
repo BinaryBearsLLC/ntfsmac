@@ -60,6 +60,16 @@ public final class MountController: ObservableObject {
     private let snapshotProvider: any MountSnapshotProviding
     private let appState: AppState
     private var pollTask: Task<Void, Never>?
+    /// Polling continues while a helper call is in flight. Preserve the visible `.mounting`
+    /// state until that call resolves; an authoritative empty snapshot during VM boot is not a
+    /// completed unmount and must not make the UI offer a second Mount action.
+    private var mountOperationsInFlight = 0
+    /// A status-only session can be a transient observation while macOS refreshes its mount
+    /// table, or it can mean Finder removed the NFS share behind ntfsmac's back. Require the same
+    /// inconsistency twice before asking the helper to tear down the orphaned anylinuxfs session.
+    /// An authoritative disappearance needs no debounce, but still routes through the helper so
+    /// stale VM/PF/route state is cleaned instead of only disappearing from the GUI.
+    private var pendingExternalUnmounts: Set<String> = []
 
     public init(
         helper: any HelperMounting = HelperClient(),
@@ -127,7 +137,66 @@ public final class MountController: ObservableObject {
     /// them unverified so the UI can never remain falsely green.
     @discardableResult
     public func reconcile(knownDrives: [Drive]) async -> MountSnapshot {
-        let snapshot = await snapshotProvider.snapshot()
+        var snapshot = await snapshotProvider.snapshot()
+        let trackedIDs = Set(mountedDrives.map(\.id))
+        let verifiedIDs = Set(mountedDrives.filter(\.isVerified).map(\.id))
+        let observedIDs = Set(snapshot.mounts.map(\.deviceIdentifier))
+        var cleanupIDs: Set<String> = []
+
+        if snapshot.isAuthoritative {
+            // Both sources agree the mount is gone. Include a previously debounced status-only
+            // session even though its cached row is no longer verified.
+            cleanupIDs = verifiedIDs
+                .union(pendingExternalUnmounts)
+                .subtracting(observedIDs)
+            pendingExternalUnmounts.subtract(observedIDs)
+        } else if snapshot.warningCode == "MOUNT_STATE_INCONSISTENT" {
+            let statusOnlyIDs = Set(snapshot.mounts.compactMap { mount in
+                mount.isReadOnly == nil ? mount.deviceIdentifier : nil
+            })
+            let eligible = statusOnlyIDs
+                .intersection(trackedIDs)
+                .intersection(verifiedIDs.union(pendingExternalUnmounts))
+            cleanupIDs = eligible.intersection(pendingExternalUnmounts)
+            pendingExternalUnmounts = eligible
+        } else {
+            // A failed source is not proof of an external unmount. Forget the debounce rather
+            // than turning an unrelated diagnostic outage into a privileged mutation later.
+            pendingExternalUnmounts.removeAll()
+        }
+
+        if !cleanupIDs.isEmpty {
+            var cleanupFailed = false
+            for device in cleanupIDs.sorted() {
+                do {
+                    let result = try await helper.unmount(target: device)
+                    if result.exitCode != 0 {
+                        cleanupFailed = true
+                        break
+                    }
+                } catch {
+                    cleanupFailed = true
+                    break
+                }
+            }
+
+            if cleanupFailed {
+                apply(snapshot, knownDrives: knownDrives)
+                let message = "EXTERNAL_UNMOUNT_CLEANUP_UNPROVEN — the NFS share disappeared, but private session cleanup could not be verified"
+                errorMessage = message
+                reconciliationWarning = message
+                if mountedDrives.isEmpty {
+                    appState.state = .error
+                }
+                return snapshot
+            }
+
+            pendingExternalUnmounts.subtract(cleanupIDs)
+            // The helper response is provisional just like mount/unmount responses elsewhere:
+            // publish only the fresh host/runtime observation after the cleanup attempt.
+            snapshot = await snapshotProvider.snapshot()
+        }
+
         apply(snapshot, knownDrives: knownDrives)
         return snapshot
     }
@@ -153,7 +222,14 @@ public final class MountController: ObservableObject {
 
         errorMessage = nil
         reconciliationWarning = nil
+        mountOperationsInFlight += 1
         appState.state = .mounting
+        defer {
+            mountOperationsInFlight -= 1
+            if appState.state == .mounting {
+                recomputeAggregateState()
+            }
+        }
         do {
             let resolvedDriver = driver ?? Self.driverFor(drive.fsType)
             let result = try await helper.mount(device: drive.identifier, driver: resolvedDriver, mountPoint: mountPoint, readOnly: readOnly)
@@ -323,7 +399,9 @@ public final class MountController: ObservableObject {
     /// else read/write; empty → idle. `.mounting` is set imperatively at mount start and
     /// overwritten here once the mount resolves.
     private func recomputeAggregateState() {
-        if mountedDrives.isEmpty {
+        if mountOperationsInFlight > 0 {
+            appState.state = .mounting
+        } else if mountedDrives.isEmpty {
             appState.state = .idle
         } else if mountedDrives.contains(where: { !$0.isVerified }) {
             appState.state = .mountedUnknown

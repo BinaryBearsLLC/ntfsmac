@@ -16,6 +16,7 @@ private final class MutableSnapshotProvider: MountSnapshotProviding {
 @MainActor
 private final class SuccessfulHelper: HelperMounting {
     private(set) var unmountCalls: [String] = []
+    var unmountResult = CommandResult(output: "unmounted", exitCode: 0)
 
     func mount(
         device: String,
@@ -31,7 +32,24 @@ private final class SuccessfulHelper: HelperMounting {
 
     func unmount(target: String) async throws -> CommandResult {
         unmountCalls.append(target)
-        return CommandResult(output: "unmounted", exitCode: 0)
+        return unmountResult
+    }
+}
+
+@MainActor
+private final class DelayedMountHelper: HelperMounting {
+    func mount(
+        device: String,
+        driver: FsDriver,
+        mountPoint: String?,
+        readOnly: Bool
+    ) async throws -> CommandResult {
+        try await Task.sleep(for: .milliseconds(150))
+        return CommandResult(output: "mount failed after delay", exitCode: 1)
+    }
+
+    func unmount(target: String) async throws -> CommandResult {
+        CommandResult(output: "unused", exitCode: 0)
     }
 }
 
@@ -124,8 +142,9 @@ private struct SnapshotCommandRunner: PrivilegedCommandRunning {
         ),
     ]))
     let appState = AppState()
+    let helper = SuccessfulHelper()
     let controller = MountController(
-        helper: SuccessfulHelper(),
+        helper: helper,
         readOnlyChecker: AlwaysReadWrite(),
         snapshotProvider: provider,
         appState: appState
@@ -136,8 +155,111 @@ private struct SnapshotCommandRunner: PrivilegedCommandRunning {
     provider.value = MountSnapshot(mounts: [])
     await controller.reconcile(knownDrives: [drive])
 
+    #expect(helper.unmountCalls == [drive.identifier])
     #expect(controller.mountedDrives.isEmpty)
     #expect(appState.state == .idle)
+}
+
+@MainActor
+@Test func pollingCannotPublishIdleWhileAHelperMountIsStillRunning() async throws {
+    let drive = Drive(identifier: "disk6s1", fsType: "ntfs", label: "Media", size: "120 GB")
+    let provider = MutableSnapshotProvider(MountSnapshot(mounts: []))
+    let appState = AppState()
+    let controller = MountController(
+        helper: DelayedMountHelper(),
+        readOnlyChecker: AlwaysReadWrite(),
+        snapshotProvider: provider,
+        appState: appState
+    )
+
+    let mountTask = Task { await controller.mount(drive) }
+    try await Task.sleep(for: .milliseconds(25))
+    #expect(appState.state == .mounting)
+
+    await controller.reconcile(knownDrives: [drive])
+    #expect(appState.state == .mounting)
+
+    await mountTask.value
+    #expect(appState.state == .error)
+    #expect(controller.errorMessage == "mount failed after delay")
+}
+
+@MainActor
+@Test func finderUnmountRequiresRepeatedInconsistentProofBeforeSessionCleanup() async {
+    let drive = Drive(identifier: "disk6s1", fsType: "ntfs", label: "Media", size: "120 GB")
+    let provider = MutableSnapshotProvider(MountSnapshot(mounts: [
+        ObservedMount(
+            deviceIdentifier: drive.identifier,
+            mountPoint: "/Volumes/Media",
+            fsDriver: "ntfs-3g",
+            isReadOnly: false
+        ),
+    ]))
+    let helper = SuccessfulHelper()
+    let appState = AppState()
+    let controller = MountController(
+        helper: helper,
+        readOnlyChecker: AlwaysReadWrite(),
+        snapshotProvider: provider,
+        appState: appState
+    )
+    await controller.mount(drive, mountPoint: "/Volumes/Media")
+
+    provider.value = MountSnapshot(
+        mounts: [ObservedMount(
+            deviceIdentifier: drive.identifier,
+            mountPoint: "/Volumes/Media",
+            fsDriver: "ntfs-3g",
+            isReadOnly: nil
+        )],
+        isAuthoritative: false,
+        warningCode: "MOUNT_STATE_INCONSISTENT"
+    )
+
+    await controller.reconcile(knownDrives: [drive])
+    #expect(helper.unmountCalls.isEmpty)
+    #expect(appState.state == .mountedUnknown)
+
+    await controller.reconcile(knownDrives: [drive])
+    #expect(helper.unmountCalls == [drive.identifier])
+    #expect(appState.state == .mountedUnknown)
+
+    provider.value = MountSnapshot(mounts: [])
+    await controller.reconcile(knownDrives: [drive])
+    #expect(controller.mountedDrives.isEmpty)
+    #expect(appState.state == .idle)
+}
+
+@MainActor
+@Test func failedExternalUnmountCleanupCannotFallBackToIdle() async {
+    let drive = Drive(identifier: "disk6s1", fsType: "ntfs", label: "Media", size: "120 GB")
+    let provider = MutableSnapshotProvider(MountSnapshot(mounts: [
+        ObservedMount(
+            deviceIdentifier: drive.identifier,
+            mountPoint: "/Volumes/Media",
+            fsDriver: "ntfs-3g",
+            isReadOnly: false
+        ),
+    ]))
+    let helper = SuccessfulHelper()
+    helper.unmountResult = CommandResult(output: "failed", exitCode: 1)
+    let appState = AppState()
+    let controller = MountController(
+        helper: helper,
+        readOnlyChecker: AlwaysReadWrite(),
+        snapshotProvider: provider,
+        appState: appState
+    )
+    await controller.mount(drive, mountPoint: "/Volumes/Media")
+
+    provider.value = MountSnapshot(mounts: [])
+    await controller.reconcile(knownDrives: [drive])
+
+    #expect(helper.unmountCalls == [drive.identifier])
+    #expect(controller.mountedDrives.isEmpty)
+    #expect(appState.state == .error)
+    #expect(controller.errorMessage?.hasPrefix("EXTERNAL_UNMOUNT_CLEANUP_UNPROVEN") == true)
+    #expect(controller.reconciliationWarning == controller.errorMessage)
 }
 
 @MainActor
