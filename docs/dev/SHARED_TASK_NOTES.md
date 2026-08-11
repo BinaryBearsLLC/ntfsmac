@@ -313,7 +313,7 @@ resolved.
       the default). `unmount.sh` accepts a bare device **or** a `/Volumes/` path, unvalidated at
       that layer — helper adds `isValidUnmountTarget()` (device regex OR `/Volumes/` prefix, no
       `..`) since L6 duplication only makes sense for device-shaped input.
-      **XPC surface scoped to exactly `mount`/`unmount`/`applyPfRules`/`teardown`** — this unit's
+      **Historical XPC surface was scoped to `mount`/`unmount`/`applyPfRules`/`teardown`** — this unit's
       own Do clause, not §3's full future table. `listDrives`/`status`/`diagnose` are deliberately
       absent: each is read-only and explicitly Don't-listed as privileged in its own later unit
       (`3-drive-detect`, `3-status-speed`, `3-diagnose-ui` call the CLI directly, unprivileged).
@@ -330,6 +330,10 @@ resolved.
       `isValidUnmountTarget`, always exercised regardless. Not unit-tested (can't fake a real XPC
       connection's SecCode in XCTest) — same class of sandbox-unverifiable gap as the VM boot
       check, flagged rather than silently skipped.
+      **Superseded 2026-08-08:** the BinaryBears live-security transaction removed raw
+      `applyPfRules`. Root `mount` now derives, applies, measures, and records one direct-child PF
+      anchor plus optional route per session; `unmount`/`teardown` remove only that owned state.
+      This prevents a caller from loading an unevaluated or ownerless PF policy.
       **maintainer decision (2026-07-10):** GUI bundles its own copies of vendor binaries into
       `ntfsmac.app/Contents/Resources` (self-contained DMG, no Homebrew/CLI dependency) —
       but the privileged helper itself always resolves binaries at the fixed `installPrefix =
@@ -757,6 +761,17 @@ still-open VM-boot gate and an end-to-end "connect a real NTFS drive" walkthroug
   runtime `PreferencesOpener` window implementation was removed; deprecated source-compatible
   adapters remain for downstream callers, but the app does not use them. No mount, helper
   privilege, signing, or deployment-target behavior changed.
+- **P0 live-security completion follow-up (2026-08-11)** — the live packaged-app test exposed a
+  VPN ordering deadlock: anylinuxfs waited for its guest NFS endpoint before ntfsmac's former
+  post-command route/PF step could run. The mount wrapper now supervises the backend, observes
+  only the new validated vmnet `/30`, installs the exact route and direct-child PF policy before
+  NFS readiness, and carries ownership into the final soft-NFS proof. Abort cleanup releases early
+  resources or persists cleanup-pending state when release is unproven. The same session also
+  closed two adjacent live defects: the installer atomically replaces signed runtime inodes, and
+  GUI discovery combines the anylinuxfs Microsoft/Linux probes. One real NTFS device with an
+  active VPN passed GUI mount, 32 MiB SHA-256 read-back, private/soft transport, app unmount,
+  Finder network-share disconnect, and external-unmount reconciliation. Physical hardware eject,
+  VPN-off, crash/restart recovery, and concurrent drives remain explicitly untested.
 
 ## DECISIONS
 

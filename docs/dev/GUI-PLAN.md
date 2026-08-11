@@ -47,11 +47,11 @@ This table describes the current integrated GUI, not the original aspirational p
 | Shipped | Diagnose summary, inline Hide, and Command-click privacy-safe JSON export |
 | Shipped | First-run helper/CLI staging, helper reinstall, and confirmed complete uninstall |
 | Shipped | In-popover Settings with Back, canonical version/build, Launch at login, contextual help, and adaptive menu-bar icon |
-| Partial | Three SECURITY rows render honestly as `unknown` and provide Hide/Show; live PF/route evidence is not wired yet |
+| Partial | Three SECURITY rows render honestly as `unknown` and provide Hide/Show; the live PF/route transaction is implemented, but its reason-coded evidence is not wired into these rows yet |
 | Partial | `FinderOpener` is implemented and tested, but no current multi-drive row exposes Open in Finder |
 | Partial | `ThroughputMonitor` and `SpeedBar` exist, but transfer speed is not presented by the current multi-drive UI |
 | Partial | NTFS3 is supported by CLI/helper internals, but has no GUI choice or completed hardware qualification |
-| Implemented — packaged validation pending | Live mount-state reconciliation pairs anylinuxfs session evidence with the host NFS mount table, polls every five seconds, refreshes on lifecycle actions, and fails closed to yellow/unknown on disagreement; see the 2026-08-06 live audit. |
+| Implemented — matrix incomplete | Live mount-state reconciliation pairs anylinuxfs session evidence with the host NFS mount table, polls every five seconds, refreshes on lifecycle actions, and fails closed to yellow/unknown on disagreement. GUI unmount and external NFS/Finder disconnect passed on one packaged device; the remaining matrix is tracked in the 2026-08-11 audit. |
 | Planned | Verified Copy, evidence-backed SECURITY state, notifications, and Eject All |
 
 ---
@@ -76,7 +76,7 @@ This table describes the current integrated GUI, not the original aspirational p
 | Per-drive `Unmount` | Safely unmount that drive | That drive is mounted |
 | Other-device `Mount` | Mount another compatible partition | Another compatible drive is detected |
 | Refresh (↻) | Re-scan drives and reconcile mounted rows against host truth | Always |
-| SECURITY rows | Display current state; currently `unknown` because live evidence is not wired | One or more drives mounted |
+| SECURITY rows | Display current state; currently `unknown` because transaction evidence is not yet wired into the GUI rows | One or more drives mounted |
 | SECURITY `Hide` / `Show` | Collapse or restore only the SECURITY presentation | One or more drives mounted |
 | ⚙ / `Quit` | As above | Always |
 
@@ -97,7 +97,9 @@ it, while the GUI's own Diagnose panel reported an inactive bridge and zero NFS 
 The P0 remediation implements this contract in source: helper success is provisional, the app
 reconciles at launch/popover open/every five seconds/Refresh/after helper completion, and an
 incomplete or inconsistent snapshot preserves recovery controls in yellow `unknown` rather than
-publishing green. The packaged-app hardware matrix remains required before this gate is closed.
+publishing green. On 2026-08-11 one packaged device passed GUI unmount, Finder network-share
+disconnect, and an external NFS unmount with complete VM/PF/route reconciliation. CLI→GUI,
+crash/restart, physical eject/hot-unplug, and concurrent-device cells remain required.
 
 Required behavior:
 
@@ -109,7 +111,9 @@ Required behavior:
 - derive header, icon, controls, and Diagnose context from the same reconciled snapshot.
 
 The detailed live evidence and acceptance matrix are in
-[`../audits/LIVE_MOUNT_STATE_AND_NFS_TRANSPORT_AUDIT_2026-08-06.md`](../audits/LIVE_MOUNT_STATE_AND_NFS_TRANSPORT_AUDIT_2026-08-06.md).
+[`../audits/LIVE_MOUNT_STATE_AND_NFS_TRANSPORT_AUDIT_2026-08-06.md`](../audits/LIVE_MOUNT_STATE_AND_NFS_TRANSPORT_AUDIT_2026-08-06.md)
+and
+[`../audits/LIVE_P0_SECURITY_TRANSACTION_AUDIT_2026-08-11.md`](../audits/LIVE_P0_SECURITY_TRANSACTION_AUDIT_2026-08-11.md).
 
 ### Read-only (dirty) state — extra
 

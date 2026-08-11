@@ -1,15 +1,16 @@
 # ntfsmac — Full Build Plan
 
 > [!IMPORTANT]
-> **Status audit (2026-08-05):** this is the historical architecture and implementation plan that
+> **Status audit (2026-08-11):** this is the historical architecture and implementation plan that
 > produced the original CLI/GUI foundation. It is not the current BinaryBears product roadmap and
 > should not be used to infer that every lower-layer primitive is live in the shipped mount flow.
 > Use [`../BINARYBEARS_ROADMAP.md`](../BINARYBEARS_ROADMAP.md) for current priorities and
 > completion status; use [`GUI-PLAN.md`](GUI-PLAN.md) for the current GUI contract.
 >
-> Baseline build/CLI/GUI units are implemented. Phase 1 packet-filter and route **primitives** and
-> their unit tests were completed, but the audit found that live mount integration,
-> effective-rule verification, and evidence-backed UI/diagnostic state remain roadmap work.
+> Baseline build/CLI/GUI units are implemented. The per-session packet-filter/route transaction,
+> evaluated-rule verification, and pre-NFS VPN bootstrap now run in the live helper mount path.
+> Evidence-backed SECURITY UI/diagnostic parity and the remaining hardware matrix stay roadmap
+> work; this historical plan is not the status source for them.
 
 > NTFS read/write on Apple Silicon macOS, no kernel extension, no SIP modification.
 > Wraps `anylinuxfs` (libkrun microVM running ntfs-3g, exported to macOS over NFS on a
@@ -175,12 +176,15 @@ UX, the helper validates for security.
 
 **XPC surface (minimal, typed — no string eval):**
 
-- `listDrives() -> [Drive]`
-- `mount(device: String, driver: {ntfs3g|ntfs3}, tuning: TuningOpts?) -> MountResult`
-- `unmount(mountID: String) -> Result`
-- `applyPfRules(bridge: BridgeInfo) -> Result` / `teardown(mountID: String) -> Result`
-- `status(mountID: String) -> StatusSnapshot`
-- `diagnose() -> DiagBundle`
+- `mount(device: String, driver: {ntfs3g|ntfs3}, mountPoint: String?, readOnly: Bool) -> Result`
+- `unmount(target: String) -> Result`
+- `teardown(mountID: String?) -> Result` for targeted or stale-session security cleanup
+- lifecycle/install methods (`stageCLI`, `removeDependencies`, `uninstallHelper`, `version`,
+  `exitHelper`) with fixed typed inputs
+
+`listDrives`, `status`, and `diagnose` stay unprivileged. PF and route policy are measured and
+owned inside the root `mount`/`unmount` transaction; there is deliberately no raw
+`applyPfRules` method that could load an anchor without a session lifecycle owner.
 
 Every method taking a device string runs the L6 regex first, rejects + logs on fail. `tuning`
 defaults to off; enabling it is explicit and logged as risk-accepted (L8).
@@ -497,7 +501,8 @@ sha256-checked downloads verified by checksum assertions, not unit tests).
 - **Deps:** GATE-CLI-BEFORE-GUI · **Tier:** large
 - **Files:** `helper/main.swift`, `helper/HelperProtocol.swift`, `helper/Info.plist`,
   `helper/launchd.plist`, `gui/Helper/HelperClient.swift`, `helper/Tests/HelperTests.swift`
-- **Do:** expose XPC methods (mount, unmount, applyPfRules, teardown) per §3; re-validate device with
+- **Do:** expose the minimal mutating/lifecycle XPC methods per §3; keep PF and route policy inside
+  the mount/unmount transaction; re-validate device with
   `^disk[0-9]+s[0-9]+$` **inside the helper**; pin the helper↔client relationship via code-sign
   requirement (ad-hoc); reject unsigned/mismatched callers.
 - **Don't:** shell out with `sudo` from the UI; skip in-helper validation (L5, L6). Any deviation from

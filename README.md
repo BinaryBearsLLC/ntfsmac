@@ -186,6 +186,9 @@ Mount, unmount, packet-filter, and route operations initiated by the GUI go thro
 
 - Partition identifiers are allow-listed before shell invocation.
 - The Linux guest uses a dedicated private `/30` `vmnet` link for the NFS path.
+- Each active mount owns a direct-child PF policy, one PF enable reference, and only the exact
+  VPN-bypass host route it needed. The wrapper applies that measured policy after the new vmnet
+  link appears and before the backend NFS readiness check can complete; teardown is per session.
 - Privileged GUI operations are restricted to the helper's XPC protocol.
 - Vendored source revisions and runtime inputs are pinned and verified by the build system. The
   Alpine tag is verified against its arm64 digest, and both packaged runtime binaries must contain
@@ -227,7 +230,7 @@ developed from `dev` and reviewed back into `dev` through its own focused branch
 | Priority | Status | Direction |
 | --- | --- | --- |
 | Completed foundation | ✅ Shipped | Multi-drive NTFS/ext support, MBR detection, in-popover Settings, adaptive icon and help, privacy-safe CLI/GUI diagnostics, version reporting, and helper reinstall/uninstall lifecycle |
-| P0 | 🟡 Partial | Alpine first-run runtime pinning and SECURITY Hide are shipped; audited anylinuxfs updates and evidence-backed PF/VPN status remain |
+| P0 | 🟡 Partial | Runtime pinning, audited updates, authoritative mount reconciliation, and the per-session PF/VPN transaction are implemented; SECURITY UI telemetry and the remaining hardware matrix stay open |
 | P1 | 🟡 Foundation exists | Add SHA-256 Verified Copy, qualify NTFS3 on real hardware, then expose it only as an explicit experimental driver choice |
 | P2 | ⬜ Planned | Migrate the deprecated privileged-helper lifecycle to `SMAppService` after its ad-hoc-signing and upgrade path are proven |
 | P3 | 🟡 Partial | Wire Open in Finder, decide the future of per-drive transfer telemetry, and add focused notifications/eject-all improvements |

@@ -6,6 +6,48 @@ Every package/feature decision below is backed by evidence read from the real
 for every non-obvious call. Scope test: {ntfs-3g mount, rpc.nfsd export, blkid device
 detection} per PLAN.md §6 `v-audit`.
 
+## Per-session live security transaction (2026-08-11)
+
+- Replaced the unevaluated shared `ntfsmac` anchor model with one child below the macOS default
+  evaluated path: direct child `com.apple/ntfsmac-<validated-device>`. The transaction checks the
+  live root ruleset for `anchor "com.apple/*"`, enables PF with a reference token, loads the child,
+  and reads it back before reporting `enforced`.
+- PF rules are scoped to the measured `bridgeN` plus exact vmnet `/30`; only client-initiated
+  TCP/UDP NFS and mountd traffic is passed statefully. No bare/global PF flush exists.
+- VPN handling repairs both full-tunnel defaults and split-tunnel endpoint captures, owns at most
+  one exact host route per session, and never changes/deletes a default or unrelated route. A route
+  already resolving through the measured bridge is recorded as `notRequired`, not fabricated as
+  an applied bypass.
+- Root-owned mode-0700 state is atomically written per device with a dedicated child anchor, PF
+  token, optional owned route, and fixed reason-coded state. Targeted/idempotent teardown and
+  bounded stale-session reconciliation preserve concurrent active mounts, retain incomplete
+  cleanup state for safe retry, and fail closed when runtime status is unavailable.
+- The old raw XPC `applyPfRules` method was removed: GUI/helper mount and unmount now enter the
+  same CLI transaction, eliminating a callable anchor-load operation with no lifecycle owner.
+- Mutating helper calls are serialized across XPC connections. Normal uninstall reconciles only
+  stale security sessions and stops if cleanup is unknown; destructive all-session teardown is
+  reserved for explicit `--force`, so removal cannot silently orphan a PF token or route.
+- Option A is explicit. anylinuxfs creates vmnet and then waits for NFS within one command, so the
+  wrapper supervises that process, identifies only the newly created validated vmnet `/30`, and
+  loads its measured route/PF policy before the backend NFS readiness check can complete. Final
+  success still requires a real soft NFS mount plus matching status. Backend or final-proof
+  failure releases the early PF token and owned route; unproven release persists retryable state.
+- Automated evidence includes PF evaluated-path failure, owned route add/delete, malformed input,
+  unverified `soft`, missing/wedged status, concurrent mounts, isolated teardown, packaged template
+  staging, pre-NFS sequencing, abort cleanup, privacy-safe live-gate pass/fail, an unparseable PF
+  enable token, unsafe state entries, and a route replaced by another interface before teardown.
+  The latter three remain fail-closed and never become successful cleanup claims.
+- The packaged 2.1 candidate passed one real NTFS/VPN-on transaction on Apple Silicon macOS
+  26.6.1: exact private bridge routing, soft NFS, intended NFS/mountd reachability, rejection of
+  unrelated bridge ports, a 32 MiB read-back hash match, and clean app/Finder/external teardown.
+  The root-only state/PF gate was run by the maintainer but its stdout was not captured in the
+  agent transcript, so this audit relies only on the separately captured transport/effect proof.
+  VPN-off and concurrent-drive results remain release gates, not inferred claims.
+- `install.sh` now replaces every runtime file through a fresh same-directory inode and atomic
+  rename before validating Mach-O signatures. This avoids stale-vnode signature failures caused
+  by in-place replacement of a running signed helper/runtime while preserving ad-hoc signing,
+  entitlements, quarantine, Gatekeeper, and SIP policy.
+
 ## anylinuxfs update-policy dry-run (2026-08-08)
 
 The repeatable workflow is documented in

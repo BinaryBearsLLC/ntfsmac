@@ -5,9 +5,12 @@ touch `pf`/route state, and drives a Linux microVM over a dedicated private `/30
 anything in `helper/`, `gui/Helper/`, `gui/FirstRun/`, and the mount/unmount CLI paths as
 security-sensitive.
 
-The current GUI intentionally reports its three SECURITY indicators as `unknown`: PF/route
-primitives exist, but live enforcement and evidence-backed status are not yet integrated into the
-mount transaction. See the [BinaryBears security roadmap](docs/BINARYBEARS_ROADMAP.md#p0--trust-reproducibility-and-truthful-security).
+The live root mount transaction now owns and measures one PF child anchor, PF enable reference,
+and optional exact VPN-bypass route per session before the backend NFS readiness check can
+complete. The current GUI still intentionally reports its three SECURITY indicators as `unknown`
+because reason-coded transaction evidence is not yet wired into those rows. `unknown` describes
+the UI evidence boundary, not the absence of the lower-layer transaction. See the
+[BinaryBears security roadmap](docs/BINARYBEARS_ROADMAP.md#p0--trust-reproducibility-and-truthful-security).
 
 ## Reporting a vulnerability
 
@@ -34,3 +37,6 @@ time isn't SLA-backed, but security reports get priority over feature work.
 - **Privilege boundary:** every mount/unmount/pf/route action must route through the
   SMJobBless XPC helper. A code path that shells out to `sudo` directly from GUI code, or an
   XPC caller-identity check that can be spoofed, is a valid, high-priority report.
+- **Session ownership:** PF anchors, PF enable references, and VPN-bypass routes are per mount.
+  Teardown must never flush global PF state, delete a default route, or release another active
+  session's resources. Cleanup that cannot be proven stays retryable and non-green.

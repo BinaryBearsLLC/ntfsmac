@@ -8,11 +8,13 @@
 
 This is the canonical product roadmap for the BinaryBears fork. It replaces the older practice
 of treating implementation plans, test-session notes, and private scratch files as a current
-feature list. The code status below was reconciled on 2026-08-05 against upstream/BinaryBears
-`main` at `d2b151d` (`v2.0.050826`) and the preserved pre-sync BinaryBears `dev` at `e9f85e5`.
-Live hardware findings from 2026-08-06 are recorded separately in
+feature list. The code status below was reconciled on 2026-08-11 against `upstream/main` at
+`0725c31` (`v2.1.090826`) and the synchronized BinaryBears `dev` at `96c3aa3`.
+The original live hardware findings from 2026-08-06 are recorded in
 [Live Mount-State and NFS Transport Audit — 2026-08-06](audits/LIVE_MOUNT_STATE_AND_NFS_TRANSPORT_AUDIT_2026-08-06.md)
-and are release-blocking until the acceptance criteria below pass.
+and the focused VPN-on P0 follow-up is recorded in
+[Live P0 Security Transaction Audit — 2026-08-11](audits/LIVE_P0_SECURITY_TRANSACTION_AUDIT_2026-08-11.md).
+Untested matrix cells remain release gates even when the implemented acceptance checks pass.
 
 The post-sync wiring audit and its focused recovery branches are recorded in
 [BinaryBears Upstream Regression Audit — 2026-08-05](audits/UPSTREAM_REGRESSION_AUDIT_2026-08-05.md).
@@ -93,8 +95,11 @@ conflicts.
 
 - [-] **NTFS3:** CLI parsing, helper/XPC transport, and command construction exist and are tested;
   there is no GUI choice and no recorded BinaryBears NTFS3 hardware qualification yet.
-- [-] **Security hardening:** packet-filter and VPN-route primitives plus unit tests exist, but
-  they are not integrated into the live mount transaction and do not feed measured GUI state.
+- [-] **Security hardening:** per-session PF/route enforcement is integrated into CLI and GUI
+  mount/unmount paths with measured reason-coded state. The Option-A transaction observes the
+  new vmnet `/30`, applies the exact route and PF policy before anylinuxfs performs its NFS
+  reachability check, then publishes success only after the final soft-NFS proof. GUI telemetry
+  is the next roadmap unit.
 - [-] **Open in Finder:** the tested `FinderOpener` implementation exists, but the current
   multi-drive popover does not expose a corresponding control.
 - [-] **Transfer telemetry:** the sampling subsystem and tests remain in the codebase, but the
@@ -104,7 +109,8 @@ conflicts.
   pass; the packaged-app hardware matrix below is still a release gate.
 - [-] **NFS transport contract:** ntfsmac now pins anylinuxfs to `--net-helper vmnet`, reports a
   privacy-safe transport-contract token, and includes a fail-closed live route/listener gate.
-  Packaged-app listener/route evidence with real hardware is still required.
+  The packaged app passed that gate with one real NTFS device and an active VPN default route;
+  VPN-off and concurrent-device evidence remain open.
 
 ## Prioritized roadmap
 
@@ -137,8 +143,14 @@ then displayed `NFS mounts: None` inside the still-mounted presentation.
   reason-coded warning/unknown state whenever the sources cannot prove green mounted state.
 - [x] Add parser and state-machine coverage for CLI-created mounts, external teardown, source
   failure, provisional helper responses, and independent concurrent mounts.
-- [ ] Complete packaged-app hardware tests for GUI→CLI, CLI→GUI, external teardown, crash
+- [-] Complete packaged-app hardware tests for GUI→CLI, CLI→GUI, external teardown, crash
   recovery, restart recovery, Refresh, hot-unplug, and multiple drives.
+
+On 2026-08-11 the packaged 2.1 candidate passed GUI mount, GUI unmount, Finder network-share
+disconnect, and a second external NFS unmount while the app remained open. In each teardown the
+host mount, anylinuxfs session, private VM/bridge, exact route, and GUI green state disappeared.
+The app also remained in `mounting` while the helper operation was in flight. CLI→GUI, crash and
+restart recovery, physical-device eject/hot-unplug, and concurrent drives were not exercised.
 
 Acceptance: no UI control, icon, diagnostic row, or CLI output may claim a drive is mounted or
 writable after the corresponding host mount disappears. A CLI-created mount must also appear in
@@ -154,7 +166,7 @@ diagnostic's broad process check incorrectly reported `bridge=up` for this loopb
 - [x] Trace both vendored paths: gvproxy binds/checks the loopback proxy, while vmnet-helper
   assigns a private `/30`, publishes the VM endpoint through the synthetic `.local` name, and
   routes the host NFS client over the private bridge.
-- [ ] Resolve `diskNsN.local` during a live mount and prove which endpoint the kernel actually
+- [x] Resolve `diskNsN.local` during a live mount and prove which endpoint the kernel actually
   uses. Confirm that no NFS listener is exposed on non-loopback or unrelated interfaces.
 - [x] Select the direct private-`/30` path and force `--net-helper vmnet` on every ntfsmac mount,
   so a stale per-user anylinuxfs configuration cannot silently re-enable gvproxy.
@@ -162,8 +174,14 @@ diagnostic's broad process check incorrectly reported `bridge=up` for this loopb
   addresses, interface names, volume labels, or device identifiers.
 - [x] Add a read-only packaged-app gate that fails on gvproxy, a loopback NFS listener, a
   non-private endpoint/route, or a non-`soft` ntfsmac mount.
-- [ ] Execute that gate with the packaged app on real hardware for VPN off/on, concurrent mounts,
+- [-] Execute that gate with the packaged app on real hardware for VPN off/on, concurrent mounts,
   teardown, and helper recovery, retaining only privacy-safe results in the repository.
+
+On 2026-08-11 one packaged VPN-on session passed the privacy-safe transport gate: private `/30`
+endpoint, bridge route, vmnet helper, soft NFS, and no loopback listener. Effect checks reached
+only the intended NFS/mountd ports and rejected unrelated bridge ports. Teardown removed the
+session and returned endpoint routing to the pre-existing VPN. VPN-off, concurrent mounts, and
+helper-recovery cells remain open.
 
 Acceptance: packet/listener/route evidence must match one documented architecture, NFS must remain
 `soft`, teardown must remove every listener and route owned by the session, and neither README nor
@@ -214,15 +232,26 @@ pin change pending dependency, build, and hardware evidence.
 
 #### 3. Make security hardening effective during a real mount
 
-- [ ] Define one transactional sequence: mount preparation → private link discovery → route policy
+- [x] Define one transactional sequence: mount preparation → private link discovery → route policy
   → packet-filter policy → NFS mount → measured status publication.
-- [ ] Verify that the packet-filter rules are attached to an evaluated PF ruleset path; loading a
+- [x] Verify that the packet-filter rules are attached to an evaluated PF ruleset path; loading a
   named anchor alone must not be treated as proof of enforcement.
-- [ ] Apply and remove VPN-bypass routes per active mount without breaking unrelated routes.
-- [ ] Make teardown idempotent across unmount, Quit, failed mount, helper reconnect, and crash
+- [x] Apply and remove VPN-bypass routes per active mount without breaking unrelated routes.
+- [x] Make teardown idempotent across unmount, Quit, failed mount, helper reconnect, and crash
   recovery.
-- [ ] Support concurrent mounts without one teardown invalidating another mount's protections.
-- [ ] Publish reason-coded state: `enforced`, `notEnforced`, `notRequired`, or `unknown`.
+- [x] Support concurrent mounts without one teardown invalidating another mount's protections.
+- [x] Publish reason-coded state: `enforced`, `notEnforced`, `notRequired`, or `unknown`.
+
+The implementation uses one direct-child `com.apple/ntfsmac-<device>` anchor, PF enable token,
+state file, and optional exact host route per active mount. It proves the macOS `com.apple/*`
+evaluation path, detects both full- and split-tunnel VPN capture,
+measures the loaded child rules, bounds status recovery, and removes only state owned by the
+target session. Root helper mutations are serialized across XPC connections, and normal uninstall
+stops when session cleanup cannot be proven. Because upstream anylinuxfs creates vmnet and then
+waits for NFS inside one command, ntfsmac runs that command under a bounded supervisor, observes
+the newly created validated bridge and `/30`, and installs the measured route/PF policy before
+allowing the backend's NFS reachability check to succeed. A backend or final-proof failure releases
+the early resources, preserving cleanup-pending state only when release itself cannot be proven.
 
 **Decision A/B**
 
@@ -231,6 +260,11 @@ pin change pending dependency, build, and hardware evidence.
 - **Option B — strict mode:** roll back or reject the mount when required policy cannot be proven.
   Consider this only after the live implementation is stable; it may later become an explicit
   user setting.
+
+Selected: **Option A**. Missing PF tools, an unevaluated anchor path, unsafe route evidence, stale
+state, or unverified `soft` semantics produce a non-green reason code while leaving the mounted
+volume usable. `tests/live/verify-security-transaction.sh` is the privacy-safe packaged-app gate;
+the remaining VPN-off and concurrent-drive hardware cells remain required before release.
 
 #### 4. Complete evidence-backed SECURITY UI
 

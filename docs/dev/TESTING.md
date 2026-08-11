@@ -199,6 +199,7 @@ Run this against the packaged candidate while the NTFS drive is mounted:
 ```bash
 /usr/local/ntfsmac/bin/ntfsmac diagnose --json | python3 -m json.tool
 ./tests/live/verify-nfs-transport.sh
+sudo ./tests/live/verify-security-transaction.sh
 ```
 
 Diagnostic schema 5 must report `"network_helper": "vmnet"` and
@@ -206,6 +207,22 @@ Diagnostic schema 5 must report `"network_helper": "vmnet"` and
 gvproxy, a loopback port-2049 listener, an endpoint outside the anylinuxfs vmnet pool, a route that
 does not use the private bridge, or an NFS mount without `soft`. Its output is privacy-safe and
 contains only a mount count plus fixed contract tokens.
+
+The security-transaction gate independently requires one protected state record per active
+anylinuxfs session, the evaluated macOS `com.apple/*` anchor path, the exact per-session child
+anchor, its PF enable reference, and a route that still resolves through the recorded bridge. It
+also emits only a count and fixed tokens. Expected output while one drive is mounted:
+
+```text
+verify-security-transaction: PASS — 1 session(s), evaluated PF, private route, owned teardown state
+```
+
+Repeat both live gates with the VPN default route off and on. When a connected vmnet `/30` already
+wins routing, `vpn_route=notRequired` is correct; when ntfsmac must add a host route, the session
+must record `vpn_route=enforced` and remove only that host route on unmount. With two drives,
+`sudo ./tests/live/verify-security-transaction.sh` must report two sessions; unmount one, rerun it,
+and require one surviving session. After the final unmount, there must be no ntfsmac state file or
+child anchor left. Do not disable the VPN or another network interface merely to force a case.
 
 With the GUI kept open, also exercise the cross-surface matrix:
 
@@ -222,6 +239,50 @@ With the GUI kept open, also exercise the cross-surface matrix:
 Record packaged-app results separately from unit-test results. Do not mark the roadmap hardware
 gate complete until VPN off/on, teardown, helper recovery, restart recovery, and concurrent mounts
 have all passed on the release artifact.
+
+### Recorded packaged P0 result — 2026-08-11
+
+The packaged 2.1 (090826) candidate was installed on Apple Silicon macOS 26.6.1 and exercised with
+one real NTFS USB device while a VPN owned the default route. Privacy-safe retained evidence:
+
+- GUI mount completed read/write only after a newly measured private `/30` bridge, exact endpoint
+  route, and per-session PF policy were active. This run originally exposed and then verified the
+  fix for the pre-NFS VPN ordering deadlock.
+- `verify-nfs-transport.sh` passed with one vmnet/private/soft mount and no loopback listener.
+  Intended NFS and mountd ports were reachable through the private endpoint; unrelated tested
+  bridge ports were blocked or closed.
+- A 32 MiB random payload had identical source and destination sizes, SHA-256
+  `29efb03c7cc5be106c13f321e212b997e445e37430ff4329fdcb1f9099434bc8`, and byte comparison.
+  Only the generated test pair was deleted afterward; pre-existing USB content was untouched.
+- App Unmount removed the NFS mount, anylinuxfs session, private VM/bridge, and owned exact route.
+- Finder **Disconnect** on the synthetic NFS share and a later external NFS unmount were each
+  detected by the open app; helper reconciliation completed the same VM/PF/route cleanup and the
+  GUI returned to a detected, unmounted drive without retaining a green state.
+- The maintainer ran the root-only security-transaction gate, but its stdout was not captured in
+  the agent transcript. Do not substitute that report for a retained gate output in a release PR.
+- Not tested in this session: VPN-off, CLI→GUI mount discovery, helper/crash restart, physical
+  hardware eject or hot-unplug, and concurrent devices. Those roadmap cells remain open.
+
+After replacing the helper/runtime binary during local development, macOS may require toggling
+the helper's existing Full Disk Access entry off and on so TCC refreshes the changed executable.
+The installer now uses fresh inodes plus atomic rename for signed runtime files; it does not alter
+Full Disk Access, Gatekeeper, SIP, quarantine, or signing policy.
+
+### App unmount, Finder disconnect, and hardware eject are different operations
+
+- **App Unmount** is the canonical transaction. It asks the privileged helper to stop the
+  anylinuxfs export/VM and NFS mount, then releases only that session's PF token and exact route;
+  the GUI waits for observed host state before publishing unmounted success.
+- Finder **Disconnect** on `diskNsN.local` removes the macOS NFS client mount outside the app.
+  The open app detects the authoritative disappearance and asks the helper to finish backend,
+  PF, and route cleanup. This recovery path passed live, but App Unmount is more deterministic
+  because one owner drives the entire transaction from the start.
+- Finder **Eject** on the physical USB disk is a Disk Arbitration whole-device action, not an NFS
+  share disconnect. While ntfsmac is active, the physical NTFS partition has already been detached
+  from macOS and the visible mounted volume is the network share. Unmount in ntfsmac first, wait
+  until the GUI shows the drive as detected/unmounted, and only then eject the physical device.
+  Soft NFS and reconciliation reduce failure impact; they are not evidence that physical eject or
+  hot-unplug was tested in this session.
 
 ```
 $ NTFSMAC_PREFIX/bin/ntfsmac diagnose
@@ -249,7 +310,7 @@ sandbox.
 
 ```
 $ NTFSMAC_PREFIX/bin/ntfsmac uninstall
-pf-teardown: done
+security_teardown=notRequired reason=NO_SESSION_STATE
 uninstall: removed <tmp-prefix>
 uninstall: removed ~/.anylinuxfs (rootfs cache + config.toml)
 uninstall: not running as root — the GUI's privileged helper (if installed) was left in place.
