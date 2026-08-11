@@ -9,7 +9,7 @@
 This is the canonical product roadmap for the BinaryBears fork. It replaces the older practice
 of treating implementation plans, test-session notes, and private scratch files as a current
 feature list. The code status below was reconciled on 2026-08-11 against `upstream/main` at
-`0725c31` (`v2.1.090826`) and the synchronized BinaryBears `dev` at `96c3aa3`.
+`0725c31` (`v2.1.090826`) and the BinaryBears live-security completion at `762cc91`.
 The original live hardware findings from 2026-08-06 are recorded in
 [Live Mount-State and NFS Transport Audit — 2026-08-06](audits/LIVE_MOUNT_STATE_AND_NFS_TRANSPORT_AUDIT_2026-08-06.md)
 and the focused VPN-on P0 follow-up is recorded in
@@ -55,12 +55,16 @@ macOS release.
 | `main` | Clean mirror of `khr898/ntfsmac:main` | Fast-forward/synchronize from upstream; no BinaryBears-only roadmap commits |
 | `dev` | BinaryBears product line | Current `main` plus this roadmap and tested fork-only improvements |
 | `feat/*`, `fix/*`, `docs/*` | One BinaryBears roadmap deliverable | Branch from `dev`, validate, then PR back to `dev` |
-| upstream candidate branch | One change proposed to khr898 | Branch directly from current `upstream/main`; exclude fork branding/roadmap |
+| `upstream-pr/<N>of<total>-*` | One ordered change proposed to khr898 | Start the series from current `upstream/main`; exclude fork branding/roadmap and refresh each dependent candidate after its predecessor merges |
 
 Upstream changes are integrated into `dev` as an explicit sync after `main` is updated. Already
 accepted work is taken from upstream's final implementation rather than replaying the fork's older
 version of the same commits. This keeps maintainer fixes authoritative and reduces recurring
 conflicts.
+
+The current four-part upstream candidate series, its dependency order, exact validation evidence,
+and local/remote publication state are recorded in [`BRANCHING.md`](BRANCHING.md). Preparing those
+branches does not imply that they were pushed, opened as pull requests, or accepted upstream.
 
 ## Completed BinaryBears foundation
 
