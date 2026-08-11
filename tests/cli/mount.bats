@@ -32,6 +32,7 @@ STUB
 
   export PATH="$STUB_DIR:$PATH"
   export NTFSMAC_SKIP_ROOT_CHECK=1
+  export NTFSMAC_SECURITY_STATE_DIR="$STUB_DIR/security-state"
   export HOME="$STUB_DIR/home"
   mkdir -p "$HOME/.anylinuxfs/alpine"
   # Every other test in this file stubs anylinuxfs's exit code directly and isn't testing the
@@ -235,6 +236,80 @@ STUB
   run "$SCRIPT" disk2s1
   [ "$status" -ne 0 ]
   [[ "$output" == *"no response after 1s"* ]]
+}
+
+@test "a VPN-captured vmnet endpoint is repaired before the backend NFS readiness check" {
+  export NTFSMAC_SECURITY_BRIDGE_CANDIDATES_FILE="$STUB_DIR/bridge-candidates"
+  export NTFSMAC_PFCTL_BIN="$STUB_DIR/pfctl"
+  export NTFSMAC_ROUTE_BIN="$STUB_DIR/route"
+  export NTFSMAC_DEFAULT_INTERFACE_OVERRIDE="utun4"
+  export NTFSMAC_SECURITY_RESOLVED_IP_OVERRIDE="172.27.1.2"
+  export NTFSMAC_SECURITY_BRIDGE_INTERFACE_OVERRIDE="bridge100"
+  export NTFSMAC_SECURITY_STATUS_OUTPUT="/dev/disk2s1 on /Volumes/Test (ntfs-3g, soft) VM[cpus: 1, ram: 512 MiB]"
+  export NTFSMAC_SECURITY_MOUNT_OUTPUT="disk2s1.local:/mnt/Test on /Volumes/Test (nfs, soft)"
+  export NTFSMAC_SECURITY_NFSSTAT_OUTPUT="/Volumes/Test from disk2s1.local:/mnt/Test
+  -- Current mount parameters:
+     NFS parameters: vers=3,tcp,soft,port=2049,mountport=32767"
+  export PFCTL_LOG="$STUB_DIR/pfctl.calls"
+
+  cat > "$NTFSMAC_PFCTL_BIN" <<STUB
+#!/bin/bash
+printf '%s\n' "\$*" >> "$PFCTL_LOG"
+if [[ "\$*" == "-sr" ]]; then
+  echo 'anchor "com.apple/*" all'
+elif [[ "\$*" == "-E" ]]; then
+  echo 'Token : A1B2C3D4'
+elif [[ "\$1" == "-a" && "\$3" == "-f" ]]; then
+  touch "$STUB_DIR/pf-loaded"
+elif [[ "\$1" == "-a" && "\$3" == "-sr" ]]; then
+  echo 'pass out quick label ntfsmac-disk2s1-nfs'
+  echo 'block drop quick label ntfsmac-disk2s1-egress-block'
+  echo 'block drop quick label ntfsmac-disk2s1-ingress-block'
+fi
+exit 0
+STUB
+  cat > "$NTFSMAC_ROUTE_BIN" <<STUB
+#!/bin/bash
+printf '%s\n' "\$*" >> "$STUB_DIR/route.calls"
+if [[ "\$1 \$2 \$3" == "-n get 172.27.1.2" ]]; then
+  [[ -f "$STUB_DIR/route-added" ]] && echo 'interface: bridge100' || echo 'interface: utun4'
+elif [[ "\$1 \$2" == "-n get" && "\$3" == "default" ]]; then
+  echo 'interface: utun4'
+elif [[ "\$1 \$2" == "add -host" ]]; then
+  touch "$STUB_DIR/route-added"
+fi
+exit 0
+STUB
+  cat > "$STUB_DIR/anylinuxfs" <<STUB
+#!/bin/bash
+echo "\$@" >> "$CALL_LOG"
+if [[ "\$1" == "mount" ]]; then
+  printf 'bridge100|172.27.1.2|172.27.1.0/30\n' > "$NTFSMAC_SECURITY_BRIDGE_CANDIDATES_FILE"
+  for _ in {1..100}; do
+    if [[ -f "$STUB_DIR/pf-loaded" && -f "$STUB_DIR/route-added" ]]; then
+      echo '/dev/disk2s1 was mounted as /Volumes/Test'
+      exit 0
+    fi
+    sleep 0.02
+  done
+  echo 'backend reached NFS check before transport preparation' >&2
+  exit 55
+fi
+exit 0
+STUB
+  chmod +x "$NTFSMAC_PFCTL_BIN" "$NTFSMAC_ROUTE_BIN" "$STUB_DIR/anylinuxfs"
+
+  run "$SCRIPT" --fs-driver ntfs-3g disk2s1
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"security_prepare=enforced reason=PREMOUNT_TRANSPORT_MEASURED"* ]]
+  [[ "$output" == *"security_overall=enforced reason=SECURITY_ENFORCED"* ]]
+  run cat "$STUB_DIR/route.calls"
+  [[ "$output" == *"add -host 172.27.1.2 -interface bridge100"* ]]
+  [[ "$output" != *"delete default"* ]]
+  run grep -c '^-E$' "$PFCTL_LOG"
+  [ "$output" -eq 1 ]
+  run grep -F 'route_owned=1' "$NTFSMAC_SECURITY_STATE_DIR/disk2s1.state"
+  [ "$status" -eq 0 ]
 }
 
 @test "auto-passes --ignore-permissions for an ext drive on the direct path (probed fstype)" {

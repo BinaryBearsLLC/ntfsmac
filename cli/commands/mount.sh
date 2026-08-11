@@ -11,6 +11,8 @@ source "$SCRIPT_DIR/../lib/nfs-mount.sh"
 source "$SCRIPT_DIR/../lib/list-drives.sh"
 # shellcheck source=../lib/interactive-select.sh
 source "$SCRIPT_DIR/../lib/interactive-select.sh"
+# shellcheck source=../lib/security-transaction.sh
+source "$SCRIPT_DIR/../lib/security-transaction.sh"
 
 usage() {
   echo "usage: mount.sh [--fs-driver ntfs-3g|ntfs3] [--read-only] [--ignore-permissions] <device> [mount_point]" >&2
@@ -29,6 +31,10 @@ cmd_mount() {
   if [[ $EUID -ne 0 && "${NTFSMAC_SKIP_ROOT_CHECK:-}" != "1" ]]; then
     exec sudo "$0" "$@"
   fi
+
+  # Recover only stale protection records before allocating another session. An unavailable
+  # runtime status source is fail-closed: reconciliation preserves all existing anchors/routes.
+  security_reconcile >/dev/null || true
 
   local fs_driver="" device="" mount_point="" read_only="" ignore_perms=""
   local -a positional=()
@@ -160,6 +166,11 @@ cmd_mount() {
   fi
 
   if run_anylinuxfs_mount "$device" "$fs_driver" "$mount_point" "$read_only" "$ignore_perms"; then
+    # anylinuxfs currently owns private-link creation and the host NFS mount as one operation, so
+    # Option A applies/measures protection immediately after the kernel mount but before this
+    # wrapper publishes "mounted". A failed proof remains visible and never becomes a green state.
+    security_apply_for_mount "$device" || \
+      echo "security_overall=unknown reason=SECURITY_TRANSACTION_FAILED" >&2
     echo "mount: $device mounted"
     return 0
   fi

@@ -236,11 +236,11 @@ private func awaitReply(_ body: (@escaping (Data?, String?) -> Void) -> Void) as
     #expect(runner.calls[0].arguments == ["unmount", "/Volumes/MyDrive"])
 }
 
-@Test func teardownOmitsSubnetArgWhenNil() async {
+@Test func teardownOmitsSessionArgWhenNil() async {
     let runner = FakeRunner()
     let service = HelperService(runner: runner)
     let (data, error) = await awaitReply { reply in
-        service.teardown(subnetCIDR: nil, reply: reply)
+        service.teardown(sessionID: nil, reply: reply)
     }
     #expect(data != nil)
     #expect(error == nil)
@@ -301,6 +301,36 @@ private final class MountsAfterFirstCheckRunner: PrivilegedCommandRunning {
 
 @Test func removeDependenciesAbortsIfAMountBecomesActiveBeforeTheDelete() async {
     let runner = MountsAfterFirstCheckRunner()
+    let service = HelperService(runner: runner)
+    let (data, error) = await awaitReply { reply in
+        service.removeDependencies(reply: reply)
+    }
+    #expect(data == nil)
+    #expect(error != nil)
+    #expect(runner.calls.contains { $0.executablePath == "/bin/rm" } == false)
+}
+
+private final class UnknownSecurityCleanupRunner: PrivilegedCommandRunning {
+    private(set) var calls: [FakeRunner.Call] = []
+
+    func run(_ executablePath: String, _ arguments: [String]) -> CommandResult {
+        calls.append(FakeRunner.Call(executablePath: executablePath, arguments: arguments))
+        if executablePath == "/sbin/mount" {
+            return CommandResult(output: "", exitCode: 0)
+        }
+        if executablePath.hasSuffix("/pf-teardown.sh") {
+            return CommandResult(output: "security_reconcile=unknown reason=STATUS_UNAVAILABLE", exitCode: 0)
+        }
+        return CommandResult(output: "", exitCode: 0)
+    }
+
+    func runPipingStdin(_ input: String, to executablePath: String, _ arguments: [String]) -> CommandResult {
+        CommandResult(output: "", exitCode: 0)
+    }
+}
+
+@Test func removeDependenciesAbortsWhenSessionSecurityCleanupIsUnknown() async {
+    let runner = UnknownSecurityCleanupRunner()
     let service = HelperService(runner: runner)
     let (data, error) = await awaitReply { reply in
         service.removeDependencies(reply: reply)
@@ -404,40 +434,15 @@ private final class SymlinkAwareRunner: PrivilegedCommandRunning {
     #expect(symlinkRemoval == nil)
 }
 
-@Test func applyPfRulesRejectsNonPrivateCIDRWithoutRunningAnything() async {
+@Test func teardownRejectsInvalidSessionWithoutRunningAnything() async {
     let runner = FakeRunner()
     let service = HelperService(runner: runner)
     let (data, error) = await awaitReply { reply in
-        service.applyPfRules(subnetCIDR: "0.0.0.0/0", reply: reply)
-    }
-    #expect(data == nil)
-    #expect(error != nil)
-    #expect(runner.calls.isEmpty, "rejected subnetCIDR must never reach the runner")
-}
-
-@Test func teardownRejectsNonPrivateCIDRWithoutRunningAnything() async {
-    let runner = FakeRunner()
-    let service = HelperService(runner: runner)
-    let (data, error) = await awaitReply { reply in
-        service.teardown(subnetCIDR: "8.8.8.8/24", reply: reply)
+        service.teardown(sessionID: "disk2s1; pfctl -d", reply: reply)
     }
     #expect(data == nil)
     #expect(error != nil)
     #expect(runner.calls.isEmpty)
-}
-
-@Test func applyPfRulesShortCircuitsOnRenderFailure() async {
-    let runner = FakeRunner()
-    runner.stubbedResult = CommandResult(output: "pf-anchor: a subnet CIDR is required", exitCode: 1)
-    let service = HelperService(runner: runner)
-    let (data, error) = await awaitReply { reply in
-        service.applyPfRules(subnetCIDR: "192.168.127.0/30", reply: reply)
-    }
-    #expect(data != nil)
-    #expect(error == nil)
-    // Render failed (exit 1) — must never proceed to pipe into pfctl.
-    #expect(runner.calls.count == 1)
-    #expect(runner.calls[0].executablePath == "\(installPrefix)/libexec/ntfsmac/lib/pf-anchor.sh")
 }
 
 // MARK: - isValidStageCLIPath (mirrors validateDevice/isValidUnmountTarget's shape-check discipline)

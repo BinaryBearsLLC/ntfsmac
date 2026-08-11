@@ -8,7 +8,7 @@
 # the helper binary, the gui binary, and finally the outer bundle, in that order (inner
 # code must be signed before the bundle that contains it).
 #
-# Bundles vendor/bin/* + cli/{commands,lib} + install.sh into Contents/Resources/cli-src/
+# Bundles vendor/bin/* + cli/{commands,lib,pf} + install.sh into Contents/Resources/cli-src/
 # (REPO_ROOT-relative layout install.sh already expects, unchanged) — explicit product
 # decision, supersedes this script's prior "CLI installed separately via install.sh/tap"
 # note: `HelperService.stageCLI` now runs this same bundled install.sh, already root, right
@@ -50,6 +50,15 @@ validate_product_versions() {
   fi
 }
 
+swift_build_release() {
+  local -a args=(-c release --package-path "$REPO_ROOT")
+  # Codex/CI may already run inside a filesystem sandbox; SwiftPM's nested sandbox cannot be
+  # created there. This opt-in disables only SwiftPM's inner process sandbox, never the outer
+  # runner or any repository safety gate.
+  [[ "${NTFSMAC_SWIFTPM_DISABLE_SANDBOX:-}" == "1" ]] && args+=(--disable-sandbox)
+  swift build "${args[@]}"
+}
+
 main() {
   validate_product_versions || exit 1
 
@@ -77,7 +86,7 @@ main() {
 
   if [[ -z "${NTFSMAC_SKIP_SWIFT_BUILD:-}" ]]; then
     echo "package-app: swift build -c release (pass 1 — placeholder hash, hashing tool only)"
-    if ! swift build -c release --package-path "$REPO_ROOT"; then
+    if ! swift_build_release; then
       echo "package-app: HARD-STOP — swift build -c release (pass 1) failed" >&2
       exit 1
     fi
@@ -100,7 +109,7 @@ main() {
   # guaranteed to match exactly what the bundle actually contains.
   local cli_stage
   cli_stage="$(mktemp -d)"
-  mkdir -p "$cli_stage/vendor/bin" "$cli_stage/vendor/kernel" "$cli_stage/cli/commands" "$cli_stage/cli/lib" "$cli_stage/build/lib" "$cli_stage/gui"
+  mkdir -p "$cli_stage/vendor/bin" "$cli_stage/vendor/kernel" "$cli_stage/cli/commands" "$cli_stage/cli/lib" "$cli_stage/cli/pf" "$cli_stage/build/lib" "$cli_stage/gui"
   if ! cp "$REPO_ROOT/install.sh" "$cli_stage/install.sh"; then
     echo "package-app: HARD-STOP — failed to stage install.sh" >&2
     exit 1
@@ -116,6 +125,10 @@ main() {
   fi
   if ! cp "$REPO_ROOT"/cli/lib/*.sh "$cli_stage/cli/lib/"; then
     echo "package-app: HARD-STOP — failed to stage cli/lib/*.sh" >&2
+    exit 1
+  fi
+  if ! cp "$REPO_ROOT"/cli/pf/*.tmpl "$cli_stage/cli/pf/"; then
+    echo "package-app: HARD-STOP — failed to stage cli/pf/*.tmpl" >&2
     exit 1
   fi
   if ! cp "$REPO_ROOT/gui/Info.plist" "$cli_stage/gui/Info.plist"; then
@@ -174,11 +187,18 @@ SWIFT
   sync
   sleep 1
 
-  echo "package-app: swift build -c release (pass 2 — real hash baked into the shipped helper)"
-  if ! swift build -c release --package-path "$REPO_ROOT"; then
-    echo "package-app: HARD-STOP — swift build -c release (pass 2) failed" >&2
-    rm -rf "$cli_stage"
-    exit 1
+  if [[ -z "${NTFSMAC_SKIP_SWIFT_BUILD:-}" ]]; then
+    echo "package-app: swift build -c release (pass 2 — real hash baked into the shipped helper)"
+    if ! swift_build_release; then
+      echo "package-app: HARD-STOP — swift build -c release (pass 2) failed" >&2
+      rm -rf "$cli_stage"
+      exit 1
+    fi
+  else
+    # Fixture tests inject already-built Mach-O binaries (including a helper that implements
+    # --print-tree-hash). Skipping pass 1 must skip pass 2 too; otherwise the test unexpectedly
+    # invokes the host Swift toolchain but still packages the injected binaries from RELEASE_DIR.
+    echo "package-app: swift build skipped — using injected release binaries"
   fi
   # Re-read: pass 2 rebuilt both binaries at the same $RELEASE_DIR paths — $helper_bin now
   # carries the real pinned hash, this is the one that actually gets signed and installed below.

@@ -6,8 +6,8 @@
 # mounted"/"not mounted yet" as non-fatal warnings, not hangs). Never passes
 # --wait-for-vm: synchronously waiting for VM process exit risks blocking on a
 # wedged/dead VM — PLAN.md's Don't clause ("never block indefinitely on a dead mount").
-# Calls Phase-1 pf teardown if that unit has landed (soft-optional — Phase 1 is
-# deferrable per PLAN.md (non-blocking); its absence here is not an error).
+# Removes only this mount's per-session PF enable token, anchor, and owned route after the
+# unmount succeeds. A failed unmount keeps its protection intact.
 set -u
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
@@ -15,11 +15,12 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 source "$SCRIPT_DIR/../lib/resolve-vendor-bin.sh"
 # See cli/lib/nfs-mount.sh's identical line for why this isn't a bare "anylinuxfs" PATH lookup.
 ANYLINUXFS_BIN="${NTFSMAC_ANYLINUXFS_BIN:-$(resolve_vendor_bin anylinuxfs || true)}"
-PF_TEARDOWN="$SCRIPT_DIR/../lib/pf-teardown.sh"
 # shellcheck source=../lib/list-drives.sh
 source "$SCRIPT_DIR/../lib/list-drives.sh"
 # shellcheck source=../lib/interactive-select.sh
 source "$SCRIPT_DIR/../lib/interactive-select.sh"
+# shellcheck source=../lib/security-transaction.sh
+source "$SCRIPT_DIR/../lib/security-transaction.sh"
 
 usage() {
   echo "usage: unmount.sh <device_or_mount_point>" >&2
@@ -85,6 +86,9 @@ cmd_unmount() {
     return 1
   fi
 
+  local security_session=""
+  security_session="$(security_session_for_target "$target" 2>/dev/null)" || security_session=""
+
   # Bounded + heartbeated (NTFSMAC_UNMOUNT_TIMEOUT, default 60s): unmount should be fast, but a
   # wedged guest VM/NFS server must never leave the user staring at a silent blocked terminal.
   # outfile "-": anylinuxfs's own live output stays visible in real time, not buffered.
@@ -93,8 +97,13 @@ cmd_unmount() {
     return 1
   fi
 
-  if [[ -x "$PF_TEARDOWN" ]]; then
-    "$PF_TEARDOWN" || echo "unmount: WARN — pf-teardown.sh failed (non-fatal)" >&2
+  if [[ -n "$security_session" ]]; then
+    security_teardown_session "$security_session" || \
+      echo "unmount: WARN — session security teardown failed (non-fatal)" >&2
+  else
+    # Do not flush a shared/global anchor when the target could not be mapped. Reconcile only
+    # records proven stale by authoritative anylinuxfs status.
+    security_reconcile >/dev/null || true
   fi
 
   echo "unmount: $target unmounted"

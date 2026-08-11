@@ -34,12 +34,24 @@ refuse_if_mounted() {
 }
 
 teardown_pf_if_present() {
+  local force="${1:-}" output
   local teardown_script="$PREFIX/libexec/ntfsmac/lib/pf-teardown.sh"
-  # Silent-failure-hunter finding (2026-07-13, LOW): a real (non-fatal-by-design) teardown
-  # failure was fully swallowed here with no message, unlike unmount.sh's identical call —
-  # matching that WARN for parity.
+  # A normal uninstall must prove stale-session reconciliation before deleting the scripts that
+  # own PF tokens/routes. Only explicit --force keeps cleanup best-effort.
   if [[ -x "$teardown_script" ]]; then
-    "$teardown_script" || echo "uninstall: WARN — pf-teardown.sh failed (non-fatal)" >&2
+    if [[ -n "$force" ]]; then
+      "$teardown_script" --all || \
+        echo "uninstall: WARN — forced session security teardown failed (non-fatal)" >&2
+      return 0
+    fi
+    if ! output="$("$teardown_script")"; then
+      echo "uninstall: session security reconciliation failed; use --force only if you accept residual risk" >&2
+      return 1
+    fi
+    if [[ "$output" == *"=unknown"* || "$output" == *"=notEnforced"* ]]; then
+      echo "uninstall: session security cleanup could not be proven; use --force only if you accept residual risk" >&2
+      return 1
+    fi
   fi
   return 0
 }
@@ -164,7 +176,7 @@ cmd_uninstall() {
   done
 
   refuse_if_mounted "$force" || return 1
-  teardown_pf_if_present
+  teardown_pf_if_present "$force" || return 1
   remove_path_symlink
   remove_prefix || return 1
   remove_rootfs_cache "$keep_cache"

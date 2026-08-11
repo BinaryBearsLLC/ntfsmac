@@ -24,6 +24,7 @@ STUB
   chmod +x "$STUB_DIR/umount"
 
   export PATH="$STUB_DIR:$PATH"
+  export NTFSMAC_SECURITY_STATE_DIR="$STUB_DIR/security-state"
 }
 
 teardown() {
@@ -41,7 +42,7 @@ teardown() {
   run "$SCRIPT" /Volumes/MyDrive
   [ "$status" -eq 0 ]
   run cat "$CALL_LOG"
-  [[ "$output" == "unmount /Volumes/MyDrive" ]]
+  [[ "$output" == *"unmount /Volumes/MyDrive"* ]]
 }
 
 @test "never passes --wait-for-vm (would risk hanging on a dead VM)" {
@@ -117,7 +118,7 @@ STUB
   run "$SCRIPT" <<< "2"
   [ "$status" -eq 0 ]
   run cat "$CALL_LOG"
-  [[ "$output" == "unmount /Volumes/OtherDrive" ]]
+  [[ "$output" == *"unmount /Volumes/OtherDrive"* ]]
 }
 
 @test "no target given, nothing mounted: clear message, no anylinuxfs call" {

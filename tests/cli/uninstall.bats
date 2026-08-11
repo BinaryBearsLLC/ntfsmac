@@ -175,12 +175,40 @@ STUB
 @test "tears down the pf anchor when the script is present" {
   cat > "$NTFSMAC_PREFIX/libexec/ntfsmac/lib/pf-teardown.sh" <<'STUB'
 #!/bin/bash
-echo "pf-teardown: called" >> "PF_TEARDOWN_LOG"
+echo "pf-teardown: $*" >> "PF_TEARDOWN_LOG"
 exit 0
 STUB
   sed -i '' "s#PF_TEARDOWN_LOG#$SCRATCH/pf-teardown.log#" "$NTFSMAC_PREFIX/libexec/ntfsmac/lib/pf-teardown.sh"
   chmod +x "$NTFSMAC_PREFIX/libexec/ntfsmac/lib/pf-teardown.sh"
   run "$SCRIPT"
   [ "$status" -eq 0 ]
-  [ -f "$SCRATCH/pf-teardown.log" ]
+  run cat "$SCRATCH/pf-teardown.log"
+  [ "$output" = "pf-teardown: " ]
+}
+
+@test "--force explicitly tears down all recorded security sessions" {
+  cat > "$NTFSMAC_PREFIX/libexec/ntfsmac/lib/pf-teardown.sh" <<'STUB'
+#!/bin/bash
+echo "pf-teardown: $*" >> "PF_TEARDOWN_LOG"
+exit 0
+STUB
+  sed -i '' "s#PF_TEARDOWN_LOG#$SCRATCH/pf-teardown.log#" "$NTFSMAC_PREFIX/libexec/ntfsmac/lib/pf-teardown.sh"
+  chmod +x "$NTFSMAC_PREFIX/libexec/ntfsmac/lib/pf-teardown.sh"
+  run "$SCRIPT" --force
+  [ "$status" -eq 0 ]
+  run cat "$SCRATCH/pf-teardown.log"
+  [ "$output" = "pf-teardown: --all" ]
+}
+
+@test "normal uninstall stops when security reconciliation is unknown" {
+  cat > "$NTFSMAC_PREFIX/libexec/ntfsmac/lib/pf-teardown.sh" <<'STUB'
+#!/bin/bash
+echo 'security_reconcile=unknown reason=STATUS_UNAVAILABLE'
+exit 0
+STUB
+  chmod +x "$NTFSMAC_PREFIX/libexec/ntfsmac/lib/pf-teardown.sh"
+  run "$SCRIPT"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"cleanup could not be proven"* ]]
+  [ -d "$NTFSMAC_PREFIX" ]
 }

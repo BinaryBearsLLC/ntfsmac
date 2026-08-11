@@ -44,31 +44,6 @@ public func isValidMountPoint(_ path: String) -> Bool {
     isValidVolumesPath(path)
 }
 
-/// `applyPfRules`/`teardown`'s `subnetCIDR` gate. Security review finding (2026-07-13, HIGH):
-/// `cli/lib/pf-anchor.sh` loads this value into a root `pfctl` anchor with no format/scope check
-/// — a syntactically valid but overly wide CIDR (e.g. `0.0.0.0/0`) would violate the anchor's
-/// own "never widen scope beyond the subnet" invariant. The vmnet-helper host-only bridge this
-/// project uses is always an RFC1918-private `/30` (PLAN.md "vmnet-helper host-only `/30`
-/// bridge") — this checks exactly that shape, independent of whatever the caller claims.
-public func isValidSubnetCIDR(_ cidr: String) -> Bool {
-    let parts = cidr.split(separator: "/", maxSplits: 1)
-    guard parts.count == 2, parts[1] == "30" else { return false }
-    let octets = parts[0].split(separator: ".", omittingEmptySubsequences: false)
-    guard octets.count == 4 else { return false }
-    var bytes: [UInt8] = []
-    for octet in octets {
-        guard octet.count >= 1, octet.count <= 3, octet.allSatisfy(\.isNumber), let value = UInt8(octet) else { return false }
-        bytes.append(value)
-    }
-    // RFC1918 private ranges only — 10/8, 172.16/12, 192.168/16.
-    switch bytes[0] {
-    case 10: return true
-    case 172: return bytes[1] >= 16 && bytes[1] <= 31
-    case 192: return bytes[1] == 168
-    default: return false
-    }
-}
-
 /// `stageCLI`'s input check — same discipline as `validateDevice`/`isValidUnmountTarget`
 /// (never trust the caller). `build/package-app.sh` only ever produces one relative layout;
 /// this string match is what pins the helper to running *that* script and nothing an
@@ -190,8 +165,10 @@ public struct CommandResult: Codable, Sendable {
     }
 }
 
-/// PLAN.md §3 XPC surface — this unit's Do clause scopes exactly these four methods (mount,
-/// unmount, applyPfRules, teardown). `listDrives`/`status`/`diagnose` are deliberately absent:
+/// Mutating XPC surface. Mount/unmount call the CLI's per-session security transaction inside the
+/// already-root helper; there is deliberately no raw "load these PF rules" method anymore. That
+/// older split API could load an unevaluated anchor with no lifecycle ownership or measured state.
+/// `listDrives`/`status`/`diagnose` are deliberately absent:
 /// each is read-only and explicitly Don't-listed as privileged in their own units
 /// (`3-drive-detect`, `3-status-speed`, `3-diagnose-ui` all call the CLI directly, unprivileged).
 @objc public protocol HelperXPCProtocol {
@@ -207,12 +184,9 @@ public struct CommandResult: Codable, Sendable {
     /// `target` is re-validated against `isValidUnmountTarget` inside the helper.
     func unmount(target: String, reply: @escaping (Data?, String?) -> Void)
 
-    /// Renders `cli/lib/pf-anchor.sh`'s anchor for `subnetCIDR` and loads it via
-    /// `pfctl -a ntfsmac -f -` (anchor-scoped, never a bare `pfctl -f`).
-    func applyPfRules(subnetCIDR: String, reply: @escaping (Data?, String?) -> Void)
-
-    /// Runs `cli/lib/pf-teardown.sh` (anchor-scoped `pfctl -a ntfsmac -F rules`, idempotent).
-    func teardown(subnetCIDR: String?, reply: @escaping (Data?, String?) -> Void)
+    /// Removes one recorded session, or reconciles stale sessions when nil. Never flushes a
+    /// global/shared anchor, so one mount cannot invalidate another mount's protection.
+    func teardown(sessionID: String?, reply: @escaping (Data?, String?) -> Void)
 
     /// Removes `installPrefix` (CLI + vendored dependencies, same tree `cli/commands/
     /// uninstall.sh` targets) plus the real invoking user's `~/.anylinuxfs` (rootfs cache +
@@ -442,10 +416,14 @@ public struct RealCommandRunner: PrivilegedCommandRunning {
     }
 }
 
-/// Implements the four privileged XPC methods this unit scopes (§3, `3-xpc-helper`'s Do
-/// clause). Every method re-validates its own input before `runner` ever sees it — the helper
+/// Implements the minimal privileged XPC surface (§3, `3-xpc-helper`'s Do clause). Every method
+/// re-validates its own input before `runner` ever sees it — the helper
 /// treats every caller as hostile regardless of what the GUI/CLI already checked.
 public final class HelperService: NSObject, HelperXPCProtocol {
+    /// One lock across every connection-owned HelperService instance. Mutating calls must not
+    /// interleave a mount with teardown/staging/removal: that could erase a freshly created
+    /// session anchor or delete the CLI while a privileged operation is starting.
+    private static let mutationLock = NSLock()
     private let runner: PrivilegedCommandRunning
     private let resolvePrefix: @Sendable () -> String
     private let expectedCLITreeHash: String
@@ -491,6 +469,8 @@ public final class HelperService: NSObject, HelperXPCProtocol {
     }
 
     public func mount(device: String, driver: String, mountPoint: String?, readOnly: Bool, reply: @escaping (Data?, String?) -> Void) {
+        Self.mutationLock.lock()
+        defer { Self.mutationLock.unlock() }
         guard validateDevice(device) else {
             reply(nil, "rejected: device \"\(device)\" does not match \(deviceNamePattern)")
             return
@@ -518,6 +498,8 @@ public final class HelperService: NSObject, HelperXPCProtocol {
     }
 
     public func unmount(target: String, reply: @escaping (Data?, String?) -> Void) {
+        Self.mutationLock.lock()
+        defer { Self.mutationLock.unlock() }
         guard isValidUnmountTarget(target) else {
             reply(nil, "rejected: unmount target \"\(target)\" is neither a valid device nor a /Volumes/ path")
             return
@@ -526,32 +508,22 @@ public final class HelperService: NSObject, HelperXPCProtocol {
         encode(result, reply: reply)
     }
 
-    public func applyPfRules(subnetCIDR: String, reply: @escaping (Data?, String?) -> Void) {
-        guard isValidSubnetCIDR(subnetCIDR) else {
-            reply(nil, "rejected: subnetCIDR \"\(subnetCIDR)\" is not a private /30")
-            return
-        }
-        let render = runner.run("\(resolvePrefix())/libexec/ntfsmac/lib/pf-anchor.sh", [subnetCIDR])
-        guard render.exitCode == 0 else {
-            encode(render, reply: reply)
-            return
-        }
-        let load = runner.runPipingStdin(render.output, to: "/sbin/pfctl", ["-a", "ntfsmac", "-f", "-"])
-        encode(load, reply: reply)
-    }
-
-    public func teardown(subnetCIDR: String?, reply: @escaping (Data?, String?) -> Void) {
-        if let subnetCIDR, !isValidSubnetCIDR(subnetCIDR) {
-            reply(nil, "rejected: subnetCIDR \"\(subnetCIDR)\" is not a private /30")
+    public func teardown(sessionID: String?, reply: @escaping (Data?, String?) -> Void) {
+        Self.mutationLock.lock()
+        defer { Self.mutationLock.unlock() }
+        if let sessionID, !validateDevice(sessionID) {
+            reply(nil, "rejected: sessionID \"\(sessionID)\" does not match \(deviceNamePattern)")
             return
         }
         var args: [String] = []
-        if let subnetCIDR { args.append(subnetCIDR) }
+        if let sessionID { args.append(sessionID) }
         let result = runner.run("\(resolvePrefix())/libexec/ntfsmac/lib/pf-teardown.sh", args)
         encode(result, reply: reply)
     }
 
     public func removeDependencies(reply: @escaping (Data?, String?) -> Void) {
+        Self.mutationLock.lock()
+        defer { Self.mutationLock.unlock() }
         guard noActiveNfsMount() else {
             reply(nil, "rejected: an NFS mount is currently active — unmount it first")
             return
@@ -562,7 +534,16 @@ public final class HelperService: NSObject, HelperXPCProtocol {
         // deleting another would be its own bug), unlike `mount`/`unmount` which only ever touch
         // the prefix once each.
         let prefix = resolvePrefix()
-        _ = runner.run("\(prefix)/libexec/ntfsmac/lib/pf-teardown.sh", [])
+        // Reconcile rather than flushing every record. If another non-XPC CLI mount appears,
+        // active state is preserved and the second mount-table check below aborts removal.
+        let cleanup = runner.run("\(prefix)/libexec/ntfsmac/lib/pf-teardown.sh", [])
+        guard cleanup.exitCode == 0,
+              !cleanup.output.contains("=unknown"),
+              !cleanup.output.contains("=notEnforced")
+        else {
+            reply(nil, "rejected: session security cleanup could not be proven")
+            return
+        }
 
         // Re-check immediately before the destructive delete, not just once at the top — a
         // concurrent `mount(...)` XPC call could land in the gap between the first check and
@@ -616,6 +597,8 @@ public final class HelperService: NSObject, HelperXPCProtocol {
     }
 
     public func stageCLI(installScriptPath: String, reply: @escaping (Data?, String?) -> Void) {
+        Self.mutationLock.lock()
+        defer { Self.mutationLock.unlock() }
         guard isValidStageCLIPath(installScriptPath) else {
             reply(nil, "rejected: installScriptPath \"\(installScriptPath)\" is not a bundled install.sh")
             return
@@ -657,6 +640,8 @@ public final class HelperService: NSObject, HelperXPCProtocol {
     }
 
     public func uninstallHelper(reply: @escaping (Data?, String?) -> Void) {
+        Self.mutationLock.lock()
+        defer { Self.mutationLock.unlock() }
         let label = helperMachServiceName
         _ = runner.run("/bin/rm", ["-f", "/Library/LaunchDaemons/\(label).plist"])
         // Deleting our own running binary is safe on Unix — the inode stays valid until this

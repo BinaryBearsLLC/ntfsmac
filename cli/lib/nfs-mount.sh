@@ -119,7 +119,27 @@ run_anylinuxfs_mount() {
   # VM boot legitimately takes 1-2 min per the notice above, this just bounds a truly wedged
   # guest instead of hanging forever with zero feedback). outfile "-": anylinuxfs's own live
   # "macOS: .../Linux: ..." progress lines stay visible in real time, never buffered.
-  if ! run_with_progress "${NTFSMAC_MOUNT_TIMEOUT:-240}" 15 "mount" - "$ANYLINUXFS_BIN" "${args[@]}"; then
+  # Start the bounded backend as a background job so the transaction layer can observe the new
+  # vmnet /30 and repair an exact VPN-captured guest route before anylinuxfs performs its own
+  # NFS readiness check. The job still runs through the same watchdog and preserves live output.
+  local security_prepare_available="0" mount_job mount_result="0"
+  if declare -F security_begin_prepared_mount >/dev/null 2>&1 \
+    && declare -F security_prepare_mount_transport >/dev/null 2>&1; then
+    security_begin_prepared_mount "$device" || true
+    security_prepare_available="1"
+  fi
+  run_with_progress "${NTFSMAC_MOUNT_TIMEOUT:-240}" 15 "mount" - \
+    "$ANYLINUXFS_BIN" "${args[@]}" &
+  mount_job=$!
+  if [[ "$security_prepare_available" == "1" ]]; then
+    security_prepare_mount_transport "$device" "$mount_job" || true
+  fi
+  wait "$mount_job" || mount_result=$?
+  if [[ "$mount_result" != "0" ]]; then
+    if [[ "$security_prepare_available" == "1" ]] \
+      && declare -F security_abort_prepared_mount >/dev/null 2>&1; then
+      security_abort_prepared_mount "$device" || true
+    fi
     return 1
   fi
 
@@ -129,6 +149,10 @@ run_anylinuxfs_mount() {
   # prints "mounted". NTFSMAC_SKIP_MOUNT_VERIFY exists only for tests that stub `anylinuxfs`
   # without a real NFS mount to check against.
   if [[ "${NTFSMAC_SKIP_MOUNT_VERIFY:-}" != "1" ]] && ! mount -t nfs 2>/dev/null | grep -q .; then
+    if [[ "$security_prepare_available" == "1" ]] \
+      && declare -F security_abort_prepared_mount >/dev/null 2>&1; then
+      security_abort_prepared_mount "$device" || true
+    fi
     echo "mount: anylinuxfs reported success but no NFS mount is present — treating as failed (try 'ntfsmac diagnose')" >&2
     return 1
   fi

@@ -144,12 +144,8 @@ public final class HelperClient: Sendable {
         return try await call { proxy, reply in proxy.unmount(target: target, reply: reply) }
     }
 
-    public func applyPfRules(subnetCIDR: String) async throws -> CommandResult {
-        try await call { proxy, reply in proxy.applyPfRules(subnetCIDR: subnetCIDR, reply: reply) }
-    }
-
-    public func teardown(subnetCIDR: String? = nil) async throws -> CommandResult {
-        try await call { proxy, reply in proxy.teardown(subnetCIDR: subnetCIDR, reply: reply) }
+    public func teardown(sessionID: String? = nil) async throws -> CommandResult {
+        try await call { proxy, reply in proxy.teardown(sessionID: sessionID, reply: reply) }
     }
 
     public func removeDependencies() async throws -> CommandResult {

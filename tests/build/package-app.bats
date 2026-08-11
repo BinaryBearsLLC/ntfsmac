@@ -41,6 +41,7 @@ teardown() {
   [ -f "$APP/Contents/Info.plist" ]
   [ -f "$APP/Contents/MacOS/ntfsmac-gui" ]
   [ -f "$APP/Contents/Resources/AppIcon.icns" ]
+  [ -f "$APP/Contents/Resources/cli-src/cli/pf/ntfsmac.anchor.tmpl" ]
   [ -f "$APP/Contents/Library/LaunchServices/com.khr898.ntfsmac.helper" ]
 }
 

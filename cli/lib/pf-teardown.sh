@@ -1,23 +1,27 @@
 #!/bin/bash
-# cli/lib/pf-teardown.sh — 1-teardown (PLAN.md §6).
+# Compatibility entrypoint for per-session security cleanup.
 #
-# Idempotent: removes only the ntfsmac pf anchor (never a global pfctl flush — only
-# `-a ntfsmac`) and the VPN-bypass host route, if one was added. Always exits 0, even if
-# there's nothing to remove (soft-optional — called from cli/commands/unmount.sh).
+#   pf-teardown.sh diskNsM  — remove exactly one mount's anchor/token/owned route
+#   pf-teardown.sh          — reconcile stale sessions only; never touches active mounts
+#   pf-teardown.sh --all    — remove every recorded session (uninstall/no-mount contexts only)
 set -u
 
-# teardown_pf [bridge_subnet_cidr]
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+# shellcheck source=security-transaction.sh
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/security-transaction.sh"
+
 teardown_pf() {
-  local bridge_subnet="${1:-}"
-
-  pfctl -a ntfsmac -F rules >/dev/null 2>&1 || true
-
-  if [[ -n "$bridge_subnet" ]]; then
-    route delete -net "$bridge_subnet" >/dev/null 2>&1 || true
-  fi
-
-  echo "pf-teardown: done"
-  return 0
+  local target="${1:-}"
+  case "$target" in
+    --all) security_teardown_all ;;
+    "") security_reconcile ;;
+    disk[0-9]*s[0-9]*) security_teardown_session "$target" ;;
+    *)
+      echo "pf-teardown: expected diskNsM, --all, or no argument" >&2
+      return 1
+      ;;
+  esac
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
