@@ -17,9 +17,9 @@
 	<key>CFBundlePackageType</key>
 	<string>TOOL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.0</string>
+	<string>2.1</string>
 	<key>CFBundleVersion</key>
-	<string>050826</string>
+	<string>090826</string>
 	<!--
 	SMJobBless authorizes the *installing app* to bless this helper. Ad-hoc signing (L4) means
 	there is no Team ID / trusted certificate chain to pin, so this only checks the identifier
