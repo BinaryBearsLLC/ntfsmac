@@ -50,12 +50,13 @@ This table describes the current integrated GUI, not the original aspirational p
 | Shipped | First-run helper/CLI staging, helper reinstall, and confirmed complete uninstall |
 | Shipped | In-popover Settings with Back, canonical version/build, Launch at login, contextual help, and adaptive menu-bar icon |
 | Shipped — matrix incomplete | Three compact SECURITY rows consume the live transaction's fixed states/reasons and provide Hide/Show. Missing, malformed, or unavailable evidence fails closed to `unknown`; the remaining packaged hardware matrix is tracked in the roadmap. |
-| Partial | `FinderOpener` is implemented and tested, but no current multi-drive row exposes Open in Finder |
-| Partial | `ThroughputMonitor` and `SpeedBar` exist, but transfer speed is not presented by the current multi-drive UI |
+| Shipped | Each verified mounted-drive row exposes Open in Finder and uses that row's observed mount point |
+| Resolved | Global transfer telemetry was removed because bridge-wide counters cannot truthfully attribute concurrent traffic per drive; the minimal UI shows no speed row |
 | Shipped — qualification incomplete | NTFS3 has an explicit one-mount menu choice, Experimental warning/preflight, no silent fallback, and privacy-safe driver/result diagnostics; hardware qualification remains open. |
 | Implemented — matrix incomplete | Live mount-state reconciliation pairs anylinuxfs session evidence with the host NFS mount table, polls every five seconds, refreshes on lifecycle actions, and fails closed to yellow/unknown on disagreement. GUI unmount and external NFS/Finder disconnect passed on one packaged device; the remaining matrix is tracked in the 2026-08-11 audit. |
 | Partial | Verified Copy core/CLI owns copy, reread, SHA-256 verification, and failure recovery; a GUI flow remains planned. |
-| Planned | Notifications and Eject All |
+| Shipped | Default-off local mount/unmount/error notifications, persisted only after macOS grants permission |
+| Shipped | Eject All attempts every drive, reports per-drive results, and retains recovery controls for failures |
 
 ---
 
@@ -77,16 +78,19 @@ This table describes the current integrated GUI, not the original aspirational p
 
 | Control | Action | Enabled when |
 |---------|--------|--------------|
+| Per-drive `Open` | Open that drive's reconciled mount point in Finder | That mounted drive is independently verified |
 | Per-drive `Unmount` | Safely unmount that drive | That drive is mounted |
+| `Eject All` | Try every mounted drive and show each result without hiding failed rows | Two or more drives are mounted |
 | Other-device `Mount` | Mount another compatible partition | Another compatible drive is detected |
 | Refresh (↻) | Re-scan drives and reconcile mounted rows against host truth | Always |
 | SECURITY rows | Display measured private-link, VPN-route, and PF-policy states/reasons; fail closed to `unknown` | One or more drives mounted |
 | SECURITY `Hide` / `Show` | Collapse or restore only the SECURITY presentation | One or more drives mounted |
 | ⚙ / `Quit` | As above | Always |
 
-`Open in Finder` and transfer speed are intentionally recorded as partial rather than shipped:
-their implementation foundations remain in the tree, but the current popover does not expose
-those controls. Wiring or removing them is a focused roadmap decision, not documentation fiction.
+The mounted row intentionally stops at two primary actions: Open and Unmount. Eject All appears
+only when it is useful for multiple drives. No transfer-speed row is shown: the removed sampler
+observed bridge-wide traffic and could not provide honest per-drive telemetry for concurrent
+mounts.
 
 ### Mount-state truth contract
 
@@ -172,6 +176,7 @@ small secondary text; it is informative and never competes visually with the `Se
 | Control | Type | Default |
 |---------|------|---------|
 | Launch at login | Toggle | Off |
+| Notifications | Toggle requesting macOS permission on first enable | Off |
 | Reinstall privileged helper | Button | — |
 | Uninstall ntfsmac | Destructive button with in-popover confirmation and progress | — |
 
@@ -197,8 +202,6 @@ or routes.
 ### Planned controls
 
 - **Verified Copy** — app-managed, SHA-256-verified copy after the CLI/core contract is stable.
-- **Open in Finder** — per mounted drive, using the existing tested opener.
-- **Notifications and Eject All** — focused follow-up work with per-drive results.
 
 ---
 

@@ -247,7 +247,7 @@ developed from `dev` and reviewed back into `dev` through its own focused branch
 | P0 | 🟡 Software complete; hardware gate open | Runtime pinning, audited updates, mount reconciliation, per-session PF/VPN transaction, and measured SECURITY telemetry are implemented; the remaining packaged hardware matrix stays open |
 | P1 | 🟡 Core controls complete; qualification open | Verified Copy core/CLI and the explicit one-mount NTFS3 GUI choice are implemented; Verified Copy GUI and same-device NTFS3 hardware qualification remain open |
 | P2 | ⬜ Planned | Migrate the deprecated privileged-helper lifecycle to `SMAppService` after its ad-hoc-signing and upgrade path are proven |
-| P3 | 🟡 Partial | Wire Open in Finder, decide the future of per-drive transfer telemetry, and add focused notifications/eject-all improvements |
+| P3 | 🟡 Software complete; packaged validation open | Per-drive Open in Finder, opt-in notifications, and resilient Eject All are implemented; misleading global transfer telemetry was removed to keep the UI minimal |
 
 The roadmap records explicit A/B options where evidence is still missing. In particular,
 `ntfs-3g` remains the compatibility-first default; NTFS3 does not become the default without a

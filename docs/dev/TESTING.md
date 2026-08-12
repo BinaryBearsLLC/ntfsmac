@@ -6,9 +6,14 @@
 > pending NTFS3/security/integrity work. Statements labelled **Was** or **Fixed** are retained as
 > historical evidence; the explicit current-state corrections below are authoritative.
 
-Run this from your own Terminal, on a real Apple Silicon Mac, outside the coding-agent sandbox.
-Every item below either can't be verified from inside that sandbox, or (until this update)
-couldn't be exercised because the GUI pieces were built unit-by-unit and never wired together.
+The current, ordered checklist we will execute together is
+[`../testing/BINARYBEARS_MANUAL_ACCEPTANCE_2026-08-12.md`](../testing/BINARYBEARS_MANUAL_ACCEPTANCE_2026-08-12.md).
+This older guide remains useful background and fault history; use the acceptance checklist for
+test IDs, stop conditions, expected results, and retained evidence.
+
+Run hardware steps on a real Apple Silicon Mac. During an assisted session Codex can prepare and
+interpret commands and evidence; the human operator remains responsible for physical media,
+administrator prompts, VPN controls, Windows preparation, and macOS permission dialogs.
 
 ---
 
@@ -21,7 +26,7 @@ unit in PLAN.md's §6 list ever assembled them.
 
 Now: `gui/Views/PopoverContentView.swift` composes all of it, driven by `AppState`, and
 `NtfsmacApp.swift` instantiates the real controllers (`DriveScanner`, `MountController`,
-`ThroughputMonitor`, `RemountController`, `DiagnoseRunner`, `HelperInstaller`, `Settings`) and
+`RemountController`, `DiagnoseRunner`, `HelperInstaller`, `Settings`) and
 wires them in; the current full Swift suite remains the authoritative regression gate. So:
 
 - The popover now shows the first-run helper-install prompt until the XPC helper is installed,
@@ -35,10 +40,11 @@ wires them in; the current full Swift suite remains the authoritative regression
 **Known, deliberately tracked limitations that remain:** the primary GUI mount button uses
 `ntfs-3g` read/write by default; a compact menu offers NTFS3 for one explicitly warned
 Experimental mount, but its hardware qualification is still open. Verified Copy is currently a
-CLI/core workflow, not a GUI flow. Open in Finder and transfer telemetry have tested
-implementation foundations but are not exposed by the current multi-drive popover. SECURITY
-indicators consume the live mount transaction's fixed PF/route state and reasons, but the remaining
-packaged VPN/concurrent-device matrix is still a release gate.
+CLI/core workflow, not a GUI flow. Per-drive Open in Finder, default-off notifications, and Eject
+All are wired; unreliable global transfer telemetry was removed rather than displaying a
+misleading concurrent-drive speed. SECURITY indicators consume the live mount transaction's fixed
+PF/route state and reasons, but the remaining packaged VPN/concurrent-device matrix is still a
+release gate.
 
 ---
 
@@ -398,7 +404,8 @@ above and re-run.
 3. Icon should pulse blue while mounting, then turn green with the drive shown as mounted, a
    per-drive Unmount action, and measured **Private VM link**, **VPN-safe route**, and **PF policy
    enforced** rows. Their state/reason codes must match CLI diagnostics; unavailable or malformed
-   evidence must stay unknown/non-green. Do not expect a speed row or Open in Finder control.
+   evidence must stay unknown/non-green. Confirm `Open` reveals this exact drive's observed mount
+   point in Finder. No speed row should appear.
 4. Click `Diagnose` in the footer — the panel should match Part A's `diagnose --json` output in
    plain language. Hide and reopen it to confirm a fresh run still works.
 5. Hold Command (⌘) and click `Diagnose`. The same diagnostic summary should run, followed by a
@@ -408,8 +415,9 @@ above and re-run.
 6. Click `Unmount` — icon returns to its system-adaptive idle state and the drive drops off the
    mounted row.
 7. Click the gear icon — Settings replaces the popover content. Confirm the current app
-   release/build appears directly below `Settings`. Exercise Launch at login if appropriate, use
-   Back, and reopen Settings.
+   release/build appears directly below `Settings`. Confirm Notifications defaults off; permission
+   is requested only when explicitly enabled. Exercise Launch at login if appropriate, use Back,
+   and reopen Settings.
 8. As the final cleanup check, click `Uninstall…` in Settings. Confirm the destructive prompt stays
    inside the popover; cancel once, reopen it, then confirm. A freshly installed helper must uninstall
    on the first confirmed attempt, the UI must reach `Uninstalled`, and the uninstall action must
@@ -443,7 +451,8 @@ around it with a local build cache:
 swift test --build-path /tmp/ntfsmac-build
 ```
 
-Expect `Test run with 230 tests in 3 suites passed` for this roadmap-completion branch.
+Require the complete Swift test run to pass. The exact case count is printed by Swift Testing and
+changes when focused regression coverage is added; do not use a stale hard-coded count as a gate.
 
 ```bash
 tests/run-all.sh   # full bats suite: lock/preflight/submodule/audit/fetch-prebuilt/gvproxy/
@@ -530,9 +539,6 @@ Project-wide Swift conventions for the GUI (`gui/`) and helper (`helper/`):
 
 ## Priority order
 
-1. **Part A (CLI end-to-end)** — highest value, this is the very first real hardware test of
-   the whole build.
-2. **Part B (GUI end-to-end)** — same underlying path, confirms the wiring works for real.
-3. **Gap 2 (visual parity)** — do this while you're already walking states in Part B.
-4. **Uninstall (CLI + GUI)** — confirm no leftovers, both paths.
-5. Optional dirty-journal repro, if you want full state coverage
+Use the ordered acceptance checklist linked at the top. Its safe single-drive tests come first;
+concurrent-drive, Windows-state, low-space, interruption, and hot-unplug fault tests run only after
+the baseline has passed and only on disposable media.

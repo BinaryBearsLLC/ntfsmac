@@ -91,6 +91,11 @@ branches does not imply that they were pushed, opened as pull requests, or accep
 - [x] In-popover helper reinstall and confirmed uninstall workflow.
 - [x] Lazy XPC connection and helper lifecycle recovery improvements.
 - [x] Real Service Management state for Launch at login.
+- [x] Per-drive **Open in Finder** using the reconciled mount point, never a guessed path.
+- [x] Mount, unmount, error, and Eject All notifications behind an explicit opt-in that persists
+  only after macOS grants notification permission.
+- [x] **Eject All** attempts every mounted drive, reports each result, and keeps failed-drive
+  recovery controls visible.
 - [x] SECURITY rows default to `unknown` instead of manufacturing a successful state.
 - [x] SECURITY Hide/Show changes presentation only and leaves mount/helper state untouched.
 - [x] Runtime Alpine tag/digest pinning, versioned cache migration, diagnostics, and package gate.
@@ -109,10 +114,10 @@ branches does not imply that they were pushed, opened as pull requests, or accep
 - [-] **Verified Copy:** the CLI owns copy-to-partial, flush, reread, deterministic SHA-256
   verification, and same-filesystem publication. A GUI copy workflow and post-reconnect media
   qualification remain separate work.
-- [-] **Open in Finder:** the tested `FinderOpener` implementation exists, but the current
-  multi-drive popover does not expose a corresponding control.
-- [-] **Transfer telemetry:** the sampling subsystem and tests remain in the codebase, but the
-  current multi-drive UI deliberately does not present a speed row.
+- [x] **Open in Finder:** every verified mounted-drive row opens its own observed mount point.
+- [x] **Transfer telemetry decision:** the unused global sampler and speed row were removed. A
+  bridge-wide byte counter cannot truthfully attribute traffic to concurrent drives, so the
+  minimal UI presents no misleading transfer speed.
 - [-] **Authoritative mount-state synchronization:** implemented with paired anylinuxfs-session
   and host NFS-mount evidence, bounded polling, and a fail-closed unknown state. Unit/state tests
   pass; the packaged-app hardware matrix below is still a release gate.
@@ -423,13 +428,17 @@ and uninstall boundary; it should not be mixed into unrelated work.
 
 ### P3 — Focused UX completion
 
-- [ ] Wire a per-drive **Open in Finder** action to the existing tested opener.
-- [ ] Decide whether per-drive transfer telemetry provides reliable, understandable value; either
-  wire it correctly for concurrent mounts or remove the unused subsystem in one focused PR.
-- [ ] Add mount, unmount, and error notifications with user-controlled behavior.
-- [ ] Add Eject All with per-drive results and no loss of a failed mount's recovery controls.
-- [ ] Revisit per-drive read-only and mount-point preferences only with a concrete user story and
-  complete helper wiring; do not add persisted no-op controls.
+- [x] Wire a per-drive **Open in Finder** action to the existing tested opener.
+- [x] Remove the global transfer sampler and speed row: the available counters cannot reliably
+  attribute concurrent traffic per drive, and an aggregate number would be misleading.
+- [x] Add mount, unmount, and error notifications with user-controlled, default-off behavior.
+- [x] Add Eject All with per-drive results and no loss of a failed mount's recovery controls.
+- [x] Keep per-drive read-only and mount-point preferences out of the UI until a concrete user
+  story and complete helper wiring exist; no persisted no-op controls were added.
+
+P3 is software-complete on 2026-08-12. Its packaged-app checks are part of the
+[assisted manual acceptance runbook](testing/BINARYBEARS_MANUAL_ACCEPTANCE_2026-08-12.md); they do
+not replace the still-open P0/P1 hardware qualification gates.
 
 ## Delivery sequence
 
