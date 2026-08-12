@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import Testing
 import HelperShared
 @testable import NtfsmacGUI
@@ -7,6 +8,20 @@ import HelperShared
 // branches.
 
 private let testExpectedVersion = "test-build-hash"
+
+private func setTestQuarantine(_ path: String) throws {
+    let bytes = Array("0083;00000000;Safari;".utf8)
+    let result = bytes.withUnsafeBytes { buffer in
+        setxattr(path, "com.apple.quarantine", buffer.baseAddress, buffer.count, 0, XATTR_NOFOLLOW)
+    }
+    guard result == 0 else {
+        throw CocoaError(.fileWriteUnknown)
+    }
+}
+
+private func hasTestQuarantine(_ path: String) -> Bool {
+    getxattr(path, "com.apple.quarantine", nil, 0, 0, XATTR_NOFOLLOW) >= 0
+}
 
 private struct FakeInstallService: HelperInstallService {
     let alreadyInstalled: Bool
@@ -212,6 +227,31 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
     // attempts on a fresh machine, not just the first one.
     await installer.install()
     #expect(stripper.callCount == 2)
+}
+
+@Test func realQuarantineStripperRemovesPresentTagsWithoutFollowingSymlinks() throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ntfsmac-quarantine-\(UUID().uuidString)")
+    let file = root.appendingPathComponent("helper")
+    let outside = FileManager.default.temporaryDirectory
+        .appendingPathComponent("ntfsmac-quarantine-outside-\(UUID().uuidString)")
+    let link = root.appendingPathComponent("outside-link")
+    defer {
+        try? FileManager.default.removeItem(at: root)
+        try? FileManager.default.removeItem(at: outside)
+    }
+
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+    try Data("helper".utf8).write(to: file)
+    try Data("outside".utf8).write(to: outside)
+    try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+    try setTestQuarantine(file.path)
+    try setTestQuarantine(outside.path)
+
+    RealQuarantineStripper.stripQuarantine(at: root)
+
+    #expect(!hasTestQuarantine(file.path))
+    #expect(hasTestQuarantine(outside.path))
 }
 
 @MainActor

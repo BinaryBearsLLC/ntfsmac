@@ -1,5 +1,14 @@
 import SwiftUI
 
+public enum NTFS3PreflightCopy {
+    public static let title = "NTFS3 · Experimental"
+    public static let guidance = "Use only after Windows Fast Startup is disabled, Windows is fully shut down, and filesystem errors are repaired with chkdsk. There is no automatic fallback."
+
+    public static func isAvailable(for fsType: String) -> Bool {
+        fsType.lowercased() == "ntfs"
+    }
+}
+
 /// One row per detected drive — `ui/prototype.html`'s "Drive row" comp (mounted/light/dirty
 /// variants, lines 134-161/313-339/583-613): icon-box + label/fsType·device + size, then a
 /// button row. Not-yet-mounted rows have no comp reference (the comp only shows mounted/idle-
@@ -13,6 +22,8 @@ public struct DriveRow: View {
     public let onMount: () -> Void
     public let onUnmount: () -> Void
     public let onMountAnyway: (() -> Void)?
+    public let onMountExperimental: (() -> Void)?
+    @State private var showsNTFS3Preflight = false
 
     public init(
         drive: Drive,
@@ -20,7 +31,8 @@ public struct DriveRow: View {
         isDirty: Bool = false,
         onMount: @escaping () -> Void = {},
         onUnmount: @escaping () -> Void = {},
-        onMountAnyway: (() -> Void)? = nil
+        onMountAnyway: (() -> Void)? = nil,
+        onMountExperimental: (() -> Void)? = nil
     ) {
         self.drive = drive
         self.isMounted = isMounted
@@ -28,6 +40,7 @@ public struct DriveRow: View {
         self.onMount = onMount
         self.onUnmount = onUnmount
         self.onMountAnyway = onMountAnyway
+        self.onMountExperimental = onMountExperimental
     }
 
     private var accentColor: Color { isDirty ? .ntfsYellow : .ntfsBlue }
@@ -88,14 +101,51 @@ public struct DriveRow: View {
                     .help(TooltipCopy.text(for: .mountReadWriteAnyway))
                 }
             } else {
-                Button {
-                    onMount()
-                } label: {
-                    Text("Mount")
-                        .frame(maxWidth: .infinity)
+                if showsNTFS3Preflight, let onMountExperimental {
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text(NTFS3PreflightCopy.title)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Color.ntfsYellow)
+                        Text(NTFS3PreflightCopy.guidance)
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: 6) {
+                            Button("Cancel") { showsNTFS3Preflight = false }
+                                .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                            Button("Mount with NTFS3") {
+                                showsNTFS3Preflight = false
+                                onMountExperimental()
+                            }
+                            .buttonStyle(.glassWarning())
+                        }
+                    }
+                } else {
+                    HStack(spacing: 5) {
+                        Button {
+                            onMount()
+                        } label: {
+                            Text("Mount")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                        .help("Mount with ntfs-3g, the compatibility-first default")
+
+                        if onMountExperimental != nil {
+                            Menu {
+                                Button("NTFS3 (Experimental)…") {
+                                    showsNTFS3Preflight = true
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .frame(width: 22)
+                            }
+                            .menuStyle(.borderlessButton)
+                            .fixedSize()
+                            .help("Choose the experimental NTFS3 driver for this mount only")
+                        }
+                    }
                 }
-                .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                .help(TooltipCopy.text(for: .mount))
             }
         }
         .padding(.vertical, 2)

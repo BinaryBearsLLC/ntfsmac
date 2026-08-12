@@ -44,6 +44,17 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
     public let nfsTransportContract: String?
     public let vpnDefaultRoute: Bool?
     public let nfsMountCount: Int?
+    public let selectedFSDriver: String?
+    public let mountFailureCategory: String?
+    public let securityActiveSessions: Int?
+    public let securityPrivateLink: String?
+    public let securityPrivateReason: String?
+    public let securityVPNRoute: String?
+    public let securityVPNRouteReason: String?
+    public let securityPFPolicy: String?
+    public let securityPFReason: String?
+    public let securityOverall: String?
+    public let securityOverallReason: String?
 
     enum CodingKeys: String, CodingKey {
         case diagnosticSchema = "diagnostic_schema"
@@ -85,6 +96,17 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
         case nfsTransportContract = "nfs_transport_contract"
         case vpnDefaultRoute = "vpn_default_route"
         case nfsMountCount = "nfs_mount_count"
+        case selectedFSDriver = "selected_fs_driver"
+        case mountFailureCategory = "mount_failure_category"
+        case securityActiveSessions = "security_active_sessions"
+        case securityPrivateLink = "security_private_link"
+        case securityPrivateReason = "security_private_reason"
+        case securityVPNRoute = "security_vpn_route"
+        case securityVPNRouteReason = "security_vpn_route_reason"
+        case securityPFPolicy = "security_pf_policy"
+        case securityPFReason = "security_pf_reason"
+        case securityOverall = "security_overall"
+        case securityOverallReason = "security_overall_reason"
     }
 
     public init(
@@ -112,6 +134,8 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
             nfsTransportContract: nil,
             vpnDefaultRoute: nil,
             nfsMountCount: nil,
+            selectedFSDriver: nil,
+            mountFailureCategory: nil,
             anylinuxfsVersion: nil,
             anylinuxfsExpectedVersion: nil,
             anylinuxfsVersionStatus: nil,
@@ -133,7 +157,16 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
             alpineInstalledCache: nil,
             alpineInstalledVersion: nil,
             ntfs3gVersion: nil,
-            nfsUtilsVersion: nil
+            nfsUtilsVersion: nil,
+            securityActiveSessions: nil,
+            securityPrivateLink: nil,
+            securityPrivateReason: nil,
+            securityVPNRoute: nil,
+            securityVPNRouteReason: nil,
+            securityPFPolicy: nil,
+            securityPFReason: nil,
+            securityOverall: nil,
+            securityOverallReason: nil
         )
     }
 
@@ -155,6 +188,8 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
         nfsTransportContract: String? = nil,
         vpnDefaultRoute: Bool?,
         nfsMountCount: Int?,
+        selectedFSDriver: String? = nil,
+        mountFailureCategory: String? = nil,
         anylinuxfsVersion: String? = nil,
         anylinuxfsExpectedVersion: String? = nil,
         anylinuxfsVersionStatus: String? = nil,
@@ -176,7 +211,16 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
         alpineInstalledCache: String? = nil,
         alpineInstalledVersion: String? = nil,
         ntfs3gVersion: String? = nil,
-        nfsUtilsVersion: String? = nil
+        nfsUtilsVersion: String? = nil,
+        securityActiveSessions: Int? = nil,
+        securityPrivateLink: String? = nil,
+        securityPrivateReason: String? = nil,
+        securityVPNRoute: String? = nil,
+        securityVPNRouteReason: String? = nil,
+        securityPFPolicy: String? = nil,
+        securityPFReason: String? = nil,
+        securityOverall: String? = nil,
+        securityOverallReason: String? = nil
     ) {
         self.diagnosticSchema = diagnosticSchema
         self.healthy = healthy
@@ -217,6 +261,17 @@ public struct DiagnoseReport: Codable, Equatable, Sendable {
         self.nfsTransportContract = nfsTransportContract
         self.vpnDefaultRoute = vpnDefaultRoute
         self.nfsMountCount = nfsMountCount
+        self.selectedFSDriver = selectedFSDriver
+        self.mountFailureCategory = mountFailureCategory
+        self.securityActiveSessions = securityActiveSessions
+        self.securityPrivateLink = securityPrivateLink
+        self.securityPrivateReason = securityPrivateReason
+        self.securityVPNRoute = securityVPNRoute
+        self.securityVPNRouteReason = securityVPNRouteReason
+        self.securityPFPolicy = securityPFPolicy
+        self.securityPFReason = securityPFReason
+        self.securityOverall = securityOverall
+        self.securityOverallReason = securityOverallReason
     }
 }
 

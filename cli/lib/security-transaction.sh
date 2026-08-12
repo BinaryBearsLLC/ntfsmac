@@ -18,6 +18,7 @@ source "$SECURITY_LIB_DIR/route-guard.sh"
 source "$SECURITY_LIB_DIR/run-with-progress.sh"
 
 SECURITY_STATE_DIR="${NTFSMAC_SECURITY_STATE_DIR:-/var/run/ntfsmac/security}"
+SECURITY_STATUS_FILE="${NTFSMAC_SECURITY_STATUS_FILE:-$(dirname "$SECURITY_STATE_DIR")/security-status}"
 SECURITY_PFCTL_BIN="${NTFSMAC_PFCTL_BIN:-/sbin/pfctl}"
 SECURITY_MOUNT_BIN="${NTFSMAC_MOUNT_BIN:-/sbin/mount}"
 SECURITY_NFSSTAT_BIN="${NTFSMAC_NFSSTAT_BIN:-/usr/bin/nfsstat}"
@@ -59,6 +60,164 @@ security_state_value() {
   local file="$1" key="$2"
   [[ -f "$file" && ! -L "$file" ]] || return 1
   awk -F= -v wanted="$key" '$1 == wanted { print substr($0, length($1) + 2); exit }' "$file"
+}
+
+# The public summary contains only fixed state/reason tokens and a count. Endpoint, interface,
+# device, mount-point, route, anchor, and PF ownership data stay exclusively in the 0700/0600
+# per-session store above.
+security_summary_valid_state() {
+  case "${1:-}" in
+    enforced|notEnforced|notRequired|unknown) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+security_summary_valid_reason() {
+  [[ -n "${1:-}" && "$1" != *[!A-Z0-9_]* ]]
+}
+
+security_summary_rank() {
+  case "$1" in
+    notEnforced) printf '4\n' ;;
+    unknown) printf '3\n' ;;
+    enforced) printf '2\n' ;;
+    notRequired) printf '1\n' ;;
+    *) printf '0\n' ;;
+  esac
+}
+
+security_summary_select() {
+  local current_state="$1" current_reason="$2" candidate_state="$3" candidate_reason="$4"
+  local current_rank candidate_rank
+  if ! security_summary_valid_state "$candidate_state" \
+    || ! security_summary_valid_reason "$candidate_reason"; then
+    printf 'unknown|MALFORMED_SESSION_STATE\n'
+    return
+  fi
+  [[ -n "$current_state" ]] || {
+    printf '%s|%s\n' "$candidate_state" "$candidate_reason"
+    return
+  }
+  current_rank="$(security_summary_rank "$current_state")"
+  candidate_rank="$(security_summary_rank "$candidate_state")"
+  if [[ "$candidate_rank" -gt "$current_rank" ]]; then
+    printf '%s|%s\n' "$candidate_state" "$candidate_reason"
+  elif [[ "$candidate_rank" -eq "$current_rank" && "$candidate_reason" != "$current_reason" ]]; then
+    printf '%s|MULTIPLE_SESSION_RESULTS\n' "$current_state"
+  else
+    printf '%s|%s\n' "$current_state" "$current_reason"
+  fi
+}
+
+security_write_summary() {
+  local active="$1" private="$2" private_reason="$3" route="$4" route_reason="$5"
+  local pf="$6" pf_reason="$7" overall="$8" overall_reason="$9"
+  local parent owner parent_mode status_tmp
+  parent="$(dirname "$SECURITY_STATUS_FILE")"
+
+  [[ "$active" == "unknown" || ( -n "$active" && "$active" != *[!0-9]* ) ]] || return 1
+  security_summary_valid_state "$private" || return 1
+  security_summary_valid_state "$route" || return 1
+  security_summary_valid_state "$pf" || return 1
+  security_summary_valid_state "$overall" || return 1
+  security_summary_valid_reason "$private_reason" || return 1
+  security_summary_valid_reason "$route_reason" || return 1
+  security_summary_valid_reason "$pf_reason" || return 1
+  security_summary_valid_reason "$overall_reason" || return 1
+
+  [[ ! -L "$parent" ]] || return 1
+  mkdir -p "$parent" || return 1
+  [[ -d "$parent" && ! -L "$parent" ]] || return 1
+  owner="$(stat -f '%u' "$parent" 2>/dev/null)" || return 1
+  [[ "$owner" == "$EUID" ]] || return 1
+  parent_mode="$(stat -f '%Lp' "$parent" 2>/dev/null)" || return 1
+  [[ "$parent_mode" =~ ^[0-7]{3,4}$ ]] || return 1
+  (( (8#$parent_mode & 8#22) == 0 )) || return 1
+  if [[ -e "$SECURITY_STATUS_FILE" || -L "$SECURITY_STATUS_FILE" ]]; then
+    [[ -f "$SECURITY_STATUS_FILE" && ! -L "$SECURITY_STATUS_FILE" ]] || return 1
+  fi
+
+  status_tmp="$(mktemp "${SECURITY_STATUS_FILE}.XXXXXX")" || return 1
+  chmod 644 "$status_tmp" 2>/dev/null || { rm -f "$status_tmp"; return 1; }
+  {
+    printf 'schema=1\n'
+    printf 'active_sessions=%s\n' "$active"
+    printf 'private_link=%s\n' "$private"
+    printf 'private_reason=%s\n' "$private_reason"
+    printf 'vpn_route=%s\n' "$route"
+    printf 'vpn_route_reason=%s\n' "$route_reason"
+    printf 'pf_policy=%s\n' "$pf"
+    printf 'pf_reason=%s\n' "$pf_reason"
+    printf 'overall=%s\n' "$overall"
+    printf 'overall_reason=%s\n' "$overall_reason"
+  } > "$status_tmp"
+  mv -f "$status_tmp" "$SECURITY_STATUS_FILE" || { rm -f "$status_tmp"; return 1; }
+}
+
+security_publish_unknown_summary() {
+  local reason="${1:-STATUS_UNAVAILABLE}"
+  security_summary_valid_reason "$reason" || reason="STATUS_UNAVAILABLE"
+  security_write_summary unknown unknown "$reason" unknown "$reason" unknown "$reason" unknown "$reason"
+}
+
+security_publish_summary() {
+  local state_file session count="0" selected
+  local private="" private_reason="" route="" route_reason="" pf="" pf_reason=""
+  local overall="" overall_reason="" candidate candidate_reason
+
+  if [[ -L "$SECURITY_STATE_DIR" ]]; then
+    security_publish_unknown_summary STATE_DIR_UNSAFE
+    return
+  fi
+  if [[ ! -d "$SECURITY_STATE_DIR" ]]; then
+    security_write_summary 0 notRequired NO_ACTIVE_MOUNTS notRequired NO_ACTIVE_MOUNTS \
+      notRequired NO_ACTIVE_MOUNTS notRequired NO_ACTIVE_MOUNTS
+    return
+  fi
+
+  for state_file in "$SECURITY_STATE_DIR"/*.state; do
+    [[ -e "$state_file" || -L "$state_file" ]] || continue
+    if [[ -L "$state_file" || ! -f "$state_file" ]]; then
+      security_publish_unknown_summary STATE_ENTRY_UNSAFE
+      return
+    fi
+    session="$(basename "$state_file" .state)"
+    if ! security_valid_session "$session" \
+      || [[ "$(security_state_value "$state_file" schema 2>/dev/null || true)" != "1" ]] \
+      || [[ "$(security_state_value "$state_file" session 2>/dev/null || true)" != "$session" ]]; then
+      security_publish_unknown_summary MALFORMED_SESSION_STATE
+      return
+    fi
+    count=$((count + 1))
+
+    candidate="$(security_state_value "$state_file" private_link 2>/dev/null || true)"
+    candidate_reason="$(security_state_value "$state_file" private_reason 2>/dev/null || true)"
+    selected="$(security_summary_select "$private" "$private_reason" "$candidate" "$candidate_reason")"
+    private="${selected%%|*}"; private_reason="${selected#*|}"
+
+    candidate="$(security_state_value "$state_file" vpn_route 2>/dev/null || true)"
+    candidate_reason="$(security_state_value "$state_file" vpn_route_reason 2>/dev/null || true)"
+    selected="$(security_summary_select "$route" "$route_reason" "$candidate" "$candidate_reason")"
+    route="${selected%%|*}"; route_reason="${selected#*|}"
+
+    candidate="$(security_state_value "$state_file" pf_policy 2>/dev/null || true)"
+    candidate_reason="$(security_state_value "$state_file" pf_reason 2>/dev/null || true)"
+    selected="$(security_summary_select "$pf" "$pf_reason" "$candidate" "$candidate_reason")"
+    pf="${selected%%|*}"; pf_reason="${selected#*|}"
+
+    candidate="$(security_state_value "$state_file" overall 2>/dev/null || true)"
+    candidate_reason="$(security_state_value "$state_file" overall_reason 2>/dev/null || true)"
+    selected="$(security_summary_select "$overall" "$overall_reason" "$candidate" "$candidate_reason")"
+    overall="${selected%%|*}"; overall_reason="${selected#*|}"
+  done
+
+  if [[ "$count" == "0" ]]; then
+    security_write_summary 0 notRequired NO_ACTIVE_MOUNTS notRequired NO_ACTIVE_MOUNTS \
+      notRequired NO_ACTIVE_MOUNTS notRequired NO_ACTIVE_MOUNTS
+  else
+    security_write_summary "$count" "$private" "$private_reason" "$route" "$route_reason" \
+      "$pf" "$pf_reason" "$overall" "$overall_reason"
+  fi
 }
 
 security_status_output() {
@@ -411,7 +570,8 @@ security_write_state() {
     printf 'overall=%s\n' "$overall"
     printf 'overall_reason=%s\n' "$overall_reason"
   } > "$state_tmp"
-  mv -f "$state_tmp" "$state_file"
+  mv -f "$state_tmp" "$state_file" || return 1
+  security_publish_summary || true
 }
 
 security_print_state() {
@@ -599,6 +759,7 @@ security_apply_for_mount() {
       [[ "$route_owned" == "1" && -n "$endpoint" ]] && remove_vpn_bypass "$endpoint" "$interface" || true
       security_print_state "$private_state" "$private_reason" "$route_state" "$route_reason" \
         "notEnforced" "STATE_WRITE_FAILED" "notEnforced" "STATE_WRITE_FAILED"
+      security_publish_unknown_summary STATE_WRITE_FAILED || true
       return 0
     }
   security_print_state "$private_state" "$private_reason" "$route_state" "$route_reason" \
@@ -612,10 +773,12 @@ security_teardown_session() {
   security_valid_session "$session" || return 1
   state_file="$(security_state_path "$session")" || return 1
   if [[ -L "$state_file" || ( -e "$state_file" && ! -f "$state_file" ) ]]; then
+    security_publish_unknown_summary STATE_ENTRY_UNSAFE || true
     printf 'security_teardown=notEnforced reason=STATE_ENTRY_UNSAFE\n'
     return 1
   fi
   [[ -f "$state_file" ]] || {
+    security_publish_summary || true
     printf 'security_teardown=notRequired reason=NO_SESSION_STATE\n'
     return 0
   }
@@ -636,19 +799,23 @@ security_teardown_session() {
     failed="1"
   fi
   if [[ "$failed" != "0" ]]; then
+    security_publish_unknown_summary TEARDOWN_INCOMPLETE || true
     printf 'security_teardown=notEnforced reason=TEARDOWN_INCOMPLETE\n'
     return 1
   fi
   rm -f "$state_file" || {
+    security_publish_unknown_summary STATE_REMOVE_FAILED || true
     printf 'security_teardown=notEnforced reason=STATE_REMOVE_FAILED\n'
     return 1
   }
+  security_publish_summary || true
   printf 'security_teardown=enforced reason=SESSION_REMOVED\n'
 }
 
 security_reconcile() {
   local status_output state_file session has_state="0" failed="0"
   if [[ -L "$SECURITY_STATE_DIR" ]]; then
+    security_publish_unknown_summary STATE_DIR_UNSAFE || true
     printf 'security_reconcile=unknown reason=STATE_DIR_UNSAFE\n'
     return 0
   fi
@@ -663,6 +830,7 @@ security_reconcile() {
     break
   done
   if [[ "$has_state" == "0" ]]; then
+    security_publish_summary || true
     printf 'security_reconcile=notRequired reason=NO_SESSION_STATE\n'
     return 0
   fi
@@ -686,19 +854,23 @@ security_reconcile() {
     fi
   done
   if [[ "$failed" != "0" ]]; then
+    security_publish_unknown_summary STALE_TEARDOWN_INCOMPLETE || true
     printf 'security_reconcile=notEnforced reason=STALE_TEARDOWN_INCOMPLETE\n'
     return 1
   fi
+  security_publish_summary || true
   printf 'security_reconcile=enforced reason=STALE_SESSIONS_REMOVED\n'
 }
 
 security_teardown_all() {
   local state_file session failed="0"
   if [[ -L "$SECURITY_STATE_DIR" ]]; then
+    security_publish_unknown_summary STATE_DIR_UNSAFE || true
     printf 'security_teardown=notEnforced reason=STATE_DIR_UNSAFE\n'
     return 1
   fi
   [[ -d "$SECURITY_STATE_DIR" ]] || {
+    security_publish_summary || true
     printf 'security_teardown=notRequired reason=NO_SESSION_STATE\n'
     return 0
   }
@@ -716,8 +888,10 @@ security_teardown_all() {
     fi
   done
   if [[ "$failed" != "0" ]]; then
+    security_publish_unknown_summary ALL_TEARDOWN_INCOMPLETE || true
     printf 'security_teardown=notEnforced reason=ALL_TEARDOWN_INCOMPLETE\n'
     return 1
   fi
+  security_publish_summary || true
   printf 'security_teardown=enforced reason=ALL_SESSIONS_REMOVED\n'
 }

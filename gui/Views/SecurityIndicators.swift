@@ -4,9 +4,10 @@ import SwiftUI
 /// states, not two — `PLAN.md` treats Phase 1 (pf/route hardening) as deferrable/non-blocking,
 /// so a real install can legitimately have no hardening data to report at all. `.unknown`
 /// exists specifically so "no data" never renders as `.enforced`.
-public enum SecurityIndicatorStatus: Equatable, Sendable {
+public enum SecurityIndicatorStatus: String, Equatable, Sendable {
     case enforced
     case notEnforced
+    case notRequired
     case unknown
 }
 
@@ -47,6 +48,8 @@ public enum SecurityIndicator {
             return SecurityIndicatorStyle(symbolName: "checkmark.shield.fill", color: .ntfsGreen, text: "\(label): enforced")
         case .notEnforced:
             return SecurityIndicatorStyle(symbolName: "exclamationmark.shield.fill", color: .ntfsYellow, text: "\(label): not enforced")
+        case .notRequired:
+            return SecurityIndicatorStyle(symbolName: "checkmark.shield.fill", color: .ntfsBlue, text: "\(label): not required")
         case .unknown:
             return SecurityIndicatorStyle(symbolName: "questionmark.diamond", color: .secondary, text: "\(label): unknown")
         }
@@ -66,17 +69,26 @@ public struct SecurityIndicatorsView: View {
     public let isolatedNetwork: SecurityIndicatorStatus
     public let vpnBypass: SecurityIndicatorStatus
     public let pfRulesLoaded: SecurityIndicatorStatus
+    public let privateReason: String
+    public let vpnReason: String
+    public let pfReason: String
     public let onHide: (() -> Void)?
 
     public init(
         isolatedNetwork: SecurityIndicatorStatus,
         vpnBypass: SecurityIndicatorStatus,
         pfRulesLoaded: SecurityIndicatorStatus = .unknown,
+        privateReason: String = "STATUS_UNAVAILABLE",
+        vpnReason: String = "STATUS_UNAVAILABLE",
+        pfReason: String = "STATUS_UNAVAILABLE",
         onHide: (() -> Void)? = nil
     ) {
         self.isolatedNetwork = isolatedNetwork
         self.vpnBypass = vpnBypass
         self.pfRulesLoaded = pfRulesLoaded
+        self.privateReason = privateReason
+        self.vpnReason = vpnReason
+        self.pfReason = pfReason
         self.onHide = onHide
     }
 
@@ -100,21 +112,21 @@ public struct SecurityIndicatorsView: View {
                 }
             }
             VStack(alignment: .leading, spacing: 6) {
-                row("Network isolated", isolatedNetwork)
-                row("VPN bypass active", vpnBypass)
-                row("pf firewall rules loaded", pfRulesLoaded)
+                row("Private VM link", isolatedNetwork, reason: privateReason)
+                row("VPN-safe route", vpnBypass, reason: vpnReason)
+                row("PF policy enforced", pfRulesLoaded, reason: pfReason)
             }
         }
     }
 
-    private func row(_ label: String, _ status: SecurityIndicatorStatus) -> some View {
+    private func row(_ label: String, _ status: SecurityIndicatorStatus, reason: String) -> some View {
         let style = SecurityIndicator.style(for: status, label: label)
         return HStack(spacing: 8) {
             ZStack {
                 Circle()
                     .fill(style.color.opacity(0.14))
                     .overlay(Circle().strokeBorder(style.color.opacity(0.3)))
-                if status == .enforced {
+                if status == .enforced || status == .notRequired {
                     ShieldCheckGlyph(color: style.color)
                 } else {
                     Image(systemName: style.symbolName)
@@ -127,7 +139,8 @@ public struct SecurityIndicatorsView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
-        .accessibilityLabel(style.text)
+        .accessibilityLabel("\(style.text), reason \(reason)")
+        .help("\(style.text) · \(reason)")
     }
 }
 

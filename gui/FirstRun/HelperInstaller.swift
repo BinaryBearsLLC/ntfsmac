@@ -44,13 +44,25 @@ public struct RealQuarantineStripper: QuarantineStripping {
     public init() {}
 
     public func stripQuarantine() {
-        guard let bundleURL = Bundle.main.bundleURL as URL?,
-              let enumerator = FileManager.default.enumerator(at: bundleURL, includingPropertiesForKeys: nil)
-        else { return }
-        removexattr(bundleURL.path, "com.apple.quarantine", 0)
+        Self.stripQuarantine(at: Bundle.main.bundleURL)
+    }
+
+    static func stripQuarantine(at bundleURL: URL) {
+        guard let enumerator = FileManager.default.enumerator(
+            at: bundleURL,
+            includingPropertiesForKeys: [.isSymbolicLinkKey],
+            options: [.skipsPackageDescendants]
+        ) else { return }
+        removeQuarantineIfPresent(at: bundleURL.path)
         for case let fileURL as URL in enumerator {
-            removexattr(fileURL.path, "com.apple.quarantine", 0)
+            removeQuarantineIfPresent(at: fileURL.path)
         }
+    }
+
+    private static func removeQuarantineIfPresent(at path: String) {
+        let name = "com.apple.quarantine"
+        guard getxattr(path, name, nil, 0, 0, XATTR_NOFOLLOW) >= 0 else { return }
+        removexattr(path, name, XATTR_NOFOLLOW)
     }
 }
 

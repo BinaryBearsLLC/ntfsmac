@@ -93,6 +93,18 @@ private struct FakeReadOnlyChecker: MountReadOnlyChecking {
 }
 
 @MainActor
+@Test func explicitExperimentalNTFS3SelectionIsOneMountOnlyAndNeverFallsBack() async {
+    let fake = FakeHelper()
+    let appState = AppState()
+    let controller = MountController(helper: fake, readOnlyChecker: FakeReadOnlyChecker(isReadOnly: false), appState: appState)
+
+    await controller.mount(sampleDrive, driver: .ntfs3)
+
+    #expect(fake.mountCalls.count == 1)
+    #expect(fake.mountCalls[0].driver == .ntfs3)
+}
+
+@MainActor
 @Test func unmountClearsMountedMountPoint() async {
     let fake = FakeHelper()
     let appState = AppState()

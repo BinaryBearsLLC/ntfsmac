@@ -63,7 +63,7 @@ public struct StatusIconView: View {
             }
     }
 
-    static func renderedGlyph(for style: StatusIconStyle) -> NSImage {
+    public static func renderedGlyph(for style: StatusIconStyle) -> NSImage {
         if style.isIdle {
             return templateGlyph()
         }

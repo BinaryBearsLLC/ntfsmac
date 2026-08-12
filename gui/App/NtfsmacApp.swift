@@ -1,12 +1,24 @@
 import AppKit
+import Combine
+import CoreServices
 import NtfsmacGUI
 import SwiftUI
 import os.log
 
 private let lifecycleLog = Logger(subsystem: "com.khr898.ntfsmac", category: "Lifecycle")
 
+/// Owns the menu-bar shell and the same long-lived model objects previously retained by
+/// `MenuBarExtra`. AppKit is used only because SwiftUI does not expose a supported way to present
+/// a `MenuBarExtra` from the CLI; the popover body remains the existing `PopoverContentView`.
+@MainActor
 final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
     private var singleInstanceGuard: SingleInstanceGuard?
+    private var popoverController: MenuBarPopoverController?
+    private var driveScanner: DriveScanner?
+    private var mountController: MountController?
+    private var securityStatusReader: SecurityStatusReader?
+    private var cancellables: Set<AnyCancellable> = []
+    private var pendingOpenRequest = false
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         do {
@@ -14,6 +26,7 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
         } catch SingleInstanceGuardError.alreadyRunning {
             lifecycleLog.notice("A second GUI instance was blocked")
             NSApplication.shared.terminate(nil)
+            return
         } catch {
             // Fail closed: two active GUI workflows are riskier than declining to launch when
             // the per-user lock cannot be acquired.
@@ -21,114 +34,161 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
                 "Unable to acquire the GUI instance lock: \(error.localizedDescription, privacy: .public)"
             )
             NSApplication.shared.terminate(nil)
+            return
         }
+
+        NSAppleEventManager.shared().setEventHandler(
+            self,
+            andSelector: #selector(handleGetURLEvent(_:withReplyEvent:)),
+            forEventClass: AEEventClass(kInternetEventClass),
+            andEventID: AEEventID(kAEGetURL)
+        )
     }
-}
 
-/// Menu-bar agent (LSUIElement=true in Info.plist — no Dock icon, no main window). `MenuBarExtra`
-/// (macOS 13+, native) covers the icon+popover shell. Feature content is `PopoverContentView`
-/// (`gui/Views/PopoverContentView.swift`), which composes every Phase 3 feature unit into one view.
-@main
-struct NtfsmacApp: App {
-    @NSApplicationDelegateAdaptor(NtfsmacApplicationDelegate.self) private var applicationDelegate
-    @StateObject private var appState: AppState
-    @StateObject private var driveScanner: DriveScanner
-    @StateObject private var mountController: MountController
-    @StateObject private var throughputMonitor: ThroughputMonitor
-    @StateObject private var remountController: RemountController
-    @StateObject private var diagnoseRunner = DiagnoseRunner()
-    @StateObject private var helperInstaller: HelperInstaller
-    @StateObject private var helperUninstaller: HelperUninstaller
-    @StateObject private var cliInstallChecker: CLIInstallChecker
-    @StateObject private var settings = Settings()
-    @StateObject private var navigation = PopoverNavigation()
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        guard singleInstanceGuard != nil else { return }
 
-    private let finderOpener = FinderOpener()
-    private let helperClient = HelperClient()
-    @StateObject private var cliAutoStager: CLIAutoStager
-
-    init() {
         let appState = AppState()
-        _appState = StateObject(wrappedValue: appState)
+        let driveScanner: DriveScanner
+        let mountController: MountController
+        let throughputMonitor: ThroughputMonitor
+        let remountController: RemountController
 
         // See `DemoScaffold.swift`: inert unless NTFSMAC_UI_DEMO is explicitly set. Real installs
-        // never set it, so this branch never runs outside a deliberate live-screen audit.
+        // never set it, so this branch is limited to deliberate live-screen audits.
         if let demoMode = ProcessInfo.processInfo.environment["NTFSMAC_UI_DEMO"] {
-            _driveScanner = StateObject(wrappedValue: DemoScaffold.driveScanner())
-            _mountController = StateObject(wrappedValue: DemoScaffold.mountController(mode: demoMode, appState: appState))
-            _remountController = StateObject(wrappedValue: DemoScaffold.remountController(appState: appState))
-            _throughputMonitor = StateObject(wrappedValue: DemoScaffold.throughputMonitor())
+            driveScanner = DemoScaffold.driveScanner()
+            mountController = DemoScaffold.mountController(mode: demoMode, appState: appState)
+            remountController = DemoScaffold.remountController(appState: appState)
+            throughputMonitor = DemoScaffold.throughputMonitor()
         } else {
-            _driveScanner = StateObject(wrappedValue: DriveScanner())
-            _mountController = StateObject(wrappedValue: MountController(appState: appState))
-            _remountController = StateObject(wrappedValue: RemountController(appState: appState))
-            _throughputMonitor = StateObject(wrappedValue: ThroughputMonitor())
+            driveScanner = DriveScanner()
+            mountController = MountController(appState: appState)
+            remountController = RemountController(appState: appState)
+            throughputMonitor = ThroughputMonitor()
         }
 
-        // See `DemoScaffold.swift`: separate axis from `NTFSMAC_INSTALL_DEMO` — orthogonal to mount
-        // state. Inert unless NTFSMAC_INSTALL_DEMO is explicitly set; real installs never set it.
         let helperInstaller: HelperInstaller
         if let installOutcome = ProcessInfo.processInfo.environment["NTFSMAC_INSTALL_DEMO"] {
             helperInstaller = DemoScaffold.helperInstaller(outcome: installOutcome)
         } else {
             helperInstaller = HelperInstaller()
         }
-        _helperInstaller = StateObject(wrappedValue: helperInstaller)
 
-        // `cliAutoStager` needs the *same* `CLIInstallChecker` instance the popover observes, but
-        // reading `self.cliInstallChecker` to build it would itself be a `self` read before every
-        // stored property (including `cliAutoStager`, which has no default) is assigned — illegal
-        // per Swift's struct definite-initialization rule. Using a local, exactly like
-        // `appState`/`mountController` above, sidesteps that entirely.
         let cliInstallChecker = CLIInstallChecker()
-        _cliInstallChecker = StateObject(wrappedValue: cliInstallChecker)
-        _cliAutoStager = StateObject(wrappedValue: CLIAutoStager(checker: cliInstallChecker))
-
+        let cliAutoStager = CLIAutoStager(checker: cliInstallChecker)
         let helperUninstaller = HelperUninstaller(onUninstallComplete: {
             helperInstaller.reset()
             cliInstallChecker.check()
         })
-        _helperUninstaller = StateObject(wrappedValue: helperUninstaller)
+        let navigation = PopoverNavigation()
+        let helperClient = HelperClient()
+        let securityStatusReader = SecurityStatusReader()
 
-    }
+        let content = PopoverContentView(
+            appState: appState,
+            driveScanner: driveScanner,
+            mountController: mountController,
+            throughputMonitor: throughputMonitor,
+            remountController: remountController,
+            diagnoseRunner: DiagnoseRunner(),
+            securityStatusReader: securityStatusReader,
+            helperInstaller: helperInstaller,
+            helperUninstaller: helperUninstaller,
+            cliInstallChecker: cliInstallChecker,
+            cliAutoStager: cliAutoStager,
+            settings: Settings(),
+            finderOpener: FinderOpener(),
+            helperClient: helperClient,
+            navigation: navigation
+        )
+        .popoverGlassBackground()
 
-    var body: some Scene {
-        MenuBarExtra {
-            PopoverContentView(
-                appState: appState,
-                driveScanner: driveScanner,
-                mountController: mountController,
-                throughputMonitor: throughputMonitor,
-                remountController: remountController,
-                diagnoseRunner: diagnoseRunner,
-                helperInstaller: helperInstaller,
-                helperUninstaller: helperUninstaller,
-                cliInstallChecker: cliInstallChecker,
-                cliAutoStager: cliAutoStager,
-                settings: settings,
-                finderOpener: finderOpener,
-                helperClient: helperClient,
-                navigation: navigation
-            )
-            .popoverGlassBackground()
-        } label: {
-            // `ui/prototype.html`'s red menu-bar icon ("Error — Helper Missing", comp lines
-            // 636-657) is driven by the helper install outcome, not `AppState.state` — these were
-            // previously fully decoupled, so a denied/failed helper install left the icon grey.
-            StatusIconView(state: helperInstaller.state.isDeniedOrFailed ? .error : appState.state)
-                .accessibilityLabel("ntfsmac")
-                .task {
-                    driveScanner.startPolling()
-                    mountController.startPolling { driveScanner.drives }
+        let popoverController = MenuBarPopoverController(content: content, initialState: appState.state)
+        self.popoverController = popoverController
+        self.driveScanner = driveScanner
+        self.mountController = mountController
+        self.securityStatusReader = securityStatusReader
+
+        Publishers.CombineLatest(appState.$state, helperInstaller.$state)
+            .sink { [weak popoverController] state, helperState in
+                Task { @MainActor in
+                    popoverController?.updateStatus(
+                        state: state,
+                        helperNeedsAttention: helperState.isDeniedOrFailed
+                    )
                 }
-                .task(id: helperInstaller.state) {
-                    if helperInstaller.state == .installing || helperInstaller.state == .notChecked {
+            }
+            .store(in: &cancellables)
+
+        helperInstaller.$state
+            .removeDuplicates()
+            .sink { state in
+                Task { @MainActor in
+                    if state == .installing || state == .notChecked {
                         cliAutoStager.reset()
                     }
-                    guard helperInstaller.state == .installed else { return }
+                    guard state == .installed else { return }
                     await cliAutoStager.stageIfNeeded()
                 }
+            }
+            .store(in: &cancellables)
+
+        driveScanner.startPolling()
+        mountController.startPolling { driveScanner.drives }
+        securityStatusReader.startPolling()
+
+        if pendingOpenRequest {
+            pendingOpenRequest = false
+            DispatchQueue.main.async { [weak popoverController] in
+                popoverController?.showPopover()
+            }
         }
-        .menuBarExtraStyle(.window)
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        popoverController?.showPopover()
+        return false
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        driveScanner?.stopPolling()
+        mountController?.stopPolling()
+        securityStatusReader?.stopPolling()
+        popoverController?.invalidate()
+        NSAppleEventManager.shared().removeEventHandler(
+            forEventClass: AEEventClass(kInternetEventClass),
+            andEventID: AEEventID(kAEGetURL)
+        )
+    }
+
+    @objc private func handleGetURLEvent(
+        _ event: NSAppleEventDescriptor,
+        withReplyEvent replyEvent: NSAppleEventDescriptor
+    ) {
+        guard let rawURL = event.paramDescriptor(forKeyword: AEKeyword(keyDirectObject))?.stringValue,
+              let url = URL(string: rawURL),
+              OpenGUIRequest.matches(url)
+        else {
+            lifecycleLog.error("Ignored an invalid GUI URL request")
+            return
+        }
+
+        if let popoverController {
+            popoverController.showPopover()
+        } else {
+            pendingOpenRequest = true
+        }
+    }
+}
+
+/// The application has no Dock icon and no standalone window. `Settings` is an inert scene used
+/// only to satisfy SwiftUI's scene contract; real settings remain inside `PopoverContentView`.
+@main
+struct NtfsmacApp: App {
+    @NSApplicationDelegateAdaptor(NtfsmacApplicationDelegate.self) private var applicationDelegate
+
+    var body: some Scene {
+        Settings { EmptyView() }
     }
 }

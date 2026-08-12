@@ -71,6 +71,8 @@ let package = Package(
                 "Drives/ThroughputMonitor.swift", "Views/SpeedBar.swift",
                 "Actions/RemountController.swift", "Views/DirtyBanner.swift",
                 "Actions/FinderOpener.swift", "Views/SecurityIndicators.swift",
+                "Actions/MenuBarPopoverController.swift",
+                "Actions/SecurityStatusReader.swift",
                 "Actions/PreferencesOpener.swift", "Actions/CLIAutoStager.swift",
                 "Actions/DiagnoseRunner.swift", "Actions/DeveloperDiagnoseExport.swift", "Views/DiagnosePanel.swift",
                 "FirstRun/HelperInstaller.swift", "Views/FirstRunView.swift",

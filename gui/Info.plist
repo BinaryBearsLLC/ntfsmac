@@ -30,6 +30,19 @@
 	<!-- No Dock icon, no main window — menu-bar agent shape (L7, GUI-PLAN "App shape"). -->
 	<key>LSUIElement</key>
 	<true/>
+	<!-- Fork-local automation entry point. It only reveals the existing menu-bar popover; it
+	     performs no mount, helper, route, or packet-filter action. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.binarybears.ntfsmac.opengui</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>binarybears-ntfsmac</string>
+			</array>
+		</dict>
+	</array>
 	<!--
 	Mirrors helper/Info.plist's SMAuthorizedClients: SMJobBless requires the trust pairing on
 	both sides. Ad-hoc signing (L4) means no Team ID / trusted certificate chain — same caveat

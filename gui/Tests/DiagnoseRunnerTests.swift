@@ -16,11 +16,11 @@ private let degradedJSON = """
 """
 
 private let expandedJSON = """
-{"diagnostic_schema":5,"healthy":true,"ntfsmac_version":"1.0","build_version":"1","macos_version":"26.6","architecture":"arm64","helper_installed":true,"missing_binaries":0,"missing_components":[],"quarantined_binaries":0,"quarantined_components":[],"kernel_pin":"match","anylinuxfs_version":"0.18.0","anylinuxfs_expected_version":"0.18.0","anylinuxfs_version_status":"match","anylinuxfs_source_commit":"8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3","vmproxy_source_version":"0.18.0","libkrun_version":"1.19.3","libkrunfw_version":"v6.12.62-rev1","gvproxy_version":"v0.8.9","gvproxy_expected_version":"v0.8.9","gvproxy_version_status":"match","gvproxy_source_commit":"9cfc86f66679ef0feed0f20ba1df558fe2bef5c6","vmnet_helper_version":"v0.12.0","vmnet_helper_expected_version":"v0.12.0","vmnet_helper_version_status":"match","vmnet_helper_source_commit":"0caef043005c7d9f03422a9914bc9d3d4637dc84","alpine_runtime_tag":"3.23.5","alpine_runtime_digest":"sha256:d858bb5442632a31bd4bca6c5e601dbe6b536fd7942092ea6a08a0a95805693c","alpine_runtime_state":"initialized","alpine_installed_cache":"pinned","alpine_installed_version":"3.23.5","ntfs_3g_version":"2026.2.25-r0","nfs_utils_version":"2.6.4-r6","bridge":"up","network_helper":"vmnet","nfs_transport_contract":"expected_vmnet","vpn_default_route":true,"nfs_mount_count":1}
+{"diagnostic_schema":6,"healthy":true,"ntfsmac_version":"1.0","build_version":"1","macos_version":"26.6","architecture":"arm64","helper_installed":true,"missing_binaries":0,"missing_components":[],"quarantined_binaries":0,"quarantined_components":[],"kernel_pin":"match","anylinuxfs_version":"0.18.0","anylinuxfs_expected_version":"0.18.0","anylinuxfs_version_status":"match","anylinuxfs_source_commit":"8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3","vmproxy_source_version":"0.18.0","libkrun_version":"1.19.3","libkrunfw_version":"v6.12.62-rev1","gvproxy_version":"v0.8.9","gvproxy_expected_version":"v0.8.9","gvproxy_version_status":"match","gvproxy_source_commit":"9cfc86f66679ef0feed0f20ba1df558fe2bef5c6","vmnet_helper_version":"v0.12.0","vmnet_helper_expected_version":"v0.12.0","vmnet_helper_version_status":"match","vmnet_helper_source_commit":"0caef043005c7d9f03422a9914bc9d3d4637dc84","alpine_runtime_tag":"3.23.5","alpine_runtime_digest":"sha256:d858bb5442632a31bd4bca6c5e601dbe6b536fd7942092ea6a08a0a95805693c","alpine_runtime_state":"initialized","alpine_installed_cache":"pinned","alpine_installed_version":"3.23.5","ntfs_3g_version":"2026.2.25-r0","nfs_utils_version":"2.6.4-r6","bridge":"up","network_helper":"vmnet","nfs_transport_contract":"expected_vmnet","vpn_default_route":true,"nfs_mount_count":1,"selected_fs_driver":"ntfs3","mount_failure_category":"none","security_active_sessions":1,"security_private_link":"enforced","security_private_reason":"PRIVATE_VMNET_SOFT","security_vpn_route":"notRequired","security_vpn_route_reason":"ROUTE_ALREADY_PRIVATE","security_pf_policy":"enforced","security_pf_reason":"PF_EVALUATED","security_overall":"enforced","security_overall_reason":"SECURITY_ENFORCED"}
 """
 
 private let developerExportJSON = """
-{"diagnostic_schema":5,"healthy":false,"ntfsmac_version":"1.0","build_version":"1","macos_version":"26.5","architecture":"arm64","helper_installed":true,"missing_binaries":1,"missing_components":["vmproxy"],"quarantined_binaries":0,"quarantined_components":[],"kernel_pin":"match","anylinuxfs_version":"0.18.0","anylinuxfs_expected_version":"0.18.0","anylinuxfs_version_status":"match","anylinuxfs_source_commit":"8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3","vmproxy_source_version":"0.18.0","libkrun_version":"1.19.3","libkrunfw_version":"v6.12.62-rev1","gvproxy_version":"v0.8.9","gvproxy_expected_version":"v0.8.9","gvproxy_version_status":"match","gvproxy_source_commit":"9cfc86f66679ef0feed0f20ba1df558fe2bef5c6","vmnet_helper_version":"v0.12.0","vmnet_helper_expected_version":"v0.12.0","vmnet_helper_version_status":"match","vmnet_helper_source_commit":"0caef043005c7d9f03422a9914bc9d3d4637dc84","alpine_runtime_tag":"3.23.5","alpine_runtime_digest":"sha256:d858bb5442632a31bd4bca6c5e601dbe6b536fd7942092ea6a08a0a95805693c","alpine_runtime_state":"not_initialized","alpine_installed_cache":"none","alpine_installed_version":"not_installed","ntfs_3g_version":"not_installed","nfs_utils_version":"not_installed","bridge":"down","network_helper":"none","nfs_transport_contract":"inactive","vpn_default_route":false,"nfs_mount_count":0}
+{"diagnostic_schema":6,"healthy":false,"ntfsmac_version":"1.0","build_version":"1","macos_version":"26.5","architecture":"arm64","helper_installed":true,"missing_binaries":1,"missing_components":["vmproxy"],"quarantined_binaries":0,"quarantined_components":[],"kernel_pin":"match","anylinuxfs_version":"0.18.0","anylinuxfs_expected_version":"0.18.0","anylinuxfs_version_status":"match","anylinuxfs_source_commit":"8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3","vmproxy_source_version":"0.18.0","libkrun_version":"1.19.3","libkrunfw_version":"v6.12.62-rev1","gvproxy_version":"v0.8.9","gvproxy_expected_version":"v0.8.9","gvproxy_version_status":"match","gvproxy_source_commit":"9cfc86f66679ef0feed0f20ba1df558fe2bef5c6","vmnet_helper_version":"v0.12.0","vmnet_helper_expected_version":"v0.12.0","vmnet_helper_version_status":"match","vmnet_helper_source_commit":"0caef043005c7d9f03422a9914bc9d3d4637dc84","alpine_runtime_tag":"3.23.5","alpine_runtime_digest":"sha256:d858bb5442632a31bd4bca6c5e601dbe6b536fd7942092ea6a08a0a95805693c","alpine_runtime_state":"not_initialized","alpine_installed_cache":"none","alpine_installed_version":"not_installed","ntfs_3g_version":"not_installed","nfs_utils_version":"not_installed","bridge":"down","network_helper":"none","nfs_transport_contract":"inactive","vpn_default_route":false,"nfs_mount_count":0,"security_active_sessions":0,"security_private_link":"notRequired","security_private_reason":"NO_ACTIVE_MOUNTS","security_vpn_route":"notRequired","security_vpn_route_reason":"NO_ACTIVE_MOUNTS","security_pf_policy":"notRequired","security_pf_reason":"NO_ACTIVE_MOUNTS","security_overall":"notRequired","security_overall_reason":"NO_ACTIVE_MOUNTS"}
 """
 
 private final class FakeRunner: PrivilegedCommandRunning {
@@ -63,9 +63,15 @@ private final class FakeRunner: PrivilegedCommandRunning {
     let report = try JSONDecoder().decode(DiagnoseReport.self, from: Data(expandedJSON.utf8))
     let rows = DiagnoseSummary.rows(for: report)
 
-    #expect(report.diagnosticSchema == 5)
+    #expect(report.diagnosticSchema == 6)
+    #expect(report.securityActiveSessions == 1)
+    #expect(report.securityPrivateLink == "enforced")
+    #expect(report.securityVPNRoute == "notRequired")
+    #expect(report.securityPFPolicy == "enforced")
+    #expect(report.selectedFSDriver == "ntfs3")
+    #expect(report.mountFailureCategory == "none")
     #expect(rows.map(\.id) == [
-        "version", "system", "binaries", "quarantine", "kernel", "anylinuxfs", "virtualization", "alpine", "guest_versions", "network_tools", "bridge", "transport", "helper", "vpn", "mounts",
+        "version", "system", "binaries", "quarantine", "kernel", "anylinuxfs", "virtualization", "alpine", "guest_versions", "network_tools", "bridge", "transport", "mount_driver", "mount_result", "security_private", "security_route", "security_pf", "helper", "vpn", "mounts",
     ])
     #expect(rows.first(where: { $0.id == "version" })?.value == "1.0 (1)")
     #expect(rows.first(where: { $0.id == "system" })?.value == "macOS 26.6 · arm64")
@@ -75,6 +81,11 @@ private final class FakeRunner: PrivilegedCommandRunning {
     #expect(rows.first(where: { $0.id == "guest_versions" })?.value == "Alpine 3.23.5 · ntfs-3g 2026.2.25-r0 · nfs-utils 2.6.4-r6")
     #expect(rows.first(where: { $0.id == "network_tools" })?.value == "gvproxy v0.8.9 · vmnet-helper v0.12.0")
     #expect(rows.first(where: { $0.id == "transport" })?.value == "Private vmnet path")
+    #expect(rows.first(where: { $0.id == "mount_driver" })?.value == "NTFS3 · experimental")
+    #expect(rows.first(where: { $0.id == "mount_result" })?.status == .healthy)
+    #expect(rows.first(where: { $0.id == "security_private" })?.value == "Enforced · PRIVATE_VMNET_SOFT")
+    #expect(rows.first(where: { $0.id == "security_route" })?.status == .informational)
+    #expect(rows.first(where: { $0.id == "security_pf" })?.status == .healthy)
     #expect(rows.first(where: { $0.id == "vpn" })?.value == "Default route uses a tunnel")
     #expect(rows.first(where: { $0.id == "mounts" })?.value == "1 active")
 }
@@ -181,7 +192,7 @@ func bridgeDownUsesMountContext(argument: (MountState, DiagnoseStatus, String)) 
     #expect(runner.errorMessage == nil)
     #expect(document != nil)
     let object = try JSONSerialization.jsonObject(with: document!.data) as? [String: Any]
-    #expect(object?["diagnostic_schema"] as? Int == 5)
+    #expect(object?["diagnostic_schema"] as? Int == 6)
     #expect(object?["ntfsmac_version"] as? String == "1.0")
     #expect(object?["macos_version"] as? String == "26.5")
     #expect(object?["missing_components"] as? [String] == ["vmproxy"])

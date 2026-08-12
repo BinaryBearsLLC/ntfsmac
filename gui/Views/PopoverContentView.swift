@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import HelperShared
 
 /// Assembles GUI-PLAN.md's "Popover — idle" / "Popover — mounted" / "Read-only (dirty) state" /
 /// "Error state" tables into the single popover `NtfsmacApp.swift` presents; every subview used
@@ -63,6 +64,7 @@ public struct PopoverContentView: View {
     @ObservedObject public var throughputMonitor: ThroughputMonitor
     @ObservedObject public var remountController: RemountController
     @ObservedObject public var diagnoseRunner: DiagnoseRunner
+    @ObservedObject public var securityStatusReader: SecurityStatusReader
     @ObservedObject public var helperInstaller: HelperInstaller
     @ObservedObject public var helperUninstaller: HelperUninstaller
     @ObservedObject public var cliInstallChecker: CLIInstallChecker
@@ -84,6 +86,7 @@ public struct PopoverContentView: View {
         throughputMonitor: ThroughputMonitor,
         remountController: RemountController,
         diagnoseRunner: DiagnoseRunner,
+        securityStatusReader: SecurityStatusReader = SecurityStatusReader(),
         helperInstaller: HelperInstaller,
         helperUninstaller: HelperUninstaller,
         cliInstallChecker: CLIInstallChecker,
@@ -99,6 +102,7 @@ public struct PopoverContentView: View {
         self.throughputMonitor = throughputMonitor
         self.remountController = remountController
         self.diagnoseRunner = diagnoseRunner
+        self.securityStatusReader = securityStatusReader
         self.helperInstaller = helperInstaller
         self.helperUninstaller = helperUninstaller
         self.cliInstallChecker = cliInstallChecker
@@ -118,6 +122,7 @@ public struct PopoverContentView: View {
         throughputMonitor: ThroughputMonitor,
         remountController: RemountController,
         diagnoseRunner: DiagnoseRunner,
+        securityStatusReader: SecurityStatusReader = SecurityStatusReader(),
         helperInstaller: HelperInstaller,
         cliInstallChecker: CLIInstallChecker,
         cliAutoStager: CLIAutoStager,
@@ -132,6 +137,7 @@ public struct PopoverContentView: View {
             throughputMonitor: throughputMonitor,
             remountController: remountController,
             diagnoseRunner: diagnoseRunner,
+            securityStatusReader: securityStatusReader,
             helperInstaller: helperInstaller,
             helperUninstaller: HelperUninstaller(),
             cliInstallChecker: cliInstallChecker,
@@ -253,7 +259,8 @@ public struct PopoverContentView: View {
                     DriveRow(
                         drive: drive,
                         isMounted: false,
-                        onMount: { mountDrive(drive) }
+                        onMount: { mountDrive(drive) },
+                        onMountExperimental: ntfs3Action(for: drive)
                     )
                 }
             }
@@ -281,7 +288,8 @@ public struct PopoverContentView: View {
                         DriveRow(
                             drive: drive,
                             isMounted: false,
-                            onMount: { mountDrive(drive) }
+                            onMount: { mountDrive(drive) },
+                            onMountExperimental: ntfs3Action(for: drive)
                         )
                     }
                 }
@@ -293,14 +301,14 @@ public struct PopoverContentView: View {
 
             if !mountController.mountedDrives.isEmpty {
                 Divider()
-                // Phase 1 (pf/route hardening) is deferrable/non-blocking (PLAN.md) and
-                // `diagnose.sh` doesn't currently surface its state at all
-                // (confirmed by `3-security-indicators`) — `.unknown` for both is the only
-                // honest value available today, never a fabricated `.enforced`.
                 if securityPresentation.isVisible {
                     SecurityIndicatorsView(
-                        isolatedNetwork: .unknown,
-                        vpnBypass: .unknown,
+                        isolatedNetwork: securityStatusReader.snapshot.privateLink.status,
+                        vpnBypass: securityStatusReader.snapshot.vpnRoute.status,
+                        pfRulesLoaded: securityStatusReader.snapshot.pfPolicy.status,
+                        privateReason: securityStatusReader.snapshot.privateLink.reason,
+                        vpnReason: securityStatusReader.snapshot.vpnRoute.reason,
+                        pfReason: securityStatusReader.snapshot.pfPolicy.reason,
                         onHide: { securityPresentation.hide() }
                     )
                 } else {
@@ -367,13 +375,19 @@ public struct PopoverContentView: View {
 
     /// Mount an unmounted drive r/w at its default mount point. Shared by the idle primary list
     /// and the mounted "Other available devices" section — both offer the same per-row Mount action.
-    private func mountDrive(_ drive: Drive) {
-        Task { await mountController.mount(drive, mountPoint: nil, readOnly: false) }
+    private func mountDrive(_ drive: Drive, driver: FsDriver? = nil) {
+        Task { await mountController.mount(drive, driver: driver, mountPoint: nil, readOnly: false) }
+    }
+
+    private func ntfs3Action(for drive: Drive) -> (() -> Void)? {
+        guard NTFS3PreflightCopy.isAvailable(for: drive.fsType) else { return nil }
+        return { mountDrive(drive, driver: .ntfs3) }
     }
 
     private func refreshAll() async {
         await driveScanner.refresh()
         await mountController.reconcile(knownDrives: driveScanner.drives)
+        securityStatusReader.refresh()
     }
 
     private var headerSubtitle: String {

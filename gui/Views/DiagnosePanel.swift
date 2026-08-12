@@ -107,6 +107,8 @@ public enum DiagnoseSummary {
         ) {
             rows.append(transport)
         }
+        rows.append(contentsOf: mountAttemptRows(report))
+        rows.append(contentsOf: securityRows(report))
         if let helperInstalled = report.helperInstalled {
             rows.append(helperRow(installed: helperInstalled))
         }
@@ -396,6 +398,76 @@ public enum DiagnoseSummary {
             status: installed ? .healthy : .informational,
             explanation: "The GUI uses its SMJobBless helper for mount, unmount, firewall, and route operations. A CLI-only installation may not need it."
         )
+    }
+
+    private static func mountAttemptRows(_ report: DiagnoseReport) -> [DiagnoseSummaryRow] {
+        var rows: [DiagnoseSummaryRow] = []
+        if let driver = report.selectedFSDriver {
+            let value: String
+            let status: DiagnoseStatus
+            switch driver {
+            case "ntfs-3g": value = "ntfs-3g · compatibility default"; status = .informational
+            case "ntfs3": value = "NTFS3 · experimental"; status = .informational
+            case "ext": value = "Linux ext"; status = .informational
+            case "none": value = "No mount attempt"; status = .informational
+            default: value = "Unknown"; status = .unavailable
+            }
+            rows.append(.init(
+                id: "mount_driver",
+                label: "Mount driver",
+                value: value,
+                status: status,
+                explanation: "Driver selected for the latest mount attempt. NTFS3 is always explicit and never falls back automatically to ntfs-3g."
+            ))
+        }
+        if let failure = report.mountFailureCategory {
+            let value: String
+            let status: DiagnoseStatus
+            switch failure {
+            case "none": value = "Succeeded"; status = .healthy
+            case "in_progress": value = "In progress"; status = .informational
+            case "invalid_request": value = "Invalid request"; status = .warning
+            case "runtime_unavailable": value = "Runtime unavailable"; status = .warning
+            case "backend_failed": value = "Backend failed"; status = .warning
+            case "mount_not_observed": value = "Mount not observed"; status = .warning
+            default: value = "Unknown"; status = .unavailable
+            }
+            rows.append(.init(
+                id: "mount_result",
+                label: "Latest mount",
+                value: value,
+                status: status,
+                explanation: "Privacy-safe result category for the latest mount attempt; device names, paths, labels, and backend output are omitted."
+            ))
+        }
+        return rows
+    }
+
+    private static func securityRows(_ report: DiagnoseReport) -> [DiagnoseSummaryRow] {
+        let fields: [(String, String, String?, String?)] = [
+            ("security_private", "Private VM link", report.securityPrivateLink, report.securityPrivateReason),
+            ("security_route", "VPN-safe route", report.securityVPNRoute, report.securityVPNRouteReason),
+            ("security_pf", "PF policy enforced", report.securityPFPolicy, report.securityPFReason),
+        ]
+        return fields.compactMap { id, label, rawState, reason in
+            guard rawState != nil || reason != nil else { return nil }
+            let value: String
+            let status: DiagnoseStatus
+            switch rawState {
+            case "enforced": value = "Enforced"; status = .healthy
+            case "notRequired": value = "Not required"; status = .informational
+            case "notEnforced": value = "Not enforced"; status = .warning
+            default: value = "Unknown"; status = .unavailable
+            }
+            let safeReason = reason?.isEmpty == false ? reason! : "STATUS_UNAVAILABLE"
+            return .init(
+                id: id,
+                label: label,
+                value: "\(value) · \(safeReason)",
+                status: status,
+                explanation: "Measured security state published by the privileged mount transaction. The reason is a fixed privacy-safe code; device, volume, network, and VPN identity are omitted."
+            )
+        }
     }
 
     private static func vpnRow(detected: Bool) -> DiagnoseSummaryRow {

@@ -5,6 +5,7 @@ setup() {
   SCRIPT="$REPO_ROOT/cli/lib/security-transaction.sh"
   STUB_DIR="$(mktemp -d)"
   export NTFSMAC_SECURITY_STATE_DIR="$STUB_DIR/state"
+  export NTFSMAC_SECURITY_STATUS_FILE="$STUB_DIR/security-status"
   export NTFSMAC_PFCTL_BIN="$STUB_DIR/pfctl"
   export NTFSMAC_ROUTE_BIN="$STUB_DIR/route"
   export NTFSMAC_SECURITY_STATUS_OUTPUT="/dev/disk2s1 on /Volumes/Test (ntfs-3g, soft, mounted by test) VM[cpus: 2, ram: 1024 MiB]"
@@ -57,6 +58,14 @@ teardown() {
   [ "$status" -eq 0 ]
   run grep -F "pf_token=A1B2C3D4" "$NTFSMAC_SECURITY_STATE_DIR/disk2s1.state"
   [ "$status" -eq 0 ]
+  [ -r "$NTFSMAC_SECURITY_STATUS_FILE" ]
+  [ "$(stat -f '%Lp' "$NTFSMAC_SECURITY_STATUS_FILE")" = "644" ]
+  [ "$(stat -f '%Lp' "$NTFSMAC_SECURITY_STATE_DIR")" = "700" ]
+  [ "$(stat -f '%Lp' "$NTFSMAC_SECURITY_STATE_DIR/disk2s1.state")" = "600" ]
+  run grep -F 'overall=enforced' "$NTFSMAC_SECURITY_STATUS_FILE"
+  [ "$status" -eq 0 ]
+  run grep -E 'disk[0-9]|172\.|bridge|anchor|pf_token|/Volumes/' "$NTFSMAC_SECURITY_STATUS_FILE"
+  [ "$status" -ne 0 ]
 }
 
 @test "a failed backend releases PF acquired during pre-mount transport preparation" {

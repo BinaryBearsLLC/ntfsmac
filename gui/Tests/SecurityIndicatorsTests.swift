@@ -25,11 +25,21 @@ import Testing
     #expect(style.text.contains("unknown"))
 }
 
+@Test func notRequiredIsDistinctAndNeverPresentedAsEnforced() {
+    let style = SecurityIndicator.style(for: .notRequired, label: "VPN-safe route")
+    #expect(style.symbolName == "checkmark.shield.fill")
+    #expect(style.color == .ntfsBlue)
+    #expect(style.text == "VPN-safe route: not required")
+}
+
 @Test func allNonEnforcedStatusesAreDistinguishableFromEachOther() {
     let notEnforced = SecurityIndicator.style(for: .notEnforced, label: "X")
     let unknown = SecurityIndicator.style(for: .unknown, label: "X")
+    let notRequired = SecurityIndicator.style(for: .notRequired, label: "X")
     #expect(notEnforced.symbolName != unknown.symbolName)
     #expect(notEnforced.color != unknown.color)
+    #expect(notRequired.color != notEnforced.color)
+    #expect(notRequired.color != unknown.color)
 }
 
 @Test func labelIsThreadedThroughForEachIndicatorIndependently() {
