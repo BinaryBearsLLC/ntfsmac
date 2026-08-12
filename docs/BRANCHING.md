@@ -152,9 +152,9 @@ All four candidate branches are published to `BinaryBearsLLC/ntfsmac`. The pull 
 | Order | Pull request | Review state | Merge rule |
 | --- | --- | --- | --- |
 | 1 of 4 | [`#17`](https://github.com/khr898/ntfsmac/pull/17) | Ready; all GitHub CI jobs passed on `ebb3aad` | Merge first |
-| 2 of 4 | [`#18`](https://github.com/khr898/ntfsmac/pull/18) | Draft; cumulative on `1of4` | Refresh from the maintainer-accepted result of `#17`, rerun gates, then mark ready |
-| 3 of 4 | [`#19`](https://github.com/khr898/ntfsmac/pull/19) | Draft; cumulative on `2of4` | Refresh only after `#18` is accepted, then rerun gates |
-| 4 of 4 | [`#20`](https://github.com/khr898/ntfsmac/pull/20) | Draft; cumulative on `3of4` | Refresh only after `#19` is accepted, then rerun all final gates |
+| 2 of 4 | [`#18`](https://github.com/khr898/ntfsmac/pull/18) | Draft; all GitHub CI jobs passed on `fdc45a9`; cumulative on `1of4` | Refresh from the maintainer-accepted result of `#17`, rerun gates, then mark ready |
+| 3 of 4 | [`#19`](https://github.com/khr898/ntfsmac/pull/19) | Draft; all GitHub CI jobs passed on `0f354ac`; cumulative on `2of4` | Refresh only after `#18` is accepted, then rerun gates |
+| 4 of 4 | [`#20`](https://github.com/khr898/ntfsmac/pull/20) | Draft; all GitHub CI jobs passed on `2f7e509`; cumulative on `3of4` | Refresh only after `#19` is accepted, then rerun all final gates |
 
 The first `#18` CI run exposed a wall-clock-sensitive Swift test: the main actor remained responsive,
 but a loaded runner exceeded the test's fixed 350 ms threshold. Commit `fdc45a9` replaced that timing
