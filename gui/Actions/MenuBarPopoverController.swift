@@ -13,6 +13,32 @@ public enum OpenGUIRequest {
     }
 }
 
+/// A status-item popover is only safe to present after AppKit has attached the button to its
+/// menu-bar window and assigned real screen coordinates. Presenting earlier makes AppKit fall
+/// back to the lower-left corner of the screen during a cold `opengui` launch.
+enum PopoverAnchorReadiness {
+    private static let maximumMenuBarBandHeight: CGFloat = 96
+
+    static func isReady(
+        buttonBounds: CGRect,
+        anchorFrameOnScreen: CGRect?,
+        screenFrame: CGRect?
+    ) -> Bool {
+        guard buttonBounds.width > 0, buttonBounds.height > 0,
+              let anchorFrameOnScreen,
+              anchorFrameOnScreen.width > 0, anchorFrameOnScreen.height > 0,
+              let screenFrame,
+              screenFrame.width > 0, screenFrame.height > 0,
+              anchorFrameOnScreen.intersects(screenFrame)
+        else {
+            return false
+        }
+
+        let menuBarBandHeight = min(maximumMenuBarBandHeight, screenFrame.height)
+        return anchorFrameOnScreen.midY >= screenFrame.maxY - menuBarBandHeight
+    }
+}
+
 /// Thin AppKit shell around the existing SwiftUI popover content. SwiftUI's `MenuBarExtra`
 /// exposes insertion but no supported presentation binding, so it cannot satisfy a robust CLI
 /// "open" request. This controller changes only the shell: `PopoverContentView` remains the one
@@ -22,7 +48,11 @@ public final class MenuBarPopoverController: NSObject, NSPopoverDelegate {
     private let statusItem: NSStatusItem
     private let popover: NSPopover
     private var pulseTimer: Timer?
+    private var pendingShowTask: Task<Void, Never>?
     private var displayedState: MountState = .idle
+
+    private static let showRetryCount = 40
+    private static let showRetryDelay = Duration.milliseconds(50)
 
     public init<Content: View>(content: Content, initialState: MountState = .idle) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -51,6 +81,8 @@ public final class MenuBarPopoverController: NSObject, NSPopoverDelegate {
     /// keeping teardown explicit also avoids Swift 6's deliberately nonisolated `deinit`
     /// touching AppKit's non-Sendable objects.
     public func invalidate() {
+        pendingShowTask?.cancel()
+        pendingShowTask = nil
         pulseTimer?.invalidate()
         pulseTimer = nil
         popover.close()
@@ -62,15 +94,54 @@ public final class MenuBarPopoverController: NSObject, NSPopoverDelegate {
     }
 
     public func showPopover() {
-        guard let button = statusItem.button else { return }
-        NSApp.activate(ignoringOtherApps: true)
-        if !popover.isShown {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        pendingShowTask?.cancel()
+        pendingShowTask = nil
+        guard !popover.isShown else { return }
+
+        pendingShowTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            for attempt in 0..<Self.showRetryCount {
+                guard !Task.isCancelled else { return }
+                if self.showPopoverIfAnchorIsReady() {
+                    self.pendingShowTask = nil
+                    return
+                }
+                guard attempt + 1 < Self.showRetryCount else { break }
+                try? await Task.sleep(for: Self.showRetryDelay)
+            }
+
+            self.pendingShowTask = nil
         }
     }
 
     public func closePopover() {
+        pendingShowTask?.cancel()
+        pendingShowTask = nil
         popover.performClose(nil)
+    }
+
+    private func showPopoverIfAnchorIsReady() -> Bool {
+        guard let button = statusItem.button,
+              let window = button.window,
+              let screen = window.screen
+        else {
+            return false
+        }
+
+        let buttonFrameInWindow = button.convert(button.bounds, to: nil)
+        let anchorFrameOnScreen = window.convertToScreen(buttonFrameInWindow)
+        guard PopoverAnchorReadiness.isReady(
+            buttonBounds: button.bounds,
+            anchorFrameOnScreen: anchorFrameOnScreen,
+            screenFrame: screen.frame
+        ) else {
+            return false
+        }
+
+        NSApp.activate(ignoringOtherApps: true)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        return popover.isShown
     }
 
     public func updateStatus(state: MountState, helperNeedsAttention: Bool) {

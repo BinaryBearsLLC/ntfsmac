@@ -448,6 +448,9 @@ and uninstall boundary; it should not be mixed into unrelated work.
 ### P3 — Focused UX completion
 
 - [x] Wire a per-drive **Open in Finder** action to the existing tested opener.
+- [x] Add automation-safe `ntfsmac opengui` presentation of the same minimal popover, without
+  Accessibility permission or synthetic clicks. Cold launch waits for a real menu-bar anchor;
+  repeated requests coalesce instead of creating windows or app instances.
 - [x] Remove the global transfer sampler and speed row: the available counters cannot reliably
   attribute concurrent traffic per drive, and an aggregate number would be misleading.
 - [x] Add mount, unmount, and error notifications with user-controlled, default-off behavior.
@@ -466,6 +469,12 @@ accepted the NFS URL but no Finder window appeared. The source now asks Finder t
 observed mount point before using fallbacks; the rebuilt artifact must pass the per-drive live
 check before P3 can be called packaged-valid. The professional DMG presentation is a separate
 open packaging-UX item and does not expand the normal menu-bar surface.
+
+The same run found a cold-launch timing defect in `opengui`: the installed app truthfully recovered
+the surviving mount but presented its popover at the lower-left of the screen. Source now defers
+presentation until AppKit exposes valid menu-bar screen geometry and has regression coverage for
+the rejected fallback position. The rebuilt package must remain anchored under its status item on
+cold, warm, and rapid repeated requests.
 
 P3's packaged-app checks are part of the
 [assisted manual acceptance runbook](testing/BINARYBEARS_MANUAL_ACCEPTANCE_2026-08-12.md); they do

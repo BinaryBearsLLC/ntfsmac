@@ -155,10 +155,12 @@ popover, and retry. A denial or cancel must remain recoverable rather than showi
 
 1. Quit ntfsmac and verify no app process remains.
 2. Run `"$BB_CLI" opengui`; require `opengui: popover requested`, one app instance, and the visible
-   popover within roughly two seconds.
+   popover within roughly two seconds. It must be anchored directly beneath its own menu-bar icon;
+   a detached popover or lower-left fallback is a failure.
 3. Close only the popover, run the same command again, and require the existing instance to reveal
    it.
-4. Run the command three times quickly. Require one app instance and a usable popover.
+4. Run the command three times quickly. Require one app instance and one usable, correctly anchored
+   popover.
 5. Run `"$BB_CLI" opengui unexpected`; require exit status `2` and no new app instance.
 
 Accessibility permission must not appear in any step.
