@@ -34,6 +34,9 @@ teardown() {
   [ -x "$PREFIX_DIR/libexec/init-rootfs" ]
   [ -f "$PREFIX_DIR/lib/modules.squashfs" ]
   [ -x "$PREFIX_DIR/libexec/ntfsmac/commands/mount.sh" ]
+  [ -x "$PREFIX_DIR/libexec/ntfsmac/commands/copy.sh" ]
+  [ -x "$PREFIX_DIR/libexec/ntfsmac/commands/verify.sh" ]
+  [ -x "$PREFIX_DIR/libexec/ntfsmac/commands/opengui.sh" ]
   [ -f "$PREFIX_DIR/libexec/ntfsmac/lib/version.sh" ]
   [ -f "$PREFIX_DIR/libexec/ntfsmac/pf/ntfsmac.anchor.tmpl" ]
   [ -f "$PREFIX_DIR/libexec/ntfsmac/lib/product-info.plist" ]
@@ -130,13 +133,21 @@ STUB
   [ ! -e "$PREFIX_DIR/bin/anylinuxfs" ]
 }
 
-@test "ntfsmac dispatcher routes to mount/unmount/diagnose" {
+@test "ntfsmac dispatcher routes diagnostics and verified-copy commands" {
   run "$SCRIPT"
   [ "$status" -eq 0 ]
   run "$PREFIX_DIR/bin/ntfsmac" diagnose --json
+  [ "$status" -eq 0 ]
   [[ "$output" == \{*\} ]]
-  [[ "$output" == *'"diagnostic_schema":5'* ]]
+  [[ "$output" == *'"diagnostic_schema":6'* ]]
   [[ "$output" == *"\"ntfsmac_version\":\"$EXPECTED_RELEASE\""* ]]
+
+  printf 'installed-dispatch\n' > "$PREFIX_DIR/source.txt"
+  run "$PREFIX_DIR/bin/ntfsmac" copy --verify "$PREFIX_DIR/source.txt" "$PREFIX_DIR/destination.txt"
+  [ "$status" -eq 0 ]
+  run "$PREFIX_DIR/bin/ntfsmac" verify "$PREFIX_DIR/source.txt" "$PREFIX_DIR/destination.txt"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"SHA-256 manifest match"* ]]
 }
 
 @test "ntfsmac help lists every real command, none left off" {
@@ -146,7 +157,10 @@ STUB
   [ "$status" -eq 0 ]
   [[ "$output" == *"mount "* ]]
   [[ "$output" == *"unmount "* ]]
+  [[ "$output" == *"copy --verify"* ]]
+  [[ "$output" == *"verify "* ]]
   [[ "$output" == *"diagnose"* ]]
+  [[ "$output" == *"opengui"* ]]
   [[ "$output" == *"uninstall"* ]]
 }
 

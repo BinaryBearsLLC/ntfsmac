@@ -138,7 +138,10 @@ commands:
   mount [device] [mount_point]       Mount an NTFS / ext drive (omit device to pick from a list).
                                       Flags: --fs-driver ntfs-3g|ntfs3, --read-only
   unmount [device|mount_point]       Unmount a drive (omit to pick from active mounts)
+  copy --verify <source> <dest>      Copy, reread, and compare a SHA-256 manifest
+  verify <source> <destination>      Compare existing file/tree bytes with SHA-256
   diagnose [--json]                  Read-only health check
+  opengui                            Open the menu-bar popover
   uninstall [--force] [--keep-cache] Remove the CLI, vendored deps, and the GUI helper
   help                               Show this message
 
@@ -151,7 +154,10 @@ sub="\${1:-}"
 case "\$sub" in
   mount) exec "\$LIBEXEC/commands/mount.sh" "\$@" ;;
   unmount) exec "\$LIBEXEC/commands/unmount.sh" "\$@" ;;
+  copy) exec "\$LIBEXEC/commands/copy.sh" "\$@" ;;
+  verify) exec "\$LIBEXEC/commands/verify.sh" "\$@" ;;
   diagnose) exec "\$LIBEXEC/commands/diagnose.sh" "\$@" ;;
+  opengui) exec "\$LIBEXEC/commands/opengui.sh" "\$@" ;;
   uninstall) exec "\$LIBEXEC/commands/uninstall.sh" "\$@" ;;
   help | --help | -h | "") print_help; exit 0 ;;
   *) echo "ntfsmac: unknown command '\$sub'" >&2; print_help >&2; exit 1 ;;
