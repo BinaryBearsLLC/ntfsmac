@@ -28,10 +28,10 @@ This is the live ledger for the assisted acceptance run defined in
 | ID | Status | Evidence observed / remaining gate |
 | --- | --- | --- |
 | BB-00 | PASS | Exact artifact recorded; app signature, DMG verification, arm64, host and Hypervisor checks passed. |
-| BB-01 | IN PROGRESS | Installed app, helper, bundled CLI, version/build and command surface confirmed. Rebuilt commit `004e76e` requested the expected privileged update on first launch and then showed the exact `com.khr898.ntfsmac.helper` Full Disk Access guidance on its first mount. Operator authorization and a deliberately blank clean-install replay remain. |
+| BB-01 | IN PROGRESS | Installed app, helper, bundled CLI, version/build and command surface confirmed. Rebuilt commit `004e76e` requested the expected privileged update and exact `com.khr898.ntfsmac.helper` Full Disk Access entry; its enabled state was read back while unrelated ChatGPT, Codex Computer Use and Terminal entries remained off. A deliberately blank clean-install replay remains. |
 | BB-02 | PASS | The original package failed cold placement. Rebuilt commit `004e76e` passed cold and warm opening beneath the menu-bar icon, three simultaneous requests with exit `0`, exactly one GUI process, and invalid-argument exit `2` without another process or Accessibility permission. |
 | BB-03 | IN PROGRESS | Mounted/Settings/Diagnostics light UI, Back, overflow-only copy action and Launch at login enable/disable passed. The cold-placement failure is tracked in BB-02; dark, full keyboard and safe warning/error states remain. |
-| BB-P0-01 | PASS | The original package passed the default `ntfs-3g` RW round trip, diagnostic truth, vmnet/private/soft transport gate and root security transaction gate with one real session. The rebuilt regression mount stopped fail-closed at the expected Full Disk Access gate, with no NFS/anylinuxfs/vmnet state, and resumes after operator authorization. |
+| BB-P0-01 | PASS | The original package passed the default `ntfs-3g` RW round trip, diagnostic truth, vmnet/private/soft transport gate and root security transaction gate with one real session. The rebuilt regression mount stopped fail-closed at the expected Full Disk Access gate, with no NFS/anylinuxfs/vmnet state; the exact helper permission is now enabled and the mount retry remains. |
 | BB-P0-02 | PASS | GUI returned to two detected drives; NFS mounts and anylinuxfs sessions were empty; diagnostics reported bridge down and zero security sessions; the root check found no session state file or PF child anchor. |
 | BB-P0-03 | NOT RUN | VPN-on mount requires the operator's VPN transition. |
 | BB-P0-04 | NOT RUN | Mounted VPN route transition requires the operator. |
@@ -97,7 +97,6 @@ cold, warm, rapid, single-instance, invalid-argument, and no-Accessibility packa
 
 ## Next operator checkpoints
 
-1. Authorize Full Disk Access only for the exact `com.khr898.ntfsmac.helper` entry, then retry the
-   rebuilt mount.
+1. Retry the rebuilt mount now that Full Disk Access for the exact helper has been verified.
 2. Retest the rebuilt P1 tree and P3 Finder/two-drive cells.
 3. Perform only the requested physical, VPN, Windows and final-uninstall actions.
