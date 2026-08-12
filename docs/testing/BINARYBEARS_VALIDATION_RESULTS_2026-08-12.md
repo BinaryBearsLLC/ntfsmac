@@ -9,9 +9,14 @@ This is the live ledger for the assisted acceptance run defined in
 
 - Installed artifact under test: commit `f1152f110477ee8e1eb98f03049176917542ee40`, release
   `2.1`, build `090826`, arm64, ad-hoc signed.
+- Rebuilt artifact under retest: commit `004e76ee38c93e5a591c14f2cf965db56c06b64e`, release
+  `2.1`, build `090826`, arm64, ad-hoc signed. The installed GUI executable SHA-256 matches the
+  freshly built `dist/ntfsmac.app` executable.
 - Host: Apple Silicon with Hypervisor support, macOS 26.6.1.
 - Local evidence folder: `ntfsmac-acceptance-20260812-190259` on the operator's Desktop. It is
   intentionally not committed because it contains local volume/device identifiers.
+- Rebuilt-artifact evidence folder: `ntfsmac-acceptance-rebuild-20260812-201045` on the operator's
+  Desktop, kept under the same local-only privacy boundary.
 - Drive A: one disposable MBR NTFS volume mounted by ntfsmac with the default `ntfs-3g` driver.
 - Drive B was initially observed as FAT32 and was later independently prepared as a disposable
   MBR NTFS volume. It is now eligible for the two-drive cells after the rebuilt app is installed.
@@ -24,7 +29,7 @@ This is the live ledger for the assisted acceptance run defined in
 | --- | --- | --- |
 | BB-00 | PASS | Exact artifact recorded; app signature, DMG verification, arm64, host and Hypervisor checks passed. |
 | BB-01 | IN PROGRESS | Installed app, helper, bundled CLI, version/build and command surface confirmed. A deliberately blank clean-install replay remains. |
-| BB-02 | FAIL | Warm open, three rapid requests, single-instance behavior and invalid-argument exit `2` passed. On cold recovery the installed app opened the correct compact popover at the lower-left of the screen instead of beneath its menu-bar icon. Source fix and rebuilt-package retest required. |
+| BB-02 | PASS | The original package failed cold placement. Rebuilt commit `004e76e` passed cold and warm opening beneath the menu-bar icon, three simultaneous requests with exit `0`, exactly one GUI process, and invalid-argument exit `2` without another process or Accessibility permission. |
 | BB-03 | IN PROGRESS | Mounted/Settings/Diagnostics light UI, Back, overflow-only copy action and Launch at login enable/disable passed. The cold-placement failure is tracked in BB-02; dark, full keyboard and safe warning/error states remain. |
 | BB-P0-01 | PASS | Default `ntfs-3g` RW round trip, diagnostic truth, the vmnet/private/soft transport gate and the root security transaction gate all passed with one real session. |
 | BB-P0-02 | PASS | GUI returned to two detected drives; NFS mounts and anylinuxfs sessions were empty; diagnostics reported bridge down and zero security sessions; the root check found no session state file or PF child anchor. |
@@ -81,16 +86,16 @@ app visibly opens the correct row's mount point.
 
 ### Cold `opengui` popover anchoring
 
-The installed app recovered the surviving mount and displayed truthful controls after a forced GUI
+The original app recovered the surviving mount and displayed truthful controls after a forced GUI
 restart, but AppKit placed the popover at the lower-left of the screen. The menu-bar button existed
 before its hosting window had usable screen geometry, so the first cold URL request presented too
-early. The working tree now coalesces requests and waits, for at most two seconds, until the button
-has non-zero bounds and a real on-screen menu-bar position. A close or teardown cancels the wait;
-no fallback detached window and no additional UI were added. New tests reject the observed
-lower-left geometry and accept primary and secondary-display menu-bar anchors.
+early. The fix coalesces requests and waits, for at most two seconds, until the button has non-zero
+bounds and a real on-screen menu-bar position. A close or teardown cancels the wait; no fallback
+detached window and no additional UI were added. Unit tests reject the observed lower-left geometry
+and accept primary and secondary-display menu-bar anchors. Rebuilt commit `004e76e` passed the full
+cold, warm, rapid, single-instance, invalid-argument, and no-Accessibility packaged check.
 
 ## Next operator checkpoints
 
-1. Build and reinstall after the focused fixes are committed; retain this old evidence folder.
-2. Retest cold/warm `opengui`, then the rebuilt P1 tree and P3 Finder/two-drive cells.
-3. Perform only the requested physical, VPN, permission, Windows and final-uninstall actions.
+1. Retest the rebuilt P1 tree and P3 Finder/two-drive cells.
+2. Perform only the requested physical, VPN, permission, Windows and final-uninstall actions.

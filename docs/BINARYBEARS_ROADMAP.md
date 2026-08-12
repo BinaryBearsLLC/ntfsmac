@@ -476,8 +476,9 @@ open packaging-UX item and does not expand the normal menu-bar surface.
 The same run found a cold-launch timing defect in `opengui`: the installed app truthfully recovered
 the surviving mount but presented its popover at the lower-left of the screen. Source now defers
 presentation until AppKit exposes valid menu-bar screen geometry and has regression coverage for
-the rejected fallback position. The rebuilt package must remain anchored under its status item on
-cold, warm, and rapid repeated requests.
+the rejected fallback position. Rebuilt commit `004e76e` passed anchored cold and warm opens, three
+simultaneous requests with one process, invalid-argument handling, and the no-Accessibility
+contract.
 
 P3's packaged-app checks are part of the
 [assisted manual acceptance runbook](testing/BINARYBEARS_MANUAL_ACCEPTANCE_2026-08-12.md); they do
