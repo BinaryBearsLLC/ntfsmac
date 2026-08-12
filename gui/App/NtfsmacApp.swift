@@ -49,6 +49,8 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
         guard singleInstanceGuard != nil else { return }
 
         let appState = AppState()
+        let settings = Settings()
+        let eventNotifier = MountEventNotifier(isEnabled: { settings.notificationsEnabled })
         let driveScanner: DriveScanner
         let mountController: MountController
         let remountController: RemountController
@@ -57,12 +59,19 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
         // never set it, so this branch is limited to deliberate live-screen audits.
         if let demoMode = ProcessInfo.processInfo.environment["NTFSMAC_UI_DEMO"] {
             driveScanner = DemoScaffold.driveScanner()
-            mountController = DemoScaffold.mountController(mode: demoMode, appState: appState)
-            remountController = DemoScaffold.remountController(appState: appState)
+            mountController = DemoScaffold.mountController(
+                mode: demoMode,
+                appState: appState,
+                notifier: eventNotifier
+            )
+            remountController = DemoScaffold.remountController(
+                appState: appState,
+                notifier: eventNotifier
+            )
         } else {
             driveScanner = DriveScanner()
-            mountController = MountController(appState: appState)
-            remountController = RemountController(appState: appState)
+            mountController = MountController(notifier: eventNotifier, appState: appState)
+            remountController = RemountController(notifier: eventNotifier, appState: appState)
         }
 
         let helperInstaller: HelperInstaller
@@ -93,7 +102,7 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
             helperUninstaller: helperUninstaller,
             cliInstallChecker: cliInstallChecker,
             cliAutoStager: cliAutoStager,
-            settings: Settings(),
+            settings: settings,
             finderOpener: FinderOpener(),
             helperClient: helperClient,
             navigation: navigation

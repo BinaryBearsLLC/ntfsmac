@@ -67,15 +67,24 @@ public final class Settings: ObservableObject {
     }
     @Published public private(set) var isUpdatingLaunchAtLogin = false
     @Published public private(set) var launchAtLoginMessage: String?
+    @Published public private(set) var notificationsEnabled: Bool
+    @Published public private(set) var isUpdatingNotifications = false
+    @Published public private(set) var notificationsMessage: String?
 
     private let defaults: UserDefaults
     private let loginService: any LaunchAtLoginService
+    private let notificationAuthorization: any NotificationAuthorizationManaging
     private var confirmedLaunchAtLogin: Bool
     private var isApplyingLaunchAtLoginStatus = false
 
-    public init(defaults: UserDefaults = .standard, loginService: any LaunchAtLoginService = RealLaunchAtLoginService()) {
+    public init(
+        defaults: UserDefaults = .standard,
+        loginService: any LaunchAtLoginService = RealLaunchAtLoginService(),
+        notificationAuthorization: any NotificationAuthorizationManaging = RealNotificationAuthorizationManager()
+    ) {
         self.defaults = defaults
         self.loginService = loginService
+        self.notificationAuthorization = notificationAuthorization
 
         let persisted = defaults.object(forKey: Keys.launchAtLogin) as? Bool ?? Defaults.launchAtLogin
         let registrationStatus = Self.registrationStatus(for: loginService, fallbackEnabled: persisted)
@@ -84,7 +93,11 @@ public final class Settings: ObservableObject {
         launchAtLogin = initialValue
         confirmedLaunchAtLogin = initialValue
         launchAtLoginMessage = Self.message(for: registrationStatus)
+        notificationsEnabled = defaults.object(forKey: Keys.notificationsEnabled) as? Bool
+            ?? Defaults.notificationsEnabled
+        notificationsMessage = nil
         defaults.set(initialValue, forKey: Keys.launchAtLogin)
+        defaults.set(notificationsEnabled, forKey: Keys.notificationsEnabled)
     }
 
     /// Updates the real Service Management registration and then reads it back. The explicit
@@ -101,6 +114,86 @@ public final class Settings: ObservableObject {
         guard !isUpdatingLaunchAtLogin,
               let statusProvider = loginService as? any LaunchAtLoginStatusProviding else { return }
         applyLaunchAtLoginStatus(statusProvider.status)
+    }
+
+    /// Requests Notification Center authorization only when the user explicitly enables the
+    /// toggle. Turning the feature off is immediate and does not alter the system-level grant.
+    public func setNotificationsEnabled(_ enabled: Bool) {
+        guard !isUpdatingNotifications else { return }
+        if !enabled {
+            applyNotifications(enabled: false, message: nil)
+            return
+        }
+
+        isUpdatingNotifications = true
+        notificationsMessage = nil
+        let notificationAuthorization = self.notificationAuthorization
+        Task { [weak self] in
+            let state = await notificationAuthorization.authorizationState()
+            guard let self else { return }
+            switch state {
+            case .authorized:
+                self.applyNotifications(enabled: true, message: nil)
+            case .denied:
+                self.applyNotifications(
+                    enabled: false,
+                    message: "Allow notifications for ntfsmac in System Settings."
+                )
+            case .unavailable:
+                self.applyNotifications(
+                    enabled: false,
+                    message: "Notifications are unavailable for this app bundle."
+                )
+            case .notDetermined:
+                do {
+                    let granted = try await notificationAuthorization.requestAuthorization()
+                    self.applyNotifications(
+                        enabled: granted,
+                        message: granted ? nil : "Notification permission was not granted."
+                    )
+                } catch {
+                    self.applyNotifications(
+                        enabled: false,
+                        message: "Could not enable notifications: \(error.localizedDescription)"
+                    )
+                }
+            }
+        }
+    }
+
+    /// Reconciles a previously enabled preference with a permission changed in System Settings.
+    /// An existing authorization never turns an opt-out back on.
+    public func refreshNotificationStatus() {
+        guard notificationsEnabled, !isUpdatingNotifications else { return }
+        isUpdatingNotifications = true
+        let notificationAuthorization = self.notificationAuthorization
+        Task { [weak self] in
+            let state = await notificationAuthorization.authorizationState()
+            guard let self else { return }
+            switch state {
+            case .authorized:
+                self.applyNotifications(enabled: true, message: nil)
+            case .denied:
+                self.applyNotifications(
+                    enabled: false,
+                    message: "Allow notifications for ntfsmac in System Settings."
+                )
+            case .notDetermined:
+                self.applyNotifications(enabled: false, message: nil)
+            case .unavailable:
+                self.applyNotifications(
+                    enabled: false,
+                    message: "Notifications are unavailable for this app bundle."
+                )
+            }
+        }
+    }
+
+    private func applyNotifications(enabled: Bool, message: String?) {
+        notificationsEnabled = enabled
+        notificationsMessage = message
+        isUpdatingNotifications = false
+        defaults.set(enabled, forKey: Keys.notificationsEnabled)
     }
 
     private func beginLaunchAtLoginUpdate(_ enabled: Bool) {
@@ -201,9 +294,11 @@ public final class Settings: ObservableObject {
     /// GUI-PLAN.md "Settings page" table's literal Default column.
     public enum Defaults {
         public static let launchAtLogin = false
+        public static let notificationsEnabled = false
     }
 
     private enum Keys {
         static let launchAtLogin = "com.khr898.ntfsmac.settings.launchAtLogin"
+        static let notificationsEnabled = "com.khr898.ntfsmac.settings.notificationsEnabled"
     }
 }

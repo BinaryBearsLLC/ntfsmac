@@ -59,15 +59,18 @@ public final class RemountController: ObservableObject {
 
     private let helper: any HelperMounting
     private let readOnlyChecker: any MountReadOnlyChecking
+    private let notifier: any MountEventNotifying
     private let appState: AppState
 
     public init(
         helper: any HelperMounting = HelperClient(),
         readOnlyChecker: any MountReadOnlyChecking = RealMountOptionsChecker(),
+        notifier: any MountEventNotifying = NullMountEventNotifier(),
         appState: AppState
     ) {
         self.helper = helper
         self.readOnlyChecker = readOnlyChecker
+        self.notifier = notifier
         self.appState = appState
     }
 
@@ -96,6 +99,7 @@ public final class RemountController: ObservableObject {
 
         guard validateDevice(drive.identifier) else {
             fail("Invalid device name: \(drive.identifier)")
+            notifier.post(.failed(action: .mount, volumeName: notificationName(for: drive)))
             return
         }
 
@@ -107,6 +111,7 @@ public final class RemountController: ObservableObject {
             let result = try await helper.mount(device: drive.identifier, driver: resolvedDriver, mountPoint: nil, readOnly: false)
             guard result.exitCode == 0 else {
                 fail(result.output)
+                notifier.post(.failed(action: .mount, volumeName: notificationName(for: drive)))
                 return
             }
             // Do NOT optimistically claim success: the CLI has no override for ntfs-3g's
@@ -118,17 +123,24 @@ public final class RemountController: ObservableObject {
             if await readOnlyChecker.isAnyNfsMountReadOnly() {
                 errorMessage = "Still read-only — the drive's journal is still unclean. Eject safely in Windows to enable writing."
                 appState.state = .mountedReadOnlyDirty
+                notifier.post(.failed(action: .mount, volumeName: notificationName(for: drive)))
             } else {
                 errorMessage = nil
                 appState.state = .mountedReadWrite
+                notifier.post(.mounted(volumeName: notificationName(for: drive), readOnly: false))
             }
         } catch {
             fail(MountController.describe(error))
+            notifier.post(.failed(action: .mount, volumeName: notificationName(for: drive)))
         }
     }
 
     private func fail(_ message: String) {
         errorMessage = message
         appState.state = .error
+    }
+
+    private func notificationName(for drive: Drive) -> String {
+        drive.label.isEmpty ? "Drive" : drive.label
     }
 }

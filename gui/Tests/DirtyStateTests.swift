@@ -27,6 +27,12 @@ private struct FakeReadOnlyChecker: MountReadOnlyChecking {
     func isAnyNfsMountReadOnly() async -> Bool { isReadOnly }
 }
 
+@MainActor
+private final class RecordingRemountNotifier: MountEventNotifying {
+    private(set) var events: [MountNotificationEvent] = []
+    func post(_ event: MountNotificationEvent) { events.append(event) }
+}
+
 /// Suspends `mount()` until the test explicitly resumes it — lets a test observe
 /// `isRemounting == true` mid-flight, which a fixed-result fake can't do.
 private final class BlockingHelper: HelperMounting {
@@ -61,7 +67,13 @@ private final class BlockingHelper: HelperMounting {
     let fake = FakeHelper()
     let appState = AppState()
     appState.state = .mountedReadOnlyDirty
-    let controller = RemountController(helper: fake, readOnlyChecker: FakeReadOnlyChecker(isReadOnly: false), appState: appState)
+    let notifier = RecordingRemountNotifier()
+    let controller = RemountController(
+        helper: fake,
+        readOnlyChecker: FakeReadOnlyChecker(isReadOnly: false),
+        notifier: notifier,
+        appState: appState
+    )
 
     // Never called requestRemount() — this is the acceptance criterion itself: "remount is
     // gated behind confirm", so a direct confirmRemount() call must be a no-op.
@@ -69,6 +81,7 @@ private final class BlockingHelper: HelperMounting {
 
     #expect(fake.mountCalls.isEmpty)
     #expect(appState.state == .mountedReadOnlyDirty)
+    #expect(notifier.events.isEmpty)
 }
 
 @MainActor
@@ -76,7 +89,13 @@ private final class BlockingHelper: HelperMounting {
     let fake = FakeHelper()
     let appState = AppState()
     appState.state = .mountedReadOnlyDirty
-    let controller = RemountController(helper: fake, readOnlyChecker: FakeReadOnlyChecker(isReadOnly: false), appState: appState)
+    let notifier = RecordingRemountNotifier()
+    let controller = RemountController(
+        helper: fake,
+        readOnlyChecker: FakeReadOnlyChecker(isReadOnly: false),
+        notifier: notifier,
+        appState: appState
+    )
 
     controller.requestRemount()
     #expect(controller.isConfirmingRemount)
@@ -87,6 +106,7 @@ private final class BlockingHelper: HelperMounting {
     #expect(!controller.isConfirmingRemount)
     #expect(!controller.isRemounting)
     #expect(appState.state == .mountedReadWrite)
+    #expect(notifier.events == [.mounted(volumeName: "My Drive", readOnly: false)])
 }
 
 @MainActor

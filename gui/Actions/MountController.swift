@@ -58,6 +58,7 @@ public final class MountController: ObservableObject {
     private let helper: any HelperMounting
     private let readOnlyChecker: any MountReadOnlyChecking
     private let snapshotProvider: any MountSnapshotProviding
+    private let notifier: any MountEventNotifying
     private let appState: AppState
     private var pollTask: Task<Void, Never>?
     /// Polling continues while a helper call is in flight. Preserve the visible `.mounting`
@@ -75,6 +76,7 @@ public final class MountController: ObservableObject {
         helper: any HelperMounting = HelperClient(),
         readOnlyChecker: any MountReadOnlyChecking = RealMountOptionsChecker(),
         snapshotProvider: (any MountSnapshotProviding)? = nil,
+        notifier: any MountEventNotifying = NullMountEventNotifier(),
         appState: AppState
     ) {
         self.helper = helper
@@ -82,6 +84,7 @@ public final class MountController: ObservableObject {
         self.snapshotProvider = snapshotProvider
             ?? (helper as? any MountSnapshotProviding)
             ?? RealMountSnapshotProvider()
+        self.notifier = notifier
         self.appState = appState
     }
 
@@ -217,6 +220,7 @@ public final class MountController: ObservableObject {
         // ("rejection of invalid device names") actually exercises.
         guard validateDevice(drive.identifier) else {
             fail("Invalid device name: \(drive.identifier)")
+            notifier.post(.failed(action: .mount, volumeName: notificationName(for: drive)))
             return
         }
 
@@ -258,6 +262,7 @@ public final class MountController: ObservableObject {
                 if snapshot.isAuthoritative && observed == nil {
                     mountedDrives.removeAll { $0.id == drive.identifier }
                     fail("MOUNT_NOT_OBSERVED — the helper returned success but no matching host mount exists")
+                    notifier.post(.failed(action: .mount, volumeName: notificationName(for: drive)))
                     return
                 }
 
@@ -284,11 +289,22 @@ public final class MountController: ObservableObject {
                     reconciliationWarning = warningMessage(for: snapshot.warningCode ?? "MOUNT_STATE_SOURCE_UNAVAILABLE")
                 }
                 recomputeAggregateState()
+                if let mounted = mountedDrives.first(where: { $0.id == drive.identifier }),
+                   mounted.isVerified {
+                    notifier.post(.mounted(
+                        volumeName: notificationName(for: drive),
+                        readOnly: mounted.isReadOnly
+                    ))
+                } else {
+                    notifier.post(.failed(action: .mount, volumeName: notificationName(for: drive)))
+                }
             } else {
                 fail(result.output)
+                notifier.post(.failed(action: .mount, volumeName: notificationName(for: drive)))
             }
         } catch {
             fail(Self.describe(error))
+            notifier.post(.failed(action: .mount, volumeName: notificationName(for: drive)))
         }
     }
 
@@ -305,16 +321,25 @@ public final class MountController: ObservableObject {
             targets = mountedDrives.map(\.id)
         }
         guard !targets.isEmpty else { return }
+        let notificationNames = Dictionary(uniqueKeysWithValues: mountedDrives.map {
+            ($0.id, notificationName(for: $0.drive))
+        })
         for target in targets {
             do {
                 let result = try await helper.unmount(target: target)
                 if result.exitCode != 0 {
                     fail(result.output)
+                    if driveID != nil {
+                        notifier.post(.failed(action: .unmount, volumeName: notificationNames[target]))
+                    }
                     recomputeAggregateState()
                     return
                 }
             } catch {
                 fail(Self.describe(error))
+                if driveID != nil {
+                    notifier.post(.failed(action: .unmount, volumeName: notificationNames[target]))
+                }
                 recomputeAggregateState()
                 return
             }
@@ -328,6 +353,13 @@ public final class MountController: ObservableObject {
             }
             reconciliationWarning = warningMessage(for: "UNMOUNT_NOT_OBSERVED")
             recomputeAggregateState()
+        }
+        if let driveID {
+            if stillMounted.contains(driveID) {
+                notifier.post(.failed(action: .unmount, volumeName: notificationNames[driveID]))
+            } else if let name = notificationNames[driveID] {
+                notifier.post(.unmounted(volumeName: name))
+            }
         }
     }
 
@@ -392,6 +424,10 @@ public final class MountController: ObservableObject {
         default:
             return "MOUNT_STATE_SOURCE_UNAVAILABLE — mounted state could not be independently verified"
         }
+    }
+
+    private func notificationName(for drive: Drive) -> String {
+        drive.label.isEmpty ? "Drive" : drive.label
     }
 
     /// Derive the shared icon/banner state from the full mounted set. The icon reflects the

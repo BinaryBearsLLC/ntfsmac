@@ -49,10 +49,22 @@ private struct FakeReadOnlyChecker: MountReadOnlyChecking {
 }
 
 @MainActor
+private final class RecordingMountNotifier: MountEventNotifying {
+    private(set) var events: [MountNotificationEvent] = []
+    func post(_ event: MountNotificationEvent) { events.append(event) }
+}
+
+@MainActor
 @Test func mountRoutesThroughHelperAndTransitionsToMountedReadWrite() async {
     let fake = FakeHelper()
     let appState = AppState()
-    let controller = MountController(helper: fake, readOnlyChecker: FakeReadOnlyChecker(isReadOnly: false), appState: appState)
+    let notifier = RecordingMountNotifier()
+    let controller = MountController(
+        helper: fake,
+        readOnlyChecker: FakeReadOnlyChecker(isReadOnly: false),
+        notifier: notifier,
+        appState: appState
+    )
 
     await controller.mount(sampleDrive)
 
@@ -62,6 +74,7 @@ private struct FakeReadOnlyChecker: MountReadOnlyChecking {
     #expect(appState.state == .mountedReadWrite)
     #expect(controller.mountedDrive == sampleDrive)
     #expect(controller.errorMessage == nil)
+    #expect(notifier.events == [.mounted(volumeName: "My Drive", readOnly: false)])
 }
 
 @MainActor
@@ -235,7 +248,13 @@ private struct FakeReadOnlyChecker: MountReadOnlyChecking {
 @Test func unmountTargetsSpecificDriveAndLeavesOthersMounted() async {
     let fake = FakeHelper()
     let appState = AppState()
-    let controller = MountController(helper: fake, readOnlyChecker: FakeReadOnlyChecker(isReadOnly: false), appState: appState)
+    let notifier = RecordingMountNotifier()
+    let controller = MountController(
+        helper: fake,
+        readOnlyChecker: FakeReadOnlyChecker(isReadOnly: false),
+        notifier: notifier,
+        appState: appState
+    )
     let otherDrive = Drive(identifier: "disk5s1", fsType: "ext4", label: "ExtVol", size: "32.0 GB")
 
     await controller.mount(sampleDrive)
@@ -245,6 +264,7 @@ private struct FakeReadOnlyChecker: MountReadOnlyChecking {
     #expect(fake.unmountCalls == ["disk4s2"])
     #expect(controller.mountedDriveIDs == Set(["disk5s1"]))
     #expect(appState.state == .mountedReadWrite)
+    #expect(notifier.events.contains(.unmounted(volumeName: "My Drive")))
 }
 
 @MainActor

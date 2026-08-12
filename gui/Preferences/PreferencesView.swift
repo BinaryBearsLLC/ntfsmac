@@ -141,6 +141,25 @@ public struct PreferencesView: View {
                 }
             }
 
+            row("Notifications", notificationsSubtitle) {
+                HStack(spacing: 8) {
+                    if settings.isUpdatingNotifications {
+                        ProgressView().controlSize(.small)
+                    }
+                    Toggle(
+                        "Notifications",
+                        isOn: Binding(
+                            get: { settings.notificationsEnabled },
+                            set: { settings.setNotificationsEnabled($0) }
+                        )
+                    )
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .disabled(settings.isUpdatingNotifications)
+                    .accessibilityLabel("Mount notifications")
+                }
+            }
+
             Divider()
 
             row("Reinstall privileged helper", "Repair the SMJobBless XPC helper") {
@@ -177,7 +196,10 @@ public struct PreferencesView: View {
         .padding(16)
         .frame(width: 320)
         .fixedSize(horizontal: false, vertical: true)
-        .onAppear { settings.refreshLaunchAtLoginStatus() }
+        .onAppear {
+            settings.refreshLaunchAtLoginStatus()
+            settings.refreshNotificationStatus()
+        }
     }
 
     private var uninstallSubtitle: String {
@@ -197,6 +219,10 @@ public struct PreferencesView: View {
 
     private var launchAtLoginSubtitle: String {
         settings.launchAtLoginMessage ?? "Start ntfsmac automatically on login"
+    }
+
+    private var notificationsSubtitle: String {
+        settings.notificationsMessage ?? "Mount, unmount, and error results"
     }
 
     /// Inline (in-popover) two-step confirmation — a native `confirmationDialog` would dismiss

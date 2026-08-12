@@ -12,18 +12,27 @@ import NtfsmacGUI
 /// `NTFSMAC_UI_DEMO=clean|dirty|error dist/ntfsmac.app/Contents/MacOS/ntfsmac-gui`
 @MainActor
 enum DemoScaffold {
-    static func mountController(mode: String, appState: AppState) -> MountController {
+    static func mountController(
+        mode: String,
+        appState: AppState,
+        notifier: any MountEventNotifying = NullMountEventNotifier()
+    ) -> MountController {
         MountController(
             helper: DemoHelperMounting(shouldFail: mode == "error"),
             readOnlyChecker: DemoReadOnlyChecker(stillReadOnly: mode == "dirty"),
+            notifier: notifier,
             appState: appState
         )
     }
 
-    static func remountController(appState: AppState) -> RemountController {
+    static func remountController(
+        appState: AppState,
+        notifier: any MountEventNotifying = NullMountEventNotifier()
+    ) -> RemountController {
         RemountController(
             helper: DemoHelperMounting(shouldFail: false),
             readOnlyChecker: DemoReadOnlyChecker(stillReadOnly: false),
+            notifier: notifier,
             appState: appState
         )
     }

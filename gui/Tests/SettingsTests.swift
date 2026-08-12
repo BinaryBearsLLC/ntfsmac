@@ -18,6 +18,42 @@ private enum FakeLoginError: LocalizedError {
     var errorDescription: String? { "registration denied" }
 }
 
+private enum FakeNotificationError: LocalizedError {
+    case requestFailed
+
+    var errorDescription: String? { "notification request failed" }
+}
+
+private final class FakeNotificationAuthorization: NotificationAuthorizationManaging, @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedState: NotificationAuthorizationState
+    private let requestResult: Result<Bool, Error>
+    private var requests = 0
+
+    init(
+        state: NotificationAuthorizationState,
+        requestResult: Result<Bool, Error> = .success(true)
+    ) {
+        storedState = state
+        self.requestResult = requestResult
+    }
+
+    func authorizationState() async -> NotificationAuthorizationState {
+        lock.withLock { storedState }
+    }
+
+    func requestAuthorization() async throws -> Bool {
+        try lock.withLock {
+            requests += 1
+            let granted = try requestResult.get()
+            storedState = granted ? .authorized : .denied
+            return granted
+        }
+    }
+
+    var requestCount: Int { lock.withLock { requests } }
+}
+
 private final class FakeLoginService: LaunchAtLoginStatusProviding, @unchecked Sendable {
     private let lock = NSLock()
     private var storedStatus: LaunchAtLoginRegistrationStatus
@@ -81,11 +117,78 @@ private func waitForLaunchAtLoginUpdate(_ settings: Settings) async {
 }
 
 @MainActor
+private func waitForNotificationUpdate(_ settings: Settings) async {
+    for _ in 0..<100 {
+        if !settings.isUpdatingNotifications { return }
+        try? await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(!settings.isUpdatingNotifications)
+}
+
+@MainActor
 @Test func defaultsMatchGuiPlanTable() {
     let defaults = makeIsolatedDefaults(#function)
     let settings = Settings(defaults: defaults, loginService: LegacyLoginService())
 
     #expect(settings.launchAtLogin == false)
+    #expect(settings.notificationsEnabled == false)
+}
+
+@MainActor
+@Test func notificationOptInRequestsPermissionAndPersistsOnlyAConfirmedGrant() async {
+    let defaults = makeIsolatedDefaults(#function)
+    let authorization = FakeNotificationAuthorization(state: .notDetermined)
+    let settings = Settings(
+        defaults: defaults,
+        loginService: LegacyLoginService(),
+        notificationAuthorization: authorization
+    )
+
+    settings.setNotificationsEnabled(true)
+    await waitForNotificationUpdate(settings)
+
+    #expect(settings.notificationsEnabled)
+    #expect(authorization.requestCount == 1)
+    #expect(defaults.bool(forKey: "com.khr898.ntfsmac.settings.notificationsEnabled"))
+}
+
+@MainActor
+@Test func deniedNotificationPermissionKeepsThePreferenceOff() async {
+    let defaults = makeIsolatedDefaults(#function)
+    let authorization = FakeNotificationAuthorization(state: .denied)
+    let settings = Settings(
+        defaults: defaults,
+        loginService: LegacyLoginService(),
+        notificationAuthorization: authorization
+    )
+
+    settings.setNotificationsEnabled(true)
+    await waitForNotificationUpdate(settings)
+
+    #expect(!settings.notificationsEnabled)
+    #expect(authorization.requestCount == 0)
+    #expect(settings.notificationsMessage?.contains("System Settings") == true)
+}
+
+@MainActor
+@Test func notificationRequestFailureIsVisibleAndNeverPersistsOptIn() async {
+    let defaults = makeIsolatedDefaults(#function)
+    let authorization = FakeNotificationAuthorization(
+        state: .notDetermined,
+        requestResult: .failure(FakeNotificationError.requestFailed)
+    )
+    let settings = Settings(
+        defaults: defaults,
+        loginService: LegacyLoginService(),
+        notificationAuthorization: authorization
+    )
+
+    settings.setNotificationsEnabled(true)
+    await waitForNotificationUpdate(settings)
+
+    #expect(!settings.notificationsEnabled)
+    #expect(settings.notificationsMessage?.contains("notification request failed") == true)
+    #expect(!defaults.bool(forKey: "com.khr898.ntfsmac.settings.notificationsEnabled"))
 }
 
 @MainActor
