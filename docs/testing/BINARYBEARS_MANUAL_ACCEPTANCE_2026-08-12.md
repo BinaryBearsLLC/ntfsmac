@@ -94,6 +94,7 @@ reviewed.
 | BB-P0-08 | Helper reconnect | No active mount | Restarted helper reconnects; next mount/unmount succeeds once |
 | BB-P0-09 | Two concurrent drives | Drives A+B | Two independent verified rows/security sessions; one teardown preserves the other |
 | BB-P0-10 | Fail-closed security evidence | Mounted, no I/O | Insecure/unreadable public evidence becomes unknown, never green, then recovers |
+| BB-P1-00 | Minimal GUI Verified Copy | Drive A verified RW | Overflow-only flow stays on exact volume; success, refusal, and Cancel are truthful |
 | BB-P1-01 | Verified single-file copy | Drive A RW | Publish only after SHA-256 match; overwrite refused; mutation detected |
 | BB-P1-02 | Verified directory tree | Drive A RW | Nested/Unicode/many-small-file/symlink manifest matches deterministically |
 | BB-P1-03 | Interrupted copy recovery | Disposable free space | Source retained, final name absent, named partial retained and reported |
@@ -168,8 +169,8 @@ real safe reproduction exists. Confirm:
   read-only control;
 - Settings replaces the popover and Back restores it;
 - text is not clipped at the normal menu-bar width;
-- keyboard focus reaches gear, Back, Mount/Open/Unmount, Diagnose, notification toggle, Eject All,
-  report dismissal, and Quit;
+- keyboard focus reaches gear, Back, Mount/Open/Unmount, the per-drive overflow menu, Verified
+  Copy Cancel/dismiss, Diagnose, notification toggle, Eject All, report dismissal, and Quit;
 - native help appears without changing layout.
 
 ## P0 live mount and security tests
@@ -303,6 +304,40 @@ per-session files while the public file has the test mode.
 
 ## P1 Verified Copy and NTFS3 qualification
 
+### BB-P1-00 — minimal GUI Verified Copy
+
+Mount Drive A read/write and wait until its row is independently verified. The normal row must
+still show only **Open** and **Unmount** as primary actions; open its small `…` menu and select
+**Verified Copy…**.
+
+```bash
+export BB_FIXTURE="$BB_EVIDENCE/fixtures"
+mkdir -p "$BB_FIXTURE" "$BB_REMOTE_A"
+printf 'BinaryBears GUI verified copy fixture\n' > "$BB_FIXTURE/gui-source.bin"
+```
+
+1. Choose `"$BB_FIXTURE/gui-source.bin"`. The destination panel must begin at
+   Drive A's observed mount point. Cancel this first picker pass: no status or file is created.
+2. Repeat, then deliberately choose a fresh path outside Drive A if the panel permits navigation.
+   The app must reject it with `Choose a destination inside this mounted drive`; no process or
+   partial starts.
+3. Repeat with the fresh destination `"$BB_REMOTE_A/gui-small.bin"`. Require one compact status
+   card, a final green success state, and the published file only after the SHA-256 match.
+4. Select the same existing destination again. Require an explicit no-overwrite refusal and the
+   original destination hash unchanged.
+5. After checking local and Drive A free space, create a disposable large source with
+   `/usr/bin/mkfile 2g "$BB_FIXTURE/gui-cancel-large.bin"` and select the fresh destination
+   `"$BB_REMOTE_A/gui-cancel.bin"`. While the card is active, verify
+   Mount/Unmount/Eject All/Settings/Quit cannot start, then select **Cancel**. Require the source to
+   remain, the final name to remain absent, the card to report cancellation, and any hidden
+   `.gui-cancel.bin.ntfsmac-partial.*` to remain recoverable beside the requested destination. If
+   2 GiB finishes before Cancel can be selected, record that successful run and repeat with a
+   larger disposable source only after rechecking free space.
+
+The overflow action must be absent for a read-only, dirty, or unverified row. Closing and reopening
+the popover through `ntfsmac opengui` while a copy is active must show the same in-flight card,
+never start a second copy, and never expand the normal interface into a permanent copy page.
+
 ### BB-P1-01 — verified single-file copy
 
 Create the source only in the local evidence folder and the destination only inside the unique
@@ -419,7 +454,7 @@ diagnostic category, and recovery guidance are all accurate.
 
 Repeat the same manifest-backed operation set where the test pool permits:
 
-- long/repeated large-file copies and cancellation;
+- long/repeated large-file copies and both CLI and GUI cancellation;
 - low free space on a dedicated test volume;
 - multiple USB controllers/cables and capacities;
 - GPT and MBR NTFS partition maps;
@@ -521,6 +556,7 @@ next-install test.
 - P0 hardware qualification closes only when VPN off/on, route transition, cross-surface truth,
   external teardown, crash/helper recovery, concurrent mounts, no-false-green, and cleanup cells
   pass on the release artifact.
-- P1 hardware qualification closes only when media-cycle/Windows hashes and the same-device
-  `ntfs-3g`/NTFS3 matrix pass, with the available OS/device/controller inventory stated honestly.
+- P1 packaged software acceptance requires BB-P1-00 through BB-P1-03. Hardware qualification
+  closes only when media-cycle/Windows hashes and the same-device `ntfs-3g`/NTFS3 matrix pass,
+  with the available OS/device/controller inventory stated honestly.
 - P2 remains deferred regardless of these results.

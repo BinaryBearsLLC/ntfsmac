@@ -111,9 +111,11 @@ branches does not imply that they were pushed, opened as pull requests, or accep
   reachability check, then publishes success only after the final soft-NFS proof. CLI text/JSON
   and the compact GUI use the same fixed states and privacy-safe reasons; the remaining real-
   hardware matrix is still required.
-- [-] **Verified Copy:** the CLI owns copy-to-partial, flush, reread, deterministic SHA-256
-  verification, and same-filesystem publication. A GUI copy workflow and post-reconnect media
-  qualification remain separate work.
+- [x] **Verified Copy software:** the CLI owns copy-to-partial, flush, reread, deterministic
+  SHA-256 verification, and same-filesystem publication. Each verified read/write GUI row exposes
+  the same workflow through a small overflow action with exact-volume validation, compact state,
+  and whole-process-group cancellation. Post-reconnect media qualification remains a separate
+  hardware gate.
 - [x] **Open in Finder:** every verified mounted-drive row opens its own observed mount point.
 - [x] **Transfer telemetry decision:** the unused global sampler and speed row were removed. A
   bridge-wide byte counter cannot truthfully attribute traffic to concurrent drives, so the
@@ -309,7 +311,7 @@ described only as a later verification, not as transparent protection for all Fi
   SHA-256; define explicit symlink and metadata behavior.
 - [x] Preserve the source and keep a failed temporary destination clearly recoverable; never
   delete the source automatically.
-- [ ] Add a GUI **Verified Copy** flow only after the CLI/core behavior is complete.
+- [x] Add a GUI **Verified Copy** flow only after the CLI/core behavior is complete.
 - [x] State the limit honestly: a successful comparison validates the bytes read at that time; it
   cannot guarantee against later media failure or preserve every platform-specific metadata field.
 
@@ -318,6 +320,15 @@ name, calls `sync`, rereads source and destination into sorted manifests, and on
 payload into place. Regular-file bytes and sizes, directory entry types, and symlink target text
 are verified; permissions, ownership, ACLs, extended attributes, resource forks, timestamps,
 hard-link relationships, and sparse allocation are explicitly outside this integrity contract.
+
+The GUI adds no permanent copy page: **Verified Copy…** lives in the mounted drive row's overflow
+menu and appears only for an independently verified read/write mount. Native source/destination
+panels feed literal argv to the unprivileged installed CLI, never a shell or the privileged helper.
+The destination parent must resolve inside the selected mount and retain the same filesystem
+identity immediately before launch; existing and broken-symlink destinations are rejected. While
+one copy is active, mount/unmount/Eject All/Settings/Quit actions are disabled. Cancel signals the
+dedicated CLI process group, retains the source and any partial destination, and never publishes a
+final name as success.
 
 ##### Media-copy integrity investigation
 
@@ -343,7 +354,7 @@ USB devices differed.
 MD5 is not proposed for new integrity work. SHA-256 is widely available, collision-resistant for
 this purpose, and suitable for one canonical manifest format.
 
-**Decision A/B**
+**Decision: Option A implemented**
 
 - **Option A — app-managed copy and explicit verify (recommended):** deterministic progress,
   cancellation, errors, and source/destination correlation.
@@ -402,6 +413,9 @@ The same suite must be run against both drivers and retain logs plus SHA-256 man
 Acceptance requires no silent corruption, deterministic failure messaging, no false read/write
 state, successful post-copy SHA-256 verification, and a documented recovery path. Hardware testing
 must use disposable test data with a separate backup.
+
+P1 is software-complete on 2026-08-12. The same-media post-reconnect/Windows verification and
+same-device `ntfs-3g` versus NTFS3 qualification above remain release gates, not implied passes.
 
 ### P2 — Modern helper lifecycle
 

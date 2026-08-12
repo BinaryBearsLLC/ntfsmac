@@ -39,12 +39,13 @@ wires them in; the current full Swift suite remains the authoritative regression
 
 **Known, deliberately tracked limitations that remain:** the primary GUI mount button uses
 `ntfs-3g` read/write by default; a compact menu offers NTFS3 for one explicitly warned
-Experimental mount, but its hardware qualification is still open. Verified Copy is currently a
-CLI/core workflow, not a GUI flow. Per-drive Open in Finder, default-off notifications, and Eject
-All are wired; unreliable global transfer telemetry was removed rather than displaying a
-misleading concurrent-drive speed. SECURITY indicators consume the live mount transaction's fixed
-PF/route state and reasons, but the remaining packaged VPN/concurrent-device matrix is still a
-release gate.
+Experimental mount, but its hardware qualification is still open. Verified Copy is wired through
+the verified read/write drive row's compact overflow menu and delegates to the same CLI/core
+contract; its post-reconnect/Windows media qualification remains open. Per-drive Open in Finder,
+default-off notifications, and Eject All are wired; unreliable global transfer telemetry was
+removed rather than displaying a misleading concurrent-drive speed. SECURITY indicators consume
+the live mount transaction's fixed PF/route state and reasons, but the remaining packaged
+VPN/concurrent-device matrix is still a release gate.
 
 ---
 
@@ -219,6 +220,12 @@ evidence, safely unmount, physically reconnect, and run `verify` again so the de
 crosses a real media cycle. A match validates bytes read at that time; permissions, ownership,
 ACLs, extended attributes, resource forks, timestamps, hard links, sparse allocation, and future
 media health are outside the contract. Remove only the named disposable fixture when finished.
+
+The packaged GUI exposes the same operation under the verified read/write drive row's `…` menu.
+Its source panel accepts one file/folder and its destination panel starts at that row's real mount;
+an outside, existing, symlink-escaped, stale-volume, or read-only destination must be rejected.
+During a large copy the compact card is the only added surface, mount lifecycle actions are
+disabled, and Cancel must retain the source/failure partial without publishing the final name.
 
 ### P0 gate — mount truth and private NFS transport
 

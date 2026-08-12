@@ -54,7 +54,7 @@ This table describes the current integrated GUI, not the original aspirational p
 | Resolved | Global transfer telemetry was removed because bridge-wide counters cannot truthfully attribute concurrent traffic per drive; the minimal UI shows no speed row |
 | Shipped — qualification incomplete | NTFS3 has an explicit one-mount menu choice, Experimental warning/preflight, no silent fallback, and privacy-safe driver/result diagnostics; hardware qualification remains open. |
 | Implemented — matrix incomplete | Live mount-state reconciliation pairs anylinuxfs session evidence with the host NFS mount table, polls every five seconds, refreshes on lifecycle actions, and fails closed to yellow/unknown on disagreement. GUI unmount and external NFS/Finder disconnect passed on one packaged device; the remaining matrix is tracked in the 2026-08-11 audit. |
-| Partial | Verified Copy core/CLI owns copy, reread, SHA-256 verification, and failure recovery; a GUI flow remains planned. |
+| Shipped — qualification incomplete | Verified Copy is a per-drive overflow action for verified read/write mounts. It validates the exact destination volume, invokes the unprivileged CLI with literal argv, shows compact progress/result state, and cancels the whole process group; post-reconnect/Windows media proof remains open. |
 | Shipped | Default-off local mount/unmount/error notifications, persisted only after macOS grants permission |
 | Shipped | Eject All attempts every drive, reports per-drive results, and retains recovery controls for failures |
 
@@ -80,6 +80,8 @@ This table describes the current integrated GUI, not the original aspirational p
 |---------|--------|--------------|
 | Per-drive `Open` | Open that drive's reconciled mount point in Finder | That mounted drive is independently verified |
 | Per-drive `Unmount` | Safely unmount that drive | That drive is mounted |
+| Per-drive `…` → `Verified Copy…` | Choose one source and a fresh destination on that exact volume; copy, flush, reread, and compare SHA-256 | That drive is independently verified read/write and no copy is active |
+| Verified Copy status / `Cancel` | Show only the active/result state; cancel the CLI and all copy/hash children while retaining any partial | A copy is active; dismissal is available after completion |
 | `Eject All` | Try every mounted drive and show each result without hiding failed rows | Two or more drives are mounted |
 | Other-device `Mount` | Mount another compatible partition | Another compatible drive is detected |
 | Refresh (↻) | Re-scan drives and reconcile mounted rows against host truth | Always |
@@ -87,10 +89,12 @@ This table describes the current integrated GUI, not the original aspirational p
 | SECURITY `Hide` / `Show` | Collapse or restore only the SECURITY presentation | One or more drives mounted |
 | ⚙ / `Quit` | As above | Always |
 
-The mounted row intentionally stops at two primary actions: Open and Unmount. Eject All appears
-only when it is useful for multiple drives. No transfer-speed row is shown: the removed sampler
-observed bridge-wide traffic and could not provide honest per-drive telemetry for concurrent
-mounts.
+The mounted row intentionally stops at two primary actions: Open and Unmount. Verified Copy is the
+single secondary item in its small overflow menu, and its card exists only while a job/result
+exists. Eject All appears only when it is useful for multiple drives. No transfer-speed row is
+shown: the removed sampler observed bridge-wide traffic and could not provide honest per-drive
+telemetry for concurrent mounts. Mount lifecycle, Settings, and Quit controls remain disabled
+while Verified Copy owns a write.
 
 ### Mount-state truth contract
 
@@ -199,9 +203,11 @@ yes/no VPN tunnel signal, and the active NFS mount count. It never displays
 or exports usernames, serials, volume/device identity, local paths, VPN identity, addresses, DNS,
 or routes.
 
-### Planned controls
+### Deliberately omitted controls
 
-- **Verified Copy** — app-managed, SHA-256-verified copy after the CLI/core contract is stable.
+There is no permanent copy page, global transfer-speed row, or saved no-op read-only/mount-point
+preference. Verified Copy uses the mounted row's overflow menu and a transient card so the normal
+surface remains focused on Mount, Open, and Unmount.
 
 ---
 

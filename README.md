@@ -158,6 +158,9 @@ Verified Copy publishes a destination only after a flush, reread, and determinis
 manifest match. It refuses implicit overwrite and retains a recoverable partial destination after
 failure. The match validates the bytes read at that time; it does not guarantee against later
 media failure or verify every macOS metadata field. A Finder copy is not implicitly verified.
+For a verified read/write mount, the drive row's compact `…` menu exposes **Verified Copy…**; its
+native picker is constrained to that exact mounted volume, shows only a transient status card, and
+can cancel the complete copy process group without adding a permanent copy page to the popover.
 
 ### Developer diagnostics from the GUI
 
@@ -245,7 +248,7 @@ developed from `dev` and reviewed back into `dev` through its own focused branch
 | --- | --- | --- |
 | Completed foundation | ✅ Shipped | Multi-drive NTFS/ext support, MBR detection, in-popover Settings, adaptive icon and help, privacy-safe CLI/GUI diagnostics, version reporting, and helper reinstall/uninstall lifecycle |
 | P0 | 🟡 Software complete; hardware gate open | Runtime pinning, audited updates, mount reconciliation, per-session PF/VPN transaction, and measured SECURITY telemetry are implemented; the remaining packaged hardware matrix stays open |
-| P1 | 🟡 Core controls complete; qualification open | Verified Copy core/CLI and the explicit one-mount NTFS3 GUI choice are implemented; Verified Copy GUI and same-device NTFS3 hardware qualification remain open |
+| P1 | 🟡 Software complete; qualification open | Verified Copy CLI/GUI and the explicit one-mount NTFS3 GUI choice are implemented; same-media reconnect/Windows proof and same-device NTFS3 hardware qualification remain open |
 | P2 | ⬜ Planned | Migrate the deprecated privileged-helper lifecycle to `SMAppService` after its ad-hoc-signing and upgrade path are proven |
 | P3 | 🟡 Software complete; packaged validation open | Per-drive Open in Finder, opt-in notifications, and resilient Eject All are implemented; misleading global transfer telemetry was removed to keep the UI minimal |
 
