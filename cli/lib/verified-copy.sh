@@ -55,11 +55,35 @@ verified_copy_manifest_entry() {
   printf '%s\t%s\t%s\t%s\n' "$(verified_copy_hex "$rel")" "$type" "$size" "$hash"
 }
 
+# macOS writes excluded xattrs (notably com.apple.provenance) as AppleDouble `._*` files when the
+# destination filesystem cannot store them natively.  Ignore only a destination-only sidecar with
+# the AppleDouble magic, an existing paired entry, and no same-path entry in the source.  A real
+# source file named `._something` remains part of the manifest and is still verified byte-for-byte.
+verified_copy_is_synthetic_appledouble() {
+  local destination_root="$1" path="$2" source_root="$3" rel base directory paired magic
+  [[ -n "$source_root" && -f "$path" && ! -L "$path" ]] || return 1
+  rel="${path#"$destination_root"/}"
+  base="${rel##*/}"
+  [[ "$base" == ._* ]] || return 1
+  [[ ! -e "$source_root/$rel" && ! -L "$source_root/$rel" ]] || return 1
+
+  if [[ "$rel" == */* ]]; then
+    directory="${rel%/*}/"
+  else
+    directory=""
+  fi
+  paired="$destination_root/${directory}${base#._}"
+  [[ -e "$paired" || -L "$paired" ]] || return 1
+
+  magic="$(/usr/bin/od -An -tx1 -N4 "$path" 2>/dev/null | /usr/bin/tr -d ' \n')" || return 1
+  [[ "$magic" == "00051607" ]]
+}
+
 # Manifest records are sorted by the hex-encoded relative path. This remains deterministic for
 # spaces, tabs, newlines, Unicode, and leading dashes without making filenames executable shell
 # input. Regular files hash bytes in a stream; symlinks hash their link text and are never followed.
 verified_copy_manifest() {
-  local root="$1" output="$2" entries unsorted path
+  local root="$1" output="$2" source_reference="${3:-}" entries unsorted path
   entries="${output}.entries"
   unsorted="${output}.unsorted"
   : > "$unsorted" || return 1
@@ -68,6 +92,9 @@ verified_copy_manifest() {
   if [[ -d "$root" && ! -L "$root" ]]; then
     /usr/bin/find "$root" -mindepth 1 -print0 > "$entries" || return 1
     while IFS= read -r -d '' path; do
+      if verified_copy_is_synthetic_appledouble "$root" "$path" "$source_reference"; then
+        continue
+      fi
       verified_copy_manifest_entry "$root" "$path" >> "$unsorted" || return 1
     done < "$entries"
   fi
@@ -91,7 +118,7 @@ verified_copy_compare() {
     return 1
   }
   verified_copy_manifest "$first" "$scratch/source.manifest" || return 1
-  verified_copy_manifest "$second" "$scratch/destination.manifest" || return 1
+  verified_copy_manifest "$second" "$scratch/destination.manifest" "$first" || return 1
   /usr/bin/cmp -s "$scratch/source.manifest" "$scratch/destination.manifest"
 }
 
@@ -174,7 +201,14 @@ HELP
   payload="$recovery/payload"
   trap 'echo "copy: interrupted — recoverable partial copy retained at: $recovery" >&2; exit 130' INT TERM HUP
 
-  if ! "$VERIFIED_COPY_CP_BIN" -pR "$source" "$payload"; then
+  # The integrity contract deliberately excludes xattrs and resource forks.  On filesystems that
+  # cannot store them natively (including the NTFS volume exposed through our NFS mount), macOS
+  # otherwise materializes that metadata as `._*` AppleDouble files.  Those are new directory
+  # entries, so they correctly make the byte manifest differ from the source.  Disable copyfile
+  # metadata synthesis for this bounded copy instead of teaching the verifier to ignore real
+  # source files that happen to begin with `._`.  `-X` is the macOS cp contract for this; the
+  # environment variable is retained as a defensive copyfile hint for the same subprocess.
+  if ! COPYFILE_DISABLE=1 "$VERIFIED_COPY_CP_BIN" -pRX "$source" "$payload"; then
     echo "copy: FAILED — recoverable partial copy retained at: $recovery" >&2
     trap - INT TERM HUP
     return 1

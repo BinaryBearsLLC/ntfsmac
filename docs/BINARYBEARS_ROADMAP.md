@@ -15,6 +15,8 @@ The original live hardware findings from 2026-08-06 are recorded in
 and the focused VPN-on P0 follow-up is recorded in
 [Live P0 Security Transaction Audit — 2026-08-11](audits/LIVE_P0_SECURITY_TRANSACTION_AUDIT_2026-08-11.md).
 Untested matrix cells remain release gates even when the implemented acceptance checks pass.
+The current packaged acceptance ledger is
+[BinaryBears packaged validation results — 2026-08-12](testing/BINARYBEARS_VALIDATION_RESULTS_2026-08-12.md).
 
 The post-sync wiring audit and its focused recovery branches are recorded in
 [BinaryBears Upstream Regression Audit — 2026-08-05](audits/UPSTREAM_REGRESSION_AUDIT_2026-08-05.md).
@@ -320,6 +322,9 @@ name, calls `sync`, rereads source and destination into sorted manifests, and on
 payload into place. Regular-file bytes and sizes, directory entry types, and symlink target text
 are verified; permissions, ownership, ACLs, extended attributes, resource forks, timestamps,
 hard-link relationships, and sparse allocation are explicitly outside this integrity contract.
+When macOS represents excluded destination metadata as `._*` AppleDouble files, normalization is
+strict: only a valid destination-only sidecar with a paired entry and no same-path source entry is
+omitted. Real source entries named `._*` remain byte-verified.
 
 The GUI adds no permanent copy page: **Verified Copy…** lives in the mounted drive row's overflow
 menu and appears only for an independently verified read/write mount. Native source/destination
@@ -449,8 +454,20 @@ and uninstall boundary; it should not be mixed into unrelated work.
 - [x] Add Eject All with per-drive results and no loss of a failed mount's recovery controls.
 - [x] Keep per-drive read-only and mount-point preferences out of the UI until a concrete user
   story and complete helper wiring exist; no persisted no-op controls were added.
+- [ ] **Professional DMG presentation:** retain the simple drag-to-Applications install model but
+  give the mounted image a polished installer-like Finder layout: large app and Applications
+  icons, deliberate alignment and spacing, a restrained branded background/drag cue, and a sized
+  window with no accidental clutter. Validate the mounted result visually in light and dark mode,
+  verify icon positions and the Applications symlink, and keep ad-hoc signing, right-click Open
+  guidance, and DMG-only distribution unchanged.
 
-P3 is software-complete on 2026-08-12. Its packaged-app checks are part of the
+The initial 2026-08-12 packaged run exposed a Finder-presentation false positive: Launch Services
+accepted the NFS URL but no Finder window appeared. The source now asks Finder to reveal the exact
+observed mount point before using fallbacks; the rebuilt artifact must pass the per-drive live
+check before P3 can be called packaged-valid. The professional DMG presentation is a separate
+open packaging-UX item and does not expand the normal menu-bar surface.
+
+P3's packaged-app checks are part of the
 [assisted manual acceptance runbook](testing/BINARYBEARS_MANUAL_ACCEPTANCE_2026-08-12.md); they do
 not replace the still-open P0/P1 hardware qualification gates.
 

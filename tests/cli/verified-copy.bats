@@ -48,6 +48,41 @@ teardown() {
   [[ "$output" == *"differs"* ]]
 }
 
+@test "directory copy tolerates destination-only AppleDouble metadata without ignoring real sidecars" {
+  mkdir -p "$FIXTURE_DIR/source tree"
+  printf 'payload\n' > "$FIXTURE_DIR/source tree/file.txt"
+  printf 'real sidecar bytes\n' > "$FIXTURE_DIR/source tree/._intentional"
+
+  local copyfile_aware_cp="$FIXTURE_DIR/copyfile-aware-cp"
+  cat > "$copyfile_aware_cp" <<'SCRIPT'
+#!/bin/bash
+last=""
+metadata_disabled=false
+for item in "$@"; do
+  last="$item"
+  [[ "$item" == -*X* ]] && metadata_disabled=true
+done
+/bin/cp "$@" || exit
+# NFS can synthesize this sidecar for com.apple.provenance even when cp receives -X.
+printf '\000\005\026\007Mac OS X metadata\n' > "$last/._file.txt"
+if [[ "$metadata_disabled" != "true" ]]; then exit 97; fi
+SCRIPT
+  chmod +x "$copyfile_aware_cp"
+
+  NTFSMAC_CP_BIN="$copyfile_aware_cp" run \
+    "$COPY_SCRIPT" --verify "$FIXTURE_DIR/source tree" "$FIXTURE_DIR/copied tree"
+
+  [ "$status" -eq 0 ]
+  [ -f "$FIXTURE_DIR/copied tree/._intentional" ]
+  [ -f "$FIXTURE_DIR/copied tree/._file.txt" ]
+  [[ "$output" == *"manifest match"* ]]
+
+  printf 'not AppleDouble\n' > "$FIXTURE_DIR/copied tree/._unexpected"
+  run "$VERIFY_SCRIPT" "$FIXTURE_DIR/source tree" "$FIXTURE_DIR/copied tree"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"differs"* ]]
+}
+
 @test "existing destination is never overwritten" {
   printf 'source\n' > "$FIXTURE_DIR/source"
   printf 'keep me\n' > "$FIXTURE_DIR/destination"

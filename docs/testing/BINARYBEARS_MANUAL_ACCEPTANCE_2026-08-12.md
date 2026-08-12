@@ -5,6 +5,9 @@ BinaryBears branch. It does **not** turn an automated pass into a hardware pass.
 `NOT RUN` until its action, expected result, and evidence have been observed on the packaged
 candidate.
 
+The active session ledger is
+[`BINARYBEARS_VALIDATION_RESULTS_2026-08-12.md`](BINARYBEARS_VALIDATION_RESULTS_2026-08-12.md).
+
 P2 (`SMAppService`) is deliberately absent. The installed helper must remain the current
 `SMJobBless` implementation throughout this matrix.
 
@@ -326,7 +329,7 @@ printf 'BinaryBears GUI verified copy fixture\n' > "$BB_FIXTURE/gui-source.bin"
 4. Select the same existing destination again. Require an explicit no-overwrite refusal and the
    original destination hash unchanged.
 5. After checking local and Drive A free space, create a disposable large source with
-   `/usr/bin/mkfile 2g "$BB_FIXTURE/gui-cancel-large.bin"` and select the fresh destination
+   `/usr/sbin/mkfile 2g "$BB_FIXTURE/gui-cancel-large.bin"` and select the fresh destination
    `"$BB_REMOTE_A/gui-cancel.bin"`. While the card is active, verify
    Mount/Unmount/Eject All/Settings/Quit cannot start, then select **Cancel**. Require the source to
    remain, the final name to remain absent, the card to report cancellation, and any hidden
@@ -382,7 +385,7 @@ done
   "$BB_FIXTURE/source tree" "$BB_REMOTE_A/copied tree"
 "$BB_CLI" verify \
   "$BB_FIXTURE/source tree" "$BB_REMOTE_A/copied tree"
-/usr/bin/test -L "$BB_REMOTE_A/copied tree/film-link"
+/bin/test -L "$BB_REMOTE_A/copied tree/film-link"
 /usr/bin/readlink "$BB_REMOTE_A/copied tree/film-link"
 ```
 

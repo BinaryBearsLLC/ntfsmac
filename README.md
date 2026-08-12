@@ -158,6 +158,9 @@ Verified Copy publishes a destination only after a flush, reread, and determinis
 manifest match. It refuses implicit overwrite and retains a recoverable partial destination after
 failure. The match validates the bytes read at that time; it does not guarantee against later
 media failure or verify every macOS metadata field. A Finder copy is not implicitly verified.
+On filesystems where macOS materializes excluded metadata as `._*` AppleDouble sidecars, the
+manifest omits only valid destination-only metadata sidecars paired with a copied entry; real
+source entries with the same naming pattern remain byte-verified.
 For a verified read/write mount, the drive row's compact `…` menu exposes **Verified Copy…**; its
 native picker is constrained to that exact mounted volume, shows only a transient status card, and
 can cancel the complete copy process group without adding a permanent copy page to the popover.
