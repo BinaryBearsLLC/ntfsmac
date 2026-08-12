@@ -61,7 +61,6 @@ public struct PopoverContentView: View {
     @ObservedObject public var appState: AppState
     @ObservedObject public var driveScanner: DriveScanner
     @ObservedObject public var mountController: MountController
-    @ObservedObject public var throughputMonitor: ThroughputMonitor
     @ObservedObject public var remountController: RemountController
     @ObservedObject public var diagnoseRunner: DiagnoseRunner
     @ObservedObject public var securityStatusReader: SecurityStatusReader
@@ -83,7 +82,6 @@ public struct PopoverContentView: View {
         appState: AppState,
         driveScanner: DriveScanner,
         mountController: MountController,
-        throughputMonitor: ThroughputMonitor,
         remountController: RemountController,
         diagnoseRunner: DiagnoseRunner,
         securityStatusReader: SecurityStatusReader = SecurityStatusReader(),
@@ -99,7 +97,6 @@ public struct PopoverContentView: View {
         self.appState = appState
         self.driveScanner = driveScanner
         self.mountController = mountController
-        self.throughputMonitor = throughputMonitor
         self.remountController = remountController
         self.diagnoseRunner = diagnoseRunner
         self.securityStatusReader = securityStatusReader
@@ -119,7 +116,6 @@ public struct PopoverContentView: View {
         appState: AppState,
         driveScanner: DriveScanner,
         mountController: MountController,
-        throughputMonitor: ThroughputMonitor,
         remountController: RemountController,
         diagnoseRunner: DiagnoseRunner,
         securityStatusReader: SecurityStatusReader = SecurityStatusReader(),
@@ -134,7 +130,6 @@ public struct PopoverContentView: View {
             appState: appState,
             driveScanner: driveScanner,
             mountController: mountController,
-            throughputMonitor: throughputMonitor,
             remountController: remountController,
             diagnoseRunner: diagnoseRunner,
             securityStatusReader: securityStatusReader,
@@ -491,13 +486,6 @@ public struct PopoverContentView: View {
             .help(TooltipCopy.text(for: .quit))
         }
     }
-
-    // ponytail: throughputMonitor is retained in the init signature (not removed) because
-    // dropping it cascades to Package.swift's NtfsmacGUI sources list + ThroughputTests + the
-    // app wiring in NtfsmacApp. The Combined speed section it fed was removed per the multi-mount
-    // rework; the ThroughputMonitor subsystem is now unused UI-side. Upgrade path: remove the
-    // subsystem in one go (Package.swift source + ThroughputTests + this property + init param +
-    // NtfsmacApp StateObject + renderPopover helper).
 
     /// GUI-PLAN.md "Popover — idle": "Quit | Exit app, tear down network state". Clean shutdown
     /// per the maintainer's decision: unmount every active drive → teardown pf/route → ask the

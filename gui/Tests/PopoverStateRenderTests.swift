@@ -78,7 +78,6 @@ private func renderPopover(
         appState: appState,
         driveScanner: driveScanner,
         mountController: mountController,
-        throughputMonitor: ThroughputMonitor(),
         remountController: RemountController(appState: appState),
         diagnoseRunner: DiagnoseRunner(),
         helperInstaller: helperInstaller,

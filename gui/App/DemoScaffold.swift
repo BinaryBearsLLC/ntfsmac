@@ -32,10 +32,6 @@ enum DemoScaffold {
         DriveScanner(runner: DemoCommandRunner())
     }
 
-    static func throughputMonitor() -> ThroughputMonitor {
-        ThroughputMonitor(counter: DemoByteCounter())
-    }
-
     /// Separate from `NTFSMAC_UI_DEMO`: install-outcome and mount-state are orthogonal axes, and
     /// unlike mounting, `HelperInstaller`'s real path is a one-shot OS auth dialog — faking
     /// denied/failed here avoids clicking "Cancel" on a real `SMJobBless` prompt repeatedly during
@@ -78,9 +74,4 @@ private struct DemoHelperMounting: HelperMounting {
 private struct DemoReadOnlyChecker: MountReadOnlyChecking {
     let stillReadOnly: Bool
     func isAnyNfsMountReadOnly() async -> Bool { stillReadOnly }
-}
-
-private final class DemoByteCounter: InterfaceByteCounting {
-    private var total: UInt64 = 0
-    func totalBytes() -> UInt64 { total += 4_200_000; return total }
 }

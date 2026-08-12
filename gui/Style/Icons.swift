@@ -143,16 +143,3 @@ public struct RefreshGlyph: View {
             .font(.system(size: 10.5))
     }
 }
-
-/// Speed-bar read/write chevrons.
-public struct SpeedDirectionGlyph: View {
-    public var color: Color
-    /// `true` = up chevron (Read), `false` = down chevron (Write).
-    public var pointsUp: Bool
-
-    public var body: some View {
-        Image(systemName: pointsUp ? "chevron.up" : "chevron.down")
-            .font(.system(size: 8, weight: .bold))
-            .foregroundStyle(color)
-    }
-}

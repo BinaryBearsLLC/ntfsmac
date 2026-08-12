@@ -95,7 +95,7 @@ public struct SecurityIndicatorsView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             // `ui/prototype.html` comp lines 202-203/376-377 — same uppercase-tracked title
-            // style `SpeedBar`'s "TRANSFER SPEED" uses. Missing entirely before this pass.
+            // same compact uppercase section style used throughout the popover.
             HStack {
                 Text("SECURITY")
                     .font(.system(size: 10, weight: .semibold))

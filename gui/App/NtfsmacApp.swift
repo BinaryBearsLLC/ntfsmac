@@ -51,7 +51,6 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
         let appState = AppState()
         let driveScanner: DriveScanner
         let mountController: MountController
-        let throughputMonitor: ThroughputMonitor
         let remountController: RemountController
 
         // See `DemoScaffold.swift`: inert unless NTFSMAC_UI_DEMO is explicitly set. Real installs
@@ -60,12 +59,10 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
             driveScanner = DemoScaffold.driveScanner()
             mountController = DemoScaffold.mountController(mode: demoMode, appState: appState)
             remountController = DemoScaffold.remountController(appState: appState)
-            throughputMonitor = DemoScaffold.throughputMonitor()
         } else {
             driveScanner = DriveScanner()
             mountController = MountController(appState: appState)
             remountController = RemountController(appState: appState)
-            throughputMonitor = ThroughputMonitor()
         }
 
         let helperInstaller: HelperInstaller
@@ -89,7 +86,6 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
             appState: appState,
             driveScanner: driveScanner,
             mountController: mountController,
-            throughputMonitor: throughputMonitor,
             remountController: remountController,
             diagnoseRunner: DiagnoseRunner(),
             securityStatusReader: securityStatusReader,
