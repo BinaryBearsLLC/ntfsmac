@@ -22,6 +22,7 @@ public struct DriveRow: View {
     public let actionsDisabled: Bool
     public let onMount: () -> Void
     public let onOpenInFinder: (() -> Void)?
+    public let onVerifiedCopy: (() -> Void)?
     public let onUnmount: () -> Void
     public let onMountAnyway: (() -> Void)?
     public let onMountExperimental: (() -> Void)?
@@ -34,6 +35,7 @@ public struct DriveRow: View {
         actionsDisabled: Bool = false,
         onMount: @escaping () -> Void = {},
         onOpenInFinder: (() -> Void)? = nil,
+        onVerifiedCopy: (() -> Void)? = nil,
         onUnmount: @escaping () -> Void = {},
         onMountAnyway: (() -> Void)? = nil,
         onMountExperimental: (() -> Void)? = nil
@@ -44,6 +46,7 @@ public struct DriveRow: View {
         self.actionsDisabled = actionsDisabled
         self.onMount = onMount
         self.onOpenInFinder = onOpenInFinder
+        self.onVerifiedCopy = onVerifiedCopy
         self.onUnmount = onUnmount
         self.onMountAnyway = onMountAnyway
         self.onMountExperimental = onMountExperimental
@@ -107,6 +110,20 @@ public struct DriveRow: View {
                     .buttonStyle(.glassDestructive(colorScheme: colorScheme))
                     .disabled(actionsDisabled)
                     .help(TooltipCopy.text(for: .unmount))
+
+                    if let onVerifiedCopy {
+                        Menu {
+                            Button("Verified Copy…") { onVerifiedCopy() }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .frame(width: 22)
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                        .disabled(actionsDisabled)
+                        .accessibilityLabel("More drive actions")
+                        .help(TooltipCopy.text(for: .verifiedCopy))
+                    }
                 }
 
                 if isDirty, let onMountAnyway {

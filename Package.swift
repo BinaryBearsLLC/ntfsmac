@@ -74,6 +74,7 @@ let package = Package(
                 "Actions/SecurityStatusReader.swift",
                 "Actions/PreferencesOpener.swift", "Actions/CLIAutoStager.swift",
                 "Actions/DiagnoseRunner.swift", "Actions/DeveloperDiagnoseExport.swift", "Views/DiagnosePanel.swift",
+                "Actions/VerifiedCopyController.swift", "Views/VerifiedCopyStatusView.swift",
                 "FirstRun/HelperInstaller.swift", "Views/FirstRunView.swift",
                 "FirstRun/HelperUninstaller.swift", "FirstRun/CLIInstallChecker.swift", "Views/CLIMissingView.swift",
                 "Preferences/ProductVersion.swift", "Preferences/Settings.swift", "Preferences/PreferencesView.swift",

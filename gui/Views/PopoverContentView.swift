@@ -70,6 +70,7 @@ public struct PopoverContentView: View {
     @ObservedObject public var cliAutoStager: CLIAutoStager
     @ObservedObject public var settings: Settings
     @StateObject private var navigation: PopoverNavigation
+    @StateObject private var verifiedCopyController: VerifiedCopyController
     public let finderOpener: FinderOpener
     public let helperClient: HelperClient
 
@@ -109,6 +110,7 @@ public struct PopoverContentView: View {
         self.finderOpener = finderOpener
         self.helperClient = helperClient
         _navigation = StateObject(wrappedValue: navigation)
+        _verifiedCopyController = StateObject(wrappedValue: VerifiedCopyController())
     }
 
     /// Source-compatible initializer matching the original public surface. The production app
@@ -199,7 +201,9 @@ public struct PopoverContentView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .ntfsmacOpenSettings)) { _ in
-            navigation.showSettings()
+            if !verifiedCopyController.isActive {
+                navigation.showSettings()
+            }
         }
         .task {
             await refreshAll()
@@ -243,7 +247,7 @@ public struct PopoverContentView: View {
                             }
                         }
                         .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                        .disabled(mountController.isEjectingAll)
+                        .disabled(driveActionsDisabled)
                         .help(TooltipCopy.text(for: .ejectAll))
                     }
                 }
@@ -252,7 +256,7 @@ public struct PopoverContentView: View {
                         drive: entry.drive,
                         isMounted: true,
                         isDirty: entry.isDirty,
-                        actionsDisabled: mountController.isEjectingAll,
+                        actionsDisabled: driveActionsDisabled,
                         onOpenInFinder: entry.isVerified ? {
                             let opened = finderOpener.open(
                                 entry.drive,
@@ -263,10 +267,15 @@ public struct PopoverContentView: View {
                                 ? nil
                                 : "Could not open this mounted drive in Finder"
                         } : nil,
+                        onVerifiedCopy: verifiedCopyAction(for: entry),
                         onUnmount: { Task { await mountController.unmount(driveID: entry.id) } },
                         onMountAnyway: { remountController.requestRemount() }
                     )
                 }
+            }
+
+            if verifiedCopyController.isVisible {
+                VerifiedCopyStatusView(controller: verifiedCopyController)
             }
 
             if let report = mountController.lastEjectAllReport {
@@ -296,7 +305,7 @@ public struct PopoverContentView: View {
                     DriveRow(
                         drive: drive,
                         isMounted: false,
-                        actionsDisabled: mountController.isEjectingAll,
+                        actionsDisabled: driveActionsDisabled,
                         onMount: { mountDrive(drive) },
                         onMountExperimental: ntfs3Action(for: drive)
                     )
@@ -320,14 +329,14 @@ public struct PopoverContentView: View {
                         RefreshGlyph()
                     }
                     .buttonStyle(.glassIcon(colorScheme: colorScheme))
-                    .disabled(mountController.isEjectingAll)
+                    .disabled(driveActionsDisabled)
                 }
                 if OtherAvailableSection.rowsRender(availableCount: otherAvailableDrives.count) {
                     ForEach(otherAvailableDrives) { drive in
                         DriveRow(
                             drive: drive,
                             isMounted: false,
-                            actionsDisabled: mountController.isEjectingAll,
+                            actionsDisabled: driveActionsDisabled,
                             onMount: { mountDrive(drive) },
                             onMountExperimental: ntfs3Action(for: drive)
                         )
@@ -417,9 +426,14 @@ public struct PopoverContentView: View {
         driveScanner.drives.filter { !mountController.mountedDriveIDs.contains($0.id) }
     }
 
+    private var driveActionsDisabled: Bool {
+        mountController.isEjectingAll || verifiedCopyController.isActive
+    }
+
     /// Mount an unmounted drive r/w at its default mount point. Shared by the idle primary list
     /// and the mounted "Other available devices" section — both offer the same per-row Mount action.
     private func mountDrive(_ drive: Drive, driver: FsDriver? = nil) {
+        guard !verifiedCopyController.isActive else { return }
         Task { await mountController.mount(drive, driver: driver, mountPoint: nil, readOnly: false) }
     }
 
@@ -432,6 +446,30 @@ public struct PopoverContentView: View {
         if !entry.isVerified { return .mountedUnknown }
         if entry.isDirty { return .mountedReadOnlyDirty }
         return entry.isReadOnly ? .mountedReadOnly : .mountedReadWrite
+    }
+
+    private func verifiedCopyAction(for entry: MountedDrive) -> (() -> Void)? {
+        guard VerifiedCopyAvailability.isAvailable(
+            isVerified: entry.isVerified,
+            isReadOnly: entry.isReadOnly,
+            isDirty: entry.isDirty,
+            mountPoint: entry.mountPoint
+        ), let mountPoint = entry.mountPoint
+        else {
+            return nil
+        }
+        return {
+            do {
+                guard let selection = try VerifiedCopyPicker.choose(onMountPoint: mountPoint) else {
+                    return
+                }
+                let volumeName = entry.drive.label.isEmpty ? entry.drive.identifier : entry.drive.label
+                verifiedCopyController.start(selection, volumeName: volumeName)
+            } catch {
+                let volumeName = entry.drive.label.isEmpty ? entry.drive.identifier : entry.drive.label
+                verifiedCopyController.showSelectionError(error, volumeName: volumeName)
+            }
+        }
     }
 
     private func refreshAll() async {
@@ -502,6 +540,7 @@ public struct PopoverContentView: View {
                 SettingsGearGlyph(color: .secondary)
             }
             .buttonStyle(.glassIcon(colorScheme: colorScheme))
+            .disabled(verifiedCopyController.isActive)
             .accessibilityLabel("Open Settings")
             .help(TooltipCopy.text(for: .settings))
 
@@ -529,7 +568,7 @@ public struct PopoverContentView: View {
                 .frame(height: 28)
             }
             .buttonStyle(.glassFooter(colorScheme: colorScheme))
-            .disabled(diagnoseRunner.isRunning)
+            .disabled(diagnoseRunner.isRunning || verifiedCopyController.isActive)
             .help(TooltipCopy.text(for: .diagnose))
 
             Button {
@@ -538,7 +577,7 @@ public struct PopoverContentView: View {
                 Text("Quit").frame(height: 28)
             }
             .buttonStyle(.glassFooter(colorScheme: colorScheme))
-            .disabled(mountController.isEjectingAll)
+            .disabled(driveActionsDisabled)
             .help(TooltipCopy.text(for: .quit))
         }
     }
@@ -550,6 +589,7 @@ public struct PopoverContentView: View {
     /// Best-effort throughout — every step is `try?` so a slow/failed unmount or a helper that's
     /// already gone never blocks quitting. The mount does NOT survive a GUI restart by design.
     private func quit() {
+        guard !verifiedCopyController.isActive else { return }
         Task {
             await mountController.unmount()
             _ = try? await helperClient.teardown()

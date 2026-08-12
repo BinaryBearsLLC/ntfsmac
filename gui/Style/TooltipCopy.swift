@@ -8,6 +8,7 @@ public enum TooltipCopy {
         case diagnose
         case mount
         case openInFinder
+        case verifiedCopy
         case unmount
         case ejectAll
         case mountReadWriteAnyway
@@ -30,6 +31,8 @@ public enum TooltipCopy {
             "Mount this NTFS drive using the configured defaults"
         case .openInFinder:
             "Open this mounted drive in Finder"
+        case .verifiedCopy:
+            "Copy one item, reread it, and compare a SHA-256 manifest"
         case .unmount:
             "Safely unmount this drive and tear down its private network"
         case .ejectAll:
