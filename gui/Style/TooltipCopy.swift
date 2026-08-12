@@ -9,6 +9,7 @@ public enum TooltipCopy {
         case mount
         case openInFinder
         case unmount
+        case ejectAll
         case mountReadWriteAnyway
         case hideSecurity
         case showSecurity
@@ -31,6 +32,8 @@ public enum TooltipCopy {
             "Open this mounted drive in Finder"
         case .unmount:
             "Safely unmount this drive and tear down its private network"
+        case .ejectAll:
+            "Try to unmount every drive and show each result"
         case .mountReadWriteAnyway:
             "Retry read/write mounting despite the unclean journal warning"
         case .hideSecurity:

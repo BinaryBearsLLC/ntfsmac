@@ -13,7 +13,9 @@ private final class FakeHelper: HelperMounting, MountSnapshotProviding {
     private(set) var unmountCalls: [String] = []
     var mountResult: Result<CommandResult, Error> = .success(CommandResult(output: "mounted", exitCode: 0))
     var unmountResult: Result<CommandResult, Error> = .success(CommandResult(output: "unmounted", exitCode: 0))
+    var unmountResultsByTarget: [String: Result<CommandResult, Error>] = [:]
     var snapshotReadOnlyOverride: Bool?
+    private var successfulUnmounts: Set<String> = []
 
     func mount(device: String, driver: FsDriver, mountPoint: String?, readOnly: Bool) async throws -> CommandResult {
         mountCalls.append((device, driver, mountPoint, readOnly))
@@ -22,13 +24,16 @@ private final class FakeHelper: HelperMounting, MountSnapshotProviding {
 
     func unmount(target: String) async throws -> CommandResult {
         unmountCalls.append(target)
-        return try unmountResult.get()
+        let result = try (unmountResultsByTarget[target] ?? unmountResult).get()
+        if result.exitCode == 0 {
+            successfulUnmounts.insert(target)
+        }
+        return result
     }
 
     func snapshot() async -> MountSnapshot {
-        let unmounted = Set(unmountCalls)
         var latest: [String: (device: String, driver: FsDriver, mountPoint: String?, readOnly: Bool)] = [:]
-        for call in mountCalls where !unmounted.contains(call.device) {
+        for call in mountCalls where !successfulUnmounts.contains(call.device) {
             latest[call.device] = call
         }
         let mounts = latest.values.map { call in
@@ -279,6 +284,74 @@ private final class RecordingMountNotifier: MountEventNotifying {
     await controller.unmount(driveID: sampleDrive.identifier)
     await controller.unmount(driveID: otherDrive.identifier)
 
+    #expect(controller.mountedDriveIDs.isEmpty)
+    #expect(appState.state == .idle)
+}
+
+@MainActor
+@Test func ejectAllContinuesAfterFailureAndPreservesRecoveryControls() async {
+    let fake = FakeHelper()
+    fake.unmountResultsByTarget["disk4s2"] = .success(
+        CommandResult(output: "device busy", exitCode: 1)
+    )
+    let appState = AppState()
+    let notifier = RecordingMountNotifier()
+    let controller = MountController(
+        helper: fake,
+        readOnlyChecker: FakeReadOnlyChecker(isReadOnly: false),
+        notifier: notifier,
+        appState: appState
+    )
+    let otherDrive = Drive(
+        identifier: "disk5s1",
+        fsType: "ext4",
+        label: "ExtVol",
+        size: "32.0 GB"
+    )
+
+    await controller.mount(sampleDrive)
+    await controller.mount(otherDrive)
+    await controller.ejectAll()
+
+    #expect(fake.unmountCalls == ["disk4s2", "disk5s1"])
+    #expect(controller.mountedDriveIDs == Set(["disk4s2"]))
+    #expect(controller.mountedDrives.first?.isVerified == true)
+    #expect(appState.state == .mountedReadWrite)
+    #expect(controller.lastEjectAllReport == EjectAllReport(results: [
+        EjectDriveResult(id: "disk4s2", volumeName: "My Drive", status: .helperFailed),
+        EjectDriveResult(id: "disk5s1", volumeName: "ExtVol", status: .unmounted),
+    ]))
+    #expect(notifier.events.last == .ejectAll(succeeded: 1, total: 2))
+
+    // The failed row remains actionable: retrying its normal per-drive Unmount can recover.
+    fake.unmountResultsByTarget["disk4s2"] = .success(CommandResult(output: "unmounted", exitCode: 0))
+    await controller.unmount(driveID: "disk4s2")
+    #expect(controller.mountedDriveIDs.isEmpty)
+    #expect(controller.lastEjectAllReport == nil)
+}
+
+@MainActor
+@Test func ejectAllPublishesOneSuccessfulResultPerDrive() async {
+    let fake = FakeHelper()
+    let appState = AppState()
+    let controller = MountController(
+        helper: fake,
+        readOnlyChecker: FakeReadOnlyChecker(isReadOnly: false),
+        appState: appState
+    )
+    let otherDrive = Drive(
+        identifier: "disk5s1",
+        fsType: "ext4",
+        label: "ExtVol",
+        size: "32.0 GB"
+    )
+
+    await controller.mount(sampleDrive)
+    await controller.mount(otherDrive)
+    await controller.ejectAll()
+
+    #expect(controller.lastEjectAllReport?.succeededCount == 2)
+    #expect(controller.lastEjectAllReport?.allSucceeded == true)
     #expect(controller.mountedDriveIDs.isEmpty)
     #expect(appState.state == .idle)
 }

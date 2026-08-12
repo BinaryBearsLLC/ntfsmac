@@ -19,6 +19,7 @@ public struct DriveRow: View {
     public let drive: Drive
     public let isMounted: Bool
     public let isDirty: Bool
+    public let actionsDisabled: Bool
     public let onMount: () -> Void
     public let onOpenInFinder: (() -> Void)?
     public let onUnmount: () -> Void
@@ -30,6 +31,7 @@ public struct DriveRow: View {
         drive: Drive,
         isMounted: Bool = false,
         isDirty: Bool = false,
+        actionsDisabled: Bool = false,
         onMount: @escaping () -> Void = {},
         onOpenInFinder: (() -> Void)? = nil,
         onUnmount: @escaping () -> Void = {},
@@ -39,6 +41,7 @@ public struct DriveRow: View {
         self.drive = drive
         self.isMounted = isMounted
         self.isDirty = isDirty
+        self.actionsDisabled = actionsDisabled
         self.onMount = onMount
         self.onOpenInFinder = onOpenInFinder
         self.onUnmount = onUnmount
@@ -88,7 +91,7 @@ public struct DriveRow: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                    .disabled(onOpenInFinder == nil)
+                    .disabled(onOpenInFinder == nil || actionsDisabled)
                     .accessibilityLabel("Open in Finder")
                     .help(TooltipCopy.text(for: .openInFinder))
 
@@ -102,6 +105,7 @@ public struct DriveRow: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.glassDestructive(colorScheme: colorScheme))
+                    .disabled(actionsDisabled)
                     .help(TooltipCopy.text(for: .unmount))
                 }
 
@@ -116,6 +120,7 @@ public struct DriveRow: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.glassWarning())
+                    .disabled(actionsDisabled)
                     .help(TooltipCopy.text(for: .mountReadWriteAnyway))
                 }
             } else {
@@ -137,6 +142,7 @@ public struct DriveRow: View {
                             }
                             .buttonStyle(.glassWarning())
                         }
+                        .disabled(actionsDisabled)
                     }
                 } else {
                     HStack(spacing: 5) {
@@ -147,6 +153,7 @@ public struct DriveRow: View {
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                        .disabled(actionsDisabled)
                         .help("Mount with ntfs-3g, the compatibility-first default")
 
                         if onMountExperimental != nil {
@@ -160,6 +167,7 @@ public struct DriveRow: View {
                             }
                             .menuStyle(.borderlessButton)
                             .fixedSize()
+                            .disabled(actionsDisabled)
                             .help("Choose the experimental NTFS3 driver for this mount only")
                         }
                     }

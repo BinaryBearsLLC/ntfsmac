@@ -223,11 +223,36 @@ public struct PopoverContentView: View {
             // Mounted drives — one DriveRow per drive, each with its own Unmount pill. Scales to
             // the number of drives anylinuxfs is exporting (one microVM per mount, mixed NTFS+ext).
             if !mountController.mountedDrives.isEmpty {
+                if mountController.mountedDrives.count > 1 {
+                    HStack(spacing: 6) {
+                        Text("MOUNTED")
+                            .font(.system(size: 10, weight: .semibold))
+                            .tracking(1.1)
+                            .foregroundStyle(.secondary.opacity(0.7))
+                        Spacer()
+                        Button {
+                            Task { await mountController.ejectAll() }
+                        } label: {
+                            HStack(spacing: 5) {
+                                if mountController.isEjectingAll {
+                                    ProgressView().controlSize(.small)
+                                } else {
+                                    EjectGlyph()
+                                }
+                                Text("Eject All")
+                            }
+                        }
+                        .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                        .disabled(mountController.isEjectingAll)
+                        .help(TooltipCopy.text(for: .ejectAll))
+                    }
+                }
                 ForEach(mountController.mountedDrives) { entry in
                     DriveRow(
                         drive: entry.drive,
                         isMounted: true,
                         isDirty: entry.isDirty,
+                        actionsDisabled: mountController.isEjectingAll,
                         onOpenInFinder: entry.isVerified ? {
                             let opened = finderOpener.open(
                                 entry.drive,
@@ -241,6 +266,12 @@ public struct PopoverContentView: View {
                         onUnmount: { Task { await mountController.unmount(driveID: entry.id) } },
                         onMountAnyway: { remountController.requestRemount() }
                     )
+                }
+            }
+
+            if let report = mountController.lastEjectAllReport {
+                EjectAllReportView(report: report) {
+                    mountController.dismissEjectAllReport()
                 }
             }
 
@@ -265,6 +296,7 @@ public struct PopoverContentView: View {
                     DriveRow(
                         drive: drive,
                         isMounted: false,
+                        actionsDisabled: mountController.isEjectingAll,
                         onMount: { mountDrive(drive) },
                         onMountExperimental: ntfs3Action(for: drive)
                     )
@@ -288,12 +320,14 @@ public struct PopoverContentView: View {
                         RefreshGlyph()
                     }
                     .buttonStyle(.glassIcon(colorScheme: colorScheme))
+                    .disabled(mountController.isEjectingAll)
                 }
                 if OtherAvailableSection.rowsRender(availableCount: otherAvailableDrives.count) {
                     ForEach(otherAvailableDrives) { drive in
                         DriveRow(
                             drive: drive,
                             isMounted: false,
+                            actionsDisabled: mountController.isEjectingAll,
                             onMount: { mountDrive(drive) },
                             onMountExperimental: ntfs3Action(for: drive)
                         )
@@ -504,6 +538,7 @@ public struct PopoverContentView: View {
                 Text("Quit").frame(height: 28)
             }
             .buttonStyle(.glassFooter(colorScheme: colorScheme))
+            .disabled(mountController.isEjectingAll)
             .help(TooltipCopy.text(for: .quit))
         }
     }
@@ -521,6 +556,44 @@ public struct PopoverContentView: View {
             _ = try? await helperClient.exitHelper()
             NSApp.terminate(nil)
         }
+    }
+}
+
+private struct EjectAllReportView: View {
+    let report: EjectAllReport
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 6) {
+                Text(report.allSucceeded ? "All drives unmounted" : "Eject All results")
+                    .font(.system(size: 11, weight: .semibold))
+                Spacer()
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .semibold))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss Eject All results")
+            }
+
+            ForEach(report.results) { result in
+                HStack(spacing: 6) {
+                    Text(result.volumeName)
+                        .font(.system(size: 10.5))
+                        .lineLimit(1)
+                    Spacer()
+                    Image(systemName: result.status == .unmounted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .foregroundStyle(result.status == .unmounted ? Color.ntfsGreen : Color.ntfsYellow)
+                    Text(result.status.label)
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(result.status == .unmounted ? Color.secondary : Color.ntfsYellow)
+                }
+            }
+        }
+        .glassCard()
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Eject All per-drive results")
     }
 }
 

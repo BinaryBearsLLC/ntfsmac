@@ -42,6 +42,46 @@ public struct MountedDrive: Identifiable, Equatable, Sendable {
     }
 }
 
+public enum EjectDriveStatus: Equatable, Sendable {
+    case unmounted
+    case helperFailed
+    case stillMounted
+    case verificationUnavailable
+
+    public var label: String {
+        switch self {
+        case .unmounted: "Unmounted"
+        case .helperFailed: "Failed"
+        case .stillMounted: "Still mounted"
+        case .verificationUnavailable: "Not verified"
+        }
+    }
+}
+
+public struct EjectDriveResult: Identifiable, Equatable, Sendable {
+    public let id: String
+    public let volumeName: String
+    public let status: EjectDriveStatus
+
+    public init(id: String, volumeName: String, status: EjectDriveStatus) {
+        self.id = id
+        self.volumeName = volumeName
+        self.status = status
+    }
+}
+
+public struct EjectAllReport: Equatable, Sendable {
+    public let results: [EjectDriveResult]
+
+    public init(results: [EjectDriveResult]) {
+        self.results = results
+    }
+
+    public var succeededCount: Int { results.filter { $0.status == .unmounted }.count }
+    public var totalCount: Int { results.count }
+    public var allSucceeded: Bool { !results.isEmpty && succeededCount == totalCount }
+}
+
 /// `[Mount]`/`Unmount` (GUI-PLAN.md "Popover — idle"/"Popover — mounted") always route through
 /// this controller, which always routes through the XPC helper (L5) — never a raw shell-out.
 /// Drives the shared `AppState.state` icon/popover transition: idle→mounting→mounted/error.
@@ -54,6 +94,8 @@ public final class MountController: ObservableObject {
     @Published public private(set) var mountedDrives: [MountedDrive] = []
     @Published public internal(set) var errorMessage: String?
     @Published public private(set) var reconciliationWarning: String?
+    @Published public private(set) var isEjectingAll = false
+    @Published public private(set) var lastEjectAllReport: EjectAllReport?
 
     private let helper: any HelperMounting
     private let readOnlyChecker: any MountReadOnlyChecking
@@ -226,6 +268,7 @@ public final class MountController: ObservableObject {
 
         errorMessage = nil
         reconciliationWarning = nil
+        lastEjectAllReport = nil
         mountOperationsInFlight += 1
         appState.state = .mounting
         defer {
@@ -313,6 +356,7 @@ public final class MountController: ObservableObject {
     public func unmount(driveID: String? = nil) async {
         errorMessage = nil
         reconciliationWarning = nil
+        lastEjectAllReport = nil
         let targets: [String]
         if let driveID {
             guard mountedDrives.contains(where: { $0.id == driveID }) else { return }
@@ -361,6 +405,63 @@ public final class MountController: ObservableObject {
                 notifier.post(.unmounted(volumeName: name))
             }
         }
+    }
+
+    /// Tries every mounted drive even after one helper failure, then judges each result from the
+    /// final authoritative snapshot. A failed or unverified drive remains in `mountedDrives`, so
+    /// its per-drive Open/Unmount recovery controls are never lost behind a batch summary.
+    public func ejectAll() async {
+        guard !isEjectingAll else { return }
+        let targets = mountedDrives.sorted { $0.id < $1.id }
+        guard !targets.isEmpty else { return }
+
+        isEjectingAll = true
+        lastEjectAllReport = nil
+        errorMessage = nil
+        reconciliationWarning = nil
+        defer { isEjectingAll = false }
+
+        var helperFailures: Set<String> = []
+        for target in targets {
+            do {
+                let result = try await helper.unmount(target: target.id)
+                if result.exitCode != 0 {
+                    helperFailures.insert(target.id)
+                }
+            } catch {
+                helperFailures.insert(target.id)
+            }
+        }
+
+        let snapshot = await snapshotProvider.snapshot()
+        apply(snapshot, knownDrives: targets.map(\.drive))
+        let remaining = mountedDriveIDs
+        let results = targets.map { target -> EjectDriveResult in
+            let status: EjectDriveStatus
+            if !remaining.contains(target.id) {
+                // Host truth wins even when the helper reply was lost after completing the work.
+                status = .unmounted
+            } else if helperFailures.contains(target.id) {
+                status = .helperFailed
+            } else if !snapshot.isAuthoritative {
+                status = .verificationUnavailable
+            } else {
+                status = .stillMounted
+            }
+            return EjectDriveResult(
+                id: target.id,
+                volumeName: notificationName(for: target.drive),
+                status: status
+            )
+        }
+
+        let report = EjectAllReport(results: results)
+        lastEjectAllReport = report
+        notifier.post(.ejectAll(succeeded: report.succeededCount, total: report.totalCount))
+    }
+
+    public func dismissEjectAllReport() {
+        lastEjectAllReport = nil
     }
 
     public func clearError() {
