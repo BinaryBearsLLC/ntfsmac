@@ -20,6 +20,7 @@ private let sampleDrive = Drive(identifier: "disk4s2", fsType: "ntfs", label: "M
 
 private final class FakeHelper: HelperMounting, MountSnapshotProviding {
     var mountResult: Result<CommandResult, Error> = .success(CommandResult(output: "mounted", exitCode: 0))
+    var unmountFailureDevices: Set<String> = []
     private var mounted: [String: ObservedMount] = [:]
     func mount(device: String, driver: FsDriver, mountPoint: String?, readOnly: Bool) async throws -> CommandResult {
         let result = try mountResult.get()
@@ -34,6 +35,9 @@ private final class FakeHelper: HelperMounting, MountSnapshotProviding {
         return result
     }
     func unmount(target: String) async throws -> CommandResult {
+        if unmountFailureDevices.contains(target) {
+            return CommandResult(output: "device busy", exitCode: 1)
+        }
         mounted.removeValue(forKey: target)
         return CommandResult(output: "", exitCode: 0)
     }
@@ -181,7 +185,31 @@ private func renderPopover(
     #expect(appState.state == .mountedReadWrite)
 
     let size = renderPopover(appState: appState, mountController: controller, helperInstaller: helperInstaller, cliInstallChecker: cliInstallChecker)
-    #expect(size != nil, "multi-mount popover (two mounted rows, each with Unmount) must render a non-empty image")
+    #expect(size != nil, "multi-mount popover (two Open/Unmount rows plus Eject All) must render a non-empty image")
+}
+
+@MainActor @Test func ejectAllPartialResultRendersWithoutHidingFailedDrive() async throws {
+    let (helperInstaller, cliInstallChecker, cleanup) = try await makeInstalledDependencies()
+    defer { cleanup() }
+    let appState = AppState()
+    let helper = FakeHelper()
+    let controller = MountController(helper: helper, appState: appState)
+    await controller.mount(sampleDrive)
+    await controller.mount(Drive(identifier: "disk5s1", fsType: "ext4", label: "ExtVol", size: "32.0 GB"))
+    helper.unmountFailureDevices = ["disk4s2"]
+
+    await controller.ejectAll()
+
+    #expect(controller.mountedDriveIDs == Set(["disk4s2"]))
+    #expect(controller.lastEjectAllReport?.results.count == 2)
+    #expect(controller.lastEjectAllReport?.results.first?.status == .helperFailed)
+    let size = renderPopover(
+        appState: appState,
+        mountController: controller,
+        helperInstaller: helperInstaller,
+        cliInstallChecker: cliInstallChecker
+    )
+    #expect(size != nil, "partial Eject All report and the failed drive's recovery row must both render")
 }
 
 @MainActor @Test func mountedReadOnlyStateRendersWithoutCollapsing() async throws {

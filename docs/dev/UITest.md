@@ -139,6 +139,14 @@ is installed"), built a real, tested pipeline:
 
 Light/dark appearance toggle still not walked for any state — deferred, not done this session (budget).
 
+The 2026-08-12 audit-harness update restores these simulated mount states after authoritative P0
+mount reconciliation made the older optimistic fake insufficient. The explicit environment-only
+demo can now publish paired host/runtime snapshots for two drives, bypass helper installation for
+screen inspection without touching a real service, and inject one per-drive Eject All failure via
+`NTFSMAC_UI_DEMO=eject-failure`. This is an audit capability, not packaged validation evidence;
+the current manual gate remains in
+[`../testing/BINARYBEARS_MANUAL_ACCEPTANCE_2026-08-12.md`](../testing/BINARYBEARS_MANUAL_ACCEPTANCE_2026-08-12.md).
+
 ## Live GUI audit session (2026-07-12, this pass)
 
 Full live walkthrough using `DemoScaffold` (`NTFSMAC_UI_DEMO`/`NTFSMAC_INSTALL_DEMO` env seams,

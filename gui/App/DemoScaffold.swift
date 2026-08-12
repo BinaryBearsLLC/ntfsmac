@@ -9,7 +9,7 @@ import NtfsmacGUI
 /// (not stripped before commit) so the next screen audit doesn't have to be re-derived from
 /// scratch — see UITest.md.
 ///
-/// `NTFSMAC_UI_DEMO=clean|dirty|error dist/ntfsmac.app/Contents/MacOS/ntfsmac-gui`
+/// `NTFSMAC_UI_DEMO=clean|dirty|error|eject-failure dist/ntfsmac.app/Contents/MacOS/ntfsmac-gui`
 @MainActor
 enum DemoScaffold {
     static func mountController(
@@ -17,9 +17,15 @@ enum DemoScaffold {
         appState: AppState,
         notifier: any MountEventNotifying = NullMountEventNotifier()
     ) -> MountController {
-        MountController(
-            helper: DemoHelperMounting(shouldFail: mode == "error"),
+        let runtime = DemoHelperMounting(
+            mountShouldFail: mode == "error",
+            unmountFailureDevice: mode == "eject-failure" ? "disk4s2" : nil,
+            stillReadOnly: mode == "dirty"
+        )
+        return MountController(
+            helper: runtime,
             readOnlyChecker: DemoReadOnlyChecker(stillReadOnly: mode == "dirty"),
+            snapshotProvider: runtime,
             notifier: notifier,
             appState: appState
         )
@@ -30,7 +36,7 @@ enum DemoScaffold {
         notifier: any MountEventNotifying = NullMountEventNotifier()
     ) -> RemountController {
         RemountController(
-            helper: DemoHelperMounting(shouldFail: false),
+            helper: DemoHelperMounting(),
             readOnlyChecker: DemoReadOnlyChecker(stillReadOnly: false),
             notifier: notifier,
             appState: appState
@@ -44,12 +50,15 @@ enum DemoScaffold {
     /// Separate from `NTFSMAC_UI_DEMO`: install-outcome and mount-state are orthogonal axes, and
     /// unlike mounting, `HelperInstaller`'s real path is a one-shot OS auth dialog — faking
     /// denied/failed here avoids clicking "Cancel" on a real `SMJobBless` prompt repeatedly during
-    /// a screen audit. `NTFSMAC_INSTALL_DEMO=denied|failed` (a real accept must still go through
-    /// `RealHelperInstallService` — this seam never fakes `.installed`).
+    /// a screen audit. `NTFSMAC_INSTALL_DEMO=installed|denied|failed`; the explicit `installed`
+    /// mode is only a screen-audit bypass and never touches a real helper registration.
     static func helperInstaller(outcome: String) -> HelperInstaller {
-        let result: HelperInstallOutcome = outcome == "failed"
-            ? .failed("demo: SMJobBless failed (fake)")
-            : .denied("demo: Authorization was denied (fake)")
+        let result: HelperInstallOutcome
+        switch outcome {
+        case "installed": result = .installed
+        case "failed": result = .failed("demo: SMJobBless failed (fake)")
+        default: result = .denied("demo: Authorization was denied (fake)")
+        }
         return HelperInstaller(service: DemoHelperInstallService(outcome: result))
     }
 }
@@ -63,21 +72,60 @@ private struct DemoHelperInstallService: HelperInstallService {
 private struct DemoCommandRunner: PrivilegedCommandRunning {
     func run(_ path: String, _ args: [String]) -> CommandResult {
         CommandResult(
-            output: "   1:                  GUID_partition_scheme                        *1.0 TB     disk4\n   2:  Microsoft Basic Data      DEMO-DRIVE               500.0 GB   disk4s2\n",
+            output: "   1:                  GUID_partition_scheme                        *1.0 TB     disk4\n   2:  Microsoft Basic Data      DEMO-DRIVE               500.0 GB   disk4s2\n   1:                  GUID_partition_scheme                       *64.0 GB     disk5\n   2:  Microsoft Basic Data      DEMO-SECOND               32.0 GB   disk5s1\n",
             exitCode: 0
         )
     }
     func runPipingStdin(_ input: String, to path: String, _ args: [String]) -> CommandResult { CommandResult(output: "", exitCode: 0) }
 }
 
-private struct DemoHelperMounting: HelperMounting {
-    let shouldFail: Bool
+@MainActor
+private final class DemoHelperMounting: HelperMounting, MountSnapshotProviding {
+    private let mountShouldFail: Bool
+    private let unmountFailureDevice: String?
+    private let stillReadOnly: Bool
+    private var mounts: [String: ObservedMount] = [:]
+
+    init(
+        mountShouldFail: Bool = false,
+        unmountFailureDevice: String? = nil,
+        stillReadOnly: Bool = false
+    ) {
+        self.mountShouldFail = mountShouldFail
+        self.unmountFailureDevice = unmountFailureDevice
+        self.stillReadOnly = stillReadOnly
+    }
+
     func mount(device: String, driver: FsDriver, mountPoint: String?, readOnly: Bool) async throws -> CommandResult {
         try? await Task.sleep(for: .seconds(1))
-        if shouldFail { return CommandResult(output: "demo: mount failed (fake ntfs-3g exit)", exitCode: 1) }
-        return CommandResult(output: "mounted", exitCode: 0)
+        if mountShouldFail {
+            return CommandResult(output: "demo: mount failed (fake ntfs-3g exit)", exitCode: 1)
+        }
+        let label = device == "disk4s2" ? "DEMO-DRIVE" : "DEMO-SECOND"
+        let resolvedMountPoint = mountPoint ?? "/Volumes/\(label)"
+        mounts[device] = ObservedMount(
+            deviceIdentifier: device,
+            mountPoint: resolvedMountPoint,
+            fsDriver: driver.rawValue,
+            isReadOnly: readOnly || stillReadOnly
+        )
+        return CommandResult(
+            output: "/dev/\(device) was mounted as \(resolvedMountPoint)",
+            exitCode: 0
+        )
     }
-    func unmount(target: String) async throws -> CommandResult { CommandResult(output: "unmounted", exitCode: 0) }
+
+    func unmount(target: String) async throws -> CommandResult {
+        if target == unmountFailureDevice {
+            return CommandResult(output: "demo: device busy", exitCode: 1)
+        }
+        mounts.removeValue(forKey: target)
+        return CommandResult(output: "unmounted", exitCode: 0)
+    }
+
+    func snapshot() async -> MountSnapshot {
+        MountSnapshot(mounts: mounts.values.sorted { $0.deviceIdentifier < $1.deviceIdentifier })
+    }
 }
 
 private struct DemoReadOnlyChecker: MountReadOnlyChecking {
