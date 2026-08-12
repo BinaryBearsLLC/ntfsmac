@@ -8,7 +8,7 @@
 
 This is the canonical product roadmap for the BinaryBears fork. It replaces the older practice
 of treating implementation plans, test-session notes, and private scratch files as a current
-feature list. The code status below was reconciled on 2026-08-11 against `upstream/main` at
+feature list. The code status below was reconciled on 2026-08-12 against `upstream/main` at
 `0725c31` (`v2.1.090826`) and the BinaryBears live-security completion at `762cc91`.
 The original live hardware findings from 2026-08-06 are recorded in
 [Live Mount-State and NFS Transport Audit — 2026-08-06](audits/LIVE_MOUNT_STATE_AND_NFS_TRANSPORT_AUDIT_2026-08-06.md)
@@ -97,13 +97,18 @@ branches does not imply that they were pushed, opened as pull requests, or accep
 
 ### Foundations that are not complete product features
 
-- [-] **NTFS3:** CLI parsing, helper/XPC transport, and command construction exist and are tested;
-  there is no GUI choice and no recorded BinaryBears NTFS3 hardware qualification yet.
+- [-] **NTFS3:** CLI parsing, helper/XPC transport, one-mount GUI opt-in, preflight guidance, and
+  privacy-safe result diagnostics exist and are tested; BinaryBears hardware qualification is
+  still a release gate.
 - [-] **Security hardening:** per-session PF/route enforcement is integrated into CLI and GUI
   mount/unmount paths with measured reason-coded state. The Option-A transaction observes the
   new vmnet `/30`, applies the exact route and PF policy before anylinuxfs performs its NFS
-  reachability check, then publishes success only after the final soft-NFS proof. GUI telemetry
-  is the next roadmap unit.
+  reachability check, then publishes success only after the final soft-NFS proof. CLI text/JSON
+  and the compact GUI use the same fixed states and privacy-safe reasons; the remaining real-
+  hardware matrix is still required.
+- [-] **Verified Copy:** the CLI owns copy-to-partial, flush, reread, deterministic SHA-256
+  verification, and same-filesystem publication. A GUI copy workflow and post-reconnect media
+  qualification remain separate work.
 - [-] **Open in Finder:** the tested `FinderOpener` implementation exists, but the current
   multi-drive popover does not expose a corresponding control.
 - [-] **Transfer telemetry:** the sampling subsystem and tests remain in the codebase, but the
@@ -272,12 +277,16 @@ the remaining VPN-off and concurrent-drive hardware cells remain required before
 
 #### 4. Complete evidence-backed SECURITY UI
 
-- [ ] Replace generic promises with narrowly measured labels such as **Private VM link**,
+- [x] Replace generic promises with narrowly measured labels such as **Private VM link**,
   **VPN-safe route**, and **PF policy enforced**.
 - [x] Add the requested **Hide** action without changing mount or helper state.
-- [ ] Feed the same state and privacy-safe reason codes to CLI text, CLI JSON, and GUI diagnostics.
-- [ ] Test mounted/unmounted, VPN on/off, multiple mounts, missing tools, stale state, malformed
+- [x] Feed the same state and privacy-safe reason codes to CLI text, CLI JSON, and GUI diagnostics.
+- [-] Test mounted/unmounted, VPN on/off, multiple mounts, missing tools, stale state, malformed
   output, helper reconnect, and teardown. No missing result may become a green check.
+
+The automated state/parser/aggregation suite covers idle, enforced, non-enforced, missing,
+malformed, stale, VPN-captured, teardown, and concurrent-session behavior. VPN-off/on,
+helper-reconnect, and concurrent-drive claims still need the packaged real-hardware matrix.
 
 ### P1 — Verifiable copying and controlled NTFS3 adoption
 
@@ -287,17 +296,23 @@ Finder and third-party applications write to the exported NFS volume directly, s
 reliably intercept every ordinary copy. A trustworthy integrity feature must own the copy or be
 described only as a later verification, not as transparent protection for all Finder operations.
 
-- [ ] Add `ntfsmac copy --verify <source> <destination>` using streaming SHA-256.
-- [ ] Copy to a temporary destination, flush it, reread the destination, compare type/size/hash,
+- [x] Add `ntfsmac copy --verify <source> <destination>` using streaming SHA-256.
+- [x] Copy to a temporary destination, flush it, reread the destination, compare type/size/hash,
   then rename atomically where the destination filesystem supports it.
-- [ ] Add `ntfsmac verify <source> <destination>` for an existing file or directory tree.
-- [ ] For directories, generate a deterministic manifest of relative path, entry type, size, and
+- [x] Add `ntfsmac verify <source> <destination>` for an existing file or directory tree.
+- [x] For directories, generate a deterministic manifest of relative path, entry type, size, and
   SHA-256; define explicit symlink and metadata behavior.
-- [ ] Preserve the source and keep a failed temporary destination clearly recoverable; never
+- [x] Preserve the source and keep a failed temporary destination clearly recoverable; never
   delete the source automatically.
 - [ ] Add a GUI **Verified Copy** flow only after the CLI/core behavior is complete.
-- [ ] State the limit honestly: a successful comparison validates the bytes read at that time; it
+- [x] State the limit honestly: a successful comparison validates the bytes read at that time; it
   cannot guarantee against later media failure or preserve every platform-specific metadata field.
+
+The destination must not exist. The CLI copies to a hidden partial directory beside the final
+name, calls `sync`, rereads source and destination into sorted manifests, and only then renames the
+payload into place. Regular-file bytes and sizes, directory entry types, and symlink target text
+are verified; permissions, ownership, ACLs, extended attributes, resource forks, timestamps,
+hard-link relationships, and sparse allocation are explicitly outside this integrity contract.
 
 ##### Media-copy integrity investigation
 
@@ -349,11 +364,11 @@ ntfsmac mount --fs-driver ntfs3 disk4s1
 - [x] Validate CLI values and translate NTFS3 to anylinuxfs `-t ntfs3`, never an inert mount
   option token.
 - [x] Carry the driver choice through the helper/XPC request.
-- [ ] Add preflight guidance: disable Windows Fast Startup, fully shut down Windows, and repair
+- [x] Add preflight guidance: disable Windows Fast Startup, fully shut down Windows, and repair
   filesystem errors with Windows `chkdsk`. Never recommend `ntfsfix` as a substitute repair.
-- [ ] Add explicit **Experimental** labeling, compatibility differences, and a one-mount driver
+- [x] Add explicit **Experimental** labeling, compatibility differences, and a one-mount driver
   choice in the GUI; no silent fallback between drivers.
-- [ ] Record the selected driver and privacy-safe failure category in diagnostics.
+- [x] Record the selected driver and privacy-safe failure category in diagnostics.
 - [ ] Compare `ntfs-3g` and NTFS3 with the same devices, data set, and Verified Copy manifest.
 
 **Decision A/B**
@@ -432,8 +447,8 @@ that proposal independently from current `upstream/main`.
 | 6 | Security telemetry and Hide | `feat/security-status-ui` | CLI/JSON/GUI parity; no-false-green matrix |
 | 7 | Verified Copy core/CLI | `feat/verified-copy-cli` | Failure injection and SHA-256 fixture matrix |
 | 8 | Verified Copy GUI | `feat/verified-copy-gui` | Packaged-app UI and cancellation tests |
-| 9 | NTFS3 hardware qualification | `test/ntfs3-qualification` | Both-driver hardware report and manifests |
-| 10 | Experimental NTFS3 GUI choice | `feat/ntfs3-driver-choice` | Preflight, diagnostics, rollback/error tests |
+| 9 | Experimental NTFS3 GUI choice | `feat/ntfs3-driver-choice` | Preflight, diagnostics, and explicit no-fallback/error tests |
+| 10 | NTFS3 hardware qualification | `test/ntfs3-qualification` | Both-driver hardware report and manifests |
 | 11 | SMAppService migration | `refactor/smappservice-helper` | Clean/upgrade/uninstall matrix on supported macOS |
 | 12 | Remaining focused UX items | one branch per item | Automated tests plus packaged-app validation |
 

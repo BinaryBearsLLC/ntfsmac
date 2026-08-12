@@ -15,8 +15,10 @@
 
 ## App shape
 
-Menu-bar agent → click icon → popover. Settings is a page inside that same popover; the only
-separate system UI is the first-run helper authorization prompt.
+Menu-bar agent → click icon or run `ntfsmac opengui` → popover. Settings is a page inside that
+same popover; the only separate system UI is the first-run helper authorization prompt. The CLI
+uses a registered URL event handled by the app's thin AppKit status-item shell, with no simulated
+mouse click or Accessibility permission.
 
 ### Menu-bar icon states
 
@@ -47,12 +49,13 @@ This table describes the current integrated GUI, not the original aspirational p
 | Shipped | Diagnose summary, inline Hide, and Command-click privacy-safe JSON export |
 | Shipped | First-run helper/CLI staging, helper reinstall, and confirmed complete uninstall |
 | Shipped | In-popover Settings with Back, canonical version/build, Launch at login, contextual help, and adaptive menu-bar icon |
-| Partial | Three SECURITY rows render honestly as `unknown` and provide Hide/Show; the live PF/route transaction is implemented, but its reason-coded evidence is not wired into these rows yet |
+| Shipped — matrix incomplete | Three compact SECURITY rows consume the live transaction's fixed states/reasons and provide Hide/Show. Missing, malformed, or unavailable evidence fails closed to `unknown`; the remaining packaged hardware matrix is tracked in the roadmap. |
 | Partial | `FinderOpener` is implemented and tested, but no current multi-drive row exposes Open in Finder |
 | Partial | `ThroughputMonitor` and `SpeedBar` exist, but transfer speed is not presented by the current multi-drive UI |
-| Partial | NTFS3 is supported by CLI/helper internals, but has no GUI choice or completed hardware qualification |
+| Shipped — qualification incomplete | NTFS3 has an explicit one-mount menu choice, Experimental warning/preflight, no silent fallback, and privacy-safe driver/result diagnostics; hardware qualification remains open. |
 | Implemented — matrix incomplete | Live mount-state reconciliation pairs anylinuxfs session evidence with the host NFS mount table, polls every five seconds, refreshes on lifecycle actions, and fails closed to yellow/unknown on disagreement. GUI unmount and external NFS/Finder disconnect passed on one packaged device; the remaining matrix is tracked in the 2026-08-11 audit. |
-| Planned | Verified Copy, evidence-backed SECURITY state, notifications, and Eject All |
+| Partial | Verified Copy core/CLI owns copy, reread, SHA-256 verification, and failure recovery; a GUI flow remains planned. |
+| Planned | Notifications and Eject All |
 
 ---
 
@@ -63,6 +66,7 @@ This table describes the current integrated GUI, not the original aspirational p
 | Control | Action | Enabled when |
 |---------|--------|--------------|
 | Drive row `[Mount]` | Mount that drive r/w via XPC helper | A compatible drive is detected |
+| Drive row `…` → `NTFS3 (Experimental)…` | Show preflight, then opt this NTFS mount into NTFS3 once | An unmounted NTFS drive is detected |
 | Refresh (↻) | Re-scan drives now | Always |
 | `Diagnose` | Run CLI diagnostic, show summary | Always |
 | `⌘`-click `Diagnose` | Run the same read-only diagnostic and save its JSON for developer support | Always |
@@ -76,7 +80,7 @@ This table describes the current integrated GUI, not the original aspirational p
 | Per-drive `Unmount` | Safely unmount that drive | That drive is mounted |
 | Other-device `Mount` | Mount another compatible partition | Another compatible drive is detected |
 | Refresh (↻) | Re-scan drives and reconcile mounted rows against host truth | Always |
-| SECURITY rows | Display current state; currently `unknown` because transaction evidence is not yet wired into the GUI rows | One or more drives mounted |
+| SECURITY rows | Display measured private-link, VPN-route, and PF-policy states/reasons; fail closed to `unknown` | One or more drives mounted |
 | SECURITY `Hide` / `Show` | Collapse or restore only the SECURITY presentation | One or more drives mounted |
 | ⚙ / `Quit` | As above | Always |
 
@@ -185,14 +189,13 @@ The diagnostic panel renders the same privacy-safe schema exported by Command-cl
 release/build, macOS and architecture, helper presence, fixed runtime component failures,
 expected and detected host-runtime versions, audited source commits, the approved Alpine
 tag/digest, selected cache state, installed Alpine and guest-package versions, kernel/bridge
-state, a yes/no VPN tunnel signal, and the active NFS mount count. It never displays
+state, the selected filesystem driver and fixed failure category, measured security reasons, a
+yes/no VPN tunnel signal, and the active NFS mount count. It never displays
 or exports usernames, serials, volume/device identity, local paths, VPN identity, addresses, DNS,
 or routes.
 
 ### Planned controls
 
-- **Experimental NTFS3 driver choice** — one-mount opt-in with explicit compatibility warnings,
-  shipped only after the roadmap hardware gate passes.
 - **Verified Copy** — app-managed, SHA-256-verified copy after the CLI/core contract is stable.
 - **Open in Finder** — per mounted drive, using the existing tested opener.
 - **Notifications and Eject All** — focused follow-up work with per-drive results.

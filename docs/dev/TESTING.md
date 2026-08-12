@@ -22,22 +22,23 @@ unit in PLAN.md's §6 list ever assembled them.
 Now: `gui/Views/PopoverContentView.swift` composes all of it, driven by `AppState`, and
 `NtfsmacApp.swift` instantiates the real controllers (`DriveScanner`, `MountController`,
 `ThroughputMonitor`, `RemountController`, `DiagnoseRunner`, `HelperInstaller`, `Settings`) and
-wires them in — reviewed (`ecc:swift-reviewer`, approve), 77/77 tests still green. So:
+wires them in; the current full Swift suite remains the authoritative regression gate. So:
 
 - The popover now shows the first-run helper-install prompt until the XPC helper is installed,
-  then the real multi-drive list, mount/unmount buttons, dirty-RO banner, three SECURITY
-  indicators (currently `unknown` because Phase 1 state is not surfaced), Diagnose panel,
-  Refresh, and Quit.
+  then the real multi-drive list, mount/unmount buttons, dirty-RO banner, three measured SECURITY
+  indicators (fail-closed to `unknown` when the public transaction summary is unavailable),
+  Diagnose panel, Refresh, and Quit.
 - The gear button replaces the current popover content with the in-popover Settings page. `Back`
   returns to the previous app content; no separate Preferences `NSWindow` or private selector is
   used.
 
-**Known, deliberately tracked limitations that remain:** the current GUI mount button uses
-`ntfs-3g` read/write by default; NTFS3 has no GUI control. Open in Finder and transfer telemetry
-have tested implementation foundations but are not exposed by the current multi-drive popover.
-SECURITY indicators stay `unknown` until the live mount transaction publishes measured PF/route
-state. These items belong to the canonical roadmap rather than being reported as regressions in
-an ordinary current-build pass.
+**Known, deliberately tracked limitations that remain:** the primary GUI mount button uses
+`ntfs-3g` read/write by default; a compact menu offers NTFS3 for one explicitly warned
+Experimental mount, but its hardware qualification is still open. Verified Copy is currently a
+CLI/core workflow, not a GUI flow. Open in Finder and transfer telemetry have tested
+implementation foundations but are not exposed by the current multi-drive popover. SECURITY
+indicators consume the live mount transaction's fixed PF/route state and reasons, but the remaining
+packaged VPN/concurrent-device matrix is still a release gate.
 
 ---
 
@@ -192,6 +193,27 @@ which case it should land read-only — see "force a dirty-journal test" below i
 verify that path specifically), the write/read/remove round-trips, `diagnose --json` reports
 `"healthy": true`, and unmount is clean.
 
+### Verified Copy — disposable-data check
+
+With the test volume mounted, keep the source and destination distinct and use a new destination
+name; the command deliberately refuses overwrite:
+
+```bash
+verified_copy_fixture="$(mktemp -d)"
+printf 'BinaryBears verified copy fixture\n' > "$verified_copy_fixture/source.txt"
+/usr/local/ntfsmac/bin/ntfsmac copy --verify \
+  "$verified_copy_fixture/source.txt" "/Volumes/<label>/ntfsmac-verified-copy-test.txt"
+/usr/local/ntfsmac/bin/ntfsmac verify \
+  "$verified_copy_fixture/source.txt" "/Volumes/<label>/ntfsmac-verified-copy-test.txt"
+```
+
+Expected: the copy reports that its SHA-256 manifest matched and publishes the final destination
+only afterward. Change the destination bytes and confirm `verify` exits non-zero. For release
+evidence, safely unmount, physically reconnect, and run `verify` again so the destination reread
+crosses a real media cycle. A match validates bytes read at that time; permissions, ownership,
+ACLs, extended attributes, resource forks, timestamps, hard links, sparse allocation, and future
+media health are outside the contract. Remove only the named disposable fixture when finished.
+
 ### P0 gate — mount truth and private NFS transport
 
 Run this against the packaged candidate while the NTFS drive is mounted:
@@ -202,7 +224,7 @@ Run this against the packaged candidate while the NTFS drive is mounted:
 sudo ./tests/live/verify-security-transaction.sh
 ```
 
-Diagnostic schema 5 must report `"network_helper": "vmnet"` and
+Diagnostic schema 6 must report `"network_helper": "vmnet"` and
 `"nfs_transport_contract": "expected_vmnet"`. The live gate must pass; it independently rejects
 gvproxy, a loopback port-2049 listener, an endpoint outside the anylinuxfs vmnet pool, a route that
 does not use the private bridge, or an NFS mount without `soft`. Its output is privacy-safe and
@@ -359,18 +381,24 @@ error: external macro implementation type 'SwiftUIMacros.StateMacro' could not b
 Confirms the CLT-only diagnosis. Not an ntfsmac code bug; select full Xcode per the prerequisite
 above and re-run.
 
-1. Click the menu-bar icon. If the privileged helper isn't installed yet, you'll get a real
+1. Click the menu-bar icon, then close it and run `ntfsmac opengui`; both actions must reveal the
+   same popover without Accessibility permission or a simulated click. If the privileged helper
+   isn't installed yet, you'll get a real
    `SMJobBless` auth prompt (admin password) — approve it. The packaged app then stages its
    bundled CLI/runtime through the helper; no separate Homebrew or manual CLI install is required
    for this GUI pass.
 2. Popover should show your drive in the list (the same filtered `anylinuxfs list` data Part A's
-   `list` command showed, including MBR `Windows_NTFS`). Click `[Mount]`.
+   `list` command showed, including MBR `Windows_NTFS`). Click `[Mount]` and confirm the default
+   is still `ntfs-3g`. In a separate disposable-data run, open the adjacent compact menu, select
+   `NTFS3 (Experimental)…`, verify the Windows shutdown/Fast Startup/`chkdsk` preflight, and
+   confirm diagnostics record `ntfs3` with no silent fallback.
    If Full Disk Access is required, macOS lists the component as
    `com.khr898.ntfsmac.helper`; this is the technical service name of **ntfsmac Helper**, not an
    unrelated package. Enable that exact entry, return to ntfsmac, and retry the mount.
 3. Icon should pulse blue while mounting, then turn green with the drive shown as mounted, a
-   per-drive Unmount action, and three neutral/unknown SECURITY indicators. Do not expect a speed
-   row or Open in Finder control in the current UI.
+   per-drive Unmount action, and measured **Private VM link**, **VPN-safe route**, and **PF policy
+   enforced** rows. Their state/reason codes must match CLI diagnostics; unavailable or malformed
+   evidence must stay unknown/non-green. Do not expect a speed row or Open in Finder control.
 4. Click `Diagnose` in the footer — the panel should match Part A's `diagnose --json` output in
    plain language. Hide and reopen it to confirm a fresh run still works.
 5. Hold Command (⌘) and click `Diagnose`. The same diagnostic summary should run, followed by a
@@ -415,12 +443,13 @@ around it with a local build cache:
 swift test --build-path /tmp/ntfsmac-build
 ```
 
-Expect `Test run with 77 tests in 0 suites passed`.
+Expect `Test run with 230 tests in 3 suites passed` for this roadmap-completion branch.
 
 ```bash
 tests/run-all.sh   # full bats suite: lock/preflight/submodule/audit/fetch-prebuilt/gvproxy/
                     # rootfs/build-all/verify-vendor/pf-rules/route-guard/teardown/
-                    # validate-device/mount/fs-driver/unmount/diagnose/install/signing/formula
+                    # security-status/validate-device/mount/fs-driver/mount-diagnostics/unmount/
+                    # verified-copy/opengui/diagnose/install/signing/formula
 ```
 
 ---

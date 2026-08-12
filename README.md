@@ -49,7 +49,7 @@ The same microVM path supports ext2, ext3, and ext4. The guest kernel handles th
 | --- | --- |
 | Mac | Apple Silicon (`arm64`) only |
 | macOS | 13.0 Ventura or newer |
-| Filesystems | NTFS (`ntfs-3g` default; NTFS3 experimental CLI opt-in), ext2, ext3, ext4 |
+| Filesystems | NTFS (`ntfs-3g` default; NTFS3 explicit experimental opt-in), ext2, ext3, ext4 |
 | Distribution | Ad-hoc signed; not notarized |
 
 ## BinaryBears improvements
@@ -60,10 +60,10 @@ The BinaryBears fork builds on the original project with a more complete, verifi
 | --- | --- |
 | UI and UX | Settings live inside the menu-bar popover; the icon adapts correctly to the menu bar; contextual tooltips clarify actions; Diagnose and SECURITY have presentation-only **Hide** controls; the app prevents duplicate instances; version and build appear directly in Settings. |
 | Drive handling | NTFS detection also recognizes MBR `Windows_NTFS` volumes; ext2/3/4 are supported through the shared mount path; multiple drives can be mounted concurrently with per-drive status. |
-| Diagnostics | Text and JSON reports use the same canonical fields; **Command-click Diagnose** opens a save panel for the same developer-oriented JSON report. It identifies expected and detected host-runtime versions, audited source commits, the installed Alpine/cache version and guest `ntfs-3g`/`nfs-utils` packages, plus app/build, system, helper, kernel, mount health, and a privacy-safe vmnet transport-contract result. |
+| Diagnostics | Text and JSON reports use the same canonical fields; **Command-click Diagnose** opens a save panel for the same developer-oriented JSON report. It identifies expected and detected host-runtime versions, audited source commits, the installed Alpine/cache version and guest `ntfs-3g`/`nfs-utils` packages, app/build, system, helper, kernel and mount health, the selected filesystem driver/failure category, and measured privacy-safe security/transport results. |
 | Helper lifecycle | Friendlier Full Disk Access guidance; a lazy XPC connection avoids stale startup state; helper reinstall and confirmed uninstall stay inside the popover and report success or actionable failure. |
 | Build and release | The interactive [`build.command`](build.command) verifies prerequisites, builds CLI and/or GUI, runs relevant tests, packages artifacts under `dist/`, and validates bundle structure, architecture, and ad-hoc signatures. |
-| Security honesty | SECURITY indicators never manufacture a green success state. Until live evidence is wired, the UI displays **unknown** rather than claiming a protection is active. |
+| Security honesty | **Private VM link**, **VPN-safe route**, and **PF policy enforced** consume the same measured fixed states and reason codes as CLI diagnostics. Missing or malformed evidence remains **unknown**, never green. |
 
 ## Screenshots
 
@@ -85,7 +85,9 @@ The BinaryBears fork builds on the original project with a more complete, verifi
 </div>
 
 > [!NOTE]
-> The question marks in the mounted-drive screenshot are intentional. The current build does not yet collect live evidence for those three SECURITY rows, so it reports `unknown` instead of showing a misleading checkmark. Evidence-backed checks are part of the [roadmap](#roadmap).
+> The question marks in this earlier mounted-drive screenshot are intentional fail-closed states.
+> Current builds replace them only when the privileged mount transaction publishes valid measured
+> evidence; absent or malformed evidence still remains `unknown`, never green.
 
 ## Quick start
 
@@ -126,8 +128,11 @@ Visit the [upstream releases](https://github.com/khr898/ntfsmac/releases) for up
 ```sh
 ntfsmac mount <disk identifier>       # for example: disk4s1
 ntfsmac unmount <disk identifier>
+ntfsmac copy --verify <source> <dest> # owned copy, reread, SHA-256 manifest verification
+ntfsmac verify <source> <destination> # verify an existing file, tree, or symlink
 ntfsmac diagnose                      # human-readable, read-only report
 ntfsmac diagnose --json               # privacy-safe structured report
+ntfsmac opengui                       # launch/reveal the menu-bar popover
 ntfsmac uninstall                     # remove CLI/runtime/helper components
 ntfsmac help
 ```
@@ -144,8 +149,15 @@ ntfsmac mount --fs-driver ntfs3 disk4s1
 faster, but it refuses some dirty, hibernated, or Windows Fast Startup volumes and has other
 documented tradeoffs. Read the
 [pinned anylinuxfs NTFS notes](https://github.com/nohajc/anylinuxfs/blob/8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3/docs/important-notes.md#ntfs)
-before using it. The BinaryBears fork has not yet completed its NTFS3 hardware qualification, and
-the current GUI deliberately does not present this choice.
+before using it. The GUI keeps the normal **Mount** button on `ntfs-3g`; an adjacent compact menu
+offers **NTFS3 (Experimental)** for that mount only after displaying the Windows shutdown,
+Fast Startup, and `chkdsk` preflight. There is no automatic fallback. The BinaryBears fork has not
+yet completed its NTFS3 hardware qualification.
+
+Verified Copy publishes a destination only after a flush, reread, and deterministic SHA-256
+manifest match. It refuses implicit overwrite and retains a recoverable partial destination after
+failure. The match validates the bytes read at that time; it does not guarantee against later
+media failure or verify every macOS metadata field. A Finder copy is not implicitly verified.
 
 ### Developer diagnostics from the GUI
 
@@ -194,6 +206,8 @@ Mount, unmount, packet-filter, and route operations initiated by the GUI go thro
   Alpine tag is verified against its arm64 digest, and both packaged runtime binaries must contain
   the immutable digest-only pull reference.
 - SECURITY indicators use an explicit `unknown` state and never equate missing data with enforcement.
+  Their public status file contains fixed aggregate states/reasons only; session details stay in
+  root-only records.
 
 The project is currently ad-hoc signed (`codesign -s -`) and is not notarized. macOS may therefore require the user to approve the app and its helper. Review [SECURITY.md](SECURITY.md) before installation or vulnerability reporting.
 
@@ -230,8 +244,8 @@ developed from `dev` and reviewed back into `dev` through its own focused branch
 | Priority | Status | Direction |
 | --- | --- | --- |
 | Completed foundation | ✅ Shipped | Multi-drive NTFS/ext support, MBR detection, in-popover Settings, adaptive icon and help, privacy-safe CLI/GUI diagnostics, version reporting, and helper reinstall/uninstall lifecycle |
-| P0 | 🟡 Partial | Runtime pinning, audited updates, authoritative mount reconciliation, and the per-session PF/VPN transaction are implemented; SECURITY UI telemetry and the remaining hardware matrix stay open |
-| P1 | 🟡 Foundation exists | Add SHA-256 Verified Copy, qualify NTFS3 on real hardware, then expose it only as an explicit experimental driver choice |
+| P0 | 🟡 Software complete; hardware gate open | Runtime pinning, audited updates, mount reconciliation, per-session PF/VPN transaction, and measured SECURITY telemetry are implemented; the remaining packaged hardware matrix stays open |
+| P1 | 🟡 Core controls complete; qualification open | Verified Copy core/CLI and the explicit one-mount NTFS3 GUI choice are implemented; Verified Copy GUI and same-device NTFS3 hardware qualification remain open |
 | P2 | ⬜ Planned | Migrate the deprecated privileged-helper lifecycle to `SMAppService` after its ad-hoc-signing and upgrade path are proven |
 | P3 | 🟡 Partial | Wire Open in Finder, decide the future of per-drive transfer telemetry, and add focused notifications/eject-all improvements |
 
