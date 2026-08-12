@@ -10,10 +10,11 @@ private let sampleDrive = Drive(identifier: "disk4s2", fsType: "ntfs", label: "M
 
 private final class FakeWorkspace: WorkspaceOpening {
     private(set) var openedPaths: [String] = []
+    var succeeds = true
     
     func openPathInFinder(_ path: String) -> Bool {
         openedPaths.append(path)
-        return true
+        return succeeds
     }
 }
 
@@ -140,4 +141,20 @@ private final class FakeRunner: PrivilegedCommandRunning {
     opener.open(sampleDrive, state: .error)
 
     #expect(fake.openedPaths.isEmpty)
+}
+
+@MainActor
+@Test func reportsWorkspaceFailureToThePopoverCaller() {
+    let fake = FakeWorkspace()
+    fake.succeeds = false
+    let opener = FinderOpener(workspace: fake, runner: FakeRunner())
+
+    let opened = opener.open(
+        sampleDrive,
+        state: .mountedReadWrite,
+        mountPoint: "/Volumes/My Drive"
+    )
+
+    #expect(!opened)
+    #expect(fake.openedPaths == ["/Volumes/My Drive"])
 }

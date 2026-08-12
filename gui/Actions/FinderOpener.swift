@@ -94,11 +94,12 @@ public final class FinderOpener {
     /// (`MountController.mountedMountPoint`, real as of the `Settings.defaultMountPoint` wiring)
     /// — falls back to the `/Volumes/<label>` heuristic guess below only when `nil` (the user
     /// never customized the default, so anylinuxfs picked its own path under `/Volumes/`).
-    public func open(_ drive: Drive, state: MountState, mountPoint: String? = nil) {
+    @discardableResult
+    public func open(_ drive: Drive, state: MountState, mountPoint: String? = nil) -> Bool {
         NSLog("ntfsmac: FinderOpener.open called for drive: \(drive.identifier) (label: '\(drive.label)'), state: \(state), mountPoint arg: '\(mountPoint ?? "nil")'")
         guard isEnabled(for: state) else {
             NSLog("ntfsmac: FinderOpener.open not enabled for state \(state)")
-            return
+            return false
         }
         
         var path = mountPoint
@@ -127,7 +128,7 @@ public final class FinderOpener {
         
         let finalPath = path ?? Self.mountPoint(for: drive)
         NSLog("ntfsmac: finalPath resolved to: '\(finalPath)'")
-        workspace.openPathInFinder(finalPath)
+        return workspace.openPathInFinder(finalPath)
     }
 
     /// Fallback heuristic for when no real mount point is available (see

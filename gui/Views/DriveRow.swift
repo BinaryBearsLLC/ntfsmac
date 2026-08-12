@@ -20,6 +20,7 @@ public struct DriveRow: View {
     public let isMounted: Bool
     public let isDirty: Bool
     public let onMount: () -> Void
+    public let onOpenInFinder: (() -> Void)?
     public let onUnmount: () -> Void
     public let onMountAnyway: (() -> Void)?
     public let onMountExperimental: (() -> Void)?
@@ -30,6 +31,7 @@ public struct DriveRow: View {
         isMounted: Bool = false,
         isDirty: Bool = false,
         onMount: @escaping () -> Void = {},
+        onOpenInFinder: (() -> Void)? = nil,
         onUnmount: @escaping () -> Void = {},
         onMountAnyway: (() -> Void)? = nil,
         onMountExperimental: (() -> Void)? = nil
@@ -38,6 +40,7 @@ public struct DriveRow: View {
         self.isMounted = isMounted
         self.isDirty = isDirty
         self.onMount = onMount
+        self.onOpenInFinder = onOpenInFinder
         self.onUnmount = onUnmount
         self.onMountAnyway = onMountAnyway
         self.onMountExperimental = onMountExperimental
@@ -74,6 +77,21 @@ public struct DriveRow: View {
 
             if isMounted {
                 HStack(spacing: 6) {
+                    Button {
+                        onOpenInFinder?()
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "folder")
+                                .font(.system(size: 10.5))
+                            Text("Open")
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                    .disabled(onOpenInFinder == nil)
+                    .accessibilityLabel("Open in Finder")
+                    .help(TooltipCopy.text(for: .openInFinder))
+
                     Button {
                         onUnmount()
                     } label: {
@@ -186,6 +204,7 @@ public struct DriveListView: View {
                 isMounted: drive.id == mountedDriveID,
                 isDirty: isDirty && drive.id == mountedDriveID,
                 onMount: { onMount(drive) },
+                onOpenInFinder: nil,
                 onUnmount: { onUnmount(drive) },
                 onMountAnyway: onMountAnyway
             )

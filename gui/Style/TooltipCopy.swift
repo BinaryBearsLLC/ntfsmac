@@ -7,6 +7,7 @@ public enum TooltipCopy {
         case refresh
         case diagnose
         case mount
+        case openInFinder
         case unmount
         case mountReadWriteAnyway
         case hideSecurity
@@ -26,6 +27,8 @@ public enum TooltipCopy {
             "Check runtime components and the private network"
         case .mount:
             "Mount this NTFS drive using the configured defaults"
+        case .openInFinder:
+            "Open this mounted drive in Finder"
         case .unmount:
             "Safely unmount this drive and tear down its private network"
         case .mountReadWriteAnyway:

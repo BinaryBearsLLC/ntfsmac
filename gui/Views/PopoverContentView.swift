@@ -77,6 +77,7 @@ public struct PopoverContentView: View {
     @State private var diagnosePresentation = DiagnosePanelPresentation()
     @State private var securityPresentation = SecurityIndicatorsPresentation()
     @State private var showFDAPrompt = false
+    @State private var finderErrorMessage: String?
 
     public init(
         appState: AppState,
@@ -227,6 +228,16 @@ public struct PopoverContentView: View {
                         drive: entry.drive,
                         isMounted: true,
                         isDirty: entry.isDirty,
+                        onOpenInFinder: entry.isVerified ? {
+                            let opened = finderOpener.open(
+                                entry.drive,
+                                state: finderState(for: entry),
+                                mountPoint: entry.mountPoint
+                            )
+                            finderErrorMessage = opened
+                                ? nil
+                                : "Could not open this mounted drive in Finder"
+                        } : nil,
                         onUnmount: { Task { await mountController.unmount(driveID: entry.id) } },
                         onMountAnyway: { remountController.requestRemount() }
                     )
@@ -317,6 +328,10 @@ public struct PopoverContentView: View {
                 Text(errorMessage).font(.caption).foregroundStyle(Color.ntfsRed)
             }
 
+            if let finderErrorMessage {
+                Text(finderErrorMessage).font(.caption).foregroundStyle(Color.ntfsRed)
+            }
+
             if let warning = mountController.reconciliationWarning {
                 Text(warning).font(.caption).foregroundStyle(Color.ntfsYellow)
             }
@@ -377,6 +392,12 @@ public struct PopoverContentView: View {
     private func ntfs3Action(for drive: Drive) -> (() -> Void)? {
         guard NTFS3PreflightCopy.isAvailable(for: drive.fsType) else { return nil }
         return { mountDrive(drive, driver: .ntfs3) }
+    }
+
+    private func finderState(for entry: MountedDrive) -> MountState {
+        if !entry.isVerified { return .mountedUnknown }
+        if entry.isDirty { return .mountedReadOnlyDirty }
+        return entry.isReadOnly ? .mountedReadOnly : .mountedReadWrite
     }
 
     private func refreshAll() async {
