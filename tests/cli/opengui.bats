@@ -18,7 +18,7 @@ teardown() {
   run "$SCRIPT"
 
   [ "$status" -eq 0 ]
-  [ "$(cat "$NTFSMAC_OPEN_CALLS")" = "-b com.khr898.ntfsmac binarybears-ntfsmac://opengui" ]
+  [ "$(cat "$NTFSMAC_OPEN_CALLS")" = $'-b com.khr898.ntfsmac binarybears-ntfsmac://opengui\n-b com.khr898.ntfsmac binarybears-ntfsmac://opengui\n-b com.khr898.ntfsmac binarybears-ntfsmac://opengui' ]
   [[ "$output" == *"popover requested"* ]]
 }
 
@@ -29,7 +29,7 @@ teardown() {
   run "$SCRIPT"
 
   [ "$status" -eq 0 ]
-  [ "$(cat "$NTFSMAC_OPEN_CALLS")" = "-a $NTFSMAC_GUI_APP_PATH binarybears-ntfsmac://opengui" ]
+  [ "$(cat "$NTFSMAC_OPEN_CALLS")" = $'-a '"$NTFSMAC_GUI_APP_PATH"$' binarybears-ntfsmac://opengui\n-a '"$NTFSMAC_GUI_APP_PATH"$' binarybears-ntfsmac://opengui\n-a '"$NTFSMAC_GUI_APP_PATH"$' binarybears-ntfsmac://opengui' ]
 }
 
 @test "fails clearly when Launch Services cannot find the app" {

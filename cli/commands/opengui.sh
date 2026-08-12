@@ -36,6 +36,7 @@ main() {
   local bundle_id="${NTFSMAC_GUI_BUNDLE_ID:-com.khr898.ntfsmac}"
   local app_path="${NTFSMAC_GUI_APP_PATH:-}"
   local request_url="binarybears-ntfsmac://opengui"
+  local -a request_args
 
   [[ -x "$open_bin" ]] || {
     echo "opengui: macOS open tool is unavailable" >&2
@@ -47,16 +48,34 @@ main() {
       echo "opengui: NTFSMAC_GUI_APP_PATH must name an existing .app bundle" >&2
       return 1
     }
-    "$open_bin" -a "$app_path" "$request_url" || {
-      echo "opengui: unable to launch '$app_path'" >&2
-      return 1
-    }
+    request_args=(-a "$app_path" "$request_url")
   else
-    "$open_bin" -b "$bundle_id" "$request_url" || {
-      echo "opengui: ntfsmac.app is not installed or registered" >&2
-      return 1
-    }
+    request_args=(-b "$bundle_id" "$request_url")
   fi
+
+  "$open_bin" "${request_args[@]}" || {
+    if [[ -n "$app_path" ]]; then
+      echo "opengui: unable to launch '$app_path'" >&2
+    else
+      echo "opengui: ntfsmac.app is not installed or registered" >&2
+    fi
+    return 1
+  }
+
+  # Launch Services can return after creating a cold process but before its Apple-event handler
+  # is ready. Re-sending the same idempotent URL across the first second closes that race without
+  # Accessibility permission, synthetic clicks, or an always-running control socket. A warm app
+  # simply receives the same harmless "show" request more than once.
+  /bin/sleep 0.4
+  "$open_bin" "${request_args[@]}" || {
+    echo "opengui: app launched, but the popover request could not be delivered" >&2
+    return 1
+  }
+  /bin/sleep 0.5
+  "$open_bin" "${request_args[@]}" || {
+    echo "opengui: app launched, but the final popover request could not be delivered" >&2
+    return 1
+  }
 
   echo "opengui: popover requested"
 }
