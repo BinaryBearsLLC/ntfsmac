@@ -167,8 +167,11 @@ then displayed `NFS mounts: None` inside the still-mounted presentation.
 On 2026-08-11 the packaged 2.1 candidate passed GUI mount, GUI unmount, Finder network-share
 disconnect, and a second external NFS unmount while the app remained open. In each teardown the
 host mount, anylinuxfs session, private VM/bridge, exact route, and GUI green state disappeared.
-The app also remained in `mounting` while the helper operation was in flight. CLI→GUI, crash and
-restart recovery, physical-device eject/hot-unplug, and concurrent drives were not exercised.
+The app also remained in `mounting` while the helper operation was in flight. On 2026-08-12 a
+forced GUI-only termination preserved the real mount; `opengui` relaunched one process, recovered
+the authoritative RW/security state, and a normal Unmount left no NFS session, security state file,
+or PF child anchor. CLI→GUI, helper restart, physical-device eject/hot-unplug, and concurrent drives
+remain open.
 
 Acceptance: no UI control, icon, diagnostic row, or CLI output may claim a drive is mounted or
 writable after the corresponding host mount disappears. A CLI-created mount must also appear in
