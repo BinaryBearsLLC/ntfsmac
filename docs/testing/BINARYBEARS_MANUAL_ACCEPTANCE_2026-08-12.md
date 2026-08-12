@@ -84,7 +84,7 @@ reviewed.
 | ID | Test | Required setup | Acceptance summary |
 | --- | --- | --- | --- |
 | BB-00 | Candidate and host identity | No drive | Exact packaged candidate, valid signature, Apple Silicon, Hypervisor available |
-| BB-01 | Clean install and first run | No drive, admin available | Helper and bundled CLI install; no Homebrew dependency or policy weakening |
+| BB-01 | Install/upgrade and first run | No drive, admin available | Helper and bundled CLI install; existing runtime cache self-heals; no Homebrew dependency or policy weakening |
 | BB-02 | `opengui`, cold and warm | Installed app | Popover opens reliably without Accessibility or synthetic clicks |
 | BB-03 | Minimal visual surface | Installed app | Light/dark, keyboard, Settings/Back, no speed or no-op preference controls |
 | BB-P0-01 | Default mount, VPN off | Drive A clean | Verified `ntfs-3g` RW/RO truth plus both live security gates |
@@ -150,6 +150,28 @@ Pass when:
 
 If Full Disk Access is requested, enable exactly the helper service shown by the app, return to the
 popover, and retry. A denial or cancel must remain recoverable rather than showing a false install.
+
+### BB-01 upgrade-cache self-heal
+
+This is part of BB-01 whenever an older ntfsmac/anylinuxfs cache already exists. It prevents a
+privileged runtime refresh from making later unprivileged drive scans appear empty.
+
+1. Before replacing the app, record whether the pinned cache contains `rootfs/vmproxy` and its
+   numeric owner/group. Do not change it manually.
+2. Install and launch the candidate normally so its helper stages the bundled CLI. Authenticate
+   only the expected ntfsmac helper action.
+3. Require every existing pinned-cache `rootfs/vmproxy` regular file to be owned by the invoking
+   user after staging. A symlinked cache component must be skipped or rejected, never followed by
+   a privileged ownership change.
+4. Run both the ordinary and Microsoft-only `anylinuxfs list` probes as the normal user. They must
+   exit successfully, and the popover must show the same supported partitions reported by
+   `diskutil`; an empty GUI caused by a backend permission error fails BB-01.
+5. Mount and unmount one disposable drive, then repeat the ownership and list checks. A privileged
+   runtime update must preserve the invoking user's host-file ownership while the guest metadata
+   remains executable as root.
+
+For an affected upgrade, the corrected package must perform the repair itself. A manual `sudo
+chown` can diagnose the old failure but cannot be used as acceptance evidence.
 
 ## BB-02 — `opengui` cold and warm
 

@@ -104,6 +104,43 @@ STUB
   [[ "$output" == anylinuxfs* ]]
 }
 
+@test "privileged update repairs only real vmproxy cache files for the invoking user" {
+  local runtime="$NTFSMAC_RUNTIME_HOME_OVERRIDE/.anylinuxfs/pinned-runtime"
+  mkdir -p "$runtime/rootfs"
+  printf 'old-vmproxy\n' > "$runtime/rootfs/vmproxy"
+  chmod 755 "$runtime/rootfs/vmproxy"
+
+  NTFSMAC_INSTALL_EUID_OVERRIDE=0 \
+  NTFSMAC_INVOKING_UID_OVERRIDE="$(id -u)" \
+  NTFSMAC_INVOKING_GID_OVERRIDE="$(id -g)" \
+    run "$SCRIPT"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"repaired ownership for 1 runtime cache file(s)"* ]]
+  [ "$(stat -f %u "$runtime/rootfs/vmproxy")" -eq "$(id -u)" ]
+  [ "$(stat -f %g "$runtime/rootfs/vmproxy")" -eq "$(id -g)" ]
+}
+
+@test "runtime ownership repair refuses symlinked cache components" {
+  local outside runtime_root
+  outside="$(mktemp -d)"
+  printf 'outside\n' > "$outside/vmproxy"
+  runtime_root="$NTFSMAC_RUNTIME_HOME_OVERRIDE/.anylinuxfs"
+  mkdir -p "$runtime_root"
+  ln -s "$outside" "$runtime_root/redirected-runtime"
+
+  NTFSMAC_INSTALL_EUID_OVERRIDE=0 \
+  NTFSMAC_INVOKING_UID_OVERRIDE="$(id -u)" \
+  NTFSMAC_INVOKING_GID_OVERRIDE="$(id -g)" \
+    run "$SCRIPT"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"repaired ownership"* ]]
+  [ -L "$runtime_root/redirected-runtime" ]
+  [ "$(cat "$outside/vmproxy")" = "outside" ]
+  rm -rf "$outside"
+}
+
 @test "NTFSMAC_REPO defaults to khr898/ntfsmac (no YOURUSERNAME literal)" {
   run "$SCRIPT"
   [ "$status" -eq 0 ]

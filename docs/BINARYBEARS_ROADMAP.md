@@ -101,6 +101,8 @@ branches does not imply that they were pushed, opened as pull requests, or accep
 - [x] SECURITY rows default to `unknown` instead of manufacturing a successful state.
 - [x] SECURITY Hide/Show changes presentation only and leaves mount/helper state untouched.
 - [x] Runtime Alpine tag/digest pinning, versioned cache migration, diagnostics, and package gate.
+- [x] Runtime-cache ownership self-heal across privileged upgrades, without following symlinks or
+  requiring a manual ownership command.
 
 ### Foundations that are not complete product features
 
@@ -222,11 +224,18 @@ GUI may claim a dedicated private path more strongly than the measured evidence 
   silently destroy user data or force a download during an unrelated action.
 - [x] Test clean initialization, cached initialization, offline reuse, digest mismatch, interrupted
   download, and upgrade/rollback behavior.
+- [x] Repair the legacy root-owned cached `vmproxy` during privileged package staging and restore
+  the invoking user's host ownership after every later privileged runtime replacement.
 
 The immutable digest-only pull reference, cache directory, and rootfs version marker are derived
 from the same locked tag, arm64 digest, and anylinuxfs commit; the build independently proves the
 tag resolves to that digest. Legacy, incomplete, or mismatched caches are preserved
 side-by-side; initialization is triggered only by a mount that needs the pinned environment.
+The installer also self-heals the specific root-owned `rootfs/vmproxy` left by older privileged
+updates. The runtime's update path restores the XPC peer's kernel-derived UID/GID after replacing
+that host file while retaining its guest-visible root metadata. Real non-symlink path checks,
+focused installer/build coverage, the full `289/289` Bats suite, Swift `247/247`, and a complete
+runtime rebuild pass; the corrected package still requires the BB-01 upgrade-cache live retest.
 
 #### 2. Establish an anylinuxfs update policy
 

@@ -40,6 +40,20 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
+@test "runtime source patch restores invoker ownership after privileged vmproxy updates" {
+  local cache_dir
+  cache_dir="$(mktemp -d)"
+  NTFSMAC_ANYLINUXFS_CACHE_DIR="$cache_dir" run bash -c '
+    source build/build-all.sh
+    prepare_build_copy
+    target="$CACHE_DIR/anylinuxfs/src/vm_image.rs"
+    grep -F "chown_to_invoker(&vmproxy_guest_path, uid, gid)" "$target"
+    test "$(grep -c "chown_to_invoker(&vmproxy_guest_path" "$target")" -eq 1
+  '
+  rm -rf "$cache_dir"
+  [ "$status" -eq 0 ]
+}
+
 @test "full build: anylinuxfs + vmproxy compile, cargo test passes for all three crates" {
   run "$SCRIPT"
   [ "$status" -eq 0 ]

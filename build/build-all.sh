@@ -59,6 +59,7 @@ prepare_build_copy() {
   runtime_alpine_load || return 1
   patch_anylinuxfs_runtime_alpine "$CACHE_DIR" || return 1
   patch_vmproxy_mount_tmpfs
+  patch_anylinuxfs_vmproxy_cache_ownership
 }
 
 # patch_vmproxy_mount_tmpfs — real bug, reproduced on real hardware (not guessed):
@@ -101,6 +102,44 @@ content = content.replace(marker, replacement, 1)
 with open(target, "w") as f:
     f.write(content)
 print("build-all: patched vmproxy mount_tmpfs to mkdir -p each tmpfs target before mounting")
+PYEOF
+}
+
+# patch_anylinuxfs_vmproxy_cache_ownership — real upgrade bug reproduced on packaged hardware:
+# the GUI helper launches anylinuxfs as root with SUDO_UID/SUDO_GID set to the XPC peer. Initial
+# rootfs creation is correctly spawned as that invoker, but vm_image.rs's later "vmproxy changed"
+# path copies the replacement as root and leaves rootfs/vmproxy root-owned. The current mount can
+# work, but the next unprivileged GUI `list` cannot replace that file after another runtime update
+# and reports no drives with `Permission denied`. Keep the guest-visible uid/gid override at 0:0,
+# but restore the host file's ownership to the verified invoker after the copy. Patch only the
+# CACHE_DIR build copy; never edit the pinned submodule.
+patch_anylinuxfs_vmproxy_cache_ownership() {
+  local target="$CACHE_DIR/anylinuxfs/src/vm_image.rs"
+  local marker='                    xattr_util::set_override_stat_file(&vmproxy_guest_path, 0, 0, 0o755)?;
+                    host_println!("Updated VM root filesystem");'
+  local replacement='                    xattr_util::set_override_stat_file(&vmproxy_guest_path, 0, 0, 0o755)?;
+                    if let (Some(uid), Some(gid)) =
+                        (config.privilege.sudo_uid, config.privilege.sudo_gid)
+                    {
+                        privilege::chown_to_invoker(&vmproxy_guest_path, uid, gid)?;
+                    }
+                    host_println!("Updated VM root filesystem");'
+
+  python3 - "$target" "$marker" "$replacement" <<'PYEOF'
+import sys
+target, marker, replacement = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(target, "r") as f:
+    content = f.read()
+if "chown_to_invoker(&vmproxy_guest_path" in content:
+    print("build-all: anylinuxfs vmproxy cache ownership already patched, skipping")
+    sys.exit(0)
+if marker not in content:
+    print(f"build-all: HARD-STOP — vmproxy cache ownership marker not found in {target} (upstream shape changed, update patch_anylinuxfs_vmproxy_cache_ownership)", file=sys.stderr)
+    sys.exit(1)
+content = content.replace(marker, replacement, 1)
+with open(target, "w") as f:
+    f.write(content)
+print("build-all: patched anylinuxfs vmproxy cache updates to restore invoker ownership")
 PYEOF
 }
 

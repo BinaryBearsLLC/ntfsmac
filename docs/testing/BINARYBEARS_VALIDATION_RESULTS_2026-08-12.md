@@ -22,16 +22,20 @@ This is the live ledger for the assisted acceptance run defined in
   MBR NTFS volume. It is now eligible for the two-drive cells after the rebuilt app is installed.
 - Source fixes made after a packaged failure are recorded separately from the installed artifact.
   They do not convert that artifact's result into a pass; a rebuilt package must be retested.
+- After Full Disk Access was enabled, macOS still enumerated both NTFS partitions but the rebuilt
+  app showed no drives. The installed unprivileged `anylinuxfs list` failed before enumeration
+  because an older privileged runtime update had left the cached guest `vmproxy` root-owned. This
+  is a packaged upgrade regression, not missing hardware or a filesystem change.
 
 ## Ledger
 
 | ID | Status | Evidence observed / remaining gate |
 | --- | --- | --- |
 | BB-00 | PASS | Exact artifact recorded; app signature, DMG verification, arm64, host and Hypervisor checks passed. |
-| BB-01 | IN PROGRESS | Installed app, helper, bundled CLI, version/build and command surface confirmed. Rebuilt commit `004e76e` requested the expected privileged update and exact `com.khr898.ntfsmac.helper` Full Disk Access entry; its enabled state was read back while unrelated ChatGPT, Codex Computer Use and Terminal entries remained off. A deliberately blank clean-install replay remains. |
+| BB-01 | FAIL | Installed app, helper, bundled CLI, version/build and command surface were confirmed. Rebuilt commit `004e76e` requested the expected privileged update and exact `com.khr898.ntfsmac.helper` Full Disk Access entry; its enabled state was read back while unrelated ChatGPT, Codex Computer Use and Terminal entries remained off. The subsequent scan exposed a root-owned cached `vmproxy` left by the privileged update, so this package does not pass upgrade installation. The source now repairs the legacy file during staging and preserves invoker ownership on later updates; a newly rebuilt package and deliberately blank clean install both remain required. |
 | BB-02 | PASS | The original package failed cold placement. Rebuilt commit `004e76e` passed cold and warm opening beneath the menu-bar icon, three simultaneous requests with exit `0`, exactly one GUI process, and invalid-argument exit `2` without another process or Accessibility permission. |
 | BB-03 | IN PROGRESS | Mounted/Settings/Diagnostics light UI, Back, overflow-only copy action and Launch at login enable/disable passed. The cold-placement failure is tracked in BB-02; dark, full keyboard and safe warning/error states remain. |
-| BB-P0-01 | PASS | The original package passed the default `ntfs-3g` RW round trip, diagnostic truth, vmnet/private/soft transport gate and root security transaction gate with one real session. The rebuilt regression mount stopped fail-closed at the expected Full Disk Access gate, with no NFS/anylinuxfs/vmnet state; the exact helper permission is now enabled and the mount retry remains. |
+| BB-P0-01 | PASS | The original package passed the default `ntfs-3g` RW round trip, diagnostic truth, vmnet/private/soft transport gate and root security transaction gate with one real session. On rebuilt commit `004e76e`, the first retry stopped fail-closed at Full Disk Access and the next scan failed before mount because of the BB-01 runtime-cache ownership regression. No NFS/anylinuxfs/vmnet state was created. The source fix is verified automatically, but the replacement package must repeat this cell. |
 | BB-P0-02 | PASS | GUI returned to two detected drives; NFS mounts and anylinuxfs sessions were empty; diagnostics reported bridge down and zero security sessions; the root check found no session state file or PF child anchor. |
 | BB-P0-03 | NOT RUN | VPN-on mount requires the operator's VPN transition. |
 | BB-P0-04 | NOT RUN | Mounted VPN route transition requires the operator. |
@@ -74,8 +78,10 @@ byte-integrity contract.
 
 After the copy/Finder corrections, the complete automated gates passed Swift `245/245` and Bats
 `286/286`. After the popover correction, Swift passes `247/247` and the focused `opengui` Bats
-suite passes `4/4`; the shell implementation did not change. These prove the working tree, not
-the still-installed pre-fix artifact.
+suite passes `4/4`; the shell implementation did not change. After the runtime-cache ownership
+correction, the full source gates pass Swift `247/247`, Bats `289/289`, shellcheck at warning
+severity, and a complete real runtime build including `41/41` anylinuxfs, `8/8` common-utils, and
+`8/8` vmproxy Rust tests. These prove the source tree, not the still-installed pre-fix artifact.
 
 ### P3 Finder presentation
 
@@ -95,8 +101,29 @@ detached window and no additional UI were added. Unit tests reject the observed 
 and accept primary and secondary-display menu-bar anchors. Rebuilt commit `004e76e` passed the full
 cold, warm, rapid, single-instance, invalid-argument, and no-Accessibility packaged check.
 
+### Runtime cache ownership after privileged updates
+
+After the helper permission was enabled, `diskutil` still reported both disposable MBR NTFS
+partitions while the popover reported no drives. Both Microsoft and unfiltered backend list probes
+failed with `Permission denied` while replacing the pinned runtime's cached `rootfs/vmproxy`.
+Directory ownership was already the invoking user's; only that file was `root:wheel`, proving the
+failure came from the privileged replacement path rather than USB discovery.
+
+The source correction has two layers. The bundled installer safely repairs only regular
+non-symlink `rootfs/vmproxy` cache entries using the XPC peer's kernel-derived UID/GID, allowing
+an affected upgrade to self-heal without a manual `chown`. The scratch-built anylinuxfs update
+path now restores the same invoker ownership immediately after a privileged replacement while
+retaining the guest-visible root ownership metadata. The pinned submodule is unchanged: the build
+patch applies only to its disposable source copy and hard-stops if the upstream shape drifts.
+
+Focused installer tests prove repair and symlink refusal; build tests prove one idempotent ownership
+patch; the complete build and regression suites pass. Packaged status remains `FAIL` until a new app
+stages the corrected installer, the cached file becomes user-owned, both USB rows return, and a
+mount/unmount cycle passes without recurrence.
+
 ## Next operator checkpoints
 
-1. Retry the rebuilt mount now that Full Disk Access for the exact helper has been verified.
-2. Retest the rebuilt P1 tree and P3 Finder/two-drive cells.
-3. Perform only the requested physical, VPN, Windows and final-uninstall actions.
+1. Build and install a replacement app containing the runtime-cache ownership correction.
+2. Verify automatic cache repair, both detected USB rows, and one default mount/unmount cycle.
+3. Retest the rebuilt P1 tree and P3 Finder/two-drive cells.
+4. Perform only the requested physical, VPN, Windows and final-uninstall actions.

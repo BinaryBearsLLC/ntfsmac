@@ -178,6 +178,43 @@ link_into_path() {
   fi
 }
 
+# Older anylinuxfs builds could leave only rootfs/vmproxy root-owned after a privileged runtime
+# update. The next unprivileged GUI scan then could not refresh it and incorrectly showed no
+# drives. Repair only the exact cache shape owned by ntfsmac, using the sudo/XPC invoker identity.
+# Every path component is required to be a real directory and the final entry a regular non-link
+# file, so a user-controlled symlink cannot redirect this root chown outside ~/.anylinuxfs.
+repair_runtime_cache_ownership() {
+  local effective_uid="${NTFSMAC_INSTALL_EUID_OVERRIDE:-$EUID}"
+  local invoking_uid="${NTFSMAC_INVOKING_UID_OVERRIDE:-${SUDO_UID:-}}"
+  local invoking_gid="${NTFSMAC_INVOKING_GID_OVERRIDE:-${SUDO_GID:-}}"
+  local runtime_home="${NTFSMAC_RUNTIME_HOME_OVERRIDE:-${HOME:-}}"
+  local cache_root runtime rootfs vmproxy repaired=0
+
+  [[ "$effective_uid" == "0" ]] || return 0
+  [[ "$invoking_uid" =~ ^[0-9]+$ && "$invoking_gid" =~ ^[0-9]+$ ]] || return 0
+  [[ "$runtime_home" == /* && "$runtime_home" != "/" && -d "$runtime_home" && ! -L "$runtime_home" ]] || return 0
+
+  cache_root="$runtime_home/.anylinuxfs"
+  [[ -d "$cache_root" && ! -L "$cache_root" ]] || return 0
+
+  for runtime in "$cache_root"/*; do
+    [[ -d "$runtime" && ! -L "$runtime" ]] || continue
+    rootfs="$runtime/rootfs"
+    [[ -d "$rootfs" && ! -L "$rootfs" ]] || continue
+    vmproxy="$rootfs/vmproxy"
+    [[ -f "$vmproxy" && ! -L "$vmproxy" ]] || continue
+    /usr/sbin/chown -h "$invoking_uid:$invoking_gid" "$vmproxy" || {
+      echo "install.sh: HARD-STOP — could not repair runtime cache ownership" >&2
+      return 1
+    }
+    repaired=$((repaired + 1))
+  done
+
+  if [[ "$repaired" -gt 0 ]]; then
+    echo "install.sh: repaired ownership for $repaired runtime cache file(s)"
+  fi
+}
+
 main() {
   # Self-elevate only if actually needed — mirrors mount.sh/uninstall.sh's own pattern, but
   # gated on real writability so a machine where $PREFIX/$PATH_SYMLINK's parent is already
@@ -206,6 +243,7 @@ main() {
   refuse_non_arm64 || exit 1
   install_binaries || exit 1
   install_cli || exit 1
+  repair_runtime_cache_ownership || exit 1
   [[ -z "$skip_link" ]] && link_into_path
   echo "install.sh: installed to $PREFIX (NTFSMAC_REPO=$NTFSMAC_REPO)"
 }
