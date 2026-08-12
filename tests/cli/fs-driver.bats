@@ -15,6 +15,7 @@ STUB
   export PATH="$STUB_DIR:$PATH"
   export NTFSMAC_SKIP_ROOT_CHECK=1
   export NTFSMAC_SKIP_MOUNT_VERIFY=1
+  export NTFSMAC_MOUNT_DIAGNOSTICS_FILE="$STUB_DIR/mount-diagnostics"
 }
 
 teardown() {
@@ -41,10 +42,25 @@ teardown() {
   run cat "$CALL_LOG"
   [[ "$output" == *" -t ntfs3"* ]]
   [[ "$output" != *"-o ntfs3"* ]]
+  [[ "$output" == *"NTFS3 is experimental"* ]]
+  run grep -F 'selected_driver=ntfs3' "$NTFSMAC_MOUNT_DIAGNOSTICS_FILE"
+  [ "$status" -eq 0 ]
+  run grep -F 'failure_category=none' "$NTFSMAC_MOUNT_DIAGNOSTICS_FILE"
+  [ "$status" -eq 0 ]
 }
 
 @test "rejects an invalid --fs-driver value, never invoking anylinuxfs" {
   run "$SCRIPT" --fs-driver hfsplus disk2s1
   [ "$status" -ne 0 ]
   [ ! -f "$CALL_LOG" ]
+  run grep -F 'failure_category=invalid_request' "$NTFSMAC_MOUNT_DIAGNOSTICS_FILE"
+  [ "$status" -eq 0 ]
+}
+
+@test "help gives Windows preflight guidance and never recommends ntfsfix as repair" {
+  run "$SCRIPT" --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"disable Fast Startup"* ]]
+  [[ "$output" == *"chkdsk"* ]]
+  [[ "$output" == *"ntfsfix is not a substitute"* ]]
 }

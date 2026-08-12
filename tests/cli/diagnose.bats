@@ -30,6 +30,10 @@ setup() {
   export NTFSMAC_RESOLVED_IP_OVERRIDE=""
   export NTFSMAC_ROUTE_INTERFACE_OVERRIDE=""
   export NTFSMAC_LOOPBACK_LISTENER_COUNT_OVERRIDE="0"
+  export NTFSMAC_SECURITY_STATUS_FILE="$FIXTURE_DIR/security-status"
+  export NTFSMAC_MOUNT_DIAGNOSTICS_FILE="$FIXTURE_DIR/mount-diagnostics"
+  printf 'schema=1\nselected_driver=none\nfailure_category=none\n' > "$NTFSMAC_MOUNT_DIAGNOSTICS_FILE"
+  write_security_status 0 notRequired NO_ACTIVE_MOUNTS notRequired NO_ACTIVE_MOUNTS notRequired NO_ACTIVE_MOUNTS notRequired NO_ACTIVE_MOUNTS
 
   # Kernel pin fixture: a lock file + a modules.squashfs whose sha256 matches it.
   mkdir -p "$FIXTURE_DIR/kernel"
@@ -50,6 +54,14 @@ setup() {
   export NTFSMAC_SOURCES_LOCK="$FIXTURE_DIR/sources.lock"
   export NTFSMAC_VENDOR_KERNEL_DIR="$FIXTURE_DIR/kernel"
   export NTFSMAC_RUNTIME_HOME_OVERRIDE="$FIXTURE_DIR/runtime-home"
+}
+
+write_security_status() {
+  local active="$1" private="$2" private_reason="$3" route="$4" route_reason="$5"
+  local pf="$6" pf_reason="$7" overall="$8" overall_reason="$9"
+  printf 'schema=1\nactive_sessions=%s\nprivate_link=%s\nprivate_reason=%s\nvpn_route=%s\nvpn_route_reason=%s\npf_policy=%s\npf_reason=%s\noverall=%s\noverall_reason=%s\n' \
+    "$active" "$private" "$private_reason" "$route" "$route_reason" "$pf" "$pf_reason" \
+    "$overall" "$overall_reason" > "$NTFSMAC_SECURITY_STATUS_FILE"
 }
 
 set_nfs_parameters() {
@@ -108,7 +120,7 @@ write_guest_versions() {
   run "$SCRIPT" --json
   [ "$status" -eq 0 ]
   [[ "$output" == \{*\} ]]
-  [[ "$output" == *'"diagnostic_schema":5'* ]]
+  [[ "$output" == *'"diagnostic_schema":6'* ]]
   [[ "$output" == *'"healthy":true'* ]]
   [[ "$output" == *'"ntfsmac_version":"1.0"'* ]]
   [[ "$output" == *'"build_version":"1"'* ]]
@@ -143,6 +155,14 @@ write_guest_versions() {
   [[ "$output" == *'"nfs_mount_count":0'* ]]
   [[ "$output" == *'"network_helper":"none"'* ]]
   [[ "$output" == *'"nfs_transport_contract":"inactive"'* ]]
+  [[ "$output" == *'"selected_fs_driver":"none"'* ]]
+  [[ "$output" == *'"mount_failure_category":"none"'* ]]
+  [[ "$output" == *'"security_active_sessions":0'* ]]
+  [[ "$output" == *'"security_private_link":"notRequired"'* ]]
+  [[ "$output" == *'"security_private_reason":"NO_ACTIVE_MOUNTS"'* ]]
+  [[ "$output" == *'"security_vpn_route":"notRequired"'* ]]
+  [[ "$output" == *'"security_pf_policy":"notRequired"'* ]]
+  [[ "$output" == *'"security_overall":"notRequired"'* ]]
 }
 
 @test "an active vmnet mount satisfies the transport contract" {
@@ -154,6 +174,7 @@ write_guest_versions() {
   export NTFSMAC_NETWORK_HELPER_OVERRIDE="vmnet"
   export NTFSMAC_RESOLVED_IP_OVERRIDE="172.16.0.2"
   export NTFSMAC_ROUTE_INTERFACE_OVERRIDE="bridge100"
+  write_security_status 1 enforced PRIVATE_VMNET_SOFT notRequired ROUTE_ALREADY_PRIVATE enforced PF_EVALUATED enforced SECURITY_ENFORCED
 
   run "$SCRIPT" --json
 
@@ -161,6 +182,65 @@ write_guest_versions() {
   [[ "$output" == *'"network_helper":"vmnet"'* ]]
   [[ "$output" == *'"nfs_transport_contract":"expected_vmnet"'* ]]
   [[ "$output" == *'"healthy":true'* ]]
+}
+
+@test "an active mount with measured incomplete hardening is explicitly degraded" {
+  export NTFSMAC_NFS_MOUNT_COUNT_OVERRIDE="1"
+  export NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE="disk4s2.local:/mnt/Test on /Volumes/Test (nfs, nodev, nosuid)"
+  set_nfs_parameters "/Volumes/Test" "disk4s2.local:/mnt/Test" "soft"
+  export NTFSMAC_BRIDGE_OVERRIDE="up"
+  export NTFSMAC_NETWORK_HELPER_OVERRIDE="vmnet"
+  export NTFSMAC_RESOLVED_IP_OVERRIDE="172.16.0.2"
+  export NTFSMAC_ROUTE_INTERFACE_OVERRIDE="bridge100"
+  write_security_status 1 enforced PRIVATE_VMNET_SOFT unknown ROUTE_UNMEASURED notEnforced PF_EVALUATED_PATH_MISSING notEnforced SECURITY_INCOMPLETE
+
+  run "$SCRIPT" --json
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'"security_private_link":"enforced"'* ]]
+  [[ "$output" == *'"security_vpn_route":"unknown"'* ]]
+  [[ "$output" == *'"security_pf_policy":"notEnforced"'* ]]
+  [[ "$output" == *'"security_overall":"notEnforced"'* ]]
+  [[ "$output" == *'"healthy":false'* ]]
+}
+
+@test "an active vmnet mount cannot be green when the security summary claims zero sessions" {
+  export NTFSMAC_NFS_MOUNT_COUNT_OVERRIDE="1"
+  export NTFSMAC_NFS_MOUNT_OUTPUT_OVERRIDE="disk4s2.local:/mnt/Test on /Volumes/Test (nfs, nodev, nosuid)"
+  set_nfs_parameters "/Volumes/Test" "disk4s2.local:/mnt/Test" "soft"
+  export NTFSMAC_BRIDGE_OVERRIDE="up"
+  export NTFSMAC_NETWORK_HELPER_OVERRIDE="vmnet"
+  export NTFSMAC_RESOLVED_IP_OVERRIDE="172.16.0.2"
+  export NTFSMAC_ROUTE_INTERFACE_OVERRIDE="bridge100"
+
+  run "$SCRIPT" --json
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'"security_active_sessions":0'* ]]
+  [[ "$output" == *'"healthy":false'* ]]
+}
+
+@test "a security session without a verified ntfsmac mount is degraded even if last policy was enforced" {
+  write_security_status 1 enforced PRIVATE_VMNET_SOFT notRequired ROUTE_ALREADY_PRIVATE enforced PF_EVALUATED enforced SECURITY_ENFORCED
+
+  run "$SCRIPT" --json
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'"nfs_transport_contract":"inactive"'* ]]
+  [[ "$output" == *'"security_active_sessions":1'* ]]
+  [[ "$output" == *'"healthy":false'* ]]
+}
+
+@test "a malformed public security summary fails closed without echoing its contents" {
+  printf 'schema=1\nprivate_link=enforced\ndevice=disk9s9\n' > "$NTFSMAC_SECURITY_STATUS_FILE"
+
+  run "$SCRIPT" --json
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"security_active_sessions":null'* ]]
+  [[ "$output" == *'"security_private_link":"unknown"'* ]]
+  [[ "$output" == *'"security_private_reason":"STATUS_UNAVAILABLE"'* ]]
+  [[ "$output" != *'disk9s9'* ]]
 }
 
 @test "a loopback gvproxy mount violates the vmnet-only transport contract" {

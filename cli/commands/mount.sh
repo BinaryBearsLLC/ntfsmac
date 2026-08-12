@@ -13,12 +13,21 @@ source "$SCRIPT_DIR/../lib/list-drives.sh"
 source "$SCRIPT_DIR/../lib/interactive-select.sh"
 # shellcheck source=../lib/security-transaction.sh
 source "$SCRIPT_DIR/../lib/security-transaction.sh"
+# shellcheck source=../lib/mount-diagnostics.sh
+source "$SCRIPT_DIR/../lib/mount-diagnostics.sh"
 
 usage() {
   echo "usage: mount.sh [--fs-driver ntfs-3g|ntfs3] [--read-only] [--ignore-permissions] <device> [mount_point]" >&2
+  echo "  ntfs3 is experimental: fully shut down Windows, disable Fast Startup, and repair errors with chkdsk first." >&2
+  echo "  ntfsfix is not a substitute for Windows filesystem repair." >&2
 }
 
 cmd_mount() {
+  if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    usage
+    return 0
+  fi
+
   # Real, upstream-documented requirement (vendor/src/anylinuxfs/docs/important-notes.md
   # "Permissions"): anylinuxfs needs raw /dev/disk* access, which macOS refuses without root
   # (it drops back to the invoking user once the disk is open — this isn't a permanent
@@ -135,6 +144,7 @@ cmd_mount() {
   fi
 
   if [[ -n "$fs_driver" && "$fs_driver" != "ntfs-3g" && "$fs_driver" != "ntfs3" ]]; then
+    mount_diagnostics_publish unknown invalid_request || true
     echo "mount: invalid --fs-driver '$fs_driver' (must be ntfs-3g or ntfs3)" >&2
     return 1
   fi
@@ -147,6 +157,7 @@ cmd_mount() {
   [[ "$fs_driver" == "ntfs-3g" ]] && fs_driver=""
 
   if ! validate_device "$device"; then
+    mount_diagnostics_publish unknown invalid_request || true
     return 1
   fi
 
@@ -165,15 +176,26 @@ cmd_mount() {
     esac
   fi
 
+  local diagnostic_driver="ntfs-3g"
+  if [[ "$fs_driver" == "ntfs3" ]]; then
+    diagnostic_driver="ntfs3"
+    echo "mount: NTFS3 is experimental. Fully shut down Windows, disable Fast Startup, and run chkdsk for filesystem errors; no fallback to ntfs-3g will occur." >&2
+  elif [[ -n "$ignore_perms" && -z "$explicit_driver" ]]; then
+    diagnostic_driver="ext"
+  fi
+  mount_diagnostics_publish "$diagnostic_driver" in_progress || true
+
   if run_anylinuxfs_mount "$device" "$fs_driver" "$mount_point" "$read_only" "$ignore_perms"; then
     # anylinuxfs currently owns private-link creation and the host NFS mount as one operation, so
     # Option A applies/measures protection immediately after the kernel mount but before this
     # wrapper publishes "mounted". A failed proof remains visible and never becomes a green state.
     security_apply_for_mount "$device" || \
       echo "security_overall=unknown reason=SECURITY_TRANSACTION_FAILED" >&2
+    mount_diagnostics_publish "$diagnostic_driver" none || true
     echo "mount: $device mounted"
     return 0
   fi
+  mount_diagnostics_publish "$diagnostic_driver" "$NTFSMAC_MOUNT_FAILURE_CATEGORY" || true
   echo "mount: failed to mount $device" >&2
   return 1
 }

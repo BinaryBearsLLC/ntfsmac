@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2034
 # cli/lib/nfs-mount.sh — 2-mount (PLAN.md §6, L1-L3).
 #
 # Wraps the real `anylinuxfs mount` invocation. anylinuxfs already brings up the
@@ -49,6 +50,7 @@ load_runtime_alpine_contract() {
 # Fails immediately with a clear diagnostic instead of falling back to a bare name that
 # produces a cryptic "command not found" from run-with-progress.sh at runtime.
 ANYLINUXFS_BIN="${NTFSMAC_ANYLINUXFS_BIN:-$(resolve_vendor_bin anylinuxfs || true)}"
+NTFSMAC_MOUNT_FAILURE_CATEGORY="unknown"
 
 # run_anylinuxfs_mount <device> <fs_driver> [mount_point] [read_only] [ignore_perms]
 # <device> must already be validate_device()-checked by the caller — this function does
@@ -73,7 +75,9 @@ ANYLINUXFS_BIN="${NTFSMAC_ANYLINUXFS_BIN:-$(resolve_vendor_bin anylinuxfs || tru
 # server root. NTFS never gets this — "do not change the NTFS part": ntfs-3g already owns
 # the uid/gid remap and adding all_squash there would change NTFS behavior.
 run_anylinuxfs_mount() {
+  NTFSMAC_MOUNT_FAILURE_CATEGORY="unknown"
   if [[ -z "$ANYLINUXFS_BIN" ]]; then
+    NTFSMAC_MOUNT_FAILURE_CATEGORY="runtime_unavailable"
     echo "mount: FATAL — anylinuxfs binary not found at any known install path (try reinstalling: sudo bash install.sh, or 'ntfsmac diagnose')" >&2
     return 1
   fi
@@ -84,8 +88,8 @@ run_anylinuxfs_mount() {
   # Validate the exact runtime contract before changing the host's current mount state.
   # Upgrades use a versioned directory; legacy, mismatched, and interrupted caches are preserved
   # side-by-side so a mount never silently destroys rollback data.
-  load_runtime_alpine_contract || return 1
-  runtime_alpine_prepare_cache "$HOME" || return 1
+  load_runtime_alpine_contract || { NTFSMAC_MOUNT_FAILURE_CATEGORY="runtime_unavailable"; return 1; }
+  runtime_alpine_prepare_cache "$HOME" || { NTFSMAC_MOUNT_FAILURE_CATEGORY="runtime_unavailable"; return 1; }
 
   # Auto-eject: if macOS already auto-mounted this partition with its own (read-only) NTFS
   # driver, the raw block device is held and anylinuxfs/ntfs-3g can't probe it ("Insufficient
@@ -140,6 +144,7 @@ run_anylinuxfs_mount() {
       && declare -F security_abort_prepared_mount >/dev/null 2>&1; then
       security_abort_prepared_mount "$device" || true
     fi
+    NTFSMAC_MOUNT_FAILURE_CATEGORY="backend_failed"
     return 1
   fi
 
@@ -154,6 +159,8 @@ run_anylinuxfs_mount() {
       security_abort_prepared_mount "$device" || true
     fi
     echo "mount: anylinuxfs reported success but no NFS mount is present — treating as failed (try 'ntfsmac diagnose')" >&2
+    NTFSMAC_MOUNT_FAILURE_CATEGORY="mount_not_observed"
     return 1
   fi
+  NTFSMAC_MOUNT_FAILURE_CATEGORY="none"
 }

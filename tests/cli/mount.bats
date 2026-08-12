@@ -33,6 +33,7 @@ STUB
   export PATH="$STUB_DIR:$PATH"
   export NTFSMAC_SKIP_ROOT_CHECK=1
   export NTFSMAC_SECURITY_STATE_DIR="$STUB_DIR/security-state"
+  export NTFSMAC_MOUNT_DIAGNOSTICS_FILE="$STUB_DIR/mount-diagnostics"
   export HOME="$STUB_DIR/home"
   mkdir -p "$HOME/.anylinuxfs/alpine"
   # Every other test in this file stubs anylinuxfs's exit code directly and isn't testing the
@@ -77,6 +78,8 @@ STUB
   chmod +x "$STUB_DIR/anylinuxfs"
   run "$SCRIPT" disk2s1
   [ "$status" -ne 0 ]
+  run grep -F 'failure_category=backend_failed' "$NTFSMAC_MOUNT_DIAGNOSTICS_FILE"
+  [ "$status" -eq 0 ]
 }
 
 @test "passes a custom mount point through when given" {

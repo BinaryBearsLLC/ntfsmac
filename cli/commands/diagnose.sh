@@ -18,7 +18,29 @@ if [[ -r "$VERSION_LIB" ]]; then
 else
   NTFSMAC_VERSION="unknown"
   NTFSMAC_BUILD_VERSION="unknown"
-  NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION="5"
+  NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION="6"
+fi
+MOUNT_DIAGNOSTICS_LIB="$SCRIPT_DIR/../lib/mount-diagnostics.sh"
+if [[ -r "$MOUNT_DIAGNOSTICS_LIB" ]]; then
+  # shellcheck disable=SC1090
+  source "$MOUNT_DIAGNOSTICS_LIB"
+else
+  mount_diagnostics_reset() { MOUNT_DIAGNOSTICS_DRIVER="unknown"; MOUNT_DIAGNOSTICS_FAILURE="unknown"; }
+  mount_diagnostics_load() { mount_diagnostics_reset; return 1; }
+fi
+SECURITY_STATUS_LIB="$SCRIPT_DIR/../lib/security-status.sh"
+if [[ -r "$SECURITY_STATUS_LIB" ]]; then
+  # shellcheck disable=SC1090
+  source "$SECURITY_STATUS_LIB"
+else
+  security_summary_reset() {
+    SECURITY_ACTIVE_SESSIONS="unknown"
+    SECURITY_PRIVATE_LINK="unknown"; SECURITY_PRIVATE_REASON="STATUS_UNAVAILABLE"
+    SECURITY_VPN_ROUTE="unknown"; SECURITY_VPN_ROUTE_REASON="STATUS_UNAVAILABLE"
+    SECURITY_PF_POLICY="unknown"; SECURITY_PF_REASON="STATUS_UNAVAILABLE"
+    SECURITY_OVERALL="unknown"; SECURITY_OVERALL_REASON="STATUS_UNAVAILABLE"
+  }
+  security_summary_load() { security_summary_reset; return 1; }
 fi
 # Same two candidates helper/HelperProtocol.swift's resolveNtfsmacPrefix() checks (bash and
 # Swift can't share source — kept in sync deliberately, same pattern as list-drives.sh's own
@@ -596,7 +618,7 @@ main() {
   local kernel_pin bridge mounts nfs_parameters mount_count network_helper nfs_transport_contract architecture healthy=1
   local macos_version macos_major macos_supported=1
   local helper_installed=0 vpn_default_route=0
-  local helper_json vpn_json missing_json quarantined_json healthy_json
+  local helper_json vpn_json missing_json quarantined_json healthy_json security_active_json
   local anylinuxfs_version anylinuxfs_version_status
   local gvproxy_version gvproxy_version_status
   local vmnet_helper_version vmnet_helper_version_status vmnet_helper_source_commit
@@ -617,6 +639,8 @@ main() {
   nfs_transport_contract="$(check_nfs_transport_contract "$network_helper" "$bridge" "$mounts" "$nfs_parameters")"
   check_helper_installed && helper_installed=1
   check_vpn_default_route && vpn_default_route=1
+  security_summary_load || true
+  mount_diagnostics_load || true
   check_alpine_runtime || true
   anylinuxfs_version="$(component_version anylinuxfs)"
   anylinuxfs_version_status="$(version_status "$anylinuxfs_version" "$ANYLINUXFS_EXPECTED_VERSION")"
@@ -652,6 +676,20 @@ main() {
   case "$nfs_transport_contract" in
     loopback_proxy|ambiguous|unverified) healthy=0 ;;
   esac
+  # Option A permits a usable mount when hardening is incomplete, but diagnostics must remain
+  # non-green. A missing summary during an otherwise confirmed ntfsmac vmnet mount also fails
+  # closed instead of manufacturing a security pass.
+  if [[ "$nfs_transport_contract" == "expected_vmnet" ]]; then
+    case "$SECURITY_ACTIVE_SESSIONS" in
+      ''|0|*[!0-9]*) healthy=0 ;;
+      *) [[ "$SECURITY_OVERALL" == "enforced" ]] || healthy=0 ;;
+    esac
+  elif [[ "$SECURITY_ACTIVE_SESSIONS" != "0" \
+    && "$SECURITY_ACTIVE_SESSIONS" != "unknown" ]]; then
+    # A root-owned session record without a corresponding verified ntfsmac mount is stale or
+    # transitional state, even if its last recorded policy was enforced. Never call that healthy.
+    healthy=0
+  fi
 
   if [[ $json_mode -eq 1 ]]; then
     [[ "$healthy" -eq 1 ]] && healthy_json=true || healthy_json=false
@@ -659,7 +697,11 @@ main() {
     [[ "$vpn_default_route" -eq 1 ]] && vpn_json=true || vpn_json=false
     missing_json="$(component_json_array "$MISSING_COMPONENTS")"
     quarantined_json="$(component_json_array "$QUARANTINED_COMPONENTS")"
-    printf '{"diagnostic_schema":%s,"healthy":%s,"ntfsmac_version":"%s","build_version":"%s","macos_version":"%s","architecture":"%s","helper_installed":%s,"missing_binaries":%s,"missing_components":%s,"quarantined_binaries":%s,"quarantined_components":%s,"kernel_pin":"%s","anylinuxfs_version":"%s","anylinuxfs_expected_version":"%s","anylinuxfs_version_status":"%s","anylinuxfs_source_commit":"%s","vmproxy_source_version":"%s","libkrun_version":"%s","libkrunfw_version":"%s","gvproxy_version":"%s","gvproxy_expected_version":"%s","gvproxy_version_status":"%s","gvproxy_source_commit":"%s","vmnet_helper_version":"%s","vmnet_helper_expected_version":"%s","vmnet_helper_version_status":"%s","vmnet_helper_source_commit":"%s","alpine_runtime_tag":"%s","alpine_runtime_digest":"%s","alpine_runtime_state":"%s","alpine_installed_cache":"%s","alpine_installed_version":"%s","ntfs_3g_version":"%s","nfs_utils_version":"%s","bridge":"%s","network_helper":"%s","nfs_transport_contract":"%s","vpn_default_route":%s,"nfs_mount_count":%s}\n' \
+    case "$SECURITY_ACTIVE_SESSIONS" in
+      ''|*[!0-9]*) security_active_json=null ;;
+      *) security_active_json="$SECURITY_ACTIVE_SESSIONS" ;;
+    esac
+    printf '{"diagnostic_schema":%s,"healthy":%s,"ntfsmac_version":"%s","build_version":"%s","macos_version":"%s","architecture":"%s","helper_installed":%s,"missing_binaries":%s,"missing_components":%s,"quarantined_binaries":%s,"quarantined_components":%s,"kernel_pin":"%s","anylinuxfs_version":"%s","anylinuxfs_expected_version":"%s","anylinuxfs_version_status":"%s","anylinuxfs_source_commit":"%s","vmproxy_source_version":"%s","libkrun_version":"%s","libkrunfw_version":"%s","gvproxy_version":"%s","gvproxy_expected_version":"%s","gvproxy_version_status":"%s","gvproxy_source_commit":"%s","vmnet_helper_version":"%s","vmnet_helper_expected_version":"%s","vmnet_helper_version_status":"%s","vmnet_helper_source_commit":"%s","alpine_runtime_tag":"%s","alpine_runtime_digest":"%s","alpine_runtime_state":"%s","alpine_installed_cache":"%s","alpine_installed_version":"%s","ntfs_3g_version":"%s","nfs_utils_version":"%s","bridge":"%s","network_helper":"%s","nfs_transport_contract":"%s","vpn_default_route":%s,"nfs_mount_count":%s,"selected_fs_driver":"%s","mount_failure_category":"%s","security_active_sessions":%s,"security_private_link":"%s","security_private_reason":"%s","security_vpn_route":"%s","security_vpn_route_reason":"%s","security_pf_policy":"%s","security_pf_reason":"%s","security_overall":"%s","security_overall_reason":"%s"}\n' \
       "$NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION" "$healthy_json" "$NTFSMAC_VERSION" \
       "$NTFSMAC_BUILD_VERSION" "$macos_version" "$architecture" "$helper_json" \
       "$MISSING_BINS" "$missing_json" "$QUARANTINED_BINS" "$quarantined_json" \
@@ -672,7 +714,11 @@ main() {
       "$ALPINE_RUNTIME_TAG" "$ALPINE_RUNTIME_DIGEST" "$ALPINE_RUNTIME_STATE" \
       "$ALPINE_INSTALLED_CACHE" "$ALPINE_INSTALLED_VERSION" "$NTFS_3G_VERSION" \
       "$NFS_UTILS_VERSION" "$bridge" "$network_helper" "$nfs_transport_contract" \
-      "$vpn_json" "$mount_count"
+      "$vpn_json" "$mount_count" "$MOUNT_DIAGNOSTICS_DRIVER" "$MOUNT_DIAGNOSTICS_FAILURE" \
+      "$security_active_json" "$SECURITY_PRIVATE_LINK" \
+      "$SECURITY_PRIVATE_REASON" "$SECURITY_VPN_ROUTE" "$SECURITY_VPN_ROUTE_REASON" \
+      "$SECURITY_PF_POLICY" "$SECURITY_PF_REASON" "$SECURITY_OVERALL" \
+      "$SECURITY_OVERALL_REASON"
   else
     echo "diagnose: ntfsmac version: $NTFSMAC_VERSION ($NTFSMAC_BUILD_VERSION)"
     echo "diagnose: macOS version: $macos_version"
@@ -701,6 +747,13 @@ main() {
     echo "diagnose: NFS transport contract: $nfs_transport_contract"
     echo "diagnose: VPN default route: $([[ "$vpn_default_route" -eq 1 ]] && echo detected || echo not detected)"
     echo "diagnose: current NFS mount count: $mount_count"
+    echo "diagnose: selected filesystem driver: $MOUNT_DIAGNOSTICS_DRIVER"
+    echo "diagnose: last mount failure category: $MOUNT_DIAGNOSTICS_FAILURE"
+    echo "diagnose: security sessions: $SECURITY_ACTIVE_SESSIONS"
+    echo "diagnose: Private VM link: $SECURITY_PRIVATE_LINK ($SECURITY_PRIVATE_REASON)"
+    echo "diagnose: VPN-safe route: $SECURITY_VPN_ROUTE ($SECURITY_VPN_ROUTE_REASON)"
+    echo "diagnose: PF policy enforced: $SECURITY_PF_POLICY ($SECURITY_PF_REASON)"
+    echo "diagnose: security overall: $SECURITY_OVERALL ($SECURITY_OVERALL_REASON)"
     echo "diagnose: overall: $([[ $healthy -eq 1 ]] && echo healthy || echo degraded)"
   fi
 
