@@ -13,7 +13,8 @@ This is the live ledger for the assisted acceptance run defined in
 - Local evidence folder: `ntfsmac-acceptance-20260812-190259` on the operator's Desktop. It is
   intentionally not committed because it contains local volume/device identifiers.
 - Drive A: one disposable MBR NTFS volume mounted by ntfsmac with the default `ntfs-3g` driver.
-- A second connected USB device is FAT32, not NTFS, so it does not satisfy the two-NTFS-drive cells.
+- Drive B was initially observed as FAT32 and was later independently prepared as a disposable
+  MBR NTFS volume. It is now eligible for the two-drive cells after the rebuilt app is installed.
 - Source fixes made after a packaged failure are recorded separately from the installed artifact.
   They do not convert that artifact's result into a pass; a rebuilt package must be retested.
 
@@ -31,11 +32,11 @@ This is the live ledger for the assisted acceptance run defined in
 | BB-P0-04 | NOT RUN | Mounted VPN route transition requires the operator. |
 | BB-P0-05 | NOT RUN | Cross-surface mount/unmount matrix remains. |
 | BB-P0-06 | NOT RUN | External NFS disconnect remains. |
-| BB-P0-07 | NOT RUN | GUI crash/restart recovery remains. |
+| BB-P0-07 | IN PROGRESS | Force-quitting only the GUI preserved the NFS mount; `opengui` relaunched exactly one process and diagnostics still reported the real mount. Visible popover/reconciliation confirmation remains. |
 | BB-P0-08 | NOT RUN | Root-authorized helper restart remains. |
-| BB-P0-09 | BLOCKED | Requires a second disposable NTFS volume. |
+| BB-P0-09 | NOT RUN | Two disposable NTFS volumes are now available; concurrent mounting follows rebuild. |
 | BB-P0-10 | NOT RUN | Reversible root-authorized public-evidence permission fault remains. |
-| BB-P1-00 | IN PROGRESS | The normal row remains Open/Unmount and exposes only Verified Copy in `…`; native picker/cancel/refusal flows remain. |
+| BB-P1-00 | IN PROGRESS | The normal row remains Open/Unmount and exposes only Verified Copy in `…`; the destination panel began on the exact MobileData mount and Cancel created no file/status. Success/refusal/active-cancel flows remain. |
 | BB-P1-01 | PASS | 256 MiB copy and reread SHA-256 matched; overwrite was refused without hash change; a controlled mutation was detected. |
 | BB-P1-02 | FAIL | Installed package retained a recoverable partial because destination-only AppleDouble metadata changed the manifest. Source fix passes the same live 505-entry Unicode/symlink tree; rebuilt-package retest required. |
 | BB-P1-03 | IN PROGRESS | Working-tree CLI interruption exited `130`, retained exactly one named partial, preserved the 4 GiB source and never published the final name. Rebuilt-package retest required. |
@@ -46,8 +47,8 @@ This is the live ledger for the assisted acceptance run defined in
 | BB-P1-08 | IN PROGRESS | One MBR device and interrupted/normal workloads recorded; the broader device/controller/OS/low-space inventory remains. |
 | BB-P3-01 | FAIL | On the installed artifact, Open targeted the observed mount but no Finder window appeared. Source now asks Finder to reveal the path before fallbacks; rebuilt-package and two-drive retest required. |
 | BB-P3-02 | IN PROGRESS | Default-off state and absence of unsolicited permission request confirmed. Grant/event/revoke matrix requires the operator. |
-| BB-P3-03 | BLOCKED | Requires two mounted NTFS drives. |
-| BB-P3-04 | BLOCKED | Requires two mounted disposable NTFS drives. |
+| BB-P3-03 | NOT RUN | Two disposable NTFS volumes are now available; run after rebuild. |
+| BB-P3-04 | NOT RUN | Two disposable NTFS volumes are now available; run after rebuild. |
 | BB-F01 | NOT RUN | No-I/O physical hot-unplug is intentionally near the end. |
 | BB-F02 | NOT RUN | Final safe eject and uninstall are intentionally last. |
 
@@ -80,5 +81,4 @@ app visibly opens the correct row's mount point.
 
 1. Build and reinstall after the focused fixes are committed; retain this old evidence folder.
 2. Run the root-only live security gate when Codex supplies the exact one-line command.
-3. Provide a second disposable **NTFS** volume for the concurrent/Eject All cells.
-4. Perform only the requested physical, VPN, permission, Windows and final-uninstall actions.
+3. Perform only the requested physical, VPN, permission, Windows and final-uninstall actions.
