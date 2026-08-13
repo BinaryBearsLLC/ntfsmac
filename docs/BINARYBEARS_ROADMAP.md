@@ -131,8 +131,8 @@ branches does not imply that they were pushed, opened as pull requests, or accep
   pass; the packaged-app hardware matrix below is still a release gate.
 - [-] **NFS transport contract:** ntfsmac now pins anylinuxfs to `--net-helper vmnet`, reports a
   privacy-safe transport-contract token, and includes a fail-closed live route/listener gate.
-  The packaged app passed that gate with one real NTFS device and an active VPN default route;
-  VPN-off and concurrent-device evidence remain open.
+  The packaged app passed that gate with one real NTFS device across VPN-on, VPN-off, and live
+  route transitions; concurrent-device transport-gate evidence remains open.
 
 ## Prioritized roadmap
 
@@ -228,8 +228,14 @@ diagnostic's broad process check incorrectly reported `bridge=up` for this loopb
 On 2026-08-11 one packaged VPN-on session passed the privacy-safe transport gate: private `/30`
 endpoint, bridge route, vmnet helper, soft NFS, and no loopback listener. Effect checks reached
 only the intended NFS/mountd ports and rejected unrelated bridge ports. Teardown removed the
-session and returned endpoint routing to the pre-existing VPN. VPN-off, concurrent mounts, and
-helper-recovery cells remain open.
+session and returned endpoint routing to the pre-existing VPN. On 2026-08-13 the current package
+repeated the VPN-on gate and then passed a live VPN-on -> VPN-off -> VPN-on transition without
+unmounting: the GUI remained truthful automatically and after Refresh, schema-6 diagnostics and
+the authenticated security gate stayed enforced, reads succeeded in every state, NFS remained
+private/vmnet/soft with no loopback listener, and each system default route changed only with the
+operator's VPN action. Final teardown preserved the restored VPN default and removed the mount,
+session, bridge, state file, and PF child anchor. The concurrent-mount transport-gate cell remains
+open; helper reconnect passed the separate packaged recovery cell.
 
 Acceptance: packet/listener/route evidence must match one documented architecture, NFS must remain
 `soft`, teardown must remove every listener and route owned by the session, and neither README nor
@@ -321,7 +327,8 @@ the early resources, preserving cleanup-pending state only when release itself c
 Selected: **Option A**. Missing PF tools, an unevaluated anchor path, unsafe route evidence, stale
 state, or unverified `soft` semantics produce a non-green reason code while leaving the mounted
 volume usable. `tests/live/verify-security-transaction.sh` is the privacy-safe packaged-app gate;
-the remaining VPN-off and concurrent-drive hardware cells remain required before release.
+the VPN-off/on and live-route-transition hardware cells pass, while the concurrent-drive gate
+remains required before release.
 
 #### 4. Complete evidence-backed SECURITY UI
 
@@ -334,7 +341,8 @@ the remaining VPN-off and concurrent-drive hardware cells remain required before
 
 The automated state/parser/aggregation suite covers idle, enforced, non-enforced, missing,
 malformed, stale, VPN-captured, teardown, and concurrent-session behavior. VPN-off/on,
-helper-reconnect, and concurrent-drive claims still need the packaged real-hardware matrix.
+live-route transition, and helper reconnect now pass on packaged real hardware; the broader
+concurrent-drive transport claim still needs its dedicated gate.
 
 ### P1 — Verifiable copying and controlled NTFS3 adoption
 
