@@ -17,6 +17,8 @@ and the focused VPN-on P0 follow-up is recorded in
 Untested matrix cells remain release gates even when the implemented acceptance checks pass.
 The current packaged acceptance ledger is
 [BinaryBears packaged validation results — 2026-08-12](testing/BINARYBEARS_VALIDATION_RESULTS_2026-08-12.md).
+Replacement commit `db3aacf` passed its default real-hardware mount, measured security transaction,
+and complete GUI/root teardown on 2026-08-13; the remaining P0 hardware matrix cells stay open.
 
 The post-sync wiring audit and its focused recovery branches are recorded in
 [BinaryBears Upstream Regression Audit — 2026-08-05](audits/UPSTREAM_REGRESSION_AUDIT_2026-08-05.md).
