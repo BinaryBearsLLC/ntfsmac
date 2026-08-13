@@ -523,7 +523,12 @@ retest then delivered mount, foreground unmount, and controlled-failure requests
 sound presentation options. macOS muted their visible presentation only because the display was
 shared during assisted control. The failure retained its mount and security session until recovery,
 and a complete mount/unmount cycle with the app preference disabled created no notification
-requests. System-level revoke and reconciliation remain.
+requests. The operator then revoked ntfsmac in System Settings: reopening the in-popover Settings
+reconciled the persisted opt-in to off and presented actionable System Settings guidance. This
+completes the packaged notification matrix. The unusual first-grant callback race was observed on
+the preceding installed package and is covered by the focused authorization regression in the
+rebuilt source; macOS does not return an already registered application to `notDetermined` through
+its normal notification controls.
 
 The same run found a cold-launch timing defect in `opengui`: the installed app truthfully recovered
 the surviving mount but presented its popover at the lower-left of the screen. Source now defers
