@@ -490,9 +490,9 @@ The initial 2026-08-12 packaged run exposed a Finder-presentation false positive
 accepted the NFS URL but no Finder window appeared. The source now asks Finder to reveal the exact
 observed mount point before using fallbacks; the rebuilt artifact must pass the per-drive live
 check before P3 can be called packaged-valid. Replacement commit `db3aacf` visibly opened the
-correct first-drive Finder window on 2026-08-13; the concurrent second-drive row remains. The
-professional DMG presentation is a separate
-open packaging-UX item and does not expand the normal menu-bar surface.
+correct Finder window for both concurrently mounted drive rows on 2026-08-13. The professional
+DMG presentation is a separate open packaging-UX item and does not expand the normal menu-bar
+surface.
 
 The same run found a cold-launch timing defect in `opengui`: the installed app truthfully recovered
 the surviving mount but presented its popover at the lower-left of the screen. Source now defers

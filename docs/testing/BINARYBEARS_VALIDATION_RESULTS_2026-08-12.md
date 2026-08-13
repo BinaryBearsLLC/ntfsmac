@@ -49,7 +49,7 @@ This is the live ledger for the assisted acceptance run defined in
 | BB-P0-06 | NOT RUN | External NFS disconnect remains. |
 | BB-P0-07 | PASS | On both tested candidates, terminating only the GUI preserved the real mount; `opengui` relaunched exactly one process, and the visible popover recovered the RW/security state. Replacement commit `db3aacf` repeated this after native-panel automation lost its accessibility bridge, then its normal GUI Unmount returned to both detected rows and passed the non-root BB-P0-02 cleanup. |
 | BB-P0-08 | NOT RUN | Root-authorized helper restart remains. |
-| BB-P0-09 | NOT RUN | Two disposable NTFS volumes are now available; concurrent mounting follows rebuild. |
+| BB-P0-09 | PASS | Replacement commit `db3aacf` mounted MobileData and USB_8GB concurrently as two independent RW `ntfs-3g` rows, NFS mounts, VM sessions, and security sessions. A fixed-name write/reread SHA-256 round trip passed on USB_8GB. Unmounting only USB_8GB reduced diagnostics from two mounts/sessions to one while MobileData remained RW, enforced, and its 256 MiB payload independently verified. |
 | BB-P0-10 | NOT RUN | Reversible root-authorized public-evidence permission fault remains. |
 | BB-P1-00 | IN PROGRESS | The normal row remains Open/Unmount and exposes only Verified Copy in `…`; the destination panel began on the exact MobileData mount and the earlier Cancel created no file/status. During replacement-candidate automation, the native source panel visually selected `gui-source.bin` but dispatched its parent `fixtures` directory, so that run is invalid rather than a product pass/fail. The copy stayed in one hidden partial with no final name and its isolated process group was stopped; mount/security remained healthy. Computer Use then lost only the app's accessibility bridge while Finder remained readable and a process sample showed the GUI main thread idle. Human source selection plus success/refusal/in-app Cancel remain. |
 | BB-P1-01 | PASS | 256 MiB copy and reread SHA-256 matched; overwrite was refused without hash change; a controlled mutation was detected. |
@@ -60,7 +60,7 @@ This is the live ledger for the assisted acceptance run defined in
 | BB-P1-06 | NOT RUN | Same-device explicit NTFS3 comparison remains. |
 | BB-P1-07 | BLOCKED | Requires Windows-prepared clean/dirty/Fast Startup/error states. |
 | BB-P1-08 | IN PROGRESS | One MBR device and interrupted/normal workloads recorded; the broader device/controller/OS/low-space inventory remains. |
-| BB-P3-01 | IN PROGRESS | The original installed artifact targeted the observed mount but showed no Finder window. Replacement commit `db3aacf` visibly opened a Finder window titled MobileData from that row's Open action while status independently reported `/Volumes/MobileData`. The second concurrently mounted row still must open its own path before this cell passes. |
+| BB-P3-01 | PASS | The original installed artifact targeted the observed mount but showed no Finder window. Replacement commit `db3aacf` visibly opened Finder windows titled MobileData and USB_8GB from their respective concurrently mounted rows while status independently reported `/Volumes/MobileData` and `/Volumes/USB_8GB`. |
 | BB-P3-02 | IN PROGRESS | Default-off state and absence of unsolicited permission request confirmed. Grant/event/revoke matrix requires the operator. |
 | BB-P3-03 | NOT RUN | Two disposable NTFS volumes are now available; run after rebuild. |
 | BB-P3-04 | NOT RUN | Two disposable NTFS volumes are now available; run after rebuild. |
@@ -96,8 +96,8 @@ severity, and a complete real runtime build including `41/41` anylinuxfs, `8/8` 
 The installed app's generic Launch Services open returned success for the NFS path without
 presenting a Finder window. The working tree now requests an exact Finder reveal first and uses
 `/usr/bin/open` only as a fallback. Replacement commit `db3aacf` visibly opened the correct
-MobileData Finder window from its mounted row on 2026-08-13. The second-drive row remains required
-before the complete two-drive cell passes.
+MobileData and USB_8GB Finder windows from their respective concurrently mounted rows on
+2026-08-13, completing the two-drive cell.
 
 ### Cold `opengui` popover anchoring
 
