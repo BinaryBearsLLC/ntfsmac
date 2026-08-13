@@ -190,8 +190,10 @@ operator-authenticated `/sbin/umount` repeat produced the same automatic zero-mo
 state without Refresh. The final root inspection found no state files or PF child anchors,
 completing the current external-disconnect cell. The operator then restarted the exact launchd
 helper with no active mount; one job, one helper process, and the expected plist/binary pair remain,
-with the post-restart mount/unmount still in progress. Physical hot-unplug also remains. Concurrent
-two-drive state and independent teardown passed separately.
+and the first post-restart GUI mount/unmount succeeded without reinstall or another authorization.
+The mount reached verified RW with one enforced session; teardown returned to healthy zero state
+while the same sole helper process remained, completing helper reconnect. Physical hot-unplug also
+remains. Concurrent two-drive state and independent teardown passed separately.
 
 Acceptance: no UI control, icon, diagnostic row, or CLI output may claim a drive is mounted or
 writable after the corresponding host mount disappears. A CLI-created mount must also appear in
