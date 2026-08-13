@@ -21,6 +21,9 @@ This is the live ledger for the assisted acceptance run defined in
 - Current installed GUI candidate includes notification correction commit `d99c4ac`, release `2.1`,
   build `090826`, arm64, ad-hoc signed. Its installed GUI executable matches the verified app from
   DMG SHA-256 `c7bacbbec54a303f3ee2541da49a916b9668b8ac78c825151fb0fdce5c0a8905`.
+- Current installed candidate also includes mount-watchdog correction commit `3a3faab`; its
+  bundled and staged watchdog hashes match, and the complete gates pass shell `294/294` and Swift
+  `251/251`.
 - Host: Apple Silicon with Hypervisor support, macOS 26.6.1.
 - Local evidence folder: `ntfsmac-acceptance-20260812-190259` on the operator's Desktop. It is
   intentionally not committed because it contains local volume/device identifiers.
@@ -69,6 +72,46 @@ This is the live ledger for the assisted acceptance run defined in
 | BB-P3-04 | PASS | The original packaged attempt exposed a security postcondition defect and led to the authoritative host-mount check in commit `3caf812`. The rebuilt installed package passed the repeat: a safe read-only working-directory hold left MobileData accessible and reported `Failed`, USB_8GB reported `Unmounted`, all mutating actions and Quit were disabled during the batch, and closing the report changed presentation only. Host truth and diagnostics agreed on one remaining NFS mount with one enforced security session throughout the hold. After release, MobileData's normal Unmount returned both rows to detected and diagnostics to healthy with zero mounts/sessions and the bridge down; the operator-authenticated check found no security state files or PF child anchors. |
 | BB-F01 | NOT RUN | No-I/O physical hot-unplug is intentionally near the end. |
 | BB-F02 | NOT RUN | Final safe eject and uninstall are intentionally last. |
+
+## Pause checkpoint — 2026-08-13
+
+Validation is intentionally paused after closing packaged BB-P1-00. The implementation under test
+is integrated in local `dev`; validation documentation is complete through commit `9959939` before
+this checkpoint commit. No push was performed.
+
+Closed on this host:
+
+- BB-00, BB-02, every BB-P0 cell, BB-P1-00 through BB-P1-04, and every BB-P3 cell are `PASS`;
+- Verified Copy now has packaged evidence for picker Cancel, volume-boundary refusal, successful
+  publication, no-overwrite behavior, and active cancellation with a recoverable partial;
+- the installed mount remains truthful and healthy after the cancelled 16 GiB copy.
+
+Exact paused host state:
+
+- MobileData (`disk6s1`) is the sole ntfsmac NFS mount, using `ntfs-3g`; diagnostics report one
+  enforced security session, private vmnet transport, evaluated PF, the VPN default still active,
+  and no copy/mount/unmount command in flight;
+- the 16 GiB local source remains intact, the requested final `gui-cancel.bin` is absent, and the
+  single recoverable `.gui-cancel.bin.ntfsmac-partial.S6kZFS` is intentionally retained on
+  MobileData as evidence;
+- USB_8GB (`disk7s1`) is not mounted by ntfsmac. macOS currently exposes it separately as a native
+  read-only NTFS/FsKit mount at `/Volumes/USB_8GB`; do not confuse that with a tested ntfsmac
+  driver session.
+
+Resume in this order:
+
+1. BB-P1-06: safely clear the native USB_8GB mount, then run the same-device operation/manifest
+   matrix first with default `ntfs-3g`, then with the explicit NTFS3 preflight and no-fallback
+   checks.
+2. BB-03: dark appearance, full keyboard traversal, and safe warning/error presentation.
+3. BB-F01: no-I/O physical hot-unplug and authoritative recovery.
+4. BB-01: deliberately blank clean-install replay.
+5. BB-F02: final safe eject and uninstall, including helper/CLI/login-item/residue checks.
+
+After those Mac-local cells, Windows remains required for BB-P1-05 and BB-P1-07. BB-P1-08 remains
+an explicitly partial coverage inventory until additional devices/controllers, GPT media, low-space
+media, supported macOS versions, and Windows-system-volume cases are available. The live
+240-second watchdog expiry also remains unmeasured because the stalled condition did not recur.
 
 ## Findings corrected in the working tree
 

@@ -18,7 +18,8 @@ Untested matrix cells remain release gates even when the implemented acceptance 
 The current packaged acceptance ledger is
 [BinaryBears packaged validation results — 2026-08-12](testing/BINARYBEARS_VALIDATION_RESULTS_2026-08-12.md).
 Replacement commit `db3aacf` passed its default real-hardware mount, measured security transaction,
-and complete GUI/root teardown on 2026-08-13; the remaining P0 hardware matrix cells stay open.
+and complete GUI/root teardown on 2026-08-13. Every named P0 acceptance cell now passes on the
+current Apple Silicon host; broader host/device coverage remains recorded separately in BB-P1-08.
 
 The post-sync wiring audit and its focused recovery branches are recorded in
 [BinaryBears Upstream Regression Audit — 2026-08-05](audits/UPSTREAM_REGRESSION_AUDIT_2026-08-05.md).
@@ -487,7 +488,9 @@ must use disposable test data with a separate backup.
 P1 is software-complete on 2026-08-12. The same-media post-reconnect/Windows verification and
 same-device `ntfs-3g` versus NTFS3 qualification above remain release gates, not implied passes.
 Replacement commit `db3aacf` passed the same-media physical reconnect and independent 256 MiB
-SHA-256 reread on 2026-08-13; Windows and the driver comparison remain open.
+SHA-256 reread on 2026-08-13. Rebuilt commit `3a3faab` then passed the complete packaged minimal-GUI
+Verified Copy flow, including active cancellation and recoverable-partial evidence. Windows and the
+same-device driver comparison remain open.
 
 ### P2 — Modern helper lifecycle
 
@@ -533,11 +536,10 @@ and uninstall boundary; it should not be mixed into unrelated work.
 
 The initial 2026-08-12 packaged run exposed a Finder-presentation false positive: Launch Services
 accepted the NFS URL but no Finder window appeared. The source now asks Finder to reveal the exact
-observed mount point before using fallbacks; the rebuilt artifact must pass the per-drive live
-check before P3 can be called packaged-valid. Replacement commit `db3aacf` visibly opened the
-correct Finder window for both concurrently mounted drive rows on 2026-08-13. The professional
-DMG presentation is a separate open packaging-UX item and does not expand the normal menu-bar
-surface.
+observed mount point before using fallbacks. Replacement commit `db3aacf` visibly opened the
+correct Finder window for both concurrently mounted drive rows on 2026-08-13, and BB-P3-01 through
+BB-P3-04 now pass on the installed package. The professional DMG presentation is a separate open
+packaging-UX item and does not expand the normal menu-bar surface.
 
 The same replacement package passed the two-drive Eject All success path on 2026-08-13: the
 compact report showed one `Unmounted` result per original row, both mounts and security sessions

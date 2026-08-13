@@ -250,10 +250,10 @@ developed from `dev` and reviewed back into `dev` through its own focused branch
 | Priority | Status | Direction |
 | --- | --- | --- |
 | Completed foundation | ✅ Shipped | Multi-drive NTFS/ext support, MBR detection, in-popover Settings, adaptive icon and help, privacy-safe CLI/GUI diagnostics, version reporting, and helper reinstall/uninstall lifecycle |
-| P0 | 🟡 Software complete; hardware gate open | Runtime pinning, audited updates, mount reconciliation, per-session PF/VPN transaction, and measured SECURITY telemetry are implemented; the remaining packaged hardware matrix stays open |
+| P0 | ✅ Current-host acceptance complete | Runtime pinning, audited updates, mount reconciliation, per-session PF/VPN transaction, and measured SECURITY telemetry are implemented; every named P0 cell passes on the current Apple Silicon host |
 | P1 | 🟡 Software complete; qualification open | Verified Copy CLI/GUI and the explicit one-mount NTFS3 GUI choice are implemented; same-media reconnect/Windows proof and same-device NTFS3 hardware qualification remain open |
 | P2 | ⬜ Planned | Migrate the deprecated privileged-helper lifecycle to `SMAppService` after its ad-hoc-signing and upgrade path are proven |
-| P3 | 🟡 Software complete; packaged validation open | Per-drive Open in Finder, opt-in notifications, and resilient Eject All are implemented; misleading global transfer telemetry was removed to keep the UI minimal |
+| P3 | ✅ Packaged validation complete | Per-drive Open in Finder, opt-in notifications, and resilient Eject All pass packaged validation; the separate professional DMG presentation remains open without expanding the minimal app UI |
 
 The roadmap records explicit A/B options where evidence is still missing. In particular,
 `ntfs-3g` remains the compatibility-first default; NTFS3 does not become the default without a
