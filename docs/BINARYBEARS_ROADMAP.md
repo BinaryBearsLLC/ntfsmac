@@ -348,6 +348,9 @@ identity immediately before launch; existing and broken-symlink destinations are
 one copy is active, mount/unmount/Eject All/Settings/Quit actions are disabled. Cancel signals the
 dedicated CLI process group, retains the source and any partial destination, and never publishes a
 final name as success.
+Replacement commit `db3aacf` passed the installed-package 505-entry nested/Unicode/symlink tree and
+independent manifest verification on real NTFS hardware on 2026-08-13, including destination-only
+AppleDouble sidecars.
 
 ##### Media-copy integrity investigation
 

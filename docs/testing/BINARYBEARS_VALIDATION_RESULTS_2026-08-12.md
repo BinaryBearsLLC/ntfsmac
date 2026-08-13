@@ -53,7 +53,7 @@ This is the live ledger for the assisted acceptance run defined in
 | BB-P0-10 | NOT RUN | Reversible root-authorized public-evidence permission fault remains. |
 | BB-P1-00 | IN PROGRESS | The normal row remains Open/Unmount and exposes only Verified Copy in `…`; the destination panel began on the exact MobileData mount and Cancel created no file/status. Success/refusal/active-cancel flows remain. |
 | BB-P1-01 | PASS | 256 MiB copy and reread SHA-256 matched; overwrite was refused without hash change; a controlled mutation was detected. |
-| BB-P1-02 | FAIL | Installed package retained a recoverable partial because destination-only AppleDouble metadata changed the manifest. Source fix passes the same live 505-entry Unicode/symlink tree; rebuilt-package retest required. |
+| BB-P1-02 | PASS | The original installed package retained a recoverable partial because destination-only AppleDouble metadata changed the manifest. Replacement commit `db3aacf` copied and published the same 505-entry nested/Unicode/symlink tree, then its installed CLI independently verified the destination manifest. The destination contained 1010 physical entries because of 505 AppleDouble sidecars, all correctly outside the byte-integrity contract without ignoring real source sidecars. |
 | BB-P1-03 | IN PROGRESS | Working-tree CLI interruption exited `130`, retained exactly one named partial, preserved the 4 GiB source and never published the final name. Rebuilt-package retest required. |
 | BB-P1-04 | NOT RUN | Physical reconnect follows clean teardown. |
 | BB-P1-05 | BLOCKED | Windows-side hash/playback comparison requires Windows and the same media. |
@@ -80,7 +80,9 @@ manifest and is verified byte-for-byte.
 Focused Bats coverage passes `8/8`. The corrected working-tree CLI also passed the original live
 tree: 505 source entries, nested paths, Unicode, 500 small files and a relative symlink. The 505
 physical metadata sidecars remained on the filesystem but were correctly outside the documented
-byte-integrity contract.
+byte-integrity contract. Replacement commit `db3aacf` repeated that exact live case from the
+installed package on 2026-08-13: copy/publish and a separate `verify` both passed, with 505 logical
+source entries and 1010 physical destination entries including the expected 505 sidecars.
 
 After the copy/Finder corrections, the complete automated gates passed Swift `245/245` and Bats
 `286/286`. After the popover correction, Swift passes `247/247` and the focused `opengui` Bats
