@@ -237,7 +237,7 @@ that host file while retaining its guest-visible root metadata. Real non-symlink
 focused installer/build coverage, the full `289/289` Bats suite, Swift `247/247`, and a complete
 runtime rebuild pass. Replacement commit `db3aacf` passed the affected BB-01 upgrade-cache staging,
 unprivileged backend enumeration, and two-row popover checks on 2026-08-13; its mount/unmount and
-deliberately blank clean-install cells remain.
+ownership-preservation cycle also passed. Only the deliberately blank clean-install cell remains.
 
 #### 2. Establish an anylinuxfs update policy
 

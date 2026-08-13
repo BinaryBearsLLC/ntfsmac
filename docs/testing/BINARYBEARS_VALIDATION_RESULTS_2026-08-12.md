@@ -38,16 +38,16 @@ This is the live ledger for the assisted acceptance run defined in
 | ID | Status | Evidence observed / remaining gate |
 | --- | --- | --- |
 | BB-00 | PASS | Exact artifact recorded; app signature, DMG verification, arm64, host and Hypervisor checks passed. |
-| BB-01 | IN PROGRESS | Installed app, helper, bundled CLI, version/build and command surface were confirmed. Rebuilt commit `004e76e` exposed a root-owned cached `vmproxy` after its privileged update and failed. Replacement commit `db3aacf` then passed the affected upgrade: staging repaired that file to the invoking user without a manual ownership command; installed payload hashes match the candidate; ordinary and Microsoft-only backend scans both exited `0`; and the popover visibly showed the same two NTFS rows as `diskutil`. A deliberately blank clean-install replay remains. |
+| BB-01 | IN PROGRESS | Installed app, helper, bundled CLI, version/build and command surface were confirmed. Rebuilt commit `004e76e` exposed a root-owned cached `vmproxy` after its privileged update and failed. Replacement commit `db3aacf` then passed the affected upgrade: staging repaired that file to the invoking user without a manual ownership command; installed payload hashes match the candidate; ordinary and Microsoft-only backend scans both exited `0`; the popover visibly showed the same two NTFS rows as `diskutil`; and a full mount/unmount cycle preserved user ownership and enumeration. A deliberately blank clean-install replay remains. |
 | BB-02 | PASS | The original package failed cold placement. Rebuilt commit `004e76e` passed cold and warm opening beneath the menu-bar icon, three simultaneous requests with exit `0`, exactly one GUI process, and invalid-argument exit `2` without another process or Accessibility permission. |
 | BB-03 | IN PROGRESS | Mounted/Settings/Diagnostics light UI, Back, overflow-only copy action and Launch at login enable/disable passed. The cold-placement failure is tracked in BB-02; dark, full keyboard and safe warning/error states remain. |
 | BB-P0-01 | PASS | The original package passed the default `ntfs-3g` RW round trip, diagnostic truth, vmnet/private/soft transport gate and root security transaction gate with one real session. Replacement commit `db3aacf` first stopped fail-closed while its replaced helper's Full Disk Access toggle was off. After the operator enabled exactly that entry, the GUI mounted MobileData RW with `ntfs-3g`; GUI, anylinuxfs status, host NFS table, diagnostic schema 6, and public security summary agreed on one mount/session with private vmnet, `soft` transport, PF evaluated, and no required route. A fixed-name write/reread SHA-256 round trip and exact test-artifact cleanup passed; both the live NFS transport gate and operator-authenticated root security transaction gate passed. Canonical teardown remains for this candidate. |
-| BB-P0-02 | PASS | GUI returned to two detected drives; NFS mounts and anylinuxfs sessions were empty; diagnostics reported bridge down and zero security sessions; the root check found no session state file or PF child anchor. |
+| BB-P0-02 | PASS | The original and replacement candidates both returned the GUI to two detected drives with empty NFS mounts and anylinuxfs sessions; replacement diagnostics reported bridge down, no network helper, and zero security sessions while both backend enumeration and cache ownership remained healthy. The original root check found no session state file or PF child anchor; the same post-unmount root check remains to be repeated for replacement commit `db3aacf`. |
 | BB-P0-03 | NOT RUN | VPN-on mount requires the operator's VPN transition. |
 | BB-P0-04 | NOT RUN | Mounted VPN route transition requires the operator. |
 | BB-P0-05 | NOT RUN | Cross-surface mount/unmount matrix remains. |
 | BB-P0-06 | NOT RUN | External NFS disconnect remains. |
-| BB-P0-07 | PASS | Force-quitting only the GUI preserved the mount; `opengui` relaunched exactly one process, and the visible popover plus diagnostics both recovered the real RW/security state. Normal Unmount then passed the full BB-P0-02 cleanup. The detached cold-popover defect remains isolated in BB-02 and is fixed only in the working tree. |
+| BB-P0-07 | PASS | On both tested candidates, terminating only the GUI preserved the real mount; `opengui` relaunched exactly one process, and the visible popover recovered the RW/security state. Replacement commit `db3aacf` repeated this after native-panel automation lost its accessibility bridge, then its normal GUI Unmount returned to both detected rows and passed the non-root BB-P0-02 cleanup. |
 | BB-P0-08 | NOT RUN | Root-authorized helper restart remains. |
 | BB-P0-09 | NOT RUN | Two disposable NTFS volumes are now available; concurrent mounting follows rebuild. |
 | BB-P0-10 | NOT RUN | Reversible root-authorized public-evidence permission fault remains. |
@@ -130,19 +130,19 @@ patch; the complete build and regression suites pass. Replacement commit `db3aac
 affected packaged upgrade on 2026-08-13: the cache file became `andrea:staff`, both backend list
 modes returned both NTFS partitions with exit `0`, diagnostics were healthy with zero mounts or
 security sessions, and the popover visibly reported `2 drive(s) detected` with the correct device,
-label, size, and unmounted controls. A live mount/unmount cycle and deliberately blank install
-remain before BB-01 closes.
+label, size, and unmounted controls. The subsequent mount/unmount cycle preserved both enumeration
+and ownership. Only the deliberately blank install remains before BB-01 closes.
 
 ## Next operator checkpoints
 
-1. Complete one default mount/unmount cycle on replacement commit `db3aacf` and recheck ownership.
-2. Retest the rebuilt P1 tree and P3 Finder/two-drive cells.
-3. Perform only the requested physical, VPN, Windows and final-uninstall actions.
+1. Complete the replacement post-unmount root PF/state absence check.
+2. Retest the remaining GUI P1 and P3 two-drive cells.
+3. Perform only the requested physical reconnect, VPN, Windows and final-uninstall actions.
 
-The first `db3aacf` Mount attempt is currently paused at the expected macOS privacy boundary:
-System Settings shows exactly `com.khr898.ntfsmac.helper` with Full Disk Access off after helper
-replacement. ChatGPT, Codex Computer Use, and Terminal remain off. The application did not create
-a backend session or mount and did not misreport success.
+The first `db3aacf` Mount attempt paused at the expected macOS privacy boundary: System Settings
+showed exactly `com.khr898.ntfsmac.helper` with Full Disk Access off after helper replacement.
+ChatGPT, Codex Computer Use, and Terminal remained off. The application did not create a backend
+session or mount and did not misreport success.
 
 After the operator enabled that entry, the mounted candidate passed all non-root BB-P0-01 checks.
 The operator then ran the root gate with explicit authentication; it passed with one session,
