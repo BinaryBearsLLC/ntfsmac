@@ -193,7 +193,12 @@ helper with no active mount; one job, one helper process, and the expected plist
 and the first post-restart GUI mount/unmount succeeded without reinstall or another authorization.
 The mount reached verified RW with one enforced session; teardown returned to healthy zero state
 while the same sole helper process remained, completing helper reconnect. Physical hot-unplug also
-remains. Concurrent two-drive state and independent teardown passed separately.
+remains. Concurrent two-drive state and independent teardown passed separately. The packaged
+public-evidence fault cell also passed: making only the root-owned security summary world-writable
+changed all three GUI security claims and schema-6 diagnostics to reason-coded `unknown` before a
+manual Refresh, without misclassifying the still-present NFS mount. Restoring `0644` recovered the
+measured enforced state automatically, and final GUI teardown returned to zero mounts/sessions with
+the bridge down. This closes the current fail-closed public-evidence gate.
 
 Acceptance: no UI control, icon, diagnostic row, or CLI output may claim a drive is mounted or
 writable after the corresponding host mount disappears. A CLI-created mount must also appear in
