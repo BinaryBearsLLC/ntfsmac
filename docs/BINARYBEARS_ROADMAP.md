@@ -501,8 +501,10 @@ files or PF child anchors. The safe packaged partial-failure attempt then expose
 postcondition defect: anylinuxfs returned zero while a read-only working-directory hold kept the
 host NFS mount active, so the CLI removed that drive's security session prematurely. Diagnostics
 correctly became unhealthy with one host mount and zero security sessions; normal Unmount recovered
-after releasing the hold. The CLI must prove the target disappeared from the authoritative host
-mount table before tearing down per-session PF/route ownership, then this packaged cell must repeat.
+after releasing the hold. The CLI now proves the target disappeared from the authoritative host
+mount table before tearing down per-session PF/route ownership and retains protection when that
+proof fails. Regression coverage includes a false-zero busy mount, an unreadable mount table, and
+a volume name containing spaces; the rebuilt packaged cell must still repeat.
 
 The same run found a cold-launch timing defect in `opengui`: the installed app truthfully recovered
 the surviving mount but presented its popover at the lower-left of the screen. Source now defers

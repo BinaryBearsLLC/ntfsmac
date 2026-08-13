@@ -97,6 +97,32 @@ cmd_unmount() {
     return 1
   fi
 
+  # anylinuxfs can return zero after its own teardown attempt even when macOS refused the host
+  # NFS unmount (for example, a process still has its working directory inside the volume). Host
+  # mount truth is therefore a mandatory postcondition, not an informational refresh. Never tear
+  # down this session's PF/route ownership while its NFS mount is still present, and fail closed
+  # when the host mount table itself cannot be read authoritatively.
+  local mounts_after mount_point server target_still_mounted="0"
+  mounts_after="$(mktemp)"
+  if ! list_active_nfs_mounts > "$mounts_after"; then
+    rm -f "$mounts_after"
+    echo "unmount: failed to verify host mount removal for $target; security protection retained" >&2
+    return 1
+  fi
+  while IFS=$'\t' read -r mount_point server; do
+    [[ -n "$mount_point" ]] || continue
+    if [[ "$target" == /Volumes/* ]]; then
+      [[ "$mount_point" == "$target" ]] && target_still_mounted="1"
+    elif [[ "$server" == "$target.local:"* || "$server" == "/dev/$target:"* ]]; then
+      target_still_mounted="1"
+    fi
+  done < "$mounts_after"
+  rm -f "$mounts_after"
+  if [[ "$target_still_mounted" == "1" ]]; then
+    echo "unmount: host NFS mount is still present for $target; security protection retained" >&2
+    return 1
+  fi
+
   if [[ -n "$security_session" ]]; then
     security_teardown_session "$security_session" || \
       echo "unmount: WARN — session security teardown failed (non-fatal)" >&2

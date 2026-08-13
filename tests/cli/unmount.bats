@@ -82,6 +82,55 @@ STUB
   [ "$status" -ne 0 ]
 }
 
+@test "a zero anylinuxfs exit cannot remove security while the host mount remains" {
+  cat > "$STUB_DIR/mount" <<STUB
+#!/bin/bash
+echo "disk2s1.local:/mnt/Media on /Volumes/Media (nfs, nodev, nosuid, mounted by test)"
+STUB
+  chmod +x "$STUB_DIR/mount"
+  mkdir -p "$NTFSMAC_SECURITY_STATE_DIR"
+  printf 'anchor=com.apple/ntfsmac-disk2s1\npf_token=\nroute_owned=0\n' \
+    > "$NTFSMAC_SECURITY_STATE_DIR/disk2s1.state"
+
+  run "$SCRIPT" disk2s1
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"host NFS mount is still present"* ]]
+  [[ "$output" == *"security protection retained"* ]]
+  [ -f "$NTFSMAC_SECURITY_STATE_DIR/disk2s1.state" ]
+}
+
+@test "postcondition recognizes a mounted volume whose name contains spaces" {
+  cat > "$STUB_DIR/mount" <<STUB
+#!/bin/bash
+echo "disk2s1.local:/mnt/My_Drive on /Volumes/My Drive (nfs, nodev, nosuid, mounted by test)"
+STUB
+  chmod +x "$STUB_DIR/mount"
+
+  run "$SCRIPT" "/Volumes/My Drive"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"host NFS mount is still present"* ]]
+}
+
+@test "an unreadable host mount table retains security and fails closed" {
+  cat > "$STUB_DIR/mount" <<STUB
+#!/bin/bash
+exit 1
+STUB
+  chmod +x "$STUB_DIR/mount"
+  mkdir -p "$NTFSMAC_SECURITY_STATE_DIR"
+  printf 'anchor=com.apple/ntfsmac-disk2s1\npf_token=\nroute_owned=0\n' \
+    > "$NTFSMAC_SECURITY_STATE_DIR/disk2s1.state"
+
+  run "$SCRIPT" disk2s1
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"failed to verify host mount removal"* ]]
+  [[ "$output" == *"security protection retained"* ]]
+  [ -f "$NTFSMAC_SECURITY_STATE_DIR/disk2s1.state" ]
+}
+
 @test "a wedged anylinuxfs unmount gets killed and reported instead of hanging forever" {
   cat > "$STUB_DIR/anylinuxfs" <<STUB
 #!/bin/bash
@@ -108,10 +157,17 @@ STUB
 }
 
 @test "no target given: lists currently mounted drives and unmounts the chosen one" {
+  mount_calls="$STUB_DIR/mount.calls"
   cat > "$STUB_DIR/mount" <<STUB
 #!/bin/bash
+count=0
+[[ ! -f "$mount_calls" ]] || count=\$(cat "$mount_calls")
+count=\$((count + 1))
+echo "\$count" > "$mount_calls"
 echo "192.168.127.2:/export/a on /Volumes/MyDrive (nfs, nodev, nosuid, mounted by test)"
-echo "192.168.127.2:/export/b on /Volumes/OtherDrive (nfs, nodev, nosuid, mounted by test)"
+if [[ "\$count" -eq 1 ]]; then
+  echo "192.168.127.2:/export/b on /Volumes/OtherDrive (nfs, nodev, nosuid, mounted by test)"
+fi
 STUB
   chmod +x "$STUB_DIR/mount"
 

@@ -162,7 +162,7 @@ fs_type_for_device() {
 # theoretical, hang point too.
 list_active_nfs_mounts() {
   local line tmp
-  local mount_re='^([^[:space:]]+)[[:space:]]+on[[:space:]]+(/Volumes/[^[:space:](]+)[[:space:]]+\(nfs'
+  local mount_re='^([^[:space:]]+)[[:space:]]+on[[:space:]]+(/Volumes/.+)[[:space:]]+\(nfs'
 
   tmp="$(mktemp)"
   if ! run_with_progress "${NTFSMAC_MOUNT_LIST_TIMEOUT:-15}" 5 "unmount: listing mounts" "$tmp" mount; then
