@@ -12,6 +12,12 @@ This is the live ledger for the assisted acceptance run defined in
 - Rebuilt artifact under retest: commit `004e76ee38c93e5a591c14f2cf965db56c06b64e`, release
   `2.1`, build `090826`, arm64, ad-hoc signed. The installed GUI executable SHA-256 matches the
   freshly built `dist/ntfsmac.app` executable.
+- Runtime-cache replacement candidate installed on 2026-08-13: commit
+  `db3aacf214085034942493739645d77658b0c532`, release `2.1`, build `090826`, arm64, ad-hoc
+  signed. Installed GUI, bundled installer, and bundled anylinuxfs hashes match `dist/ntfsmac.app`;
+  the staged `/usr/local` anylinuxfs also matches. DMG SHA-256 is
+  `419235670feb5b6d0c3ad19328c6ba415f1efb2386db818300bbc872dc501e48`, and `hdiutil verify`
+  passes.
 - Host: Apple Silicon with Hypervisor support, macOS 26.6.1.
 - Local evidence folder: `ntfsmac-acceptance-20260812-190259` on the operator's Desktop. It is
   intentionally not committed because it contains local volume/device identifiers.
@@ -32,7 +38,7 @@ This is the live ledger for the assisted acceptance run defined in
 | ID | Status | Evidence observed / remaining gate |
 | --- | --- | --- |
 | BB-00 | PASS | Exact artifact recorded; app signature, DMG verification, arm64, host and Hypervisor checks passed. |
-| BB-01 | FAIL | Installed app, helper, bundled CLI, version/build and command surface were confirmed. Rebuilt commit `004e76e` requested the expected privileged update and exact `com.khr898.ntfsmac.helper` Full Disk Access entry; its enabled state was read back while unrelated ChatGPT, Codex Computer Use and Terminal entries remained off. The subsequent scan exposed a root-owned cached `vmproxy` left by the privileged update, so this package does not pass upgrade installation. The source now repairs the legacy file during staging and preserves invoker ownership on later updates; a newly rebuilt package and deliberately blank clean install both remain required. |
+| BB-01 | IN PROGRESS | Installed app, helper, bundled CLI, version/build and command surface were confirmed. Rebuilt commit `004e76e` exposed a root-owned cached `vmproxy` after its privileged update and failed. Replacement commit `db3aacf` then passed the affected upgrade: staging repaired that file to the invoking user without a manual ownership command; installed payload hashes match the candidate; ordinary and Microsoft-only backend scans both exited `0`; and the popover visibly showed the same two NTFS rows as `diskutil`. A deliberately blank clean-install replay remains. |
 | BB-02 | PASS | The original package failed cold placement. Rebuilt commit `004e76e` passed cold and warm opening beneath the menu-bar icon, three simultaneous requests with exit `0`, exactly one GUI process, and invalid-argument exit `2` without another process or Accessibility permission. |
 | BB-03 | IN PROGRESS | Mounted/Settings/Diagnostics light UI, Back, overflow-only copy action and Launch at login enable/disable passed. The cold-placement failure is tracked in BB-02; dark, full keyboard and safe warning/error states remain. |
 | BB-P0-01 | PASS | The original package passed the default `ntfs-3g` RW round trip, diagnostic truth, vmnet/private/soft transport gate and root security transaction gate with one real session. On rebuilt commit `004e76e`, the first retry stopped fail-closed at Full Disk Access and the next scan failed before mount because of the BB-01 runtime-cache ownership regression. No NFS/anylinuxfs/vmnet state was created. The source fix is verified automatically, but the replacement package must repeat this cell. |
@@ -117,13 +123,15 @@ retaining the guest-visible root ownership metadata. The pinned submodule is unc
 patch applies only to its disposable source copy and hard-stops if the upstream shape drifts.
 
 Focused installer tests prove repair and symlink refusal; build tests prove one idempotent ownership
-patch; the complete build and regression suites pass. Packaged status remains `FAIL` until a new app
-stages the corrected installer, the cached file becomes user-owned, both USB rows return, and a
-mount/unmount cycle passes without recurrence.
+patch; the complete build and regression suites pass. Replacement commit `db3aacf` passed the
+affected packaged upgrade on 2026-08-13: the cache file became `andrea:staff`, both backend list
+modes returned both NTFS partitions with exit `0`, diagnostics were healthy with zero mounts or
+security sessions, and the popover visibly reported `2 drive(s) detected` with the correct device,
+label, size, and unmounted controls. A live mount/unmount cycle and deliberately blank install
+remain before BB-01 closes.
 
 ## Next operator checkpoints
 
-1. Build and install a replacement app containing the runtime-cache ownership correction.
-2. Verify automatic cache repair, both detected USB rows, and one default mount/unmount cycle.
-3. Retest the rebuilt P1 tree and P3 Finder/two-drive cells.
-4. Perform only the requested physical, VPN, Windows and final-uninstall actions.
+1. Complete one default mount/unmount cycle on replacement commit `db3aacf` and recheck ownership.
+2. Retest the rebuilt P1 tree and P3 Finder/two-drive cells.
+3. Perform only the requested physical, VPN, Windows and final-uninstall actions.

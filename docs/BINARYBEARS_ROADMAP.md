@@ -235,7 +235,9 @@ The installer also self-heals the specific root-owned `rootfs/vmproxy` left by o
 updates. The runtime's update path restores the XPC peer's kernel-derived UID/GID after replacing
 that host file while retaining its guest-visible root metadata. Real non-symlink path checks,
 focused installer/build coverage, the full `289/289` Bats suite, Swift `247/247`, and a complete
-runtime rebuild pass; the corrected package still requires the BB-01 upgrade-cache live retest.
+runtime rebuild pass. Replacement commit `db3aacf` passed the affected BB-01 upgrade-cache staging,
+unprivileged backend enumeration, and two-row popover checks on 2026-08-13; its mount/unmount and
+deliberately blank clean-install cells remain.
 
 #### 2. Establish an anylinuxfs update policy
 
