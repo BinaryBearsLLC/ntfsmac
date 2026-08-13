@@ -504,7 +504,11 @@ correctly became unhealthy with one host mount and zero security sessions; norma
 after releasing the hold. The CLI now proves the target disappeared from the authoritative host
 mount table before tearing down per-session PF/route ownership and retains protection when that
 proof fails. Regression coverage includes a false-zero busy mount, an unreadable mount table, and
-a volume name containing spaces; the rebuilt packaged cell must still repeat.
+a volume name containing spaces. The rebuilt installed package passed the functional repeat: the
+held drive remained accessible and retained one enforced security session, the idle drive left,
+the per-drive report and recovery controls stayed truthful, and normal Unmount recovered to a
+healthy zero-mount state after release. Only the final operator-authenticated absence check for
+private state files and PF child anchors remains for the packaged cell.
 
 The same run found a cold-launch timing defect in `opengui`: the installed app truthfully recovered
 the surviving mount but presented its popover at the lower-left of the screen. Source now defers
