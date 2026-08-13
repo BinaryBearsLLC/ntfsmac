@@ -41,7 +41,7 @@ This is the live ledger for the assisted acceptance run defined in
 | BB-01 | IN PROGRESS | Installed app, helper, bundled CLI, version/build and command surface were confirmed. Rebuilt commit `004e76e` exposed a root-owned cached `vmproxy` after its privileged update and failed. Replacement commit `db3aacf` then passed the affected upgrade: staging repaired that file to the invoking user without a manual ownership command; installed payload hashes match the candidate; ordinary and Microsoft-only backend scans both exited `0`; and the popover visibly showed the same two NTFS rows as `diskutil`. A deliberately blank clean-install replay remains. |
 | BB-02 | PASS | The original package failed cold placement. Rebuilt commit `004e76e` passed cold and warm opening beneath the menu-bar icon, three simultaneous requests with exit `0`, exactly one GUI process, and invalid-argument exit `2` without another process or Accessibility permission. |
 | BB-03 | IN PROGRESS | Mounted/Settings/Diagnostics light UI, Back, overflow-only copy action and Launch at login enable/disable passed. The cold-placement failure is tracked in BB-02; dark, full keyboard and safe warning/error states remain. |
-| BB-P0-01 | PASS | The original package passed the default `ntfs-3g` RW round trip, diagnostic truth, vmnet/private/soft transport gate and root security transaction gate with one real session. On rebuilt commit `004e76e`, the first retry stopped fail-closed at Full Disk Access and the next scan failed before mount because of the BB-01 runtime-cache ownership regression. Replacement commit `db3aacf` repaired enumeration, then its first Mount again stopped fail-closed because macOS reset the newly replaced helper's Full Disk Access toggle to off. No NFS/anylinuxfs/vmnet state was created; the exact helper entry is visible and awaits the operator's explicit enable action before this candidate repeats the cell. |
+| BB-P0-01 | PASS | The original package passed the default `ntfs-3g` RW round trip, diagnostic truth, vmnet/private/soft transport gate and root security transaction gate with one real session. Replacement commit `db3aacf` first stopped fail-closed while its replaced helper's Full Disk Access toggle was off. After the operator enabled exactly that entry, the GUI mounted MobileData RW with `ntfs-3g`; GUI, anylinuxfs status, host NFS table, diagnostic schema 6, and public security summary agreed on one mount/session with private vmnet, `soft` transport, PF evaluated, and no required route. A fixed-name write/reread SHA-256 round trip and exact test-artifact cleanup passed; the live NFS transport gate passed. Root security transaction verification and canonical teardown remain for this candidate. |
 | BB-P0-02 | PASS | GUI returned to two detected drives; NFS mounts and anylinuxfs sessions were empty; diagnostics reported bridge down and zero security sessions; the root check found no session state file or PF child anchor. |
 | BB-P0-03 | NOT RUN | VPN-on mount requires the operator's VPN transition. |
 | BB-P0-04 | NOT RUN | Mounted VPN route transition requires the operator. |
@@ -60,7 +60,7 @@ This is the live ledger for the assisted acceptance run defined in
 | BB-P1-06 | NOT RUN | Same-device explicit NTFS3 comparison remains. |
 | BB-P1-07 | BLOCKED | Requires Windows-prepared clean/dirty/Fast Startup/error states. |
 | BB-P1-08 | IN PROGRESS | One MBR device and interrupted/normal workloads recorded; the broader device/controller/OS/low-space inventory remains. |
-| BB-P3-01 | FAIL | On the installed artifact, Open targeted the observed mount but no Finder window appeared. Source now asks Finder to reveal the path before fallbacks; rebuilt-package and two-drive retest required. |
+| BB-P3-01 | IN PROGRESS | The original installed artifact targeted the observed mount but showed no Finder window. Replacement commit `db3aacf` visibly opened a Finder window titled MobileData from that row's Open action while status independently reported `/Volumes/MobileData`. The second concurrently mounted row still must open its own path before this cell passes. |
 | BB-P3-02 | IN PROGRESS | Default-off state and absence of unsolicited permission request confirmed. Grant/event/revoke matrix requires the operator. |
 | BB-P3-03 | NOT RUN | Two disposable NTFS volumes are now available; run after rebuild. |
 | BB-P3-04 | NOT RUN | Two disposable NTFS volumes are now available; run after rebuild. |
@@ -93,8 +93,9 @@ severity, and a complete real runtime build including `41/41` anylinuxfs, `8/8` 
 
 The installed app's generic Launch Services open returned success for the NFS path without
 presenting a Finder window. The working tree now requests an exact Finder reveal first and uses
-`/usr/bin/open` only as a fallback. This remains `FAIL` for the installed artifact until the rebuilt
-app visibly opens the correct row's mount point.
+`/usr/bin/open` only as a fallback. Replacement commit `db3aacf` visibly opened the correct
+MobileData Finder window from its mounted row on 2026-08-13. The second-drive row remains required
+before the complete two-drive cell passes.
 
 ### Cold `opengui` popover anchoring
 
