@@ -186,8 +186,10 @@ SECURITY rows; final GUI Unmount again cleared the mount, session, and bridge. T
 current packaged cross-surface cell. The current package also passed the Finder external-disconnect
 half of the teardown cell: ejecting only the synthetic `disk6s1.local` share removed host NFS,
 session security, VM/bridge, and GUI green state by the first observation. The independent
-operator-authenticated `/sbin/umount` repeat remains, as do helper restart and physical hot-unplug.
-Concurrent two-drive state and independent teardown passed separately.
+operator-authenticated `/sbin/umount` repeat produced the same automatic zero-mount/session/bridge
+state without Refresh. Only the final root inspection for state files and PF child anchors remains
+for that cell. Helper restart and physical hot-unplug also remain. Concurrent two-drive state and
+independent teardown passed separately.
 
 Acceptance: no UI control, icon, diagnostic row, or CLI output may claim a drive is mounted or
 writable after the corresponding host mount disappears. A CLI-created mount must also appear in
