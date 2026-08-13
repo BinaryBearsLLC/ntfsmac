@@ -177,8 +177,12 @@ the authoritative RW/security state, and a normal Unmount left no NFS session, s
 or PF child anchor. On 2026-08-13 the current installed package also passed GUI-created mount to
 installed-CLI Unmount reconciliation both passively and with immediate Refresh: the open GUI left
 green in under one second and diagnostics settled to zero mounts/sessions. The reverse CLI mount
-requires an operator-authenticated terminal and remains in progress; helper restart and physical
-hot-unplug also remain. Concurrent two-drive state and independent teardown passed separately.
+then passed its passive functional path: with the app process still running, reopening the
+menu-bar popover discovered the CLI-created RW mount and enforced security state; Open targeted
+the exact MobileData Finder window and GUI Unmount returned to healthy zero state. The menu-bar
+popover closing while Terminal owns focus is normal AppKit presentation, not an app exit. Only the
+immediate-Refresh repeat remains for this cross-surface cell; helper restart and physical hot-unplug
+also remain. Concurrent two-drive state and independent teardown passed separately.
 
 Acceptance: no UI control, icon, diagnostic row, or CLI output may claim a drive is mounted or
 writable after the corresponding host mount disappears. A CLI-created mount must also appear in
