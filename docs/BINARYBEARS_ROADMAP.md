@@ -519,7 +519,11 @@ for the same concise banner plus sound. Commit `d99c4ac` then rebuilt successful
 shell tests and `249/249` Swift tests. The resulting arm64 app passed strict code-signature checks
 and its verified DMG has SHA-256
 `c7bacbbec54a303f3ee2541da49a916b9668b8ac78c825151fb0fdce5c0a8905`; the packaged
-grant/event/failure/disable/revoke matrix remains.
+retest then delivered mount, foreground unmount, and controlled-failure requests with banner and
+sound presentation options. macOS muted their visible presentation only because the display was
+shared during assisted control. The failure retained its mount and security session until recovery,
+and a complete mount/unmount cycle with the app preference disabled created no notification
+requests. System-level revoke and reconciliation remain.
 
 The same run found a cold-launch timing defect in `opengui`: the installed app truthfully recovered
 the surviving mount but presented its popover at the lower-left of the screen. Source now defers
