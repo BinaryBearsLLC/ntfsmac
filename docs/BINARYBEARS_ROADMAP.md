@@ -209,7 +209,10 @@ not claim that its bound failed. Source review nevertheless found that its timeo
 direct child even though anylinuxfs may move the VM supervisor into another process group. The
 working tree now terminates the snapshotted descendant tree, reports fixed `backend_timeout`
 diagnostics, and renders one concise minimal-UI recovery message. Automated shell and Swift tests
-pass; a rebuilt packaged expiry/retry is still required before closing this new lifecycle finding.
+pass. Rebuilt commit `3a3faab` was installed with matching bundled/staged watchdog hashes and its
+first post-authorization retry mounted successfully with private vmnet transport and enforced
+security. The 240-second live expiry did not recur naturally, so its packaged cleanup remains an
+explicit unmeasured cell rather than a claimed pass.
 
 Acceptance: no UI control, icon, diagnostic row, or CLI output may claim a drive is mounted or
 writable after the corresponding host mount disappears. A CLI-created mount must also appear in

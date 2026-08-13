@@ -244,6 +244,10 @@ error, `mount_failure_category=backend_timeout`, no surviving mount/VM/vmnet des
 canonical teardown state before retrying. Do not manually terminate a process merely because the
 documented first-run VM initialization is slow.
 
+On rebuilt commit `3a3faab`, the first retry after the expected Full Disk Access reauthorization
+completed normally with private vmnet transport and enforced security. That successful retry does
+not substitute for the live-expiry assertions above when the 240-second condition does not recur.
+
 ### BB-P0-02 — canonical teardown
 
 Click the row's **Unmount** and wait for observed host truth. Pass when the GUI returns to
