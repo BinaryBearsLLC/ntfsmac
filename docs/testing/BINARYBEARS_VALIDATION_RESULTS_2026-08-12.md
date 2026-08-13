@@ -51,7 +51,7 @@ This is the live ledger for the assisted acceptance run defined in
 | BB-P0-08 | NOT RUN | Root-authorized helper restart remains. |
 | BB-P0-09 | NOT RUN | Two disposable NTFS volumes are now available; concurrent mounting follows rebuild. |
 | BB-P0-10 | NOT RUN | Reversible root-authorized public-evidence permission fault remains. |
-| BB-P1-00 | IN PROGRESS | The normal row remains Open/Unmount and exposes only Verified Copy in `…`; the destination panel began on the exact MobileData mount and Cancel created no file/status. Success/refusal/active-cancel flows remain. |
+| BB-P1-00 | IN PROGRESS | The normal row remains Open/Unmount and exposes only Verified Copy in `…`; the destination panel began on the exact MobileData mount and the earlier Cancel created no file/status. During replacement-candidate automation, the native source panel visually selected `gui-source.bin` but dispatched its parent `fixtures` directory, so that run is invalid rather than a product pass/fail. The copy stayed in one hidden partial with no final name and its isolated process group was stopped; mount/security remained healthy. Computer Use then lost only the app's accessibility bridge while Finder remained readable and a process sample showed the GUI main thread idle. Human source selection plus success/refusal/in-app Cancel remain. |
 | BB-P1-01 | PASS | 256 MiB copy and reread SHA-256 matched; overwrite was refused without hash change; a controlled mutation was detected. |
 | BB-P1-02 | PASS | The original installed package retained a recoverable partial because destination-only AppleDouble metadata changed the manifest. Replacement commit `db3aacf` copied and published the same 505-entry nested/Unicode/symlink tree, then its installed CLI independently verified the destination manifest. The destination contained 1010 physical entries because of 505 AppleDouble sidecars, all correctly outside the byte-integrity contract without ignoring real source sidecars. |
 | BB-P1-03 | PASS | The working-tree check and replacement commit `db3aacf` installed CLI both passed. The packaged copy was interrupted as one process group after a 25 MiB payload appeared, exited `130`, preserved the 4 GiB source, left the final name absent, and retained exactly one named partial for inspection. |
@@ -143,3 +143,7 @@ The first `db3aacf` Mount attempt is currently paused at the expected macOS priv
 System Settings shows exactly `com.khr898.ntfsmac.helper` with Full Disk Access off after helper
 replacement. ChatGPT, Codex Computer Use, and Terminal remain off. The application did not create
 a backend session or mount and did not misreport success.
+
+After the operator enabled that entry, the mounted candidate passed all non-root BB-P0-01 checks.
+The root PF/state transaction script still requires an operator-authenticated `sudo` invocation;
+non-interactive cached authorization was unavailable and no password was requested or captured.
