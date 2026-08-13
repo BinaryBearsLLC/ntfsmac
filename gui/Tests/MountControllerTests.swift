@@ -207,6 +207,22 @@ private final class RecordingMountNotifier: MountEventNotifying {
 }
 
 @MainActor
+@Test func mountTimeoutUsesAConciseRecoveryMessage() async {
+    let fake = FakeHelper()
+    fake.mountResult = .success(CommandResult(
+        output: "mount: still working (240s elapsed)...\nmount: no response after 240s — backend may be wedged (try 'ntfsmac diagnose')\nmount: failed to mount disk4s2",
+        exitCode: 1
+    ))
+    let appState = AppState()
+    let controller = MountController(helper: fake, readOnlyChecker: FakeReadOnlyChecker(isReadOnly: false), appState: appState)
+
+    await controller.mount(sampleDrive)
+
+    #expect(appState.state == .error)
+    #expect(controller.errorMessage == "Mount timed out before the private VM became ready. Retry; if it repeats, run Diagnose.")
+}
+
+@MainActor
 @Test func unmountWithNothingMountedNeverCallsHelper() async {
     let fake = FakeHelper()
     let appState = AppState()

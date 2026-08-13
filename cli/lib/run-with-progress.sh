@@ -6,6 +6,39 @@
 # pattern already used by build/init-rootfs.sh's own VM-boot bound, generalized for reuse.
 set -u
 
+# Print one process tree rooted at <pid>, parent first. anylinuxfs can create a new process group
+# for its VM supervisor, so killing only the direct child is insufficient: vmnet-helper and the
+# guest can otherwise survive a watchdog timeout even though the CLI has already returned.
+# Parent/child ancestry remains authoritative across process-group changes and is available on
+# both supported macOS and the Linux CI runners through pgrep -P.
+run_with_progress_process_tree() {
+  local root="$1" child children
+  [[ "$root" =~ ^[0-9]+$ ]] || return 1
+  printf '%s\n' "$root"
+  children="$(/usr/bin/pgrep -P "$root" 2>/dev/null || true)"
+  for child in $children; do
+    run_with_progress_process_tree "$child"
+  done
+}
+
+run_with_progress_terminate_tree() {
+  local root="$1" tree pid
+  tree="$(run_with_progress_process_tree "$root" 2>/dev/null || printf '%s\n' "$root")"
+
+  # Signal the parent first so it cannot spawn another child after the snapshot, then every
+  # recorded descendant (including descendants that entered their own process group/session).
+  while IFS= read -r pid; do
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    kill -TERM "$pid" 2>/dev/null || true
+  done <<< "$tree"
+  sleep 1
+  while IFS= read -r pid; do
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    kill -0 "$pid" 2>/dev/null || continue
+    kill -KILL "$pid" 2>/dev/null || true
+  done <<< "$tree"
+}
+
 # run_with_progress <timeout_secs> <heartbeat_secs> <label> <outfile|-> <cmd...>
 #   <outfile>: capture <cmd>'s stdout there (caller reads it after a 0 return); pass "-" to
 #              let <cmd> inherit this script's real stdout/stderr instead (used for anylinuxfs
@@ -35,9 +68,7 @@ run_with_progress() {
     kill -0 "$pid" 2>/dev/null || break
     elapsed=$((SECONDS - start))
     if [[ $elapsed -ge $timeout_secs ]]; then
-      kill -TERM "$pid" 2>/dev/null
-      sleep 1
-      kill -KILL "$pid" 2>/dev/null
+      run_with_progress_terminate_tree "$pid"
       wait "$pid" 2>/dev/null
       echo "$label: no response after ${timeout_secs}s — backend may be wedged (try 'ntfsmac diagnose')" >&2
       return 124

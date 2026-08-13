@@ -238,6 +238,12 @@ contract, and measured security state; both gates exit zero; the NFS mount is `s
 loopback/gvproxy transport is accepted. With VPN on, ntfsmac may add only the exact private host
 route it owns and must not replace the VPN default route.
 
+If the backend does not complete, allow the packaged 240-second watchdog to expire unless host
+truth shows a mount that must be protected. Require the GUI to remain non-green, a concise timeout
+error, `mount_failure_category=backend_timeout`, no surviving mount/VM/vmnet descendant, and the
+canonical teardown state before retrying. Do not manually terminate a process merely because the
+documented first-run VM initialization is slow.
+
 ### BB-P0-02 — canonical teardown
 
 Click the row's **Unmount** and wait for observed host truth. Pass when the GUI returns to

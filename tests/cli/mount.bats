@@ -239,6 +239,8 @@ STUB
   run "$SCRIPT" disk2s1
   [ "$status" -ne 0 ]
   [[ "$output" == *"no response after 1s"* ]]
+  run grep -F 'failure_category=backend_timeout' "$NTFSMAC_MOUNT_DIAGNOSTICS_FILE"
+  [ "$status" -eq 0 ]
 }
 
 @test "a VPN-captured vmnet endpoint is repaired before the backend NFS readiness check" {

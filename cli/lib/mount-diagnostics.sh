@@ -14,7 +14,7 @@ mount_diagnostics_valid_driver() {
 
 mount_diagnostics_valid_failure() {
   case "${1:-}" in
-    none|in_progress|invalid_request|runtime_unavailable|backend_failed|mount_not_observed|unknown) return 0 ;;
+    none|in_progress|invalid_request|runtime_unavailable|backend_failed|backend_timeout|mount_not_observed|unknown) return 0 ;;
     *) return 1 ;;
   esac
 }

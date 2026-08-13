@@ -17,6 +17,12 @@ teardown() { rm -rf "$FIXTURE_DIR"; }
   [ "$status" -ne 0 ]
 }
 
+@test "accepts the fixed backend timeout category" {
+  run bash -c "source '$SCRIPT'; mount_diagnostics_publish ntfs-3g backend_timeout; mount_diagnostics_load; printf '%s\n' \"\$MOUNT_DIAGNOSTICS_FAILURE\""
+  [ "$status" -eq 0 ]
+  [ "$output" = "backend_timeout" ]
+}
+
 @test "unknown keys and free-form failure text fail closed" {
   printf 'schema=1\nselected_driver=ntfs3\nfailure_category=Windows volume dirty\n' > "$NTFSMAC_MOUNT_DIAGNOSTICS_FILE"
   run bash -c "source '$SCRIPT'; mount_diagnostics_load"

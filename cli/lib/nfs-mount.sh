@@ -144,7 +144,11 @@ run_anylinuxfs_mount() {
       && declare -F security_abort_prepared_mount >/dev/null 2>&1; then
       security_abort_prepared_mount "$device" || true
     fi
-    NTFSMAC_MOUNT_FAILURE_CATEGORY="backend_failed"
+    if [[ "$mount_result" == "124" ]]; then
+      NTFSMAC_MOUNT_FAILURE_CATEGORY="backend_timeout"
+    else
+      NTFSMAC_MOUNT_FAILURE_CATEGORY="backend_failed"
+    fi
     return 1
   fi
 

@@ -33,15 +33,53 @@ setup() {
 }
 
 @test "does not leave the killed process running" {
-  run_with_progress 1 1 "test" - sleep 30 &
-  local watchdog_pid=$!
-  # run_with_progress itself returns 124 on this path (a "failure" exit code) — the point of
-  # this test is only whether the killed `sleep 30` is still alive afterward, not the
-  # watchdog's own exit status (already covered above).
-  wait "$watchdog_pid" || true
+  local stub pidfile victim_pid
+  stub="$(mktemp)"
+  pidfile="$(mktemp)"
+  cat > "$stub" <<'STUB'
+#!/bin/bash
+sleep 30 &
+printf '%s\n' "$!" > "$1"
+wait
+STUB
+  chmod +x "$stub"
+
+  run run_with_progress 1 1 "test" - "$stub" "$pidfile"
+
+  [ "$status" -eq 124 ]
+  victim_pid="$(cat "$pidfile")"
   sleep 1
-  # No leaked `sleep 30` from this test should still be alive.
-  ! pgrep -f "sleep 30" >/dev/null 2>&1
+  ! kill -0 "$victim_pid" 2>/dev/null
+  rm -f "$stub" "$pidfile"
+}
+
+@test "timeout terminates descendants that ignore TERM" {
+  local stub pidfile nested_pid nested_sleep_pid
+  stub="$(mktemp)"
+  pidfile="$(mktemp)"
+  cat > "$stub" <<'STUB'
+#!/bin/bash
+trap '' TERM
+(
+  trap '' TERM
+  sleep 30 &
+  printf '%s\n' "$!" > "$1.sleep"
+  wait
+) &
+printf '%s\n' "$!" > "$1"
+wait
+STUB
+  chmod +x "$stub"
+
+  run run_with_progress 1 1 "nested-test" - "$stub" "$pidfile"
+
+  [ "$status" -eq 124 ]
+  nested_pid="$(cat "$pidfile")"
+  nested_sleep_pid="$(cat "$pidfile.sleep")"
+  sleep 1
+  ! kill -0 "$nested_pid" 2>/dev/null
+  ! kill -0 "$nested_sleep_pid" 2>/dev/null
+  rm -f "$stub" "$pidfile" "$pidfile.sleep"
 }
 
 @test "prints a heartbeat line while a slow-but-eventually-completing command runs" {

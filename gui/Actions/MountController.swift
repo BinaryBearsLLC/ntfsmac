@@ -556,6 +556,8 @@ public final class MountController: ObservableObject {
         // `.error` and hide the "mounted" indicator — only go `.error` when nothing is mounted.
         if message.contains("Insufficient permissions?") || message.contains("Cannot probe") {
             errorMessage = "FDA_REQUIRED"
+        } else if message.contains("mount: no response after") {
+            errorMessage = "Mount timed out before the private VM became ready. Retry; if it repeats, run Diagnose."
         } else {
             errorMessage = message
         }

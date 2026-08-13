@@ -200,6 +200,17 @@ manual Refresh, without misclassifying the still-present NFS mount. Restoring `0
 measured enforced state automatically, and final GUI teardown returned to zero mounts/sessions with
 the bridge down. This closes the current fail-closed public-evidence gate.
 
+The first new mount attempted immediately after that VPN-transition cycle then remained in vmnet
+startup for about 150 seconds without creating an NFS mount or security session. The packaged GUI
+correctly stayed non-green on `Mounting…`, and the operator's scoped process-group recovery left
+zero backend processes, mounts, sessions, or bridge state while preserving the VPN default. The
+existing packaged watchdog is 240 seconds and was not allowed to expire, so this observation does
+not claim that its bound failed. Source review nevertheless found that its timeout killed only the
+direct child even though anylinuxfs may move the VM supervisor into another process group. The
+working tree now terminates the snapshotted descendant tree, reports fixed `backend_timeout`
+diagnostics, and renders one concise minimal-UI recovery message. Automated shell and Swift tests
+pass; a rebuilt packaged expiry/retry is still required before closing this new lifecycle finding.
+
 Acceptance: no UI control, icon, diagnostic row, or CLI output may claim a drive is mounted or
 writable after the corresponding host mount disappears. A CLI-created mount must also appear in
 the already-running GUI within the bounded reconciliation interval.

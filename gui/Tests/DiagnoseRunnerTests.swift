@@ -98,6 +98,18 @@ private final class FakeRunner: PrivilegedCommandRunning {
     #expect(rows.first(where: { $0.id == "quarantine" })?.value == "Clear")
 }
 
+@Test func mountTimeoutHasAnExplicitWarningRow() {
+    let json = expandedJSON.replacingOccurrences(
+        of: #""mount_failure_category":"none""#,
+        with: #""mount_failure_category":"backend_timeout""#
+    )
+    let report = try! JSONDecoder().decode(DiagnoseReport.self, from: Data(json.utf8))
+    let row = DiagnoseSummary.rows(for: report).first { $0.id == "mount_result" }
+
+    #expect(row?.value == "Backend timed out")
+    #expect(row?.status == .warning)
+}
+
 @Test func expandedSystemRowWarnsForUnsupportedHost() {
     let report = DiagnoseReport(
         healthy: false,

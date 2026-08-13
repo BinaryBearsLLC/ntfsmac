@@ -429,6 +429,7 @@ public enum DiagnoseSummary {
             case "invalid_request": value = "Invalid request"; status = .warning
             case "runtime_unavailable": value = "Runtime unavailable"; status = .warning
             case "backend_failed": value = "Backend failed"; status = .warning
+            case "backend_timeout": value = "Backend timed out"; status = .warning
             case "mount_not_observed": value = "Mount not observed"; status = .warning
             default: value = "Unknown"; status = .unavailable
             }
