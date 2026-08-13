@@ -62,7 +62,7 @@ This is the live ledger for the assisted acceptance run defined in
 | BB-P1-08 | IN PROGRESS | One MBR device and interrupted/normal workloads recorded; the broader device/controller/OS/low-space inventory remains. |
 | BB-P3-01 | PASS | The original installed artifact targeted the observed mount but showed no Finder window. Replacement commit `db3aacf` visibly opened Finder windows titled MobileData and USB_8GB from their respective concurrently mounted rows while status independently reported `/Volumes/MobileData` and `/Volumes/USB_8GB`. |
 | BB-P3-02 | IN PROGRESS | Default-off state and absence of unsolicited permission request confirmed. Grant/event/revoke matrix requires the operator. |
-| BB-P3-03 | NOT RUN | Two disposable NTFS volumes are now available; run after rebuild. |
+| BB-P3-03 | PASS | With MobileData and USB_8GB mounted concurrently, diagnostics first proved two NFS mounts and two enforced security sessions. Eject All attempted both rows and presented two explicit `Unmounted` results. Both rows returned to detected, diagnostics settled to zero mounts/sessions with the bridge down, and the operator-authenticated check found no security state files or PF child anchors. |
 | BB-P3-04 | NOT RUN | Two disposable NTFS volumes are now available; run after rebuild. |
 | BB-F01 | NOT RUN | No-I/O physical hot-unplug is intentionally near the end. |
 | BB-F02 | NOT RUN | Final safe eject and uninstall are intentionally last. |

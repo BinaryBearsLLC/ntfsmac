@@ -494,6 +494,11 @@ correct Finder window for both concurrently mounted drive rows on 2026-08-13. Th
 DMG presentation is a separate open packaging-UX item and does not expand the normal menu-bar
 surface.
 
+The same replacement package passed the two-drive Eject All success path on 2026-08-13: the
+compact report showed one `Unmounted` result per original row, both mounts and security sessions
+settled to zero, the bridge stopped, and an operator-authenticated check found no security state
+files or PF child anchors. The safe packaged partial-failure attempt remains a separate cell.
+
 The same run found a cold-launch timing defect in `opengui`: the installed app truthfully recovered
 the surviving mount but presented its popover at the lower-left of the screen. Source now defers
 presentation until AppKit exposes valid menu-bar screen geometry and has regression coverage for
