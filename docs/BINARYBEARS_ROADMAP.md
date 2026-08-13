@@ -174,8 +174,11 @@ host mount, anylinuxfs session, private VM/bridge, exact route, and GUI green st
 The app also remained in `mounting` while the helper operation was in flight. On 2026-08-12 a
 forced GUI-only termination preserved the real mount; `opengui` relaunched one process, recovered
 the authoritative RW/security state, and a normal Unmount left no NFS session, security state file,
-or PF child anchor. CLI→GUI, helper restart, physical-device eject/hot-unplug, and concurrent drives
-remain open.
+or PF child anchor. On 2026-08-13 the current installed package also passed GUI-created mount to
+installed-CLI Unmount reconciliation both passively and with immediate Refresh: the open GUI left
+green in under one second and diagnostics settled to zero mounts/sessions. The reverse CLI mount
+requires an operator-authenticated terminal and remains in progress; helper restart and physical
+hot-unplug also remain. Concurrent two-drive state and independent teardown passed separately.
 
 Acceptance: no UI control, icon, diagnostic row, or CLI output may claim a drive is mounted or
 writable after the corresponding host mount disappears. A CLI-created mount must also appear in
