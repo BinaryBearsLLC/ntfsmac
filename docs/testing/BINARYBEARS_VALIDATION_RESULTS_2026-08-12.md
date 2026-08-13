@@ -41,7 +41,7 @@ This is the live ledger for the assisted acceptance run defined in
 | BB-01 | IN PROGRESS | Installed app, helper, bundled CLI, version/build and command surface were confirmed. Rebuilt commit `004e76e` exposed a root-owned cached `vmproxy` after its privileged update and failed. Replacement commit `db3aacf` then passed the affected upgrade: staging repaired that file to the invoking user without a manual ownership command; installed payload hashes match the candidate; ordinary and Microsoft-only backend scans both exited `0`; and the popover visibly showed the same two NTFS rows as `diskutil`. A deliberately blank clean-install replay remains. |
 | BB-02 | PASS | The original package failed cold placement. Rebuilt commit `004e76e` passed cold and warm opening beneath the menu-bar icon, three simultaneous requests with exit `0`, exactly one GUI process, and invalid-argument exit `2` without another process or Accessibility permission. |
 | BB-03 | IN PROGRESS | Mounted/Settings/Diagnostics light UI, Back, overflow-only copy action and Launch at login enable/disable passed. The cold-placement failure is tracked in BB-02; dark, full keyboard and safe warning/error states remain. |
-| BB-P0-01 | PASS | The original package passed the default `ntfs-3g` RW round trip, diagnostic truth, vmnet/private/soft transport gate and root security transaction gate with one real session. On rebuilt commit `004e76e`, the first retry stopped fail-closed at Full Disk Access and the next scan failed before mount because of the BB-01 runtime-cache ownership regression. No NFS/anylinuxfs/vmnet state was created. The source fix is verified automatically, but the replacement package must repeat this cell. |
+| BB-P0-01 | PASS | The original package passed the default `ntfs-3g` RW round trip, diagnostic truth, vmnet/private/soft transport gate and root security transaction gate with one real session. On rebuilt commit `004e76e`, the first retry stopped fail-closed at Full Disk Access and the next scan failed before mount because of the BB-01 runtime-cache ownership regression. Replacement commit `db3aacf` repaired enumeration, then its first Mount again stopped fail-closed because macOS reset the newly replaced helper's Full Disk Access toggle to off. No NFS/anylinuxfs/vmnet state was created; the exact helper entry is visible and awaits the operator's explicit enable action before this candidate repeats the cell. |
 | BB-P0-02 | PASS | GUI returned to two detected drives; NFS mounts and anylinuxfs sessions were empty; diagnostics reported bridge down and zero security sessions; the root check found no session state file or PF child anchor. |
 | BB-P0-03 | NOT RUN | VPN-on mount requires the operator's VPN transition. |
 | BB-P0-04 | NOT RUN | Mounted VPN route transition requires the operator. |
@@ -135,3 +135,8 @@ remain before BB-01 closes.
 1. Complete one default mount/unmount cycle on replacement commit `db3aacf` and recheck ownership.
 2. Retest the rebuilt P1 tree and P3 Finder/two-drive cells.
 3. Perform only the requested physical, VPN, Windows and final-uninstall actions.
+
+The first `db3aacf` Mount attempt is currently paused at the expected macOS privacy boundary:
+System Settings shows exactly `com.khr898.ntfsmac.helper` with Full Disk Access off after helper
+replacement. ChatGPT, Codex Computer Use, and Terminal remain off. The application did not create
+a backend session or mount and did not misreport success.
