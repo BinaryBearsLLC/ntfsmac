@@ -54,7 +54,7 @@ This is the live ledger for the assisted acceptance run defined in
 | BB-P1-00 | IN PROGRESS | The normal row remains Open/Unmount and exposes only Verified Copy in `…`; the destination panel began on the exact MobileData mount and Cancel created no file/status. Success/refusal/active-cancel flows remain. |
 | BB-P1-01 | PASS | 256 MiB copy and reread SHA-256 matched; overwrite was refused without hash change; a controlled mutation was detected. |
 | BB-P1-02 | PASS | The original installed package retained a recoverable partial because destination-only AppleDouble metadata changed the manifest. Replacement commit `db3aacf` copied and published the same 505-entry nested/Unicode/symlink tree, then its installed CLI independently verified the destination manifest. The destination contained 1010 physical entries because of 505 AppleDouble sidecars, all correctly outside the byte-integrity contract without ignoring real source sidecars. |
-| BB-P1-03 | IN PROGRESS | Working-tree CLI interruption exited `130`, retained exactly one named partial, preserved the 4 GiB source and never published the final name. Rebuilt-package retest required. |
+| BB-P1-03 | PASS | The working-tree check and replacement commit `db3aacf` installed CLI both passed. The packaged copy was interrupted as one process group after a 25 MiB payload appeared, exited `130`, preserved the 4 GiB source, left the final name absent, and retained exactly one named partial for inspection. |
 | BB-P1-04 | NOT RUN | Physical reconnect follows clean teardown. |
 | BB-P1-05 | BLOCKED | Windows-side hash/playback comparison requires Windows and the same media. |
 | BB-P1-06 | NOT RUN | Same-device explicit NTFS3 comparison remains. |

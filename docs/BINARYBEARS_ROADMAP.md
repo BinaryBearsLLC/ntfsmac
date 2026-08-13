@@ -350,7 +350,8 @@ dedicated CLI process group, retains the source and any partial destination, and
 final name as success.
 Replacement commit `db3aacf` passed the installed-package 505-entry nested/Unicode/symlink tree and
 independent manifest verification on real NTFS hardware on 2026-08-13, including destination-only
-AppleDouble sidecars.
+AppleDouble sidecars. Its installed CLI interruption test also exited `130`, preserved the 4 GiB
+source, withheld the final name, and retained one recoverable partial as designed.
 
 ##### Media-copy integrity investigation
 
