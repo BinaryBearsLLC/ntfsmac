@@ -187,9 +187,11 @@ current packaged cross-surface cell. The current package also passed the Finder 
 half of the teardown cell: ejecting only the synthetic `disk6s1.local` share removed host NFS,
 session security, VM/bridge, and GUI green state by the first observation. The independent
 operator-authenticated `/sbin/umount` repeat produced the same automatic zero-mount/session/bridge
-state without Refresh. Only the final root inspection for state files and PF child anchors remains
-for that cell. Helper restart and physical hot-unplug also remain. Concurrent two-drive state and
-independent teardown passed separately.
+state without Refresh. The final root inspection found no state files or PF child anchors,
+completing the current external-disconnect cell. The operator then restarted the exact launchd
+helper with no active mount; one job, one helper process, and the expected plist/binary pair remain,
+with the post-restart mount/unmount still in progress. Physical hot-unplug also remains. Concurrent
+two-drive state and independent teardown passed separately.
 
 Acceptance: no UI control, icon, diagnostic row, or CLI output may claim a drive is mounted or
 writable after the corresponding host mount disappears. A CLI-created mount must also appear in
