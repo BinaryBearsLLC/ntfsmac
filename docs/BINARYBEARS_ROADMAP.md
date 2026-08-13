@@ -507,8 +507,8 @@ proof fails. Regression coverage includes a false-zero busy mount, an unreadable
 a volume name containing spaces. The rebuilt installed package passed the functional repeat: the
 held drive remained accessible and retained one enforced security session, the idle drive left,
 the per-drive report and recovery controls stayed truthful, and normal Unmount recovered to a
-healthy zero-mount state after release. Only the final operator-authenticated absence check for
-private state files and PF child anchors remains for the packaged cell.
+healthy zero-mount state after release. The final operator-authenticated check found no private
+state files or PF child anchors, completing the packaged partial-failure cell.
 
 The same run found a cold-launch timing defect in `opengui`: the installed app truthfully recovered
 the surviving mount but presented its popover at the lower-left of the screen. Source now defers
