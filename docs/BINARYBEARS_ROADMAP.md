@@ -515,7 +515,11 @@ prompt, then exposed two lifecycle edge cases without changing the minimal Setti
 committed the operator's Allow choice while the async request returned an error, and a notification
 scheduled while ntfsmac was foreground received an empty presentation option set. Source now
 reconciles system authorization after a request error and retains a foreground delegate that asks
-for the same concise banner plus sound. A rebuilt grant/event/failure/disable/revoke matrix remains.
+for the same concise banner plus sound. Commit `d99c4ac` then rebuilt successfully with `292/292`
+shell tests and `249/249` Swift tests. The resulting arm64 app passed strict code-signature checks
+and its verified DMG has SHA-256
+`c7bacbbec54a303f3ee2541da49a916b9668b8ac78c825151fb0fdce5c0a8905`; the packaged
+grant/event/failure/disable/revoke matrix remains.
 
 The same run found a cold-launch timing defect in `opengui`: the installed app truthfully recovered
 the surviving mount but presented its popover at the lower-left of the screen. Source now defers
