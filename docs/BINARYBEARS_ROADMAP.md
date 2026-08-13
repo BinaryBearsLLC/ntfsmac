@@ -181,8 +181,10 @@ then passed its passive functional path: with the app process still running, reo
 menu-bar popover discovered the CLI-created RW mount and enforced security state; Open targeted
 the exact MobileData Finder window and GUI Unmount returned to healthy zero state. The menu-bar
 popover closing while Terminal owns focus is normal AppKit presentation, not an app exit. Only the
-immediate-Refresh repeat remains for this cross-surface cell; helper restart and physical hot-unplug
-also remain. Concurrent two-drive state and independent teardown passed separately.
+immediate-Refresh repeat then showed the same CLI-created disk6s1 RW state and all three truthful
+SECURITY rows; final GUI Unmount again cleared the mount, session, and bridge. This completes the
+current packaged cross-surface cell. Helper restart and physical hot-unplug remain. Concurrent
+two-drive state and independent teardown passed separately.
 
 Acceptance: no UI control, icon, diagnostic row, or CLI output may claim a drive is mounted or
 writable after the corresponding host mount disappears. A CLI-created mount must also appear in
