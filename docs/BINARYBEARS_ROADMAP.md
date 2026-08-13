@@ -441,6 +441,8 @@ must use disposable test data with a separate backup.
 
 P1 is software-complete on 2026-08-12. The same-media post-reconnect/Windows verification and
 same-device `ntfs-3g` versus NTFS3 qualification above remain release gates, not implied passes.
+Replacement commit `db3aacf` passed the same-media physical reconnect and independent 256 MiB
+SHA-256 reread on 2026-08-13; Windows and the driver comparison remain open.
 
 ### P2 — Modern helper lifecycle
 

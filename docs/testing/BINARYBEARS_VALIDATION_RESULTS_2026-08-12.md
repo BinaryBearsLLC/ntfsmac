@@ -55,7 +55,7 @@ This is the live ledger for the assisted acceptance run defined in
 | BB-P1-01 | PASS | 256 MiB copy and reread SHA-256 matched; overwrite was refused without hash change; a controlled mutation was detected. |
 | BB-P1-02 | PASS | The original installed package retained a recoverable partial because destination-only AppleDouble metadata changed the manifest. Replacement commit `db3aacf` copied and published the same 505-entry nested/Unicode/symlink tree, then its installed CLI independently verified the destination manifest. The destination contained 1010 physical entries because of 505 AppleDouble sidecars, all correctly outside the byte-integrity contract without ignoring real source sidecars. |
 | BB-P1-03 | PASS | The working-tree check and replacement commit `db3aacf` installed CLI both passed. The packaged copy was interrupted as one process group after a 25 MiB payload appeared, exited `130`, preserved the 4 GiB source, left the final name absent, and retained exactly one named partial for inspection. |
-| BB-P1-04 | NOT RUN | Physical reconnect follows clean teardown. |
+| BB-P1-04 | PASS | After the complete GUI/root teardown, the operator physically disconnected MobileData, waited, and reconnected it to the same port. The GUI remounted it RW with `ntfs-3g`; the installed CLI independently verified the existing 256 MiB destination manifest, and both fresh SHA-256 values matched at `54ca03f1af5eeb02ca7e562f93a33b2bb77ceaf62f035d51e40142dd330e12b5`. Diagnostics and the settled GUI security rows agreed on one enforced session. |
 | BB-P1-05 | BLOCKED | Windows-side hash/playback comparison requires Windows and the same media. |
 | BB-P1-06 | NOT RUN | Same-device explicit NTFS3 comparison remains. |
 | BB-P1-07 | BLOCKED | Requires Windows-prepared clean/dirty/Fast Startup/error states. |
@@ -135,9 +135,8 @@ and ownership. Only the deliberately blank install remains before BB-01 closes.
 
 ## Next operator checkpoints
 
-1. Perform the BB-P1-04 physical reconnect and independent hash reread on MobileData.
-2. Retest the remaining GUI P1 and P3 two-drive cells.
-3. Perform only the requested VPN, Windows and final-uninstall actions.
+1. Retest the remaining GUI P1 and P3 two-drive cells.
+2. Perform only the requested VPN, Windows and final-uninstall actions.
 
 The first `db3aacf` Mount attempt paused at the expected macOS privacy boundary: System Settings
 showed exactly `com.khr898.ntfsmac.helper` with Full Disk Access off after helper replacement.
