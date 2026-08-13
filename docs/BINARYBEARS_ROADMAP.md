@@ -510,6 +510,13 @@ the per-drive report and recovery controls stayed truthful, and normal Unmount r
 healthy zero-mount state after release. The final operator-authenticated check found no private
 state files or PF child anchors, completing the packaged partial-failure cell.
 
+The 2026-08-13 packaged notification run confirmed the default-off boundary and explicit macOS
+prompt, then exposed two lifecycle edge cases without changing the minimal Settings surface. macOS
+committed the operator's Allow choice while the async request returned an error, and a notification
+scheduled while ntfsmac was foreground received an empty presentation option set. Source now
+reconciles system authorization after a request error and retains a foreground delegate that asks
+for the same concise banner plus sound. A rebuilt grant/event/failure/disable/revoke matrix remains.
+
 The same run found a cold-launch timing defect in `opengui`: the installed app truthfully recovered
 the surviving mount but presented its popover at the lower-left of the screen. Source now defers
 presentation until AppKit exposes valid menu-bar screen geometry and has regression coverage for

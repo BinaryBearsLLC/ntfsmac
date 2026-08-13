@@ -12,6 +12,7 @@ private let lifecycleLog = Logger(subsystem: "com.khr898.ntfsmac", category: "Li
 /// a `MenuBarExtra` from the CLI; the popover body remains the existing `PopoverContentView`.
 @MainActor
 final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
+    private let foregroundNotificationPresenter = ForegroundNotificationPresenter()
     private var singleInstanceGuard: SingleInstanceGuard?
     private var popoverController: MenuBarPopoverController?
     private var driveScanner: DriveScanner?
@@ -21,6 +22,7 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
     private var pendingOpenRequest = false
 
     func applicationWillFinishLaunching(_ notification: Notification) {
+        foregroundNotificationPresenter.install()
         do {
             singleInstanceGuard = try SingleInstanceGuard()
         } catch SingleInstanceGuardError.alreadyRunning {

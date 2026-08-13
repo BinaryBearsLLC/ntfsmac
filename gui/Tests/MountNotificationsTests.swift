@@ -1,4 +1,5 @@
 import Testing
+import UserNotifications
 @testable import NtfsmacGUI
 
 @MainActor
@@ -21,6 +22,13 @@ private final class RecordingNotificationScheduler: LocalNotificationScheduling 
 
     #expect(payload.title == "Eject All needs attention")
     #expect(payload.body.contains("1 of 3"))
+}
+
+@Test func foregroundNotificationsRetainVisibleBannerAndSound() {
+    let options = ForegroundNotificationPresenter.presentationOptions
+
+    #expect(options.contains(.banner))
+    #expect(options.contains(.sound))
 }
 
 @MainActor

@@ -152,10 +152,19 @@ public final class Settings: ObservableObject {
                         message: granted ? nil : "Notification permission was not granted."
                     )
                 } catch {
-                    self.applyNotifications(
-                        enabled: false,
-                        message: "Could not enable notifications: \(error.localizedDescription)"
-                    )
+                    // macOS can commit the user's Allow choice before the async request callback
+                    // returns an error (observed on the packaged menu-bar app). Read the system
+                    // truth once more before treating that callback as a denial; never persist an
+                    // opt-in unless Notification Center itself now reports authorization.
+                    let recoveredState = await notificationAuthorization.authorizationState()
+                    if recoveredState == .authorized {
+                        self.applyNotifications(enabled: true, message: nil)
+                    } else {
+                        self.applyNotifications(
+                            enabled: false,
+                            message: "Could not enable notifications: \(error.localizedDescription)"
+                        )
+                    }
                 }
             }
         }

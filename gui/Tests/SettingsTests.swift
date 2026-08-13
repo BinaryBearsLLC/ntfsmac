@@ -28,14 +28,17 @@ private final class FakeNotificationAuthorization: NotificationAuthorizationMana
     private let lock = NSLock()
     private var storedState: NotificationAuthorizationState
     private let requestResult: Result<Bool, Error>
+    private let stateAfterRequestFailure: NotificationAuthorizationState?
     private var requests = 0
 
     init(
         state: NotificationAuthorizationState,
-        requestResult: Result<Bool, Error> = .success(true)
+        requestResult: Result<Bool, Error> = .success(true),
+        stateAfterRequestFailure: NotificationAuthorizationState? = nil
     ) {
         storedState = state
         self.requestResult = requestResult
+        self.stateAfterRequestFailure = stateAfterRequestFailure
     }
 
     func authorizationState() async -> NotificationAuthorizationState {
@@ -45,9 +48,16 @@ private final class FakeNotificationAuthorization: NotificationAuthorizationMana
     func requestAuthorization() async throws -> Bool {
         try lock.withLock {
             requests += 1
-            let granted = try requestResult.get()
-            storedState = granted ? .authorized : .denied
-            return granted
+            do {
+                let granted = try requestResult.get()
+                storedState = granted ? .authorized : .denied
+                return granted
+            } catch {
+                if let stateAfterRequestFailure {
+                    storedState = stateAfterRequestFailure
+                }
+                throw error
+            }
         }
     }
 
@@ -189,6 +199,28 @@ private func waitForNotificationUpdate(_ settings: Settings) async {
     #expect(!settings.notificationsEnabled)
     #expect(settings.notificationsMessage?.contains("notification request failed") == true)
     #expect(!defaults.bool(forKey: "com.khr898.ntfsmac.settings.notificationsEnabled"))
+}
+
+@MainActor
+@Test func notificationRequestErrorRecoversWhenSystemAuthorizationWasCommitted() async {
+    let defaults = makeIsolatedDefaults(#function)
+    let authorization = FakeNotificationAuthorization(
+        state: .notDetermined,
+        requestResult: .failure(FakeNotificationError.requestFailed),
+        stateAfterRequestFailure: .authorized
+    )
+    let settings = Settings(
+        defaults: defaults,
+        loginService: LegacyLoginService(),
+        notificationAuthorization: authorization
+    )
+
+    settings.setNotificationsEnabled(true)
+    await waitForNotificationUpdate(settings)
+
+    #expect(settings.notificationsEnabled)
+    #expect(settings.notificationsMessage == nil)
+    #expect(defaults.bool(forKey: "com.khr898.ntfsmac.settings.notificationsEnabled"))
 }
 
 @MainActor

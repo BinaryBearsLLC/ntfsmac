@@ -112,6 +112,31 @@ public struct RealLocalNotificationScheduler: LocalNotificationScheduling {
     }
 }
 
+/// Menu-bar actions complete while ntfsmac is the foreground application. Without an explicit
+/// delegate response macOS accepts those notifications but presents them with an empty option set,
+/// so the user sees no unmount/failure result. Keep the same compact banner + sound behavior in
+/// foreground and background; payload content remains owned by `MountNotificationCopy` above.
+public final class ForegroundNotificationPresenter: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
+    public static let presentationOptions: UNNotificationPresentationOptions = [.banner, .sound]
+
+    public override init() {
+        super.init()
+    }
+
+    @MainActor
+    public func install() {
+        UNUserNotificationCenter.current().delegate = self
+    }
+
+    public func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler(Self.presentationOptions)
+    }
+}
+
 @MainActor
 public protocol MountEventNotifying {
     func post(_ event: MountNotificationEvent)
