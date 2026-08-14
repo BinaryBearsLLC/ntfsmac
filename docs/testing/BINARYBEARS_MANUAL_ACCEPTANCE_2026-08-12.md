@@ -110,6 +110,7 @@ reviewed.
 | BB-P3-02 | Opt-in notifications | Permission controllable | Default off; explicit grant only; events shown; revoke/disable fails closed |
 | BB-P3-03 | Eject All success | Drives A+B mounted | Every drive attempted, two successes reported, all backend state removed |
 | BB-P3-04 | Eject All partial recovery | Two disposable drives | Failure is per-drive; successful drive leaves; failed row remains actionable |
+| BB-P3-05 | Professional DMG | Packaged app | Large aligned icons, Applications link, restrained background, verified light/dark presentation |
 | BB-F01 | No-I/O hot-unplug recovery | Disposable Drive A only | No hang/false green; bounded reconciliation and cleanup; no writes in flight |
 | BB-F02 | Safe eject and uninstall | No active mount | Physical eject follows app unmount; complete uninstall leaves no helper/runtime |
 
@@ -556,6 +557,21 @@ When one unmount genuinely fails, require:
 The deterministic partial-failure path is also a mandatory automated regression test, even when
 the packaged environment cannot safely force one.
 
+### BB-P3-05 — professional DMG presentation
+
+Build the packaged app and DMG through the normal project pipeline. Require all of the following:
+
+- the image contains only `ntfsmac.app`, the `/Applications` symlink, and hidden layout assets;
+- Finder opens a 720×460 icon-view window with toolbar, path bar, and status bar hidden;
+- app and Applications icons are 112 points, deliberately aligned, and connected by a restrained
+  drag cue rather than additional installer controls;
+- `.DS_Store` references the 720×460 PNG in `.background` and preserves the icon positions;
+- the same mounted image remains legible in macOS Light and Dark appearance;
+- `hdiutil verify` and strict app-bundle signature verification pass after packaging.
+
+The static background does not replace the native drag-to-Applications model, add an installer
+package, change entitlements, or alter the minimal menu-bar UI.
+
 ## Final fault and cleanup tests
 
 ### BB-F01 — no-I/O hot-unplug recovery
@@ -587,9 +603,9 @@ next-install test.
 
 ## Completion rule
 
-- P3 can be marked packaged-validated after BB-02, BB-03, BB-P3-01 through BB-P3-04, and relevant
-  teardown checks pass; a safely uninducible partial failure retains its automated evidence and is
-  recorded explicitly.
+- The P3 feature set can be marked packaged-validated after BB-P3-01 through BB-P3-05 and their
+  relevant teardown checks pass. BB-02 and BB-03 remain global GUI/release gates and are reported
+  independently; a P3 feature pass never hides a BB-03 accessibility or lifecycle failure.
 - P0 hardware qualification closes only when VPN off/on, route transition, cross-surface truth,
   external teardown, crash/helper recovery, concurrent mounts, no-false-green, and cleanup cells
   pass on the release artifact.

@@ -253,7 +253,7 @@ developed from `dev` and reviewed back into `dev` through its own focused branch
 | P0 | 🟡 Baseline complete; recovery fixes open | Runtime pinning, audited updates, mount reconciliation, per-session PF/VPN transaction, and measured SECURITY telemetry pass on the current host; physical hot-unplug reconciliation and empty-cache initialization after helper reinstall still require focused fixes |
 | P1 | 🟡 Software complete; qualification fixes open | Verified Copy CLI/GUI and the explicit one-mount NTFS3 GUI choice are implemented; cross-OS hashes and clean NTFS checks pass, while same-device testing exposed NTFS3 symlink portability, transient stale-green NFS timeout, and dirty-volume policy/presentation failures |
 | P2 | ⬜ Separate edition planned | Migrate the deprecated privileged-helper lifecycle to `SMAppService` in a dedicated app/version and validation track, without changing the current P0/P1/P3 product line |
-| P3 | ✅ Packaged validation complete | Per-drive Open in Finder, opt-in notifications, and resilient Eject All pass packaged validation; the separate professional DMG presentation remains open without expanding the minimal app UI |
+| P3 | ✅ Feature validation complete | Per-drive Open in Finder, opt-in notifications, resilient Eject All, and the professional drag-to-Applications DMG pass packaged validation without expanding the minimal app UI; the global BB-03 accessibility/lifecycle fix remains separate |
 
 The roadmap records explicit A/B options where evidence is still missing. In particular,
 `ntfs-3g` remains the compatibility-first default; NTFS3 does not become the default without a

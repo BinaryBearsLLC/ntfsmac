@@ -592,7 +592,7 @@ inside the current P0/P1/P3 product line.
 - [x] Add Eject All with per-drive results and no loss of a failed mount's recovery controls.
 - [x] Keep per-drive read-only and mount-point preferences out of the UI until a concrete user
   story and complete helper wiring exist; no persisted no-op controls were added.
-- [ ] **Professional DMG presentation:** retain the simple drag-to-Applications install model but
+- [x] **Professional DMG presentation:** retain the simple drag-to-Applications install model but
   give the mounted image a polished installer-like Finder layout: large app and Applications
   icons, deliberate alignment and spacing, a restrained branded background/drag cue, and a sized
   window with no accidental clutter. Validate the mounted result visually in light and dark mode,
@@ -603,8 +603,13 @@ The initial 2026-08-12 packaged run exposed a Finder-presentation false positive
 accepted the NFS URL but no Finder window appeared. The source now asks Finder to reveal the exact
 observed mount point before using fallbacks. Replacement commit `db3aacf` visibly opened the
 correct Finder window for both concurrently mounted drive rows on 2026-08-13, and BB-P3-01 through
-BB-P3-04 now pass on the installed package. The professional DMG presentation is a separate open
-packaging-UX item and does not expand the normal menu-bar surface.
+BB-P3-04 now pass on the installed package. BB-P3-05 then passed the professional DMG gate: the
+720×460 Finder window uses two 112-point icons, an exact Applications symlink, hidden layout
+assets, and a restrained neutral background/drag cue. The compressed image and unchanged app
+signature verify, automated packaging coverage passes, and the mounted result passed Light/Dark
+visual inspection with the host's Automatic appearance restored. This packaging change does not
+expand the normal menu-bar surface. P3's feature-specific cells are complete; the global BB-03
+accessibility/lifecycle failure remains a separate release gate.
 
 The same replacement package passed the two-drive Eject All success path on 2026-08-13: the
 compact report showed one `Unmounted` result per original row, both mounts and security sessions
@@ -656,11 +661,46 @@ not replace the still-open P0/P1 hardware qualification gates.
 ## 2026-08-14 scope boundary
 
 The assisted run is closed with no `IN PROGRESS` acceptance row: measured defects are `FAIL` and
-unavailable external-resource cells are `BLOCKED`. The only implementation in the current scope is
-the professional DMG presentation. Do not combine helper environment, hot-unplug reconciliation,
-dirty-volume policy, NTFS3 symlink handling, keyboard/login-item behavior, or Verified Copy panel
-wording into that packaging change. Each remains a later focused correction with its own packaged
+unavailable external-resource cells are `BLOCKED`. The professional DMG was the only implementation
+in this checkpoint and is complete. No helper environment, hot-unplug reconciliation, dirty-volume
+policy, NTFS3 symlink handling, keyboard/login-item behavior, or Verified Copy panel wording was
+mixed into the packaging change. Each remains a later focused correction with its own packaged
 retest. P2 remains a separate edition/version and is not part of those corrections.
+
+## Exact next-agent handoff
+
+Start from `dev` after the focused validation-checkpoint and professional-DMG commits. Do not push
+unless explicitly authorized. The expected source gates at this checkpoint are Bats `295/295`,
+Swift `251/251`, ShellCheck clean for `build/make-dmg.sh`, strict app signature verification, and
+`hdiutil verify` on the generated UDZO image. The working product remains minimal and P2 remains a
+separate edition.
+
+Resume implementation in this order, one focused change and packaged retest at a time:
+
+1. **BB-01 — empty-cache first mount:** in `helper/HelperProtocol.swift`, populate the invoker's
+   `USER` and `LOGNAME` alongside `HOME` and `SUDO_UID/GID`; add unit coverage and repeat complete
+   uninstall, reinstall, empty runtime cache, first mount, unmount, and authenticated teardown.
+2. **BB-F01 / BB-P1-07 — authoritative disappearance and timeout:** include physical-device
+   presence and backend liveness in reconciliation. A removed device or timed-out NFS/backend must
+   leave green promptly, tear down only its owned VM/PF/session state, and remove the cached row
+   without harming another mount. Repeat no-I/O hot-unplug and the clean Windows-created sequence.
+3. **BB-P1-07 — dirty-volume policy:** classify the dirty refusal without raw guest transcripts;
+   define fail-closed behavior for both drivers so default `ntfs-3g` cannot silently advertise RW
+   on the measured dirty fixture. Recovery guidance remains Windows `chkdsk`, never `ntfsfix`.
+4. **BB-P1-06 — NTFS3 symlinks:** reject or explain unsupported symlink portability before the
+   lower layer returns `Invalid argument`/`Operation timed out`; retain Verified Copy's no-publish
+   guarantee and repeat the exact same-device tree.
+5. **BB-03 — accessibility/lifecycle:** restore keyboard traversal for the first Mount, Diagnose,
+   and Quit controls, then diagnose packaged Launch at login availability without expanding the
+   popover.
+6. **Verified Copy panel wording:** prevent the native save panel from offering a misleading
+   `Replace` path while preserving the authoritative never-overwrite rule, hashes, and partial-file
+   behavior.
+7. **Resource-gated qualification:** run the controlled TV comparison and extended GPT/low-space/
+   controller/OS/system-volume matrix only when those external resources are actually available.
+
+Do not reopen BB-P3-05 unless the packaging scripts, app icon/name, DMG dimensions, or distribution
+model changes. Do not begin P2 inside this product line.
 
 ## Delivery sequence
 

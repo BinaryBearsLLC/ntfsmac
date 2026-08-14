@@ -41,9 +41,37 @@ teardown() {
 
   [ -d "$MOUNT_DIR/ntfsmac.app" ]
   [ -L "$MOUNT_DIR/Applications" ]
+  [ "$(readlink "$MOUNT_DIR/Applications")" = "/Applications" ]
+  [ -f "$MOUNT_DIR/.DS_Store" ]
+  [ -f "$MOUNT_DIR/.background/ntfsmac-dmg-background.png" ]
+
+  run sips -g pixelWidth -g pixelHeight \
+    "$MOUNT_DIR/.background/ntfsmac-dmg-background.png"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"pixelWidth: 720"* ]]
+  [[ "$output" == *"pixelHeight: 460"* ]]
+
+  run strings "$MOUNT_DIR/.DS_Store"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ntfsmac-dmg-background.png"* ]]
 
   hdiutil detach "$MOUNT_DIR" -quiet
   rm -rf "$MOUNT_DIR"
+}
+
+@test "professional layout sources are present and renderer emits the expected canvas" {
+  [ -f "$REPO_ROOT/build/configure-dmg.applescript" ]
+  [ -f "$REPO_ROOT/build/render-dmg-background.swift" ]
+
+  BACKGROUND="$OUT_DIR/background.png"
+  run xcrun swift "$REPO_ROOT/build/render-dmg-background.swift" "$BACKGROUND"
+  [ "$status" -eq 0 ]
+  [ -f "$BACKGROUND" ]
+
+  run sips -g pixelWidth -g pixelHeight "$BACKGROUND"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"pixelWidth: 720"* ]]
+  [[ "$output" == *"pixelHeight: 460"* ]]
 }
 
 @test "fails clearly when the app bundle is missing" {

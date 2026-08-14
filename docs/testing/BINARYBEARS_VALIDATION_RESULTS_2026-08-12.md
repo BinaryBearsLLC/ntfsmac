@@ -24,6 +24,10 @@ This is the live ledger for the assisted acceptance run defined in
 - Current installed candidate also includes mount-watchdog correction commit `3a3faab`; its
   bundled and staged watchdog hashes match, and the complete gates pass shell `294/294` and Swift
   `251/251`.
+- Professional-DMG packaging candidate built on 2026-08-14 from the unchanged packaged app:
+  SHA-256 `6c08067e431791b3e8be983c16c80f5a14a539c3b2a90c6ab30594f19b724b24`.
+  `hdiutil verify` and strict app signature verification pass; the packaging source passes Bats
+  `295/295`, Swift remains `251/251`, and the changed shell script passes ShellCheck.
 - Host: Apple Silicon with Hypervisor support, macOS 26.6.1.
 - Local evidence folder: `ntfsmac-acceptance-20260812-190259` on the operator's Desktop. It is
   intentionally not committed because it contains local volume/device identifiers.
@@ -70,6 +74,7 @@ This is the live ledger for the assisted acceptance run defined in
 | BB-P3-02 | PASS | Default-off state and absence of unsolicited permission requests passed. The first installed package exposed an authorization-callback race and empty foreground presentation options; commit `d99c4ac` corrects both and passes `292/292` shell plus `249/249` Swift tests, including the observed first-grant race. Its installed GUI exactly matched the strictly verified candidate app from DMG `c7bacbbec54a303f3ee2541da49a916b9668b8ac78c825151fb0fdce5c0a8905`. The rebuilt package scheduled mount, foreground unmount, and controlled-failure notifications with banner and sound options; macOS muted only their visible presentation because the display was shared during assisted control. The controlled failure retained one authoritative mount and enforced security session until normal recovery. With the app preference disabled, a successful mount/unmount cycle left the ntfsmac Notification Center request count unchanged at five. After the operator revoked system permission, reopening Settings reconciled the app toggle off and displayed actionable System Settings guidance instead of claiming enabled. |
 | BB-P3-03 | PASS | With MobileData and USB_8GB mounted concurrently, diagnostics first proved two NFS mounts and two enforced security sessions. Eject All attempted both rows and presented two explicit `Unmounted` results. Both rows returned to detected, diagnostics settled to zero mounts/sessions with the bridge down, and the operator-authenticated check found no security state files or PF child anchors. |
 | BB-P3-04 | PASS | The original packaged attempt exposed a security postcondition defect and led to the authoritative host-mount check in commit `3caf812`. The rebuilt installed package passed the repeat: a safe read-only working-directory hold left MobileData accessible and reported `Failed`, USB_8GB reported `Unmounted`, all mutating actions and Quit were disabled during the batch, and closing the report changed presentation only. Host truth and diagnostics agreed on one remaining NFS mount with one enforced security session throughout the hold. After release, MobileData's normal Unmount returned both rows to detected and diagnostics to healthy with zero mounts/sessions and the bridge down; the operator-authenticated check found no security state files or PF child anchors. |
+| BB-P3-05 | PASS | The professional DMG retains the native drag-to-Applications model and the unchanged ad-hoc-signed app. Its Finder layout opens at 720×460 with two 112-point icons, deliberate app/Applications alignment, hidden chrome, a restrained neutral background and centered drag cue. Automated packaging tests verify the app, exact `/Applications` symlink, persisted `.DS_Store` background reference, hidden 720×460 PNG, and missing-app hard stop. The real compressed UDZO image passes `hdiutil verify`; the app passes strict deep signature verification; Light and Dark visual checks passed with the host's original Automatic appearance restored. Local screenshots remain outside Git. |
 | BB-F01 | FAIL | On 2026-08-14 USB_8GB was mounted with default `ntfs-3g`; diagnostics proved one enforced private session, and the live gate proved vmnet/private/`soft` NFS with no loopback listener. With no copy/verify process or Finder use, the operator physically removed only that disposable device. `diskutil list external` then showed only MobileData, but after more than 36 seconds the host NFS mount, anylinuxfs VM, vmnet helper, security session, and green GUI `Mounted read/write` row all remained. The `soft` contract avoided a system hang, but bounded transition away from green and automatic teardown failed. Authorized GUI Unmount on the stale row immediately removed NFS, VM, bridge, and security state; one manual Refresh was then required to remove the cached disconnected drive row. Recovery is therefore available but not automatic, and must be retested after a focused physical-device-presence reconciliation fix. |
 | BB-F02 | PASS | On 2026-08-14 USB_8GB was remounted once with default `ntfs-3g`; the host NFS table, schema-6 diagnostics, GUI SECURITY rows, and the live transport gate agreed on one private vmnet/`soft` session with evaluated PF. GUI Unmount returned to zero mounts/sessions with the bridge down, then `diskutil eject /dev/disk4` succeeded and the physical disk disappeared from authoritative enumeration. The app retained its cached unmounted row after the logical eject and manual Refresh; that presentation defect is already covered by BB-F01 and did not leave backend state. In Settings, cancelling the complete-uninstall confirmation preserved the service, plist, helper, and CLI/runtime. Confirming it then reached `Uninstalled`, disabled the action against a second run, and removed the launchd service, `/Library/LaunchDaemons/com.khr898.ntfsmac.helper.plist`, `/Library/PrivilegedHelperTools/com.khr898.ntfsmac.helper`, and `/usr/local/ntfsmac`. No ntfsmac NFS mount, VM/network-helper process, or session-state file remained. The root-owned public diagnostics retained only privacy-safe zero-session/`NO_ACTIVE_MOUNTS` state; the app bundle and user preferences remain the separately removable user-level files described by the confirmation UI. The final operator-authenticated check found no security state files or PF child anchors. |
 
@@ -120,19 +125,20 @@ unmeasured because the stalled condition did not recur.
 
 ## Validation closure checkpoint — 2026-08-14
 
-No acceptance row remains `IN PROGRESS`. Of the 29 rows defined by the current runbook, 22 are
-`PASS`, five are measured `FAIL`, and two are resource `BLOCKED`:
+No acceptance row remains `IN PROGRESS`. Of the 30 rows now defined by the runbook, 23 are `PASS`,
+five are measured `FAIL`, and two are resource `BLOCKED`:
 
 - failures: BB-01, BB-03, BB-P1-06, BB-P1-07, and BB-F01;
 - blocked: BB-P1-05 controlled TV playback and the unavailable BB-P1-08 extended matrix;
 - Fast Startup and a genuinely hibernated removable NTFS fixture are recorded inside BB-P1-07 as
   blocked subcells, while its observed dirty-volume policy/presentation remains a failure.
 
-The local evidence directory and disposable-volume contents remain outside Git. Public documents
+BB-P3-05 is the added passing professional-DMG cell. The local evidence directory and
+disposable-volume contents remain outside Git. Public documents
 retain only generalized device roles, reproducible sizes/hashes, privacy-safe reason codes, and
-generic paths. The only implementation authorized for the next checkpoint is the professional DMG
-presentation. Every mount/helper/driver/GUI correction listed above is deliberately deferred and
-must be implemented and packaged in focused later changes rather than folded into the DMG work.
+generic paths. The professional DMG was the only implementation authorized for this checkpoint and
+is now complete. Every mount/helper/driver/GUI correction listed above remains deliberately
+deferred and must be implemented and packaged in focused later changes.
 
 ## Findings corrected in the working tree
 
