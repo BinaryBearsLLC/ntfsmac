@@ -250,9 +250,9 @@ developed from `dev` and reviewed back into `dev` through its own focused branch
 | Priority | Status | Direction |
 | --- | --- | --- |
 | Completed foundation | ✅ Shipped | Multi-drive NTFS/ext support, MBR detection, in-popover Settings, adaptive icon and help, privacy-safe CLI/GUI diagnostics, version reporting, and helper reinstall/uninstall lifecycle |
-| P0 | ✅ Current-host acceptance complete | Runtime pinning, audited updates, mount reconciliation, per-session PF/VPN transaction, and measured SECURITY telemetry are implemented; every named P0 cell passes on the current Apple Silicon host |
-| P1 | 🟡 Software complete; qualification open | Verified Copy CLI/GUI and the explicit one-mount NTFS3 GUI choice are implemented; same-media reconnect/Windows proof and same-device NTFS3 hardware qualification remain open |
-| P2 | ⬜ Planned | Migrate the deprecated privileged-helper lifecycle to `SMAppService` after its ad-hoc-signing and upgrade path are proven |
+| P0 | 🟡 Baseline complete; recovery fixes open | Runtime pinning, audited updates, mount reconciliation, per-session PF/VPN transaction, and measured SECURITY telemetry pass on the current host; physical hot-unplug reconciliation and empty-cache initialization after helper reinstall still require focused fixes |
+| P1 | 🟡 Software complete; qualification fixes open | Verified Copy CLI/GUI and the explicit one-mount NTFS3 GUI choice are implemented; cross-OS hashes and clean NTFS checks pass, while same-device testing exposed NTFS3 symlink portability, transient stale-green NFS timeout, and dirty-volume policy/presentation failures |
+| P2 | ⬜ Separate edition planned | Migrate the deprecated privileged-helper lifecycle to `SMAppService` in a dedicated app/version and validation track, without changing the current P0/P1/P3 product line |
 | P3 | ✅ Packaged validation complete | Per-drive Open in Finder, opt-in notifications, and resilient Eject All pass packaged validation; the separate professional DMG presentation remains open without expanding the minimal app UI |
 
 The roadmap records explicit A/B options where evidence is still missing. In particular,

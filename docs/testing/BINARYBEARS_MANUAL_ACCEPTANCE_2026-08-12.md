@@ -48,7 +48,7 @@ Before changing system state, we will resolve every placeholder and show the exa
 not paste placeholder text literally.
 
 ```bash
-export BB_REPO="/Users/andrea/Documents/GitHub/ntfsmac"
+export BB_REPO="$HOME/path/to/ntfsmac"
 export BB_CLI="/usr/local/ntfsmac/bin/ntfsmac"
 export BB_APP="/Applications/ntfsmac.app"
 export BB_DMG="$BB_REPO/dist/ntfsmac.dmg"

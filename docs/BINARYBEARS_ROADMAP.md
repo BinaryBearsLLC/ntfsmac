@@ -20,6 +20,13 @@ The current packaged acceptance ledger is
 Replacement commit `db3aacf` passed its default real-hardware mount, measured security transaction,
 and complete GUI/root teardown on 2026-08-13. Every named P0 acceptance cell now passes on the
 current Apple Silicon host; broader host/device coverage remains recorded separately in BB-P1-08.
+The final BB-F02 safe-eject/uninstall cell passed on 2026-08-14, including the authenticated
+no-state/no-PF-anchor teardown proof. The initially accepted BB-01 install cell was reopened after
+the later empty-cache first mount proved that the launchd helper supplies `HOME` and invoker IDs but
+not `USER`, causing anylinuxfs `init-rootfs` to fail before filesystem access. BB-F01 hot-unplug
+reconciliation, BB-03 keyboard/login-item behavior, BB-01 first-run initialization, and the
+BB-P1-06 NTFS3 symlink limitation remain focused correction-and-retest gates rather than hidden
+inside those completed lifecycle cells.
 
 The post-sync wiring audit and its focused recovery branches are recorded in
 [BinaryBears Upstream Regression Audit — 2026-08-05](audits/UPSTREAM_REGRESSION_AUDIT_2026-08-05.md).
@@ -193,8 +200,12 @@ completing the current external-disconnect cell. The operator then restarted the
 helper with no active mount; one job, one helper process, and the expected plist/binary pair remain,
 and the first post-restart GUI mount/unmount succeeded without reinstall or another authorization.
 The mount reached verified RW with one enforced session; teardown returned to healthy zero state
-while the same sole helper process remained, completing helper reconnect. Physical hot-unplug also
-remains. Concurrent two-drive state and independent teardown passed separately. The packaged
+while the same sole helper process remained, completing helper reconnect. The 2026-08-14 physical
+no-I/O hot-unplug test then failed: after the raw device disappeared from `diskutil`, the `soft` NFS
+mount avoided a host hang but the VM/session and green GUI row remained beyond the bounded
+reconciliation interval. The authoritative snapshot must include physical-device presence and
+drive failed-closed cleanup when it disappears. Concurrent two-drive state and independent
+teardown passed separately. The packaged
 public-evidence fault cell also passed: making only the root-owned security summary world-writable
 changed all three GUI security claims and schema-6 diagnostics to reason-coded `unknown` before a
 manual Refresh, without misclassifying the still-present NFS mount. Restoring `0644` recovered the
@@ -283,7 +294,12 @@ that host file while retaining its guest-visible root metadata. Real non-symlink
 focused installer/build coverage, the full `289/289` Bats suite, Swift `247/247`, and a complete
 runtime rebuild pass. Replacement commit `db3aacf` passed the affected BB-01 upgrade-cache staging,
 unprivileged backend enumeration, and two-row popover checks on 2026-08-13; its mount/unmount and
-ownership-preservation cycle also passed. Only the deliberately blank clean-install cell remains.
+ownership-preservation cycle also passed. The deliberately blank clean-install replay initially
+passed its install-only checks on 2026-08-14 with one expected authorization, exactly one helper
+registration, matching GUI/CLI version metadata, the complete command surface, and healthy
+zero-mount diagnostics. A later empty-cache first mount reopened this gate: `init-rootfs` failed
+because the helper environment omitted `USER`. Fix and retest that boundary alongside the separate
+fresh-install `Launch at login` availability anomaly tracked under BB-03.
 
 #### 2. Establish an anylinuxfs update policy
 
@@ -456,7 +472,46 @@ ntfsmac mount --fs-driver ntfs3 disk4s1
 - [x] Add explicit **Experimental** labeling, compatibility differences, and a one-mount driver
   choice in the GUI; no silent fallback between drivers.
 - [x] Record the selected driver and privacy-safe failure category in diagnostics.
-- [ ] Compare `ntfs-3g` and NTFS3 with the same devices, data set, and Verified Copy manifest.
+- [x] Compare `ntfs-3g` and NTFS3 with the same devices, data set, and Verified Copy manifest.
+
+The 2026-08-14 same-device run passed the 256 MiB payload, a 505-entry regular-only tree, Unicode,
+the complete mutation set, and post-remount verification with both drivers. It also identified a
+portability failure that keeps the hardware qualification gate red: NTFS3 exposes an `ntfs-3g`
+symlink as a regular `IntxLNK` file, and cannot create the same symlink through the macOS/NFS copy
+path. Verified Copy failed closed, withheld the final tree, and retained one recoverable partial.
+Add an NTFS3 symlink preflight with specific guidance instead of allowing the lower-level
+`Invalid argument`/`Operation timed out` pair to be the primary user message.
+
+Windows subsequently enumerated the same `ntfs-3g` link payload as a regular 46-byte file while
+backing up both driver test trees without copy failures. This corroborates the portability limit
+across the Windows boundary; it does not redefine the POSIX link as a verified Windows symlink.
+The first BB-P1-07 Windows-clean subcell also passed its regular-file operation matrix, retained the
+256 MiB SHA-256, and completed read-only CHKDSK with no filesystem problem, bad sector, or dirty
+bit. The current package then failed the Mac observation under default `ntfs-3g`: an ordinary
+directory access returned `Operation timed out` after the fresh 256 MiB copy and mutations, while
+the GUI remained green. The test stopped before NTFS3 and recovered through normal Unmount to zero
+backend/security state. An independent Windows reread then proved both 256 MiB files retained the
+expected SHA-256 and that CHKDSK, bad-sector, and dirty-bit state remained clean. This isolates the
+failure to the NFS/backend path and stale-green presentation rather than payload or NTFS corruption.
+Require a focused timeout/fail-closed UI investigation and packaged clean-state retest; the
+remaining controlled Windows states continue as separate evidence cells. The intentionally dirty
+state was then measured separately: NTFS3 correctly produced no host mount and did not fall back,
+but surfaced a long raw Linux error transcript instead of a classified dirty-volume refusal.
+Default `ntfs-3g` mounted the same dirty media read/write and presented a green GUI. No write was
+performed and normal Unmount returned mounts/sessions to zero with the bridge down. Qualification
+therefore also requires a deterministic dirty-state preflight/policy for both drivers, concise
+recovery guidance, and a packaged repeat. Windows subsequently confirmed that the dirty bit
+survived the macOS observations, found no structural error or bad sector, cleared the bit with
+`chkdsk /F /X`, and passed both the final dirty query and read-only CHKDSK with exit `0`.
+The Windows host exposes hibernation but disables Fast Startup through current system policy
+(`HiberbootEnabled=0`), so Fast Startup is recorded as blocked by the available test configuration
+instead of changing the operator's machine policy. An actual Windows hibernation with the external
+USB attached did not reproduce a hibernated NTFS volume: explicit NTFS3 mounted it read/write with
+no fallback, no Mac payload access occurred, and teardown was clean. Windows therefore closed that
+removable volume during hibernation; the required fixture remains blocked rather than passed.
+After the device was reconnected before Windows resumed, the volume remained non-dirty and a
+read-only CHKDSK again completed with no problem, bad sector, or required action. The authenticated
+Mac teardown also found no security state file or PF child anchor.
 
 **Decision A/B**
 
@@ -485,12 +540,17 @@ Acceptance requires no silent corruption, deterministic failure messaging, no fa
 state, successful post-copy SHA-256 verification, and a documented recovery path. Hardware testing
 must use disposable test data with a separate backup.
 
-P1 is software-complete on 2026-08-12. The same-media post-reconnect/Windows verification and
-same-device `ntfs-3g` versus NTFS3 qualification above remain release gates, not implied passes.
+P1 is software-complete on 2026-08-12, but qualification has exposed implementation corrections
+that remain release gates. Windows independently matched the retained 256 MiB Mac source SHA-256
+on the same MobileData volume on 2026-08-14; the controlled same-media TV playback comparison
+remains open. The independent clean Windows matrix and reread passed without NTFS corruption, while
+the dirty-volume observation failed the required deterministic refusal/presentation policy.
+The same-device `ntfs-3g` versus NTFS3 comparison has now run and failed the symlink
+portability cell described above; completion of the comparison is not an implied qualification pass.
 Replacement commit `db3aacf` passed the same-media physical reconnect and independent 256 MiB
 SHA-256 reread on 2026-08-13. Rebuilt commit `3a3faab` then passed the complete packaged minimal-GUI
-Verified Copy flow, including active cancellation and recoverable-partial evidence. Windows and the
-same-device driver comparison remain open.
+Verified Copy flow, including active cancellation and recoverable-partial evidence. The remaining
+Windows state cells and the focused fixes/retests described above remain open.
 
 ### P2 — Modern helper lifecycle
 
@@ -498,7 +558,9 @@ same-device driver comparison remain open.
 
 `SMJobBless` and `SMJobCopyDictionary` still work in the current ad-hoc-signed flow but are
 deprecated. The migration changes a security-critical installation, approval, upgrade, reconnect,
-and uninstall boundary; it should not be mixed into unrelated work.
+and uninstall boundary; it should not be mixed into unrelated work. BinaryBears has explicitly
+deferred P2 to a separate app/edition and release track, rather than changing the helper boundary
+inside the current P0/P1/P3 product line.
 
 - [ ] Prototype registration and status behavior with the existing macOS 13+ floor.
 - [ ] Prove that the chosen ad-hoc signing model can support a predictable clean-install flow.
@@ -507,6 +569,9 @@ and uninstall boundary; it should not be mixed into unrelated work.
   communication failure, uninstall, and app deletion.
 - [ ] Update Full Disk Access guidance and screenshots only after macOS presents the new service
   behavior consistently.
+- [ ] Give the P2 edition its own bundle identity, migration contract, package, validation ledger,
+  and release notes so that it can coexist with or cleanly replace the current edition without
+  duplicate helpers or ambiguous ownership.
 
 **Decision A/B**
 
@@ -588,6 +653,15 @@ P3's packaged-app checks are part of the
 [assisted manual acceptance runbook](testing/BINARYBEARS_MANUAL_ACCEPTANCE_2026-08-12.md); they do
 not replace the still-open P0/P1 hardware qualification gates.
 
+## 2026-08-14 scope boundary
+
+The assisted run is closed with no `IN PROGRESS` acceptance row: measured defects are `FAIL` and
+unavailable external-resource cells are `BLOCKED`. The only implementation in the current scope is
+the professional DMG presentation. Do not combine helper environment, hot-unplug reconciliation,
+dirty-volume policy, NTFS3 symlink handling, keyboard/login-item behavior, or Verified Copy panel
+wording into that packaging change. Each remains a later focused correction with its own packaged
+retest. P2 remains a separate edition/version and is not part of those corrections.
+
 ## Delivery sequence
 
 Each row is a separate review unit. Branch names are suggestions; BinaryBears implementation
@@ -608,6 +682,11 @@ that proposal independently from current `upstream/main`.
 | 10 | NTFS3 hardware qualification | `test/ntfs3-qualification` | Both-driver hardware report and manifests |
 | 11 | SMAppService migration | `refactor/smappservice-helper` | Clean/upgrade/uninstall matrix on supported macOS |
 | 12 | Remaining focused UX items | one branch per item | Automated tests plus packaged-app validation |
+
+The 2026-08-14 packaged Full Keyboard Access pass found incomplete traversal in the main popover:
+the first drive's Mount action, Diagnose, and Quit were skipped while the remaining tested controls
+accepted focus. Treat this as a focused accessibility correction under item 12; preserve the current
+minimal layout and retest the installed package before closing BB-03.
 
 ## Documentation ownership
 
