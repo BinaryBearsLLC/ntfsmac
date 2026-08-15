@@ -552,26 +552,27 @@ SHA-256 reread on 2026-08-13. Rebuilt commit `3a3faab` then passed the complete 
 Verified Copy flow, including active cancellation and recoverable-partial evidence. The remaining
 Windows state cells and the focused fixes/retests described above remain open.
 
-### P2 — Modern helper lifecycle
+### P2 — Modern helper variant
 
 #### 7. Migrate privileged-helper management to SMAppService
 
 `SMJobBless` and `SMJobCopyDictionary` still work in the current ad-hoc-signed flow but are
 deprecated. The migration changes a security-critical installation, approval, upgrade, reconnect,
-and uninstall boundary; it should not be mixed into unrelated work. BinaryBears has explicitly
-deferred P2 to a separate app/edition and release track, rather than changing the helper boundary
-inside the current P0/P1/P3 product line.
+and uninstall boundary; it should not be mixed into unrelated work. BinaryBears has deferred P2 to
+a separately buildable modern variant of the same product. It will share the repository, brand,
+features, documentation, and release train with the current compatibility variant, while retaining
+the distinct internal identity required to prevent helper and installation collisions.
 
 - [ ] Prototype registration and status behavior with the existing macOS 13+ floor.
-- [ ] Prove that the chosen ad-hoc signing model can support a predictable clean-install flow.
+- [ ] Prove a predictable Developer ID-signed and notarized clean-install flow.
 - [ ] Define migration from an already installed SMJobBless helper without leaving duplicate jobs.
 - [ ] Validate install, approval-required, denial, reinstall, app upgrade, helper mismatch,
   communication failure, uninstall, and app deletion.
 - [ ] Update Full Disk Access guidance and screenshots only after macOS presents the new service
   behavior consistently.
-- [ ] Give the P2 edition its own bundle identity, migration contract, package, validation ledger,
-  and release notes so that it can coexist with or cleanly replace the current edition without
-  duplicate helpers or ambiguous ownership.
+- [ ] Give the P2 variant its own internal bundle/helper identity, migration contract, artifact,
+  and validation matrix so it can coexist with or cleanly replace the compatibility variant
+  without duplicate helpers or ambiguous ownership; publish both from the same release pipeline.
 
 **Decision A/B**
 
@@ -665,42 +666,98 @@ unavailable external-resource cells are `BLOCKED`. The professional DMG was the 
 in this checkpoint and is complete. No helper environment, hot-unplug reconciliation, dirty-volume
 policy, NTFS3 symlink handling, keyboard/login-item behavior, or Verified Copy panel wording was
 mixed into the packaging change. Each remains a later focused correction with its own packaged
-retest. P2 remains a separate edition/version and is not part of those corrections.
+retest. At that checkpoint P2 remained a separate edition/version; the product direction approved
+on 2026-08-15 below supersedes that classification.
+
+## 2026-08-15 blocker-correction checkpoint
+
+Commit `3c4f23a` implements every focused correction identified by the closed acceptance run:
+
+- BB-01 supplies the complete invoking-user environment (`HOME`, `USER`, `LOGNAME`, `SUDO_UID`,
+  and `SUDO_GID`) to helper-launched CLI children.
+- BB-F01/BB-P1-07 reconciliation combines runtime status, the host NFS table, bounded mount
+  responsiveness, and external physical-partition presence. Physical removal triggers exact
+  helper teardown immediately; one backend probe failure removes green, while two consecutive
+  failures trigger teardown without disturbing surviving mounts. Stale scanner rows for absent
+  devices are hidden.
+- BB-P1-07 makes `ntfs-3g` use `norecover`, removes the packaged GUI's unsafe read/write override,
+  and maps dirty/hibernated failures to concise Windows `chkdsk`/Fast Startup/full-shutdown
+  guidance without exposing guest transcripts.
+- BB-P1-06 carries the observed filesystem driver into the mounted row and rejects root or nested
+  symbolic links before an NTFS3 Verified Copy starts.
+- BB-03 restores keyboard focusability and labels for the skipped Mount, Diagnose, and Quit
+  controls. A fresh `SMAppService.mainApp.status == .notFound` remains actionable so the documented
+  registration call can run and surface its real result.
+- Verified Copy validates a fresh destination through the native save-panel delegate before
+  AppKit can offer a misleading destructive Replace path; the final validator still refuses every
+  existing destination.
+
+Source gates pass Bats `297/297` and Swift `259/259`, including a clean vendored-component rebuild.
+These are source fixes, not packaged evidence. BB-01, BB-03, BB-P1-06, BB-P1-07, and BB-F01 remain
+`FAIL` until the newly built app passes the hardware/UI repeats below.
+
+## Approved BinaryBears production direction
+
+After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
+product integration and GitHub distribution source while `main` continues to mirror upstream for
+comparison and clean contributions. Distribution remains free, open source, and release-based on
+GitHub.
+
+The approved replacement app icon is a 500×500 PNG with alpha, SHA-256
+`fcfddbb98d4745fa1e34fd7778283d348a613fa8f5be0a7f500b38cf05eeddc3`. Import it under a neutral
+repository-owned filename during the rebranding commit, generate the complete `.icns` set, and
+replace every app/DMG/README/site use together. Do not commit the operator's original download
+path or generator filename.
+
+Production releases will later use a BinaryBears Developer ID and Apple notarization. The
+identifier/helper-label migration, signing identity, entitlements, update/uninstall behavior, and
+old-install cleanup require a dedicated rebranding migration. Apple credentials and notarization
+secrets belong only in local Keychain/GitHub encrypted secrets, never in Git.
+
+P2 is no longer an unrelated app. It is the modern compatibility variant of the same BinaryBears
+product: one name, one public repository, one roadmap, and one release pipeline should produce both
+the current compatibility artifact and the future P2 artifact. They may require distinct internal
+bundle/helper identifiers and artifact suffixes so they cannot collide, but their UX, feature
+contract, documentation, and fixes should remain shared wherever technically possible. GitHub
+Actions must eventually build/test both variants in a matrix and publish both DMGs in the same
+release. The GitHub Pages product site follows rebranding and should remain macOS-like, polished,
+animated with restraint, accessible, and fast.
 
 ## Exact next-agent handoff
 
-Start from `dev` after the focused validation-checkpoint and professional-DMG commits. Do not push
-unless explicitly authorized. The expected source gates at this checkpoint are Bats `295/295`,
-Swift `251/251`, ShellCheck clean for `build/make-dmg.sh`, strict app signature verification, and
-`hdiutil verify` on the generated UDZO image. The working product remains minimal and P2 remains a
-separate edition.
+Start from `dev` at code commit `3c4f23a` plus the following documentation commit. Do not push
+unless explicitly authorized. Expected source gates are Bats `297/297` and Swift `259/259`.
+Preserve the minimal popover and do not mix identity/signing migration into the blocker retest.
 
-Resume implementation in this order, one focused change and packaged retest at a time:
+Build and install one fresh DMG, then run the packaged retest in this order:
 
-1. **BB-01 — empty-cache first mount:** in `helper/HelperProtocol.swift`, populate the invoker's
-   `USER` and `LOGNAME` alongside `HOME` and `SUDO_UID/GID`; add unit coverage and repeat complete
-   uninstall, reinstall, empty runtime cache, first mount, unmount, and authenticated teardown.
-2. **BB-F01 / BB-P1-07 — authoritative disappearance and timeout:** include physical-device
-   presence and backend liveness in reconciliation. A removed device or timed-out NFS/backend must
-   leave green promptly, tear down only its owned VM/PF/session state, and remove the cached row
-   without harming another mount. Repeat no-I/O hot-unplug and the clean Windows-created sequence.
-3. **BB-P1-07 — dirty-volume policy:** classify the dirty refusal without raw guest transcripts;
-   define fail-closed behavior for both drivers so default `ntfs-3g` cannot silently advertise RW
-   on the measured dirty fixture. Recovery guidance remains Windows `chkdsk`, never `ntfsfix`.
-4. **BB-P1-06 — NTFS3 symlinks:** reject or explain unsupported symlink portability before the
-   lower layer returns `Invalid argument`/`Operation timed out`; retain Verified Copy's no-publish
-   guarantee and repeat the exact same-device tree.
-5. **BB-03 — accessibility/lifecycle:** restore keyboard traversal for the first Mount, Diagnose,
-   and Quit controls, then diagnose packaged Launch at login availability without expanding the
-   popover.
-6. **Verified Copy panel wording:** prevent the native save panel from offering a misleading
-   `Replace` path while preserving the authoritative never-overwrite rule, hashes, and partial-file
-   behavior.
+1. **BB-01:** complete uninstall, remove only the disposable runtime cache, install the DMG, approve
+   the helper once, mount the first NTFS device without a second launch, unmount, then prove zero
+   security state/PF child anchors.
+2. **BB-03:** with Full Keyboard Access temporarily enabled, traverse the first Mount, Diagnose,
+   Quit, Settings, menus, and Back controls; restore the host setting. Toggle Launch at login on,
+   confirm its system state, toggle it off, and confirm removal.
+3. **BB-P1-06 and save panel:** mount once with NTFS3, attempt Verified Copy with the known symlink
+   fixture, and require the specific preflight before any copy. Enter an existing destination name
+   and require ntfsmac's no-overwrite explanation without a native Replace offer or mutation.
+4. **BB-P1-07 dirty policy:** use only the disposable dirty fixture. Both default `ntfs-3g` and
+   explicit NTFS3 must refuse a writable mount, show concise Windows recovery guidance, publish no
+   green row, and leave zero VM/PF/session residue. Repair with Windows `chkdsk`, fully shut down,
+   then repeat the clean mount/hash/unmount/reread sequence.
+5. **BB-F01/backend timeout:** with two disposable drives mounted and no I/O, physically remove one.
+   It must stop showing green on the first failed proof, automatically tear down only its owned
+   session, remove its row, and preserve the other drive. If a controlled backend stall is
+   available, verify the same bounded unknown-to-cleanup transition without waiting for a
+   240-second CLI watchdog.
+6. Run strict signature verification, `hdiutil verify`, Bats `297/297`, Swift `259/259`, and the
+   authenticated zero-state/PF check; only then convert the five ledger rows from FAIL to PASS.
 7. **Resource-gated qualification:** run the controlled TV comparison and extended GPT/low-space/
    controller/OS/system-volume matrix only when those external resources are actually available.
 
-Do not reopen BB-P3-05 unless the packaging scripts, app icon/name, DMG dimensions, or distribution
-model changes. Do not begin P2 inside this product line.
+Once steps 1–6 pass, begin the rebranding/production migration as a new review unit: replace the
+icon everywhere, migrate BinaryBears identifiers safely, sign/notarize, update Actions/releases,
+and revalidate the professional DMG. That change intentionally reopens BB-P3-05. Implement the P2
+variant later in the same product/release pipeline, not as an unrelated application.
 
 ## Delivery sequence
 

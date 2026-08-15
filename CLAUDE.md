@@ -21,8 +21,13 @@ recipe. Match what's already built; don't re-design.
   launches vmnet-helper with `--operation-mode=shared`; do not call that strict network isolation
   unless effective PF/route evidence proves the narrower claim.
 - **NFS mount mode stays `soft`** — never switch to `hard`, it's what prevents a kernel panic on hot-unplug.
-- **Signing:** ad-hoc only (`codesign -s -`). No paid Apple Developer account, no notarization. This is why the GUI is DMG-only (never a Homebrew cask) and the CLI is a formula in the project's own tap (never homebrew-core).
-- **Every control that mounts/unmounts/touches pf/route goes through the SMJobBless XPC helper** — never a raw `sudo` shell-out from Swift UI code.
+- **Signing today:** the current compatibility artifact stays ad-hoc (`codesign -s -`) until the
+  dedicated BinaryBears production-rebrand migration. That future phase is explicitly approved to
+  use BinaryBears Developer ID signing and Apple notarization; credentials must stay in Keychain or
+  GitHub encrypted secrets and never enter Git. Do not mix that migration into unrelated fixes.
+- **Every control that mounts/unmounts/touches pf/route goes through a reviewed XPC helper** — the
+  current compatibility artifact uses SMJobBless; the future P2 variant may use SMAppService. Never
+  add a raw `sudo` shell-out from Swift UI code.
 - **Device names validated against `^disk[0-9]+s[0-9]+$`** before any shell invocation, in both CLI and GUI/helper.
 - **Platform:** Apple Silicon only. Don't add Intel fallback paths.
 - Security and connection stability outrank speed. Speed tuning (rsize/wsize/async export) is opt-in and documented as risk, never silently defaulted on.
@@ -59,7 +64,8 @@ Branch roles in the BinaryBears fork:
 
 - `main` mirrors `upstream/main`; do not land BinaryBears-only roadmap or branding there.
 - `dev` is the long-lived BinaryBears integration branch: current upstream plus the fork roadmap
-  and fork-only work.
+  and fork-only product work. After blocker validation it is also the canonical source for the
+  BinaryBears GitHub release, rebranding, site, and dual compatibility/P2 artifact pipeline.
 - BinaryBears feature/fix branches start from `dev` and target `dev` through focused PRs.
 - A candidate intended for the original project starts independently from current
   `upstream/main`, contains no BinaryBears-only documentation, and is submitted upstream only

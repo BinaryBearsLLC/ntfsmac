@@ -9,7 +9,8 @@
 
 - **One job, zero clutter.** Pick a drive, mount it, get out of the way.
 - **Status at a glance.** Menu-bar icon colour tells the whole story without opening the popover.
-- **Never lie about safety.** If a drive mounts read-only (dirty journal), say so loudly before the user trusts a write.
+- **Never lie about safety.** Refuse unsafe dirty/hibernated writable mounts and explain the
+  Windows recovery path before the user can trust a green state.
 
 ---
 
@@ -27,7 +28,7 @@ mouse click or Accessibility permission.
 | System-adaptive | Idle, nothing mounted |
 | Blue (pulsing) | Mounting |
 | Green | Mounted read/write |
-| Yellow | Mounted **read-only** (dirty journal) |
+| Yellow | State unknown, backend unresponsive, or externally observed read-only mount |
 | Red | Error |
 
 The idle SF Symbol is an AppKit template image, so macOS supplies the same contrasting tint used
@@ -45,7 +46,7 @@ This table describes the current integrated GUI, not the original aspirational p
 | --- | --- |
 | Shipped | Auto-detect NTFS, MBR `Windows_NTFS`, ext2, ext3, and ext4 partitions |
 | Shipped | One-click mount/unmount and multiple concurrent drive rows |
-| Shipped | Dirty-volume read-only detection, warning, and confirmed read/write retry |
+| Source-fixed — packaged retest pending | Dirty/hibernated NTFS fails closed with no read/write override and concise Windows recovery guidance |
 | Shipped | Diagnose summary, inline Hide, and Command-click privacy-safe JSON export |
 | Shipped | First-run helper/CLI staging, helper reinstall, and confirmed complete uninstall |
 | Shipped | In-popover Settings with Back, canonical version/build, Launch at login, contextual help, and adaptive menu-bar icon |
@@ -127,12 +128,12 @@ The detailed live evidence and acceptance matrix are in
 and
 [`../audits/LIVE_P0_SECURITY_TRANSACTION_AUDIT_2026-08-11.md`](../audits/LIVE_P0_SECURITY_TRANSACTION_AUDIT_2026-08-11.md).
 
-### Read-only (dirty) state — extra
+### Unsafe dirty/hibernated state
 
 | Control | Action |
 |---------|--------|
-| Warning banner | "Mounted read-only — drive has an unclean journal. Eject safely in Windows to enable writing." (non-dismissable while RO) |
-| `Mount read/write anyway` | Re-mount r/w **only after** an explicit confirm dialog spelling out corruption risk |
+| Warning banner | Explain that ntfsmac refused writable mounting and requires Windows repair/full shutdown |
+| Unsafe Windows state | Never offer a read/write override. Refuse with `norecover`/driver policy and direct the user to Windows `chkdsk`, Fast Startup off, and a full shutdown |
 
 ### Error state
 

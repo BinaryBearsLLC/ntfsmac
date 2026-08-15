@@ -196,7 +196,7 @@ on the GUI side). Regression test: `tests/cli/unmount.bats` — "rejects a garba
 of faking success".
 
 Expected: mount succeeds read-write (unless the drive genuinely has a dirty NTFS journal, in
-which case it should land read-only — see "force a dirty-journal test" below if you want to
+which case it must fail closed with Windows recovery guidance — see "force a dirty-journal test" below if you want to
 verify that path specifically), the write/read/remove round-trips, `diagnose --json` reports
 `"healthy": true`, and unmount is clean.
 
@@ -432,13 +432,14 @@ above and re-run.
 9. Click `Quit` — app should exit; `mount | grep nfs` back in Terminal should show nothing
    ntfsmac-related left mounted.
 
-### Force a dirty-journal (read-only) test, optional
+### Force a dirty-journal refusal test, optional and disposable-media only
 
-If you want to specifically verify the yellow/read-only-with-banner path: mount the NTFS drive
-in Windows (or via Boot Camp/a VM), don't cleanly eject it (pull it, or force-shutdown Windows
-while it's mounted), then bring it back to macOS and mount via `ntfsmac`/the GUI — ntfs-3g's
-dirty-journal check should kick in and mount read-only. This is optional and drive-specific,
-skip if inconvenient — Part A/B above are the primary coverage.
+Use only a sacrificial NTFS device and the controlled Windows dirty-bit procedure from the
+BinaryBears acceptance runbook; do not pull a device during writes or force-shutdown a machine to
+manufacture this state. On macOS, both default `ntfs-3g` and explicit NTFS3 must refuse a writable
+mount, show concise Windows `chkdsk`/Fast Startup/full-shutdown guidance, publish no green row, and
+leave no VM/PF/security-session residue. Repair it with Windows `chkdsk`, fully shut down Windows,
+then repeat the normal clean mount. This is optional and drive-specific; Part A/B remain primary.
 
 ---
 

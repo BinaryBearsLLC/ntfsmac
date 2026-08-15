@@ -250,14 +250,19 @@ developed from `dev` and reviewed back into `dev` through its own focused branch
 | Priority | Status | Direction |
 | --- | --- | --- |
 | Completed foundation | ✅ Shipped | Multi-drive NTFS/ext support, MBR detection, in-popover Settings, adaptive icon and help, privacy-safe CLI/GUI diagnostics, version reporting, and helper reinstall/uninstall lifecycle |
-| P0 | 🟡 Baseline complete; recovery fixes open | Runtime pinning, audited updates, mount reconciliation, per-session PF/VPN transaction, and measured SECURITY telemetry pass on the current host; physical hot-unplug reconciliation and empty-cache initialization after helper reinstall still require focused fixes |
-| P1 | 🟡 Software complete; qualification fixes open | Verified Copy CLI/GUI and the explicit one-mount NTFS3 GUI choice are implemented; cross-OS hashes and clean NTFS checks pass, while same-device testing exposed NTFS3 symlink portability, transient stale-green NFS timeout, and dirty-volume policy/presentation failures |
-| P2 | ⬜ Separate edition planned | Migrate the deprecated privileged-helper lifecycle to `SMAppService` in a dedicated app/version and validation track, without changing the current P0/P1/P3 product line |
-| P3 | ✅ Feature validation complete | Per-drive Open in Finder, opt-in notifications, resilient Eject All, and the professional drag-to-Applications DMG pass packaged validation without expanding the minimal app UI; the global BB-03 accessibility/lifecycle fix remains separate |
+| P0 | 🟡 Source fixes complete; packaged retest pending | Runtime pinning, audited updates, per-session PF/VPN security, complete helper user identity, and physical/backend mount reconciliation are implemented; the new empty-cache and hot-unplug package still needs hardware confirmation |
+| P1 | 🟡 Source fixes complete; packaged retest pending | Verified Copy, NTFS3 preflight, fail-closed dirty-volume handling, and no-overwrite panel validation are implemented; the corrected DMG still needs the focused same-device/Windows repeat |
+| P2 | ⬜ Same-product modern variant planned | A future modern helper lifecycle will ship as a second compatibility artifact of the same BinaryBears product, built and released beside the current variant from one repository and shared roadmap |
+| P3 | 🟡 Features passed; corrected package pending | Open in Finder, notifications, resilient Eject All, and the professional DMG passed; keyboard/login-item fixes are implemented in source and await one packaged retest |
 
 The roadmap records explicit A/B options where evidence is still missing. In particular,
 `ntfs-3g` remains the compatibility-first default; NTFS3 does not become the default without a
 documented, repeatable hardware and integrity test matrix.
+
+After that packaged retest, BinaryBears will perform a dedicated production rebrand: the approved
+new icon across app/README/DMG/site, BinaryBears identifiers, Developer ID signing, Apple
+notarization, dual-variant GitHub Actions releases, and a restrained macOS-style GitHub Pages site.
+The project remains free, open source, and distributed through GitHub.
 
 Repository synchronization and contribution branches follow the documented
 [BinaryBears branch workflow](docs/BRANCHING.md): `main` mirrors upstream, `dev` is the fork's

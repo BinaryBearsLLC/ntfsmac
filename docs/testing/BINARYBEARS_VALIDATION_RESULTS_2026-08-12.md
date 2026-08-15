@@ -28,6 +28,9 @@ This is the live ledger for the assisted acceptance run defined in
   SHA-256 `6c08067e431791b3e8be983c16c80f5a14a539c3b2a90c6ab30594f19b724b24`.
   `hdiutil verify` and strict app signature verification pass; the packaging source passes Bats
   `295/295`, Swift remains `251/251`, and the changed shell script passes ShellCheck.
+- Source-only blocker correction commit `3c4f23a` was completed on 2026-08-15. Bats pass
+  `297/297` and Swift pass `259/259`, including a clean vendored-component rebuild. It has not yet
+  been packaged or installed, so it does not change any acceptance-row status.
 - Host: Apple Silicon with Hypervisor support, macOS 26.6.1.
 - Local evidence folder: `ntfsmac-acceptance-20260812-190259` on the operator's Desktop. It is
   intentionally not committed because it contains local volume/device identifiers.
@@ -239,6 +242,19 @@ later empty-cache first mount reopened BB-01 with the missing helper `USER` envi
 6. Retain NSSavePanel's no-overwrite safety while replacing the misleading intermediate native
    `Replace` wording in a separate focused Verified Copy UX change.
 7. Resume BB-P1-05/BB-P1-08 only when the external TV and missing test resources are available.
+
+## Source correction ready for packaged retest — 2026-08-15
+
+Commit `3c4f23a` implements all six deferred software corrections: complete helper invoking-user
+environment; physical-presence and bounded backend-liveness reconciliation; fail-closed
+`ntfs-3g norecover` dirty policy and concise Windows recovery copy; NTFS3 root/nested-symlink
+preflight; explicit keyboard focus plus actionable fresh Launch-at-login registration; and native
+save-panel validation before an existing destination can offer Replace.
+
+The five ledger failures remain unchanged until a new DMG passes the exact repeat. The next run
+must record the new artifact hash/signature first, then execute BB-01, BB-03, BB-P1-06, BB-P1-07,
+and BB-F01 in that order. No operator name, home path, device serial, local evidence path, Apple ID,
+or signing secret belongs in this public document.
 
 The first `db3aacf` Mount attempt paused at the expected macOS privacy boundary: System Settings
 showed exactly `com.khr898.ntfsmac.helper` with Full Disk Access off after helper replacement.
