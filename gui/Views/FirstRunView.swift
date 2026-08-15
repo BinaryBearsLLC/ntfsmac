@@ -61,6 +61,7 @@ public struct FirstRunView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glassPrimary())
+                .focusable(true)
 
                 Button {
                     let mode = DiagnoseActionMode.resolve(
@@ -85,6 +86,7 @@ public struct FirstRunView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                .focusable(true)
                 .disabled(diagnoseRunner.isRunning)
                 .help(TooltipCopy.text(for: .diagnose))
             }
@@ -164,6 +166,7 @@ public struct FirstRunView: View {
                 SettingsGearGlyph(color: .secondary)
             }
             .buttonStyle(.glassIcon(colorScheme: colorScheme))
+            .focusable(true)
             .accessibilityLabel("Open Settings")
             .help(TooltipCopy.text(for: .settings))
             Spacer()
@@ -171,6 +174,7 @@ public struct FirstRunView: View {
                 Text("Quit").frame(height: 28)
             }
             .buttonStyle(.glassFooter(colorScheme: colorScheme))
+            .focusable(true)
             .help(TooltipCopy.text(for: .quit))
         }
     }

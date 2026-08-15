@@ -536,6 +536,7 @@ public struct DiagnosePanel: View {
                     Spacer()
                     Button("Hide", action: onHide)
                         .buttonStyle(.plain)
+                        .focusable(true)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .accessibilityLabel("Hide diagnostics")

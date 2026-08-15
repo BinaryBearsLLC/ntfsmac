@@ -114,6 +114,7 @@ public struct PreferencesView: View {
                             }
                         }
                         .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                        .focusable(true)
                         .accessibilityLabel("Back")
                         .help(TooltipCopy.text(for: .back))
                         Spacer()
@@ -136,6 +137,7 @@ public struct PreferencesView: View {
                     )
                     .labelsHidden()
                     .toggleStyle(.switch)
+                    .focusable(true)
                     .disabled(settings.isUpdatingLaunchAtLogin)
                     .accessibilityLabel("Launch at login")
                 }
@@ -155,6 +157,7 @@ public struct PreferencesView: View {
                     )
                     .labelsHidden()
                     .toggleStyle(.switch)
+                    .focusable(true)
                     .disabled(settings.isUpdatingNotifications)
                     .accessibilityLabel("Mount notifications")
                 }
@@ -170,6 +173,7 @@ public struct PreferencesView: View {
                     Button("Reinstall…") {
                         Task { await installer.install() }
                     }
+                    .focusable(true)
                 }
             }
 
@@ -181,6 +185,7 @@ public struct PreferencesView: View {
                     Button("Uninstall…", role: .destructive) {
                         uninstallConfirmation.request()
                     }
+                    .focusable(true)
                     .disabled(
                         uninstaller.state == .removingDependencies
                             || uninstaller.state == .removingHelper
@@ -243,12 +248,14 @@ public struct PreferencesView: View {
                     uninstallConfirmation.cancel()
                 }
                 .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                .focusable(true)
 
                 Button("Uninstall Everything", role: .destructive) {
                     guard uninstallConfirmation.confirm() else { return }
                     Task { await uninstaller.uninstallEverything() }
                 }
                 .buttonStyle(.glassDestructive(colorScheme: colorScheme))
+                .focusable(true)
             }
         }
         .glassCard()

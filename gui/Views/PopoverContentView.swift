@@ -247,6 +247,7 @@ public struct PopoverContentView: View {
                             }
                         }
                         .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                        .focusable(true)
                         .disabled(driveActionsDisabled)
                         .help(TooltipCopy.text(for: .ejectAll))
                     }
@@ -299,6 +300,8 @@ public struct PopoverContentView: View {
                         }
                     }
                     .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                    .focusable(true)
+                    .accessibilityLabel("Refresh drives")
                 }
                 ForEach(visibleDrives) { drive in
                     DriveRow(
@@ -328,7 +331,9 @@ public struct PopoverContentView: View {
                         RefreshGlyph()
                     }
                     .buttonStyle(.glassIcon(colorScheme: colorScheme))
+                    .focusable(true)
                     .disabled(driveActionsDisabled)
+                    .accessibilityLabel("Refresh drives")
                 }
                 if OtherAvailableSection.rowsRender(availableCount: otherAvailableDrives.count) {
                     ForEach(otherAvailableDrives) { drive in
@@ -527,6 +532,8 @@ public struct PopoverContentView: View {
                 }
             }
             .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+            .focusable(true)
+            .accessibilityLabel("Refresh drives")
             .help(TooltipCopy.text(for: .refresh))
         }
         .frame(maxWidth: .infinity)
@@ -546,6 +553,7 @@ public struct PopoverContentView: View {
                 SettingsGearGlyph(color: .secondary)
             }
             .buttonStyle(.glassIcon(colorScheme: colorScheme))
+            .focusable(true)
             .disabled(verifiedCopyController.isActive)
             .accessibilityLabel("Open Settings")
             .help(TooltipCopy.text(for: .settings))
@@ -624,6 +632,7 @@ private struct EjectAllReportView: View {
                         .font(.system(size: 9, weight: .semibold))
                 }
                 .buttonStyle(.plain)
+                .focusable(true)
                 .accessibilityLabel("Dismiss Eject All results")
             }
 
@@ -692,6 +701,7 @@ struct FDAPromptView: View {
                     onCancel()
                 }
                 .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                .focusable(true)
                 
                 Spacer()
                 
@@ -699,6 +709,7 @@ struct FDAPromptView: View {
                     onOpenSettings()
                 }
                 .buttonStyle(.glassPrimary())
+                .focusable(true)
             }
         }
         .padding(20)
