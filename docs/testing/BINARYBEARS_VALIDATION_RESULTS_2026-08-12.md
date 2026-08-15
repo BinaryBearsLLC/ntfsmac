@@ -35,7 +35,9 @@ This is the live ledger for the assisted acceptance run defined in
   Keyboard Access was active; Open, Unmount, the overflow menu, Refresh, Security Show, and
   Settings were skipped. BB-03 therefore remains `FAIL`. Follow-up source commit `864abd8` adds
   explicit focus participation to every interactive popover surface and passes Swift `260/260`;
-  it still requires a newly packaged manual repeat.
+  its DMG was built and verified from documentation head `2e0ae09` with SHA-256
+  `bdfcd62b8a7070639a4476301461ca4f630d7b1ade5edfe150161c1e28292fed`. It still requires a newly
+  installed manual repeat.
 - Host: Apple Silicon with Hypervisor support, macOS 26.6.1.
 - Local evidence folder: `ntfsmac-acceptance-20260812-190259` on the operator's Desktop. It is
   intentionally not committed because it contains local volume/device identifiers.

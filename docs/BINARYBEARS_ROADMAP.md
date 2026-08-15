@@ -699,6 +699,12 @@ Source gates pass Bats `297/297` and Swift `260/260`, including a clean vendored
 These are source fixes, not packaged evidence. BB-01, BB-03, BB-P1-06, BB-P1-07, and BB-F01 remain
 `FAIL` until the newly built app passes the hardware/UI repeats below.
 
+The 2026-08-15 keyboard follow-up candidate was built from `864abd8`/`2e0ae09` as
+`dist/ntfsmac.dmg`, SHA-256
+`bdfcd62b8a7070639a4476301461ca4f630d7b1ade5edfe150161c1e28292fed`. Its strict app signature,
+DMG checksum, clean runtime rebuild, and Swift `260/260` gate pass. Installation and keyboard
+traversal remain manual evidence and are not inferred from successful packaging.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
