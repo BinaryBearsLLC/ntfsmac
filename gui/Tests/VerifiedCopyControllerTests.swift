@@ -150,6 +150,22 @@ private func waitForPhase(
     }
 }
 
+@MainActor
+@Test func savePanelDelegateRejectsExistingNameBeforeNativeReplaceFlow() throws {
+    let fixture = try VerifiedCopyFixture()
+    defer { fixture.cleanup() }
+    let existing = fixture.mountPoint.appendingPathComponent("existing.bin")
+    try Data("keep".utf8).write(to: existing)
+    let delegate = VerifiedCopySavePanelDelegate()
+
+    #expect(throws: VerifiedCopyValidationError.destinationExists) {
+        try delegate.validateFreshDestination(existing)
+    }
+    #expect(throws: Never.self) {
+        try delegate.validateFreshDestination(fixture.mountPoint.appendingPathComponent("new.bin"))
+    }
+}
+
 @Test func validatorRejectsBrokenDestinationSymlinksAndParentSymlinkEscapes() throws {
     let fixture = try VerifiedCopyFixture()
     defer { fixture.cleanup() }
@@ -192,6 +208,34 @@ private func waitForPhase(
             source: sourceFolder,
             destination: child.appendingPathComponent("copy"),
             mountPoint: fixture.mountPoint
+        )
+    }
+}
+
+@Test func ntfs3PreflightRejectsRootAndNestedSymbolicLinksBeforeCopy() throws {
+    let fixture = try VerifiedCopyFixture()
+    defer { fixture.cleanup() }
+    let sourceFolder = fixture.root.appendingPathComponent("source folder", isDirectory: true)
+    try FileManager.default.createDirectory(at: sourceFolder, withIntermediateDirectories: true)
+    let target = sourceFolder.appendingPathComponent("target.txt")
+    try Data("target".utf8).write(to: target)
+    let nestedLink = sourceFolder.appendingPathComponent("nested-link")
+    try FileManager.default.createSymbolicLink(at: nestedLink, withDestinationURL: target)
+
+    #expect(throws: VerifiedCopyValidationError.symbolicLinksUnsupportedByNTFS3) {
+        try VerifiedCopySelectionValidator.validate(
+            source: sourceFolder,
+            destination: fixture.mountPoint.appendingPathComponent("folder-copy"),
+            mountPoint: fixture.mountPoint,
+            rejectSymbolicLinks: true
+        )
+    }
+    #expect(throws: VerifiedCopyValidationError.symbolicLinksUnsupportedByNTFS3) {
+        try VerifiedCopySelectionValidator.validate(
+            source: nestedLink,
+            destination: fixture.mountPoint.appendingPathComponent("link-copy"),
+            mountPoint: fixture.mountPoint,
+            rejectSymbolicLinks: true
         )
     }
 }

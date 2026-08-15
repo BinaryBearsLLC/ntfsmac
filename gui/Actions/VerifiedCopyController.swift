@@ -15,6 +15,7 @@ public enum VerifiedCopyValidationError: LocalizedError, Equatable, Sendable {
     case sourceAndDestinationMatch
     case destinationInsideSource
     case destinationNotWritable
+    case symbolicLinksUnsupportedByNTFS3
 
     public var errorDescription: String? {
         switch self {
@@ -38,6 +39,8 @@ public enum VerifiedCopyValidationError: LocalizedError, Equatable, Sendable {
             "A folder cannot be copied inside itself."
         case .destinationNotWritable:
             "The destination folder is not writable."
+        case .symbolicLinksUnsupportedByNTFS3:
+            "NTFS3 cannot safely preserve symbolic links from macOS. Choose a source without symbolic links, or mount with ntfs-3g."
         }
     }
 }
@@ -47,12 +50,20 @@ public struct VerifiedCopySelection: Equatable, Sendable {
     public let destination: URL
     public let mountPoint: URL
     public let volumeDeviceID: UInt64
+    public let rejectsSymbolicLinks: Bool
 
-    public init(source: URL, destination: URL, mountPoint: URL, volumeDeviceID: UInt64) {
+    public init(
+        source: URL,
+        destination: URL,
+        mountPoint: URL,
+        volumeDeviceID: UInt64,
+        rejectsSymbolicLinks: Bool = false
+    ) {
         self.source = source
         self.destination = destination
         self.mountPoint = mountPoint
         self.volumeDeviceID = volumeDeviceID
+        self.rejectsSymbolicLinks = rejectsSymbolicLinks
     }
 }
 
@@ -80,6 +91,7 @@ public enum VerifiedCopySelectionValidator {
         source sourceURL: URL,
         destination destinationURL: URL,
         mountPoint mountPointURL: URL,
+        rejectSymbolicLinks: Bool = false,
         fileManager: FileManager = .default
     ) throws -> VerifiedCopySelection {
         let mountPoint = try canonicalDirectory(
@@ -107,6 +119,9 @@ public enum VerifiedCopySelectionValidator {
                 || sourceType == mode_t(S_IFLNK)
         else {
             throw VerifiedCopyValidationError.unsupportedSource
+        }
+        if rejectSymbolicLinks {
+            try rejectSymbolicLinksRecursively(source, sourceType: sourceType)
         }
 
         guard source.path != destination.path else {
@@ -141,8 +156,28 @@ public enum VerifiedCopySelectionValidator {
             source: source,
             destination: destination,
             mountPoint: mountPoint,
-            volumeDeviceID: UInt64(mountDevice)
+            volumeDeviceID: UInt64(mountDevice),
+            rejectsSymbolicLinks: rejectSymbolicLinks
         )
+    }
+
+    private static func rejectSymbolicLinksRecursively(_ source: URL, sourceType: mode_t) throws {
+        if sourceType == mode_t(S_IFLNK) {
+            throw VerifiedCopyValidationError.symbolicLinksUnsupportedByNTFS3
+        }
+        guard sourceType == mode_t(S_IFDIR) else { return }
+        guard let enumerator = FileManager.default.enumerator(atPath: source.path) else {
+            throw VerifiedCopyValidationError.sourceUnavailable
+        }
+        while let relativePath = enumerator.nextObject() as? String {
+            let child = source.appendingPathComponent(relativePath, isDirectory: false)
+            guard let mode = lstatMode(atPath: child.path) else {
+                throw VerifiedCopyValidationError.sourceUnavailable
+            }
+            if mode & mode_t(S_IFMT) == mode_t(S_IFLNK) {
+                throw VerifiedCopyValidationError.symbolicLinksUnsupportedByNTFS3
+            }
+        }
     }
 
     private static func canonicalDirectory(
@@ -201,8 +236,25 @@ public enum VerifiedCopySelectionValidator {
 /// Native panels are used only after the user selects Verified Copy from a mounted drive's small
 /// overflow menu. There is no permanent page or global copy control in the popover.
 @MainActor
+final class VerifiedCopySavePanelDelegate: NSObject, NSOpenSavePanelDelegate {
+    func validateFreshDestination(_ url: URL) throws {
+        var information = stat()
+        if Darwin.lstat(url.path, &information) == 0 {
+            throw VerifiedCopyValidationError.destinationExists
+        }
+    }
+
+    func panel(_ sender: Any, validate url: URL) throws {
+        try validateFreshDestination(url)
+    }
+}
+
+@MainActor
 public enum VerifiedCopyPicker {
-    public static func choose(onMountPoint mountPoint: String) throws -> VerifiedCopySelection? {
+    public static func choose(
+        onMountPoint mountPoint: String,
+        rejectSymbolicLinks: Bool = false
+    ) throws -> VerifiedCopySelection? {
         let sourcePanel = NSOpenPanel()
         sourcePanel.title = "Verified Copy"
         sourcePanel.message = "Choose one file or folder to copy and verify with SHA-256."
@@ -224,6 +276,10 @@ public enum VerifiedCopyPicker {
         destinationPanel.directoryURL = mountPointURL
         destinationPanel.nameFieldStringValue = source.lastPathComponent
         destinationPanel.canCreateDirectories = true
+        // Validate before AppKit offers its generic destructive "Replace" confirmation. The
+        // delegate is held strongly for the entire modal run because NSSavePanel.delegate is weak.
+        let destinationDelegate = VerifiedCopySavePanelDelegate()
+        destinationPanel.delegate = destinationDelegate
 
         guard destinationPanel.runModal() == .OK, let destination = destinationPanel.url else {
             return nil
@@ -231,7 +287,8 @@ public enum VerifiedCopyPicker {
         return try VerifiedCopySelectionValidator.validate(
             source: source,
             destination: destination,
-            mountPoint: mountPointURL
+            mountPoint: mountPointURL,
+            rejectSymbolicLinks: rejectSymbolicLinks
         )
     }
 }
@@ -279,7 +336,8 @@ public actor VerifiedCopyProcessExecutor: VerifiedCopyExecuting {
             let current = try VerifiedCopySelectionValidator.validate(
                 source: selection.source,
                 destination: selection.destination,
-                mountPoint: selection.mountPoint
+                mountPoint: selection.mountPoint,
+                rejectSymbolicLinks: selection.rejectsSymbolicLinks
             )
             guard current.volumeDeviceID == selection.volumeDeviceID else {
                 throw VerifiedCopyValidationError.destinationOnDifferentFilesystem

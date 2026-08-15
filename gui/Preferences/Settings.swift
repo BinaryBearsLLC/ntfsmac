@@ -26,7 +26,11 @@ public struct RealLaunchAtLoginService: LaunchAtLoginStatusProviding {
     public init() {}
 
     public var status: LaunchAtLoginRegistrationStatus {
-        switch SMAppService.mainApp.status {
+        Self.map(SMAppService.mainApp.status)
+    }
+
+    public static func map(_ status: SMAppService.Status) -> LaunchAtLoginRegistrationStatus {
+        switch status {
         case .notRegistered:
             return .disabled
         case .enabled:
@@ -34,7 +38,10 @@ public struct RealLaunchAtLoginService: LaunchAtLoginStatusProviding {
         case .requiresApproval:
             return .requiresApproval
         case .notFound:
-            return .unavailable
+            // A freshly replaced ad-hoc bundle can briefly be absent from Background Task
+            // Management even though `mainApp.register()` is the documented way to add it.
+            // Keep the toggle actionable; a real registration error is surfaced after the call.
+            return .disabled
         @unknown default:
             return .unavailable
         }

@@ -223,6 +223,23 @@ private final class RecordingMountNotifier: MountEventNotifying {
 }
 
 @MainActor
+@Test func unsafeWindowsVolumeFailureNeverSurfacesRawBackendTranscript() async {
+    let fake = FakeHelper()
+    fake.mountResult = .success(CommandResult(
+        output: "NTFS is inconsistent. The volume is dirty and the dirty bit is set. Failed to mount /dev/disk4s2.",
+        exitCode: 1
+    ))
+    let appState = AppState()
+    let controller = MountController(helper: fake, appState: appState)
+
+    await controller.mount(sampleDrive)
+
+    #expect(appState.state == .error)
+    #expect(controller.errorMessage == MountFailureCopy.unsafeWindowsVolume)
+    #expect(controller.errorMessage?.contains("disk4s2") == false)
+}
+
+@MainActor
 @Test func unmountWithNothingMountedNeverCallsHelper() async {
     let fake = FakeHelper()
     let appState = AppState()

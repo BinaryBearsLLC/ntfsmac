@@ -29,15 +29,39 @@ public struct MountSnapshot: Equatable, Sendable {
     public let mounts: [ObservedMount]
     public let isAuthoritative: Bool
     public let warningCode: String?
+    public let physicallyPresentDeviceIDs: Set<String>?
+    public let unresponsiveDeviceIDs: Set<String>
 
     public init(
         mounts: [ObservedMount],
         isAuthoritative: Bool = true,
-        warningCode: String? = nil
+        warningCode: String? = nil,
+        physicallyPresentDeviceIDs: Set<String>? = nil,
+        unresponsiveDeviceIDs: Set<String> = []
     ) {
         self.mounts = mounts
         self.isAuthoritative = isAuthoritative
         self.warningCode = warningCode
+        self.physicallyPresentDeviceIDs = physicallyPresentDeviceIDs
+        self.unresponsiveDeviceIDs = unresponsiveDeviceIDs
+    }
+}
+
+/// Extracts partition identifiers from `diskutil list external physical`. The command's scope,
+/// not cached runtime state, makes absence meaningful after a physical disconnect.
+public enum ExternalPhysicalDeviceParser {
+    private static let partitionPattern = try! NSRegularExpression(
+        pattern: #"\b(disk[0-9]+s[0-9]+)\b"#,
+        options: [.caseInsensitive]
+    )
+
+    public static func parse(_ output: String) -> Set<String> {
+        let range = NSRange(output.startIndex..., in: output)
+        return Set(partitionPattern.matches(in: output, range: range).compactMap { match in
+            guard let captureRange = Range(match.range(at: 1), in: output) else { return nil }
+            let device = String(output[captureRange]).lowercased()
+            return validateDevice(device) ? device : nil
+        })
     }
 }
 
@@ -163,31 +187,58 @@ public struct RealMountSnapshotProvider: MountSnapshotProviding {
     private let runner: (any PrivilegedCommandRunning)?
     private let anylinuxfsPath: String
     private let mountPath: String
+    private let diskutilPath: String
+    private let statPath: String
+    private let probeTimeout: TimeInterval
+    private let sourceTimeout: TimeInterval
 
     public init(
         runner: (any PrivilegedCommandRunning)? = nil,
         anylinuxfsPath: String = "\(installPrefix)/bin/anylinuxfs",
-        mountPath: String = "/sbin/mount"
+        mountPath: String = "/sbin/mount",
+        diskutilPath: String = "/usr/sbin/diskutil",
+        statPath: String = "/usr/bin/stat",
+        probeTimeout: TimeInterval = 2,
+        sourceTimeout: TimeInterval = 5
     ) {
         self.runner = runner
         self.anylinuxfsPath = anylinuxfsPath
         self.mountPath = mountPath
+        self.diskutilPath = diskutilPath
+        self.statPath = statPath
+        self.probeTimeout = probeTimeout
+        self.sourceTimeout = sourceTimeout
     }
 
     public func snapshot() async -> MountSnapshot {
         let statusResult: CommandResult
         let mountResult: CommandResult
+        let physicalResult: CommandResult?
         if let runner {
             // Explicit runners are a deterministic test seam and execute on the caller's actor.
             statusResult = runner.run(anylinuxfsPath, ["status"])
             mountResult = runner.run(mountPath, ["-t", "nfs"])
+            physicalResult = nil
         } else {
             // Production polling must never block the menu-bar UI while Process waits. Each
             // reconciliation waits for its own reads before scheduling the next poll, so a slow
             // source cannot create an unbounded queue of subprocesses.
-            async let statusTask = Self.runOffMain(anylinuxfsPath, ["status"])
-            async let mountTask = Self.runOffMain(mountPath, ["-t", "nfs"])
-            (statusResult, mountResult) = await (statusTask, mountTask)
+            async let statusTask = Self.runOffMain(
+                anylinuxfsPath,
+                ["status"],
+                timeout: sourceTimeout
+            )
+            async let mountTask = Self.runOffMain(
+                mountPath,
+                ["-t", "nfs"],
+                timeout: sourceTimeout
+            )
+            async let physicalTask = Self.runOffMain(
+                diskutilPath,
+                ["list", "external", "physical"],
+                timeout: probeTimeout
+            )
+            (statusResult, mountResult, physicalResult) = await (statusTask, mountTask, physicalTask)
         }
         let statusMounts = statusResult.exitCode == 0
             ? AnyLinuxFSStatusParser.parse(statusResult.output)
@@ -221,6 +272,12 @@ public struct RealMountSnapshotProvider: MountSnapshotProviding {
         }
 
         observed.sort { $0.deviceIdentifier < $1.deviceIdentifier }
+        let physicallyPresent = physicalResult.flatMap { result in
+            result.exitCode == 0 ? ExternalPhysicalDeviceParser.parse(result.output) : nil
+        }
+        let unresponsive = runner == nil
+            ? await Self.unresponsiveMounts(observed, statPath: statPath, timeout: probeTimeout)
+            : []
         let sourcesSucceeded = statusResult.exitCode == 0 && mountResult.exitCode == 0
         let everyStatusMountWasPaired = statusMounts.allSatisfy { statusMount in
             tableMounts.contains {
@@ -237,28 +294,62 @@ public struct RealMountSnapshotProvider: MountSnapshotProviding {
                 }
             }
         let sourcesAgree = everyStatusMountWasPaired && everyNtfsmacTableMountWasPaired
-        let authoritative = sourcesSucceeded && sourcesAgree
+        let physicallyMissing = physicallyPresent.map { present in
+            observed.contains { !present.contains($0.deviceIdentifier) }
+        } ?? false
+        let authoritative = sourcesSucceeded && sourcesAgree && !physicallyMissing && unresponsive.isEmpty
         let warningCode: String?
         if !sourcesSucceeded {
             warningCode = "MOUNT_STATE_SOURCE_UNAVAILABLE"
         } else if !sourcesAgree {
             warningCode = "MOUNT_STATE_INCONSISTENT"
+        } else if physicallyMissing {
+            warningCode = "PHYSICAL_DEVICE_MISSING"
+        } else if !unresponsive.isEmpty {
+            warningCode = "MOUNT_BACKEND_UNRESPONSIVE"
         } else {
             warningCode = nil
         }
         return MountSnapshot(
             mounts: observed,
             isAuthoritative: authoritative,
-            warningCode: warningCode
+            warningCode: warningCode,
+            physicallyPresentDeviceIDs: physicallyPresent,
+            unresponsiveDeviceIDs: unresponsive
         )
     }
 
     private nonisolated static func runOffMain(
         _ executablePath: String,
-        _ arguments: [String]
+        _ arguments: [String],
+        timeout: TimeInterval
     ) async -> CommandResult {
         await Task.detached(priority: .userInitiated) {
-            RealCommandRunner().run(executablePath, arguments)
+            RealCommandRunner().run(executablePath, arguments, timeout: timeout)
         }.value
+    }
+
+    private nonisolated static func unresponsiveMounts(
+        _ mounts: [ObservedMount],
+        statPath: String,
+        timeout: TimeInterval
+    ) async -> Set<String> {
+        await withTaskGroup(of: (String, Bool).self, returning: Set<String>.self) { group in
+            for mount in mounts {
+                group.addTask {
+                    let result = RealCommandRunner().run(
+                        statPath,
+                        ["-f", "%d", mount.mountPoint],
+                        timeout: timeout
+                    )
+                    return (mount.deviceIdentifier, result.exitCode == 0)
+                }
+            }
+            var failed = Set<String>()
+            for await (device, succeeded) in group where !succeeded {
+                failed.insert(device)
+            }
+            return failed
+        }
     }
 }

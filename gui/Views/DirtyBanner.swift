@@ -5,23 +5,15 @@ import SwiftUI
 /// so `DirtyStateTests` can assert visibility without a SwiftUI view-inspection dependency.
 public enum DirtyBanner {
     public static let bannerCopy =
-        "Mounted read-only — drive has an unclean journal. Eject safely in Windows to enable writing."
-
-    public static let corruptionRiskCopy =
-        "Mounting a drive with an unclean journal read/write risks data corruption. Only continue if you understand the risk."
+        "Mounted read-only — Windows left this drive in an unsafe state. Run chkdsk, disable Fast Startup, then fully shut down Windows."
 
     public static func isVisible(for state: MountState) -> Bool {
         state == .mountedReadOnlyDirty
     }
 }
 
-/// Non-dismissable while RO-dirty (this unit's Don't clause: no close control exists here at
-/// all). Text-only per `ui/prototype.html`'s warning banner (comp lines 573-579) — the actual
-/// "Mount read/write anyway…" action lives on `DriveRow` now (comp puts that button in the
-/// drive row's own button stack, not the banner), but the confirmation dialog stays attached
-/// here since this is where `remountController`/`drive` are already in scope; `DriveRow`'s
-/// button only calls `requestRemount()`, which flips `isConfirmingRemount` and surfaces this
-/// dialog (Don't clause: never auto-remount r/w without it).
+/// Non-dismissable while RO-dirty. Production policy offers recovery guidance only: it never
+/// exposes a read/write override for an unclean or hibernated Windows volume.
 public struct DirtyBannerView: View {
     @ObservedObject public var appState: AppState
     @ObservedObject public var remountController: RemountController
@@ -57,19 +49,6 @@ public struct DirtyBannerView: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .strokeBorder(Color.ntfsYellow.opacity(0.22))
             )
-            .confirmationDialog(
-                "Mount read/write anyway?",
-                isPresented: $remountController.isConfirmingRemount
-            ) {
-                Button("Mount Read/Write", role: .destructive) {
-                    Task { await remountController.confirmRemount(drive) }
-                }
-                Button("Cancel", role: .cancel) {
-                    remountController.cancelRemount()
-                }
-            } message: {
-                Text(DirtyBanner.corruptionRiskCopy)
-            }
         }
     }
 }

@@ -33,6 +33,52 @@ private func awaitReply(_ body: (@escaping (Data?, String?) -> Void) -> Void) as
     }
 }
 
+// MARK: - Invoking-user environment
+
+@Test func helperChildEnvironmentUsesCompleteInvokingUserIdentity() {
+    var environment = [
+        "HOME": "/var/root",
+        "USER": "root",
+        "LOGNAME": "root"
+    ]
+
+    applyInvokerIdentityEnvironment(
+        &environment,
+        uid: 501,
+        gid: 20,
+        username: "testuser",
+        homeDirectory: "/Users/testuser"
+    )
+
+    #expect(environment["SUDO_UID"] == "501")
+    #expect(environment["SUDO_GID"] == "20")
+    #expect(environment["USER"] == "testuser")
+    #expect(environment["LOGNAME"] == "testuser")
+    #expect(environment["HOME"] == "/Users/testuser")
+}
+
+@Test func helperChildEnvironmentDoesNotEraseIdentityWhenPasswdFieldsAreMissing() {
+    var environment = [
+        "HOME": "/var/root",
+        "USER": "root",
+        "LOGNAME": "root"
+    ]
+
+    applyInvokerIdentityEnvironment(
+        &environment,
+        uid: 502,
+        gid: 20,
+        username: nil,
+        homeDirectory: nil
+    )
+
+    #expect(environment["SUDO_UID"] == "502")
+    #expect(environment["SUDO_GID"] == "20")
+    #expect(environment["USER"] == "root")
+    #expect(environment["LOGNAME"] == "root")
+    #expect(environment["HOME"] == "/var/root")
+}
+
 // MARK: - validateDevice (mirrors tests/cli/validate-device.bats, PLAN.md L6)
 
 @Test func acceptsDisk2s1() {

@@ -1,4 +1,5 @@
 import Foundation
+import ServiceManagement
 import Testing
 @testable import NtfsmacGUI
 
@@ -124,6 +125,10 @@ private func waitForLaunchAtLoginUpdate(_ settings: Settings) async {
         try? await Task.sleep(for: .milliseconds(10))
     }
     #expect(!settings.isUpdatingLaunchAtLogin)
+}
+
+@Test func aFreshMainAppNotFoundStatusStillAllowsRegistrationAttempt() {
+    #expect(RealLaunchAtLoginService.map(.notFound) == .disabled)
 }
 
 @MainActor

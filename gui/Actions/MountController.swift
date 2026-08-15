@@ -14,6 +14,25 @@ public protocol HelperMounting {
 
 extension HelperClient: HelperMounting {}
 
+public enum MountFailureCopy {
+    public static let unsafeWindowsVolume = "Windows left this NTFS volume in an unsafe state. ntfsmac did not mount it. Connect it to Windows, run chkdsk, disable Fast Startup, then fully shut down Windows."
+
+    public static func conciseMessage(for output: String) -> String? {
+        let normalized = output.lowercased()
+        let unsafeMarkers = [
+            "volume is dirty",
+            "dirty bit is set",
+            "unclean file system",
+            "unclean filesystem",
+            "windows is hibernated",
+            "windows is hibernating",
+            "metadata kept in windows cache",
+            "hibernated volume",
+        ]
+        return unsafeMarkers.contains(where: normalized.contains) ? unsafeWindowsVolume : nil
+    }
+}
+
 /// One mounted drive: the `Drive` plus its real mount point and per-drive read-only/dirty
 /// landing state. Multi-mount (PLAN.md / GUI-PLAN.md "v2") means the controller holds a list
 /// of these, not a single optional drive. `isDirty` is per-drive so `DriveRow`'s
@@ -22,6 +41,7 @@ extension HelperClient: HelperMounting {}
 public struct MountedDrive: Identifiable, Equatable, Sendable {
     public let drive: Drive
     public var mountPoint: String?
+    public var fsDriver: String?
     public var isReadOnly: Bool
     public var isDirty: Bool
     public var isVerified: Bool
@@ -30,12 +50,14 @@ public struct MountedDrive: Identifiable, Equatable, Sendable {
     public init(
         drive: Drive,
         mountPoint: String?,
+        fsDriver: String? = nil,
         isReadOnly: Bool,
         isDirty: Bool,
         isVerified: Bool = true
     ) {
         self.drive = drive
         self.mountPoint = mountPoint
+        self.fsDriver = fsDriver
         self.isReadOnly = isReadOnly
         self.isDirty = isDirty
         self.isVerified = isVerified
@@ -94,6 +116,7 @@ public final class MountController: ObservableObject {
     @Published public private(set) var mountedDrives: [MountedDrive] = []
     @Published public internal(set) var errorMessage: String?
     @Published public private(set) var reconciliationWarning: String?
+    @Published public private(set) var physicallyMissingDriveIDs: Set<String> = []
     @Published public private(set) var isEjectingAll = false
     @Published public private(set) var lastEjectAllReport: EjectAllReport?
 
@@ -113,6 +136,7 @@ public final class MountController: ObservableObject {
     /// An authoritative disappearance needs no debounce, but still routes through the helper so
     /// stale VM/PF/route state is cleaned instead of only disappearing from the GUI.
     private var pendingExternalUnmounts: Set<String> = []
+    private var pendingBackendFailures: Set<String> = []
 
     public init(
         helper: any HelperMounting = HelperClient(),
@@ -187,13 +211,23 @@ public final class MountController: ObservableObject {
         let verifiedIDs = Set(mountedDrives.filter(\.isVerified).map(\.id))
         let observedIDs = Set(snapshot.mounts.map(\.deviceIdentifier))
         var cleanupIDs: Set<String> = []
+        let physicallyMissingIDs: Set<String> = snapshot.physicallyPresentDeviceIDs.map {
+            trackedIDs.subtracting($0)
+        } ?? []
+        let backendFailureIDs = snapshot.unresponsiveDeviceIDs.intersection(trackedIDs)
+
+        // Physical absence is definitive. Backend non-response removes the green state on the
+        // first bounded probe but needs two consecutive polls before privileged teardown.
+        cleanupIDs.formUnion(physicallyMissingIDs)
+        cleanupIDs.formUnion(backendFailureIDs.intersection(pendingBackendFailures))
+        pendingBackendFailures = backendFailureIDs
 
         if snapshot.isAuthoritative {
             // Both sources agree the mount is gone. Include a previously debounced status-only
             // session even though its cached row is no longer verified.
-            cleanupIDs = verifiedIDs
+            cleanupIDs.formUnion(verifiedIDs
                 .union(pendingExternalUnmounts)
-                .subtracting(observedIDs)
+                .subtracting(observedIDs))
             pendingExternalUnmounts.subtract(observedIDs)
         } else if snapshot.warningCode == "MOUNT_STATE_INCONSISTENT" {
             let statusOnlyIDs = Set(snapshot.mounts.compactMap { mount in
@@ -207,7 +241,10 @@ public final class MountController: ObservableObject {
         } else {
             // A failed source is not proof of an external unmount. Forget the debounce rather
             // than turning an unrelated diagnostic outage into a privileged mutation later.
-            pendingExternalUnmounts.removeAll()
+            if snapshot.warningCode != "PHYSICAL_DEVICE_MISSING"
+                && snapshot.warningCode != "MOUNT_BACKEND_UNRESPONSIVE" {
+                pendingExternalUnmounts.removeAll()
+            }
         }
 
         if !cleanupIDs.isEmpty {
@@ -237,6 +274,7 @@ public final class MountController: ObservableObject {
             }
 
             pendingExternalUnmounts.subtract(cleanupIDs)
+            pendingBackendFailures.subtract(cleanupIDs)
             // The helper response is provisional just like mount/unmount responses elsewhere:
             // publish only the fresh host/runtime observation after the cleanup attempt.
             snapshot = await snapshotProvider.snapshot()
@@ -318,6 +356,7 @@ public final class MountController: ObservableObject {
                 let landedReadOnly = readOnly || (observed?.isReadOnly ?? fallbackReadOnly)
                 if let index = mountedDrives.firstIndex(where: { $0.id == drive.identifier }) {
                     mountedDrives[index].mountPoint = observed?.mountPoint ?? resolvedMountPoint
+                    mountedDrives[index].fsDriver = observed?.fsDriver ?? resolvedDriver.rawValue
                     mountedDrives[index].isReadOnly = landedReadOnly
                     mountedDrives[index].isDirty = landedReadOnly && !readOnly
                     mountedDrives[index].isVerified = snapshot.isAuthoritative && observed?.isReadOnly != nil
@@ -325,6 +364,7 @@ public final class MountController: ObservableObject {
                     mountedDrives.append(MountedDrive(
                         drive: drive,
                         mountPoint: resolvedMountPoint,
+                        fsDriver: resolvedDriver.rawValue,
                         isReadOnly: landedReadOnly,
                         isDirty: landedReadOnly && !readOnly,
                         isVerified: false
@@ -471,6 +511,15 @@ public final class MountController: ObservableObject {
     private func apply(_ snapshot: MountSnapshot, knownDrives: [Drive]) {
         let previous = Dictionary(uniqueKeysWithValues: mountedDrives.map { ($0.id, $0) })
         let known = Dictionary(uniqueKeysWithValues: knownDrives.map { ($0.id, $0) })
+        physicallyMissingDriveIDs = snapshot.physicallyPresentDeviceIDs.map { present in
+            Set(knownDrives.map(\.id))
+                .union(previous.keys)
+                .union(snapshot.mounts.map(\.deviceIdentifier))
+                .subtracting(present)
+        } ?? []
+        let supportsPerDriveVerification = snapshot.isAuthoritative
+            || snapshot.warningCode == "PHYSICAL_DEVICE_MISSING"
+            || snapshot.warningCode == "MOUNT_BACKEND_UNRESPONSIVE"
         var updated = snapshot.mounts.map { observed -> MountedDrive in
             let prior = previous[observed.deviceIdentifier]
             let drive = known[observed.deviceIdentifier]
@@ -479,9 +528,13 @@ public final class MountController: ObservableObject {
             return MountedDrive(
                 drive: drive,
                 mountPoint: observed.mountPoint,
+                fsDriver: observed.fsDriver ?? prior?.fsDriver,
                 isReadOnly: observed.isReadOnly ?? prior?.isReadOnly ?? true,
                 isDirty: prior?.isDirty ?? false,
-                isVerified: observed.isReadOnly != nil && snapshot.isAuthoritative
+                isVerified: observed.isReadOnly != nil
+                    && supportsPerDriveVerification
+                    && !snapshot.unresponsiveDeviceIDs.contains(observed.deviceIdentifier)
+                    && !physicallyMissingDriveIDs.contains(observed.deviceIdentifier)
             )
         }
 
@@ -522,6 +575,10 @@ public final class MountController: ObservableObject {
             return "MOUNT_STATE_INCONSISTENT — runtime and host mount table disagree"
         case "UNMOUNT_NOT_OBSERVED":
             return "UNMOUNT_NOT_OBSERVED — the drive is still present in the host mount table"
+        case "PHYSICAL_DEVICE_MISSING":
+            return "PHYSICAL_DEVICE_MISSING — the device was disconnected; cleaning up its private session"
+        case "MOUNT_BACKEND_UNRESPONSIVE":
+            return "MOUNT_BACKEND_UNRESPONSIVE — the mounted drive stopped responding"
         default:
             return "MOUNT_STATE_SOURCE_UNAVAILABLE — mounted state could not be independently verified"
         }
@@ -554,7 +611,9 @@ public final class MountController: ObservableObject {
     private func fail(_ message: String) {
         // A failed mount/unmount while other drives are still mounted must not flip the icon to
         // `.error` and hide the "mounted" indicator — only go `.error` when nothing is mounted.
-        if message.contains("Insufficient permissions?") || message.contains("Cannot probe") {
+        if let concise = MountFailureCopy.conciseMessage(for: message) {
+            errorMessage = concise
+        } else if message.contains("Insufficient permissions?") || message.contains("Cannot probe") {
             errorMessage = "FDA_REQUIRED"
         } else if message.contains("mount: no response after") {
             errorMessage = "Mount timed out before the private VM became ready. Retry; if it repeats, run Diagnose."

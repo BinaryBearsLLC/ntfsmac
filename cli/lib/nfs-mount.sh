@@ -118,6 +118,13 @@ run_anylinuxfs_mount() {
   args+=(--nfs-options "$nfs_opts")
   [[ -n "$fs_driver" ]] && args+=(-t "$fs_driver")
   [[ -n "$ignore_perms" ]] && args+=(--ignore-permissions)
+  # ntfs-3g defaults to `recover`, which may replay an unclean journal and mount read/write.
+  # Production policy is fail-closed: an NTFS volume not cleanly shut down by Windows is refused
+  # and must be repaired with chkdsk. `ignore_perms` identifies ext-family mounts; ntfs3 has its
+  # own kernel refusal behavior, so `norecover` is sent only to the default ntfs-3g path.
+  if [[ -z "$ignore_perms" && "$fs_driver" != "ntfs3" ]]; then
+    args+=(-o norecover)
+  fi
 
   # Bounded + heartbeated (NTFSMAC_MOUNT_TIMEOUT, default 240s — generous: first-run download +
   # VM boot legitimately takes 1-2 min per the notice above, this just bounds a truly wedged

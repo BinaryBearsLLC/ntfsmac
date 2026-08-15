@@ -3,6 +3,28 @@ import Security
 import Darwin
 import CryptoKit
 
+/// Reconstructs the invoking console user's identity for CLI children launched by the root XPC
+/// helper. A launchd service otherwise inherits root's sparse environment, while the runtime
+/// cache and OCI tooling require the caller's HOME, USER and LOGNAME to agree. Kept as a pure
+/// helper so the contract is testable without manufacturing an NSXPCConnection.
+func applyInvokerIdentityEnvironment(
+    _ environment: inout [String: String],
+    uid: uid_t,
+    gid: gid_t,
+    username: String?,
+    homeDirectory: String?
+) {
+    environment["SUDO_UID"] = String(uid)
+    environment["SUDO_GID"] = String(gid)
+    if let username, !username.isEmpty {
+        environment["USER"] = username
+        environment["LOGNAME"] = username
+    }
+    if let homeDirectory, !homeDirectory.isEmpty {
+        environment["HOME"] = homeDirectory
+    }
+}
+
 // Shared between the privileged helper (`ntfsmac-helper`) and the GUI client
 // (`gui/Helper/HelperClient.swift`). PLAN.md §3: the XPC interface is the trust boundary —
 // everything in this file is untrusted input until `validateDevice` / `isValidUnmountTarget`
@@ -296,11 +318,16 @@ public struct RealCommandRunner: PrivilegedCommandRunning {
         if let connection = NSXPCConnection.current() {
             let uid = connection.effectiveUserIdentifier
             let gid = connection.effectiveGroupIdentifier
-            env["SUDO_UID"] = String(uid)
-            env["SUDO_GID"] = String(gid)
-            if let pw = getpwuid(uid), let dir = pw.pointee.pw_dir {
-                env["HOME"] = String(cString: dir)
-            }
+            let passwordEntry = getpwuid(uid)
+            let username = passwordEntry.map { String(cString: $0.pointee.pw_name) }
+            let homeDirectory = passwordEntry.map { String(cString: $0.pointee.pw_dir) }
+            applyInvokerIdentityEnvironment(
+                &env,
+                uid: uid,
+                gid: gid,
+                username: username,
+                homeDirectory: homeDirectory
+            )
         }
         process.environment = env
     }

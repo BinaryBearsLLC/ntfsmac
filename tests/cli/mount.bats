@@ -57,6 +57,26 @@ teardown() {
   [[ "$output" == *"--net-helper vmnet"* ]]
 }
 
+@test "ntfs-3g defaults to norecover so an unclean Windows volume fails closed" {
+  run "$SCRIPT" --fs-driver ntfs-3g disk2s1
+  [ "$status" -eq 0 ]
+  run cat "$CALL_LOG"
+  [[ "$output" == *"-o norecover"* ]]
+}
+
+@test "ntfs3 and ext mounts never receive the ntfs-3g norecover option" {
+  run "$SCRIPT" --fs-driver ntfs3 disk2s1
+  [ "$status" -eq 0 ]
+  run cat "$CALL_LOG"
+  [[ "$output" != *"norecover"* ]]
+
+  : > "$CALL_LOG"
+  run "$SCRIPT" --ignore-permissions disk3s1
+  [ "$status" -eq 0 ]
+  run cat "$CALL_LOG"
+  [[ "$output" != *"norecover"* ]]
+}
+
 @test "rejects invalid device before ever invoking anylinuxfs" {
   run "$SCRIPT" "disk2s1; rm -rf /"
   [ "$status" -ne 0 ]

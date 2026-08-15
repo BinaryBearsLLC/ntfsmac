@@ -108,6 +108,19 @@ private struct SnapshotCommandRunner: PrivilegedCommandRunning {
     #expect(mounts[2].deviceIdentifier == nil)
 }
 
+@Test func parsesExternalPhysicalPartitionsWithoutWholeDisks() {
+    let output = """
+    /dev/disk4 (external, physical):
+       0: GUID_partition_scheme *16.0 GB disk4
+       1: Microsoft Basic Data USB_8GB 16.0 GB disk4s1
+    /dev/disk7 (external, physical):
+       0: FDisk_partition_scheme *32.0 GB disk7
+       1: Windows_NTFS DATA 32.0 GB disk7s2
+    """
+
+    #expect(ExternalPhysicalDeviceParser.parse(output) == Set(["disk4s1", "disk7s2"]))
+}
+
 @MainActor
 @Test func tableOnlyNtfsmacMountIsInconsistentRatherThanAuthoritativeGreen() async {
     let runner = SnapshotCommandRunner(
@@ -158,6 +171,70 @@ private struct SnapshotCommandRunner: PrivilegedCommandRunning {
     #expect(helper.unmountCalls == [drive.identifier])
     #expect(controller.mountedDrives.isEmpty)
     #expect(appState.state == .idle)
+}
+
+@MainActor
+@Test func physicalRemovalOverridesStaleRuntimeAndMountTableTruth() async {
+    let removed = Drive(identifier: "disk6s1", fsType: "ntfs", label: "Media", size: "120 GB")
+    let survivor = Drive(identifier: "disk7s2", fsType: "ntfs", label: "Backup", size: "32 GB")
+    let both = [
+        ObservedMount(deviceIdentifier: removed.id, mountPoint: "/Volumes/Media", fsDriver: "ntfs-3g", isReadOnly: false),
+        ObservedMount(deviceIdentifier: survivor.id, mountPoint: "/Volumes/Backup", fsDriver: "ntfs-3g", isReadOnly: false),
+    ]
+    let provider = MutableSnapshotProvider(MountSnapshot(
+        mounts: both,
+        physicallyPresentDeviceIDs: Set([removed.id, survivor.id])
+    ))
+    let helper = SuccessfulHelper()
+    let appState = AppState()
+    let controller = MountController(helper: helper, snapshotProvider: provider, appState: appState)
+    await controller.reconcile(knownDrives: [removed, survivor])
+
+    provider.value = MountSnapshot(
+        mounts: both,
+        isAuthoritative: false,
+        warningCode: "PHYSICAL_DEVICE_MISSING",
+        physicallyPresentDeviceIDs: Set([survivor.id])
+    )
+    // The scanner may already have dropped the unplugged partition. Physical evidence still
+    // has to invalidate the controller's cached/observed mounted row.
+    await controller.reconcile(knownDrives: [survivor])
+
+    #expect(helper.unmountCalls == [removed.id])
+    #expect(controller.physicallyMissingDriveIDs == Set([removed.id]))
+    #expect(controller.mountedDrives.first { $0.id == removed.id }?.isVerified == false)
+    #expect(controller.mountedDrives.first { $0.id == survivor.id }?.isVerified == true)
+    #expect(appState.state == .mountedUnknown)
+}
+
+@MainActor
+@Test func backendFailureRemovesGreenThenDebouncesExactCleanup() async {
+    let drive = Drive(identifier: "disk6s1", fsType: "ntfs", label: "Media", size: "120 GB")
+    let observed = ObservedMount(
+        deviceIdentifier: drive.id,
+        mountPoint: "/Volumes/Media",
+        fsDriver: "ntfs-3g",
+        isReadOnly: false
+    )
+    let provider = MutableSnapshotProvider(MountSnapshot(mounts: [observed]))
+    let helper = SuccessfulHelper()
+    let appState = AppState()
+    let controller = MountController(helper: helper, snapshotProvider: provider, appState: appState)
+    await controller.reconcile(knownDrives: [drive])
+
+    provider.value = MountSnapshot(
+        mounts: [observed],
+        isAuthoritative: false,
+        warningCode: "MOUNT_BACKEND_UNRESPONSIVE",
+        unresponsiveDeviceIDs: Set([drive.id])
+    )
+    await controller.reconcile(knownDrives: [drive])
+    #expect(helper.unmountCalls.isEmpty)
+    #expect(appState.state == .mountedUnknown)
+
+    await controller.reconcile(knownDrives: [drive])
+    #expect(helper.unmountCalls == [drive.id])
+    #expect(appState.state == .mountedUnknown)
 }
 
 @MainActor

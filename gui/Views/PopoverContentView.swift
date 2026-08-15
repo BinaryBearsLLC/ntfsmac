@@ -268,8 +268,7 @@ public struct PopoverContentView: View {
                                 : "Could not open this mounted drive in Finder"
                         } : nil,
                         onVerifiedCopy: verifiedCopyAction(for: entry),
-                        onUnmount: { Task { await mountController.unmount(driveID: entry.id) } },
-                        onMountAnyway: { remountController.requestRemount() }
+                        onUnmount: { Task { await mountController.unmount(driveID: entry.id) } }
                     )
                 }
             }
@@ -288,7 +287,7 @@ public struct PopoverContentView: View {
             // nothing is primary yet, so no "Other available" section header. Each row is a
             // mountable DriveRow, with a Refresh pill (icon + "Refresh" text, same shape as the
             // no-drives empty-state Refresh) above the list so the user can re-scan before mounting.
-            if mountController.mountedDrives.isEmpty && !driveScanner.drives.isEmpty {
+            if mountController.mountedDrives.isEmpty && !visibleDrives.isEmpty {
                 HStack(spacing: 6) {
                     Spacer()
                     Button {
@@ -301,7 +300,7 @@ public struct PopoverContentView: View {
                     }
                     .buttonStyle(.glassNeutral(colorScheme: colorScheme))
                 }
-                ForEach(driveScanner.drives) { drive in
+                ForEach(visibleDrives) { drive in
                     DriveRow(
                         drive: drive,
                         isMounted: false,
@@ -344,7 +343,7 @@ public struct PopoverContentView: View {
                 }
             }
 
-            if mountController.mountedDrives.isEmpty && driveScanner.drives.isEmpty {
+            if mountController.mountedDrives.isEmpty && visibleDrives.isEmpty {
                 emptyState
             }
 
@@ -423,7 +422,11 @@ public struct PopoverContentView: View {
 
     /// Drives the scanner sees that aren't currently mounted — the "Other available" section.
     private var otherAvailableDrives: [Drive] {
-        driveScanner.drives.filter { !mountController.mountedDriveIDs.contains($0.id) }
+        visibleDrives.filter { !mountController.mountedDriveIDs.contains($0.id) }
+    }
+
+    private var visibleDrives: [Drive] {
+        driveScanner.drives.filter { !mountController.physicallyMissingDriveIDs.contains($0.id) }
     }
 
     private var driveActionsDisabled: Bool {
@@ -460,7 +463,10 @@ public struct PopoverContentView: View {
         }
         return {
             do {
-                guard let selection = try VerifiedCopyPicker.choose(onMountPoint: mountPoint) else {
+                guard let selection = try VerifiedCopyPicker.choose(
+                    onMountPoint: mountPoint,
+                    rejectSymbolicLinks: entry.fsDriver == FsDriver.ntfs3.rawValue
+                ) else {
                     return
                 }
                 let volumeName = entry.drive.label.isEmpty ? entry.drive.identifier : entry.drive.label
@@ -568,7 +574,9 @@ public struct PopoverContentView: View {
                 .frame(height: 28)
             }
             .buttonStyle(.glassFooter(colorScheme: colorScheme))
+            .focusable(true)
             .disabled(diagnoseRunner.isRunning || verifiedCopyController.isActive)
+            .accessibilityLabel("Diagnose")
             .help(TooltipCopy.text(for: .diagnose))
 
             Button {
@@ -577,7 +585,9 @@ public struct PopoverContentView: View {
                 Text("Quit").frame(height: 28)
             }
             .buttonStyle(.glassFooter(colorScheme: colorScheme))
+            .focusable(true)
             .disabled(driveActionsDisabled)
+            .accessibilityLabel("Quit ntfsmac")
             .help(TooltipCopy.text(for: .quit))
         }
     }

@@ -2,7 +2,7 @@ import SwiftUI
 
 public enum NTFS3PreflightCopy {
     public static let title = "NTFS3 · Experimental"
-    public static let guidance = "Use only after Windows Fast Startup is disabled, Windows is fully shut down, and filesystem errors are repaired with chkdsk. There is no automatic fallback."
+    public static let guidance = "Use only after Windows Fast Startup is disabled, Windows is fully shut down, and filesystem errors are repaired with chkdsk. Symbolic links created by macOS/ntfs-3g are not portable to NTFS3 and Verified Copy rejects them. There is no automatic fallback."
 
     public static func isAvailable(for fsType: String) -> Bool {
         fsType.lowercased() == "ntfs"
@@ -170,7 +170,9 @@ public struct DriveRow: View {
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                        .focusable(true)
                         .disabled(actionsDisabled)
+                        .accessibilityLabel("Mount \(drive.label.isEmpty ? drive.identifier : drive.label)")
                         .help("Mount with ntfs-3g, the compatibility-first default")
 
                         if onMountExperimental != nil {
