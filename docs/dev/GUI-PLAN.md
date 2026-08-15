@@ -170,6 +170,10 @@ Controls and statuses whose purpose is not immediately obvious expose concise na
 on hover. Tooltip copy does not replace accessibility labels or hints, does not duplicate long
 paragraphs across views, and must not change layout, focus order, or the macOS 13.0 target.
 
+With macOS Full Keyboard Access enabled, every interactive control has an explicit focus stop and
+uses the native blue focus indicator. That indicator is intentionally visible only while keyboard
+focus is active; it is accessibility state, not a permanent decorative border.
+
 ### Settings page
 
 The gear replaces the main popover content with Settings. A keyboard-reachable `Back` action

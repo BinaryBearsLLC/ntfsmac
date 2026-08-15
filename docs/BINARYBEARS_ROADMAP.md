@@ -671,7 +671,9 @@ on 2026-08-15 below supersedes that classification.
 
 ## 2026-08-15 blocker-correction checkpoint
 
-Commit `3c4f23a` implements every focused correction identified by the closed acceptance run:
+Commit `3c4f23a` implements the focused blocker corrections identified by the closed acceptance
+run. The first installed keyboard repeat then proved its BB-03 focus change incomplete; follow-up
+commit `864abd8` completes the explicit focus path across every interactive popover surface.
 
 - BB-01 supplies the complete invoking-user environment (`HOME`, `USER`, `LOGNAME`, `SUDO_UID`,
   and `SUDO_GID`) to helper-launched CLI children.
@@ -685,14 +687,15 @@ Commit `3c4f23a` implements every focused correction identified by the closed ac
   guidance without exposing guest transcripts.
 - BB-P1-06 carries the observed filesystem driver into the mounted row and rejects root or nested
   symbolic links before an NTFS3 Verified Copy starts.
-- BB-03 restores keyboard focusability and labels for the skipped Mount, Diagnose, and Quit
-  controls. A fresh `SMAppService.mainApp.status == .notFound` remains actionable so the documented
-  registration call can run and surface its real result.
+- BB-03 gives every main-row action, overflow menu, refresh/security/footer control, Settings
+  control, first-run/repair action, diagnostics action, and Verified Copy action an explicit
+  keyboard focus stop. A fresh `SMAppService.mainApp.status == .notFound` remains actionable so the
+  documented registration call can run and surface its real result.
 - Verified Copy validates a fresh destination through the native save-panel delegate before
   AppKit can offer a misleading destructive Replace path; the final validator still refuses every
   existing destination.
 
-Source gates pass Bats `297/297` and Swift `259/259`, including a clean vendored-component rebuild.
+Source gates pass Bats `297/297` and Swift `260/260`, including a clean vendored-component rebuild.
 These are source fixes, not packaged evidence. BB-01, BB-03, BB-P1-06, BB-P1-07, and BB-F01 remain
 `FAIL` until the newly built app passes the hardware/UI repeats below.
 
@@ -725,8 +728,9 @@ animated with restraint, accessible, and fast.
 
 ## Exact next-agent handoff
 
-Start from `dev` at code commit `3c4f23a` plus the following documentation commit. Do not push
-unless explicitly authorized. Expected source gates are Bats `297/297` and Swift `259/259`.
+Start from `dev` at blocker commits `3c4f23a` and `864abd8` plus the following documentation
+commits. Do not push unless explicitly authorized. Expected source gates are Bats `297/297` and
+Swift `260/260`.
 Preserve the minimal popover and do not mix identity/signing migration into the blocker retest.
 
 Build and install one fresh DMG, then run the packaged retest in this order:
@@ -749,7 +753,7 @@ Build and install one fresh DMG, then run the packaged retest in this order:
    session, remove its row, and preserve the other drive. If a controlled backend stall is
    available, verify the same bounded unknown-to-cleanup transition without waiting for a
    240-second CLI watchdog.
-6. Run strict signature verification, `hdiutil verify`, Bats `297/297`, Swift `259/259`, and the
+6. Run strict signature verification, `hdiutil verify`, Bats `297/297`, Swift `260/260`, and the
    authenticated zero-state/PF check; only then convert the five ledger rows from FAIL to PASS.
 7. **Resource-gated qualification:** run the controlled TV comparison and extended GPT/low-space/
    controller/OS/system-volume matrix only when those external resources are actually available.

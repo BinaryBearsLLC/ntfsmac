@@ -29,8 +29,13 @@ This is the live ledger for the assisted acceptance run defined in
   `hdiutil verify` and strict app signature verification pass; the packaging source passes Bats
   `295/295`, Swift remains `251/251`, and the changed shell script passes ShellCheck.
 - Source-only blocker correction commit `3c4f23a` was completed on 2026-08-15. Bats pass
-  `297/297` and Swift pass `259/259`, including a clean vendored-component rebuild. It has not yet
-  been packaged or installed, so it does not change any acceptance-row status.
+  `297/297`; its original Swift gate passed `259/259`, including a clean vendored-component
+  rebuild. It does not by itself change any acceptance-row status.
+- The first installed BB-03 repeat of that candidate reached only Diagnose and Quit while Full
+  Keyboard Access was active; Open, Unmount, the overflow menu, Refresh, Security Show, and
+  Settings were skipped. BB-03 therefore remains `FAIL`. Follow-up source commit `864abd8` adds
+  explicit focus participation to every interactive popover surface and passes Swift `260/260`;
+  it still requires a newly packaged manual repeat.
 - Host: Apple Silicon with Hypervisor support, macOS 26.6.1.
 - Local evidence folder: `ntfsmac-acceptance-20260812-190259` on the operator's Desktop. It is
   intentionally not committed because it contains local volume/device identifiers.
@@ -245,11 +250,13 @@ later empty-cache first mount reopened BB-01 with the missing helper `USER` envi
 
 ## Source correction ready for packaged retest — 2026-08-15
 
-Commit `3c4f23a` implements all six deferred software corrections: complete helper invoking-user
+Commit `3c4f23a` implements the six deferred software corrections: complete helper invoking-user
 environment; physical-presence and bounded backend-liveness reconciliation; fail-closed
 `ntfs-3g norecover` dirty policy and concise Windows recovery copy; NTFS3 root/nested-symlink
-preflight; explicit keyboard focus plus actionable fresh Launch-at-login registration; and native
-save-panel validation before an existing destination can offer Replace.
+preflight; initial keyboard focus plus actionable fresh Launch-at-login registration; and native
+save-panel validation before an existing destination can offer Replace. Installed evidence then
+showed that the keyboard correction covered only Diagnose and Quit. Commit `864abd8` completes the
+focus path across the main, Settings, first-run/repair, diagnostics, and Verified Copy surfaces.
 
 The five ledger failures remain unchanged until a new DMG passes the exact repeat. The next run
 must record the new artifact hash/signature first, then execute BB-01, BB-03, BB-P1-06, BB-P1-07,
