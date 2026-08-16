@@ -823,6 +823,14 @@ zero security sessions, no backend/network-helper process, and revision-2 Alpine
 The next gate is one GUI Mount request followed by authoritative host/diagnostic convergence; the
 baseline alone does not convert any live ledger row.
 
+That first request subsequently passed. Revision 2 initialized, the known-clean fixture mounted
+read/write through default `ntfs-3g`, and the popover, NFS table, and schema-6 diagnostics agreed on
+one enforced private session. The live vmnet/private/`soft` transport gate passed with no loopback
+listener. A new 4 MiB payload matched by bytes and SHA-256 after reread and was removed. GUI
+Unmount then reached zero mounts/sessions, bridge down, no backend/network-helper process, and no
+scoped artifact. This closes the fresh runtime-v2 and clean compatibility-driver sub-gate; the
+authenticated state/PF teardown and the three focused blocker repeats remain open.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears

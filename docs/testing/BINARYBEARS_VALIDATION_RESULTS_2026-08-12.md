@@ -269,6 +269,17 @@ and the application-owned revision-2 Alpine runtime correctly reported `not_init
 than reusing an older cache. One known-clean removable NTFS fixture was present. This is a clean
 installed baseline, not yet a hardware-mount acceptance result.
 
+The first GUI Mount request then initialized revision 2 and mounted that fixture read/write with
+the default `ntfs-3g` driver. Authoritative NFS state, schema-6 diagnostics, and the inspected
+popover agreed on one healthy mount and one enforced security session; the private vmnet link,
+`soft` NFS contract, evaluated PF policy, and absence of a loopback listener passed the live
+transport gate. A fresh 4194304-byte payload matched byte-for-byte and by SHA-256 after flush and
+reread, then its uniquely scoped source and destination were removed. GUI Unmount immediately
+returned to zero NFS mounts and sessions with the bridge down, no backend/network-helper process,
+and no scoped artifact. This passes the candidate's fresh runtime-v2 initialization and clean
+`ntfs-3g` round-trip sub-gate. The authenticated state/PF teardown remains pending, and the three
+focused blocker rows are not converted by this sub-gate.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence
