@@ -729,6 +729,19 @@ The replacement DMG was then built from documentation head `3ef125e`, SHA-256
 verification and `hdiutil verify` both pass. This is a candidate artifact, not BB-01 acceptance
 evidence until the installed onboarding and first mount pass.
 
+The installed replay then passed the corrected onboarding boundary: no password prompt appeared
+before explicit consent, helper/CLI preparation completed, Full Disk Access unlocked the normal
+popover, and the first Mount click started the ntfsmac session without a retry. Independent host
+and runtime evidence proved that this was the private NFS export, not macOS's native NTFS mount:
+the host mounted `diskNsM.local:/mnt/...` as NFS while anylinuxfs reported the paired guest NTFS
+filesystem. That guest filesystem landed `ro,norecover`; a write was correctly refused, but the
+installed GUI incorrectly remained green because it derived writability only from the host NFS
+client. Source commit `06dcd03` now combines both layers and treats read-only at either layer as
+read-only. Its focused live-shaped regression test passes; the complete source gates are Bats
+`297/297` and Swift `270/270`. BB-01 remains
+open until a rebuilt package shows the read-only warning for this fixture, then completes a clean
+read/write round trip and authenticated teardown on a known-clean fixture.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
@@ -758,19 +771,19 @@ animated with restraint, accessible, and fast.
 
 ## Exact next-agent handoff
 
-Start from `dev` at blocker commits `3c4f23a`, `864abd8`, and first-run correction `33ce2af` plus
+Start from `dev` at blocker commits `3c4f23a`, `864abd8`, first-run correction `33ce2af`, and
+guest/host mount-mode reconciliation `06dcd03` plus
 the following documentation commits. Do not push unless explicitly authorized. Expected source
-gates are Bats `297/297` and Swift `269/269`.
+gates are Bats `297/297` and Swift `270/270`.
 Preserve the minimal popover and do not mix identity/signing migration into the blocker retest.
 
 Build and install one fresh DMG, then run the packaged retest in this order:
 
-1. **BB-01 — clean preflight passed, candidate ready:** install DMG `f02a2c…c5e2` containing
-   `33ce2af`, quit the retained app, and replace it. Require the helper explanation before any
-   password prompt, click **Install Helper…** once, observe progress, enable exactly the named
-   Full Disk Access helper, and require the normal popover to unlock automatically. The first
-   NTFS **Mount** must then succeed without a retry or relaunch; unmount and prove zero security
-   state/PF child anchors.
+1. **BB-01 — onboarding passed, mount-mode package repeat required:** rebuild after `06dcd03`.
+   The consent/progress/Full Disk Access gate and first-click session startup already passed on
+   `f02a2c…c5e2`. First use the same read-only fixture and require a yellow read-only state rather
+   than green. Then use a known-clean NTFS fixture and require the first Mount to land read/write,
+   complete a write/reread check, unmount, and prove zero security state/PF child anchors.
 2. **BB-03 — complete:** installed keyboard traversal and the independently read-back Launch at
    login enable/disable cycle passed on `bdfcd6…92fed`; do not repeat unless related code changes.
 3. **BB-P1-06 and save panel:** mount once with NTFS3, attempt Verified Copy with the known symlink
@@ -785,7 +798,7 @@ Build and install one fresh DMG, then run the packaged retest in this order:
    session, remove its row, and preserve the other drive. If a controlled backend stall is
    available, verify the same bounded unknown-to-cleanup transition without waiting for a
    240-second CLI watchdog.
-6. Run strict signature verification, `hdiutil verify`, Bats `297/297`, Swift `260/260`, and the
+6. Run strict signature verification, `hdiutil verify`, Bats `297/297`, Swift `270/270`, and the
    authenticated zero-state/PF check; only then convert the five ledger rows from FAIL to PASS.
 7. **Resource-gated qualification:** run the controlled TV comparison and extended GPT/low-space/
    controller/OS/system-volume matrix only when those external resources are actually available.

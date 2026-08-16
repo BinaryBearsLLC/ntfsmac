@@ -249,6 +249,12 @@ contract, and measured security state; both gates exit zero; the NFS mount is `s
 loopback/gvproxy transport is accepted. With VPN on, ntfsmac may add only the exact private host
 route it owns and must not replace the VPN default route.
 
+Writability requires agreement at both layers. `/sbin/mount -t nfs` must show the ntfsmac
+`diskNsM.local:/mnt/...` export, and anylinuxfs status must show the paired guest filesystem without
+`ro`/`read-only`. A writable NFS client above a guest `ntfs,ro` mount is a read-only result: the GUI
+must be yellow/read-only and the write sub-gate must not run. A native macOS NTFS/FsKit mount is
+not ntfsmac evidence and must be unmounted before this cell.
+
 If the backend does not complete, allow the packaged 240-second watchdog to expire unless host
 truth shows a mount that must be protected. Require the GUI to remain non-green, a concise timeout
 error, `mount_failure_category=backend_timeout`, no surviving mount/VM/vmnet descendant, and the

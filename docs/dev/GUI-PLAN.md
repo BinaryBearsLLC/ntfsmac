@@ -114,11 +114,17 @@ publishing green. On 2026-08-11 one packaged device passed GUI unmount, Finder n
 disconnect, and an external NFS unmount with complete VM/PF/route reconciliation. CLI→GUI,
 crash/restart, physical eject/hot-unplug, and concurrent-device cells remain required.
 
+Writability is also a two-layer fact. The host NFS client and the guest filesystem beneath its
+export can disagree: a writable NFS client does not make a guest `ntfs,ro` mount writable. The
+2026-08-16 installed replay exposed exactly that false-green state. Commit `06dcd03` preserves the
+guest mode from anylinuxfs status and combines it with the paired host mount table; read-only at
+either layer must prevent a green read/write row.
+
 Required behavior:
 
 - reconcile on launch, popover open, periodic poll, Refresh, and after helper completion;
 - discover CLI-created mounts and remove CLI/external-unmounted rows within a bounded interval;
-- verify observed read/write state per mount point before publishing green;
+- verify both paired host NFS and guest filesystem read/write state before publishing green;
 - represent disagreement explicitly as warning/unknown, never as mounted read/write;
 - keep multiple mount rows independent across partial failure and teardown;
 - derive header, icon, controls, and Diagnose context from the same reconciled snapshot.
