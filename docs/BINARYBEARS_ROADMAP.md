@@ -829,10 +829,11 @@ Build and install one fresh DMG, then run the packaged retest in this order:
    publication, with no new partial. The existing-destination repeat still exposed AppKit's native
    `Replace` offer. Cancel preserved the destination exactly, but BB-P1-06 remains `FAIL` until the
    save panel prevents that misleading offer and the packaged repeat passes without mutation.
-4. **BB-P1-07 dirty policy:** use only the disposable dirty fixture. Both default `ntfs-3g` and
-   explicit NTFS3 must refuse a writable mount, show concise Windows recovery guidance, publish no
-   green row, and leave zero VM/PF/session residue. Repair with Windows `chkdsk`, fully shut down,
-   then repeat the clean mount/hash/unmount/reread sequence.
+4. **BB-P1-07 dirty policy — disagreement reproduced:** on the same unrepaired disposable volume,
+   default `ntfs-3g` landed read-only with the corrected yellow recovery state, while explicit
+   NTFS3 mounted read/write with no fallback. No payload write was issued. Treat this as a policy
+   failure, not as NTFS3 recovery evidence. A deterministic cross-driver refusal plus the Windows
+   `chkdsk`/full-shutdown and clean mount/hash/unmount/reread repeat remain required.
 5. **BB-F01/backend timeout:** with two disposable drives mounted and no I/O, physically remove one.
    It must stop showing green on the first failed proof, automatically tear down only its owned
    session, remove its row, and preserve the other drive. If a controlled backend stall is

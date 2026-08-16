@@ -220,6 +220,14 @@ creating a destination or a new recoverable partial. It also reproduced the nati
 safety invariant still holds, but the row remains `FAIL` until the save-panel UX prevents that
 misleading destructive offer entirely.
 
+The same disposable-volume replay also reconfirmed the open BB-P1-07 driver-policy disagreement.
+Default `ntfs-3g` exposed the volume read-only with `norecover`, and the corrected GUI truthfully
+showed the yellow read-only/recovery state. Without any intervening repair, explicit NTFS3 mounted
+the same physical partition read/write with no fallback and one enforced private session. No
+payload write was issued. This is not accepted as proof that NTFS3 safely recovered the volume:
+the drivers disagree on writable eligibility, so BB-P1-07 remains `FAIL` pending deterministic
+cross-driver policy plus a Windows-cleaned repeat.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence
