@@ -338,6 +338,13 @@ checks prove that this image contains both the privileged direct-CLI unmount fix
 status-binary resolution fix. Installation and the three remaining packaged live cells are still
 pending, so this artifact verification does not convert BB-P1-07 or BB-F01 by itself.
 
+That exact candidate was installed on 2026-08-16. The installed GUI executable, privileged-CLI
+unmount script, and standalone teardown script matched the candidate byte for byte, and the
+installed application passed strict deep signature verification. The pre-test baseline reported
+zero NFS mounts, zero security sessions, no backend or network-helper process, and a clean public
+`NO_ACTIVE_MOUNTS` summary with one known-clean removable NTFS fixture present. This closes the
+artifact/install baseline only; no live packaged regression is credited yet.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence

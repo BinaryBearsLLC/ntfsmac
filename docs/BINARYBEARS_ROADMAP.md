@@ -870,9 +870,10 @@ The clean source rerun subsequently passed Bats `302/302` and Swift `271/271`. A
 teardown candidate was built with DMG SHA-256
 `a00677da68b76cbb68bef6fd0b936fe8e6d04470397085fad2fbeb884f30c637`; the image, strict deep
 ad-hoc signature, arm64 executables, static AArch64 vmproxy, and both corrected bundled scripts
-were verified. Install this exact artifact before the live steps below. Artifact verification is
-complete; packaged behavior remains uncredited until the direct CLI, BB-P1-07, and BB-F01 cells
-pass on the installed application.
+were verified. That exact artifact is now installed: the GUI and both corrected scripts match the
+candidate byte for byte, its strict deep signature passes, and the pre-test baseline has zero
+mounts, sessions, and backend processes. Packaged behavior remains uncredited until the direct
+CLI, BB-P1-07, and BB-F01 cells pass on the installed application.
 
 ## Approved BinaryBears production direction
 
@@ -918,9 +919,9 @@ Start from `dev` with the earlier blocker commits plus `8408f4f` (hot-unplug/sav
 Bats `302/302` and Swift `271/271`.
 Preserve the minimal popover and do not mix identity/signing migration into the blocker retest.
 
-Install the already-built DMG
-`a00677da68b76cbb68bef6fd0b936fe8e6d04470397085fad2fbeb884f30c637`, then run the packaged retest
-in this order:
+The already-built DMG
+`a00677da68b76cbb68bef6fd0b936fe8e6d04470397085fad2fbeb884f30c637` is installed and its clean
+baseline is verified. Run the packaged retest in this order:
 
 1. **BB-01 — complete:** corrected DMG `e9a549…fbdc5`
    containing `06dcd03` correctly presented the rw-NFS/ro-guest fixture as yellow/read-only.
