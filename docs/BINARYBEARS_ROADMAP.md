@@ -24,9 +24,9 @@ The final BB-F02 safe-eject/uninstall cell passed on 2026-08-14, including the a
 no-state/no-PF-anchor teardown proof. The initially accepted BB-01 install cell was reopened after
 the later empty-cache first mount proved that the launchd helper supplies `HOME` and invoker IDs but
 not `USER`, causing anylinuxfs `init-rootfs` to fail before filesystem access. BB-F01 hot-unplug
-reconciliation, BB-03 keyboard/login-item behavior, BB-01 first-run initialization, and the
-BB-P1-06 NTFS3 symlink limitation remain focused correction-and-retest gates rather than hidden
-inside those completed lifecycle cells.
+reconciliation, BB-01 first-run initialization, and the BB-P1-06 NTFS3 symlink limitation remain
+focused correction-and-retest gates rather than hidden inside those completed lifecycle cells.
+BB-03 keyboard and login-item behavior passed its corrected packaged retest on 2026-08-16.
 
 The post-sync wiring audit and its focused recovery branches are recorded in
 [BinaryBears Upstream Regression Audit — 2026-08-05](audits/UPSTREAM_REGRESSION_AUDIT_2026-08-05.md).
@@ -696,8 +696,8 @@ commit `864abd8` completes the explicit focus path across every interactive popo
   existing destination.
 
 Source gates pass Bats `297/297` and Swift `260/260`, including a clean vendored-component rebuild.
-These are source fixes, not packaged evidence. BB-01, BB-03, BB-P1-06, BB-P1-07, and BB-F01 remain
-`FAIL` until the newly built app passes the hardware/UI repeats below.
+These are source fixes, not packaged evidence. BB-01, BB-P1-06, BB-P1-07, and BB-F01 remain `FAIL`
+until the newly built app passes the hardware/UI repeats below; BB-03 now has packaged evidence.
 
 The 2026-08-15 keyboard follow-up candidate was built from `864abd8`/`2e0ae09` as
 `dist/ntfsmac.dmg`, SHA-256
@@ -705,7 +705,9 @@ The 2026-08-15 keyboard follow-up candidate was built from `864abd8`/`2e0ae09` a
 DMG checksum, clean runtime rebuild, and Swift `260/260` gate pass. On 2026-08-16 its installed
 forward/reverse keyboard traversal reached every required main, drive, security, footer, Settings,
 menu, and Back control. The BB-03 keyboard sub-gate therefore passes; packaged Launch-at-login
-enable/readback/disable remains the only open BB-03 sub-gate.
+enable/readback/disable then also passed: macOS independently reported the app record enabled after
+registration and disabled after removal while preserving the privileged helper. BB-03 is `PASS` as
+of 2026-08-16.
 
 ## Approved BinaryBears production direction
 
@@ -746,9 +748,8 @@ Build and install one fresh DMG, then run the packaged retest in this order:
 1. **BB-01:** complete uninstall, remove only the disposable runtime cache, install the DMG, approve
    the helper once, mount the first NTFS device without a second launch, unmount, then prove zero
    security state/PF child anchors.
-2. **BB-03:** keyboard traversal passed on the installed `bdfcd6…92fed` candidate. Restore the
-   host's original Full Keyboard Access setting, toggle Launch at login on, confirm its system
-   readback, toggle it off, and confirm removal. Only then close BB-03.
+2. **BB-03 — complete:** installed keyboard traversal and the independently read-back Launch at
+   login enable/disable cycle passed on `bdfcd6…92fed`; do not repeat unless related code changes.
 3. **BB-P1-06 and save panel:** mount once with NTFS3, attempt Verified Copy with the known symlink
    fixture, and require the specific preflight before any copy. Enter an existing destination name
    and require ntfsmac's no-overwrite explanation without a native Replace offer or mutation.

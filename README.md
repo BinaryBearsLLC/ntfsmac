@@ -253,7 +253,7 @@ developed from `dev` and reviewed back into `dev` through its own focused branch
 | P0 | 🟡 Source fixes complete; packaged retest pending | Runtime pinning, audited updates, per-session PF/VPN security, complete helper user identity, and physical/backend mount reconciliation are implemented; the new empty-cache and hot-unplug package still needs hardware confirmation |
 | P1 | 🟡 Source fixes complete; packaged retest pending | Verified Copy, NTFS3 preflight, fail-closed dirty-volume handling, and no-overwrite panel validation are implemented; the corrected DMG still needs the focused same-device/Windows repeat |
 | P2 | ⬜ Same-product modern variant planned | A future modern helper lifecycle will ship as a second compatibility artifact of the same BinaryBears product, built and released beside the current variant from one repository and shared roadmap |
-| P3 | 🟡 Features passed; corrected package pending | Open in Finder, notifications, resilient Eject All, and the professional DMG passed; keyboard/login-item fixes are implemented in source and await one packaged retest |
+| P3 | ✅ Packaged validation complete | Open in Finder, notifications, resilient Eject All, the professional DMG, full keyboard traversal, and Launch at login enable/disable pass on the installed package |
 
 The roadmap records explicit A/B options where evidence is still missing. In particular,
 `ntfs-3g` remains the compatibility-first default; NTFS3 does not become the default without a
