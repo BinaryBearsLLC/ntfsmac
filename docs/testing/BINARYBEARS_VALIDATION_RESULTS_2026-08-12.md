@@ -82,6 +82,9 @@ This is the live ledger for the assisted acceptance run defined in
   guest mounts, lowered the bridge, and returned diagnostics/public evidence to zero sessions.
   The packaged read-only-truth sub-gate passes; authenticated PF/state teardown and a known-clean
   read/write round trip remain before BB-01 can pass.
+- The immediate operator-authenticated teardown returned `BB-01-RO-ROOT: PASS`: no security state
+  files or PF child anchors remained. BB-01 now lacks only the known-clean read/write round trip and
+  its final canonical teardown.
 - Host: Apple Silicon with Hypervisor support, macOS 26.6.1.
 - Local evidence folder: `ntfsmac-acceptance-20260812-190259` on the operator's Desktop. It is
   intentionally not committed because it contains local volume/device identifiers.

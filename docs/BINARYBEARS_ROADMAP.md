@@ -756,6 +756,8 @@ with concise Windows recovery guidance. No write was attempted. GUI Unmount remo
 mount and guest session; diagnostics returned healthy with bridge down and zero security sessions.
 The read-only false-green defect is therefore closed on packaged hardware. BB-01 still requires a
 known-clean read/write round trip and the authenticated no-state/no-PF-anchor teardown proof.
+The operator-authenticated follow-up then confirmed no security state file or PF child anchor, so
+only the known-clean read/write round trip and its final teardown remain for BB-01.
 
 ## Approved BinaryBears production direction
 
