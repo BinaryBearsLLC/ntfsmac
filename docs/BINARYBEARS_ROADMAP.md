@@ -836,6 +836,14 @@ completes the candidate's runtime-v2/clean-mount cell. Continue with BB-P1-06 ex
 presentation, BB-P1-07 unsafe-state refusal, and BB-F01 two-drive hot unplug; do not credit the
 clean-mount result for those distinct behaviors.
 
+The packaged BB-P1-06 existing-destination presentation now passes: the save panel remained open
+with the app's direct no-overwrite guidance, no native Replace dialog appeared, the destination
+hash and size were unchanged, no copy/partial started, and the scoped fixtures were removed. A
+following CLI cleanup removed the NFS mount and all backend/network processes, but the public
+diagnostic summary remained at one security session even though that cleanup reported
+`NO_SESSION_STATE`. Keep BB-P1-06 unconverted until an authenticated state/PF audit classifies this
+as stale presentation or real residue; if residue exists, recover it before any next mount.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears

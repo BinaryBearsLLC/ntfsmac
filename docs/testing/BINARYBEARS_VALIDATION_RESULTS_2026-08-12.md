@@ -285,6 +285,18 @@ files or PF child anchors remained. The candidate's fresh runtime-v2 initializat
 read/write round trip, normal GUI unmount, and privileged teardown cell is complete. It does not
 replace the still-required existing-destination, unsafe-state refusal, or hot-unplug repeats.
 
+The rebuilt BB-P1-06 existing-destination repeat then exercised the packaged native save panel.
+After an already-existing destination was submitted, AppKit did not display its Replace dialog:
+the same panel remained open and changed its guidance to the fixed no-overwrite message. The
+original destination retained its exact size and SHA-256, no copy process or partial file appeared,
+and both uniquely scoped fixtures were removed. This satisfies the presentation and data-safety
+behavior that previously failed. During the separate cleanup, the visual automation service could
+not reacquire the popover after closing the panel, so the installed CLI performed the unmount. The
+host NFS mount, bridge, and backend processes disappeared, but the public diagnostic summary still
+reported one security session while the CLI reported `NO_SESSION_STATE`. An authenticated audit is
+required to distinguish a stale public summary from real PF/state residue before converting the
+ledger row or proceeding.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence
