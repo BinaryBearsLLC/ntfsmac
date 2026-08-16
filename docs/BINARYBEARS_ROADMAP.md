@@ -742,6 +742,13 @@ read-only. Its focused live-shaped regression test passes; the complete source g
 open until a rebuilt package shows the read-only warning for this fixture, then completes a clean
 read/write round trip and authenticated teardown on a known-clean fixture.
 
+The corrected package was built from documentation head `73d3d08` with source fix `06dcd03` as
+`dist/ntfsmac.dmg`, SHA-256
+`e9a5494c44e8fe68ea07a0cbef1afbf3880b1dc32c92edd1504d89164bafbdc5`. Strict deep app-signature
+verification, arm64 inspection, the complete source gates, and `hdiutil verify` pass. It is the
+exact candidate for the read-only-truth and clean read/write repeats; it is not acceptance evidence
+until installed.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
@@ -779,7 +786,8 @@ Preserve the minimal popover and do not mix identity/signing migration into the 
 
 Build and install one fresh DMG, then run the packaged retest in this order:
 
-1. **BB-01 — onboarding passed, mount-mode package repeat required:** rebuild after `06dcd03`.
+1. **BB-01 — onboarding passed, mount-mode package repeat required:** install corrected DMG
+   `e9a549…fbdc5`, which contains `06dcd03`.
    The consent/progress/Full Disk Access gate and first-click session startup already passed on
    `f02a2c…c5e2`. First use the same read-only fixture and require a yellow read-only state rather
    than green. Then use a known-clean NTFS fixture and require the first Mount to land read/write,

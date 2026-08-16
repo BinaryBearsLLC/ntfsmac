@@ -70,6 +70,10 @@ This is the live ledger for the assisted acceptance run defined in
   `06dcd03` fixes the two-layer reconciliation and adds the exact rw-NFS/ro-guest regression case;
   the complete source gates pass at Bats `297/297` and Swift `270/270`. This is source evidence
   pending a rebuilt package and authenticated root teardown, so BB-01 remains `FAIL`.
+- Corrected DMG SHA-256 `e9a5494c44e8fe68ea07a0cbef1afbf3880b1dc32c92edd1504d89164bafbdc5`
+  was then built from documentation head `73d3d08` with source fix `06dcd03`. The app is arm64 and
+  passes strict deep ad-hoc signature verification; the DMG passes `hdiutil verify`. This is the
+  exact installed-test candidate, not a ledger PASS.
 - Host: Apple Silicon with Hypervisor support, macOS 26.6.1.
 - Local evidence folder: `ntfsmac-acceptance-20260812-190259` on the operator's Desktop. It is
   intentionally not committed because it contains local volume/device identifiers.
