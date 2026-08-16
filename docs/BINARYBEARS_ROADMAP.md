@@ -806,8 +806,8 @@ cannot be mistaken for a runtime containing the probe. Completion checks require
 Automated evidence is Bats `300/300`, Swift `271/271`, a real host/guest rebuild, Rust probe-
 selection coverage, an arm64 host `anylinuxfs`, an aarch64 Linux `vmproxy` containing the refusal
 path, static libblkid verification, hypervisor-entitlement checks, and an exact generated rootfs
-package manifest. The live ledger intentionally remains 25 `PASS`, 3 `FAIL`, and 2 `BLOCKED`
-until a DMG built from these changes passes the three focused packaged repeats.
+package manifest. After the packaged save-panel repeat, the live ledger is 26 `PASS`, 2 `FAIL`,
+and 2 `BLOCKED`. BB-P1-07 and BB-F01 still require their focused packaged repeats.
 
 The packaged candidate was built from documentation head `8ae12df` with source fixes `8408f4f`
 and `e635bb9`. Its SHA-256 is
@@ -860,6 +860,12 @@ currently installed artifact predates that fix, perform one explicit trusted-bin
 prove zero state/anchors/public sessions, then rerun all 302 Bats tests after the new regression is
 included. Rebuild/reinstall only after those source gates pass.
 
+The explicit trusted-binary recovery then returned `STALE_SESSIONS_REMOVED`; authenticated checks
+proved zero state files, zero PF child anchors, and a zero-session public summary. BB-P1-06 is now
+`PASS` on its packaged no-overwrite behavior. Before the remaining two blocker repeats, require a
+clean `302/302` source run, rebuild/reinstall, and validate one direct CLI mount/unmount so the two
+new teardown/reconciliation fixes have packaged evidence.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
@@ -899,8 +905,9 @@ animated with restraint, accessible, and fast.
 ## Exact next-agent handoff
 
 Start from `dev` with the earlier blocker commits plus `8408f4f` (hot-unplug/save panel),
-`e635bb9` (NTFS3/runtime v2), and their following documentation commit. Do not push unless
-explicitly authorized. Expected source gates are Bats `300/300` and Swift `271/271`.
+`e635bb9` (NTFS3/runtime v2), `58e6998` (privileged direct CLI unmount), and `ac42b7c`
+(standalone reconciliation). Do not push unless explicitly authorized. Current source gates are
+Bats `302/302` and Swift `271/271`.
 Preserve the minimal popover and do not mix identity/signing migration into the blocker retest.
 
 Build and install one fresh DMG, then run the packaged retest in this order:
@@ -913,19 +920,23 @@ Build and install one fresh DMG, then run the packaged retest in this order:
    do not repeat unless onboarding, helper identity, mount reconciliation, or teardown changes.
 2. **BB-03 — complete:** installed keyboard traversal and the independently read-back Launch at
    login enable/disable cycle passed on `bdfcd6…92fed`; do not repeat unless related code changes.
-3. **BB-P1-06 and save panel — source fix ready:** the previous packaged app rejected a local
+3. **BB-P1-06 and save panel — complete:** the previous packaged app rejected a local
    directory containing a nested symlink with the specific NTFS3 warning before destination
-   publication, with no new partial. The existing-destination repeat still exposed AppKit's native
-   `Replace` offer. The new delegate hook prevents that offer in automated coverage. Repeat with an
-   existing destination: the panel must remain open, show the fixed no-overwrite message, start no
-   copy, create no partial, and preserve the existing destination byte-for-byte.
-4. **BB-P1-07 dirty policy — source fix ready:** on the same unrepaired disposable volume,
+   publication, with no new partial. The final candidate intercepted an existing name before
+   AppKit's Replace flow: the panel stayed open with direct no-overwrite guidance, destination
+   size/hash stayed unchanged, and no copy or partial started. BB-P1-06 is `PASS`.
+4. **Direct CLI teardown/reconciliation — source fixes ready:** packaged fallback cleanup exposed
+   that direct CLI unmount did not self-elevate and standalone `pf-teardown.sh` did not resolve its
+   backend status binary. The orphan was recovered with authenticated zero-state/PF/public-summary
+   evidence. Rebuild, mount through direct CLI, unmount through direct CLI, require the expected
+   authentication before mutation, and prove zero mount/backend/state/anchor/public sessions.
+5. **BB-P1-07 dirty policy — source fix ready:** on the same unrepaired disposable volume,
    default `ntfs-3g` landed read-only with the corrected yellow recovery state, while explicit
    NTFS3 mounted read/write with no fallback. No payload write was issued. Treat this as a policy
    failure, not as NTFS3 recovery evidence. The new runtime v2 probe must refuse explicit read/write
    NTFS3 before a host NFS mount/session is published and show concise recovery guidance. Then
    repair/clean on Windows and repeat mount/hash/unmount/Windows reread.
-5. **BB-F01 hot unplug — source fix ready:** with USB_8GB on NTFS3 and MobileData on
+6. **BB-F01 hot unplug — source fix ready:** with USB_8GB on NTFS3 and MobileData on
    default `ntfs-3g`, physically removing only USB_8GB left its NFS mount, VM, security session,
    and green row alive for more than 30 seconds even though physical enumeration lost it
    immediately. Manual stale-row Unmount performed exact selective teardown and preserved
@@ -933,13 +944,13 @@ Build and install one fresh DMG, then run the packaged retest in this order:
    files or PF child anchors. Repeat the two-drive no-I/O removal: the removed row must leave green
    promptly and its exact mount/VM/security state must disappear automatically while the survivor
    remains mounted and enforced. A controlled backend-stall cell remains optional when available.
-6. Run strict signature verification, `hdiutil verify`, Bats `300/300`, Swift `271/271`, and the
-   authenticated zero-state/PF check; only then convert the three remaining ledger rows from FAIL
+7. Run strict signature verification, `hdiutil verify`, Bats `302/302`, Swift `271/271`, and the
+   authenticated zero-state/PF check; only then convert the two remaining ledger rows from FAIL
    to PASS.
-7. **Resource-gated qualification:** run the controlled TV comparison and extended GPT/low-space/
+8. **Resource-gated qualification:** run the controlled TV comparison and extended GPT/low-space/
    controller/OS/system-volume matrix only when those external resources are actually available.
 
-Once steps 1–6 pass, begin the rebranding/production migration as a new review unit: replace the
+Once steps 1–7 pass, begin the rebranding/production migration as a new review unit: replace the
 icon everywhere, migrate BinaryBears identifiers safely, sign/notarize, update Actions/releases,
 and revalidate the professional DMG. That change intentionally reopens BB-P3-05. Implement the P2
 variant later in the same product/release pipeline, not as an unrelated application.
