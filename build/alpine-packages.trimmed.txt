@@ -6,4 +6,5 @@ lvm2
 mount
 nfs-utils
 ntfs-3g
+ntfs-3g-progs
 squashfs-tools

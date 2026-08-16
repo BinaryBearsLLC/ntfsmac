@@ -51,16 +51,21 @@ runtime_alpine_load() {
     return 1
   fi
 
+  # Revision 2 changes the guest package contract by adding the read-only
+  # `ntfs-3g.probe` safety preflight required by opt-in NTFS3 read/write mounts. Keep this
+  # application-owned revision in both the directory and marker so installations with the
+  # earlier, otherwise identical base image cannot silently reuse a rootfs missing the probe.
+  ALPINE_RUNTIME_REVISION="2"
   ALPINE_RUNTIME_TAG="$tag"
   ALPINE_RUNTIME_DIGEST="$digest"
   # containers/image rejects a Docker reference containing both tag and digest. The pull uses the
   # immutable digest-only reference; build/init-rootfs.sh separately proves that ALPINE_TAG's arm64
   # manifest resolves to this exact digest before either runtime binary is produced.
   ALPINE_RUNTIME_REF="docker.io/library/alpine@${digest}"
-  ALPINE_RUNTIME_BASE_DIR="alpine-${tag}-${digest_hex:0:12}-${commit:0:12}"
-  ALPINE_RUNTIME_VERSION="ntfsmac-alpine-v1|tag=${tag}|digest=${digest}|anylinuxfs=${commit}"
+  ALPINE_RUNTIME_BASE_DIR="alpine-${tag}-${digest_hex:0:12}-${commit:0:12}-r${ALPINE_RUNTIME_REVISION}"
+  ALPINE_RUNTIME_VERSION="ntfsmac-alpine-v${ALPINE_RUNTIME_REVISION}|tag=${tag}|digest=${digest}|anylinuxfs=${commit}"
   export ALPINE_RUNTIME_TAG ALPINE_RUNTIME_DIGEST ALPINE_RUNTIME_REF
-  export ALPINE_RUNTIME_BASE_DIR ALPINE_RUNTIME_VERSION
+  export ALPINE_RUNTIME_BASE_DIR ALPINE_RUNTIME_VERSION ALPINE_RUNTIME_REVISION
 }
 
 runtime_alpine_cache_path() {
@@ -96,7 +101,7 @@ runtime_alpine_cache_state() {
     return 0
   fi
 
-  for required in bin/bash usr/sbin/rpc.nfsd usr/local/bin/entrypoint.sh vmproxy; do
+  for required in bin/bash usr/bin/ntfs-3g.probe usr/sbin/rpc.nfsd usr/local/bin/entrypoint.sh vmproxy; do
     if [[ ! -e "$base/rootfs/$required" ]]; then
       printf 'incomplete\n'
       return 0

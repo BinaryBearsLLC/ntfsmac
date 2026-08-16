@@ -54,6 +54,28 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
+@test "runtime source patch fail-closes unsafe read-write NTFS3 mounts" {
+  local cache_dir
+  cache_dir="$(mktemp -d)"
+  NTFSMAC_ANYLINUXFS_CACHE_DIR="$cache_dir" run bash -c '
+    source build/build-all.sh
+    prepare_build_copy
+    target="$CACHE_DIR/vmproxy/src/main.rs"
+    grep -F "fn verify_ntfs3_read_write_eligibility" "$target"
+    grep -F "Command::new(\"/usr/bin/ntfs-3g.probe\")" "$target"
+    grep -F "dsk.verify_ntfs3_read_write_eligibility()?" "$target"
+    grep -F "test_ntfs3_read_write_probe_selection" "$target"
+    test "$(grep -c "fn verify_ntfs3_read_write_eligibility" "$target")" -eq 1
+  '
+  rm -rf "$cache_dir"
+  [ "$status" -eq 0 ]
+}
+
+@test "trimmed Alpine runtime includes the NTFS read-write safety probe package" {
+  run grep -Fx "ntfs-3g-progs" "$REPO_ROOT/build/alpine-packages.trimmed.txt"
+  [ "$status" -eq 0 ]
+}
+
 @test "full build: anylinuxfs + vmproxy compile, cargo test passes for all three crates" {
   run "$SCRIPT"
   [ "$status" -eq 0 ]

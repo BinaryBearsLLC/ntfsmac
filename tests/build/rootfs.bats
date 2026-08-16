@@ -6,8 +6,8 @@
 # and gvproxy.bats. Greps the generated vm-setup.sh (the package manifest for this rootfs
 # — see build/init-rootfs.sh's header for why full VM-boot package installation isn't
 # reachable yet: it needs vendor/bin/vmproxy, a v-anylinuxfs-build artifact) for our
-# trimmed package list: ntfs-3g and nfs-utils (which provides rpc.nfsd) present; every
-# audited-cut package absent.
+# trimmed package list: ntfs-3g, its read/write safety probe package, and nfs-utils (which
+# provides rpc.nfsd) present; every audited-cut package absent.
 
 setup() {
   REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
@@ -44,12 +44,12 @@ setup() {
 
   # present: our trimmed list (nfs-utils provides rpc.nfsd; lvm2 provides /etc/lvm/{archive,
   # backup} that vmproxy's guest init hard-requires, see AUDIT.md's corrected lvm2 entry)
-  for pkg in bash blkid cryptsetup lsblk lvm2 mount nfs-utils ntfs-3g squashfs-tools; do
+  for pkg in bash blkid cryptsetup lsblk lvm2 mount nfs-utils ntfs-3g ntfs-3g-progs squashfs-tools; do
     [[ "$output" == *"$pkg"* ]]
   done
 
   # absent: every audited-cut package
-  for pkg in btrfs-progs mdadm ntfs-3g-progs zfs; do
+  for pkg in btrfs-progs mdadm zfs; do
     [[ "$output" != *"$pkg"* ]]
   done
 }

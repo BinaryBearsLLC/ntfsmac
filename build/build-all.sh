@@ -59,6 +59,7 @@ prepare_build_copy() {
   runtime_alpine_load || return 1
   patch_anylinuxfs_runtime_alpine "$CACHE_DIR" || return 1
   patch_vmproxy_mount_tmpfs
+  patch_vmproxy_ntfs3_read_write_preflight
   patch_anylinuxfs_vmproxy_cache_ownership
 }
 
@@ -102,6 +103,114 @@ content = content.replace(marker, replacement, 1)
 with open(target, "w") as f:
     f.write(content)
 print("build-all: patched vmproxy mount_tmpfs to mkdir -p each tmpfs target before mounting")
+PYEOF
+}
+
+# NTFS3 does not apply ntfs-3g's `norecover` mount policy and, on real hardware, accepted a
+# volume that the default driver had correctly landed read-only after an unsafe Windows state.
+# Before an explicitly requested read/write NTFS3 mount, use ntfs-3g's purpose-built, read-only
+# probe utility to determine read/write mountability. The probe never repairs or writes the
+# volume. Read-only NTFS3 requests and every other filesystem remain unchanged.
+#
+# `ntfs-3g.probe` is provided by Alpine's ntfs-3g-progs package, now retained in the audited
+# guest package list for this single safety dependency. As with the other runtime fixes, patch
+# only the disposable CACHE_DIR copy and leave the pinned anylinuxfs submodule untouched.
+patch_vmproxy_ntfs3_read_write_preflight() {
+  local target="$CACHE_DIR/vmproxy/src/main.rs"
+
+  python3 - "$target" <<'PYEOF'
+import sys
+
+target = sys.argv[1]
+with open(target, "r") as f:
+    content = f.read()
+
+if "fn verify_ntfs3_read_write_eligibility" in content:
+    print("build-all: vmproxy NTFS3 read/write preflight already patched, skipping")
+    sys.exit(0)
+
+method_marker = '''    fn specified_read_only(&self) -> bool {
+        self.mount_options
+            .as_deref()
+            .map(|opts| is_read_only_set(opts.split(',')))
+            .unwrap_or(false)
+    }
+'''
+method_replacement = method_marker + '''
+    fn requires_ntfs3_read_write_probe(&self) -> bool {
+        self.fs_driver.as_deref() == Some("ntfs3") && !self.specified_read_only()
+    }
+
+    fn verify_ntfs3_read_write_eligibility(&self) -> anyhow::Result<()> {
+        if !self.requires_ntfs3_read_write_probe() {
+            return Ok(());
+        }
+
+        let status = Command::new("/usr/bin/ntfs-3g.probe")
+            .args(["--readwrite", &self.disk_path])
+            .status()
+            .context("Failed to run the NTFS3 read/write safety probe")?;
+        if !status.success() {
+            anyhow::bail!(
+                "NTFS volume is dirty, hibernated, or otherwise unsafe for read/write; fully shut down Windows, disable Fast Startup, and run chkdsk (probe exit code {})",
+                status
+                    .code()
+                    .map(|code| code.to_string())
+                    .unwrap_or_else(|| "unknown".to_owned())
+            );
+        }
+        Ok(())
+    }
+'''
+
+mount_marker = '''    if !dsk.disk_path.is_empty() && !mount_point.is_empty() {
+        dsk.mount(&mount_point, &mut deferred)?;
+    }
+'''
+mount_replacement = '''    if !dsk.disk_path.is_empty() && !mount_point.is_empty() {
+        dsk.verify_ntfs3_read_write_eligibility()?;
+        dsk.mount(&mount_point, &mut deferred)?;
+    }
+'''
+
+test_marker = '''        let dsk = VmDiskContext::new(&cli, None);
+        assert!(dsk.specified_read_only());
+    }
+'''
+test_replacement = test_marker + '''
+    #[test]
+    fn test_ntfs3_read_write_probe_selection() {
+        let cli = parse_mount(&["/dev/vda", "test", "--fs-driver", "ntfs3"]);
+        let dsk = VmDiskContext::new(&cli, None);
+        assert!(dsk.requires_ntfs3_read_write_probe());
+
+        let cli = parse_mount(&["/dev/vda", "test", "--fs-driver", "ntfs3", "-o", "ro"]);
+        let dsk = VmDiskContext::new(&cli, None);
+        assert!(!dsk.requires_ntfs3_read_write_probe());
+
+        let cli = parse_mount(&["/dev/vda", "test"]);
+        let dsk = VmDiskContext::new(&cli, None);
+        assert!(!dsk.requires_ntfs3_read_write_probe());
+    }
+'''
+
+for marker, replacement, label in (
+    (method_marker, method_replacement, "VmDiskContext method"),
+    (mount_marker, mount_replacement, "mount call"),
+    (test_marker, test_replacement, "unit test"),
+):
+    if marker not in content:
+        print(
+            f"build-all: HARD-STOP — NTFS3 preflight {label} marker not found in {target} "
+            "(upstream shape changed, update patch_vmproxy_ntfs3_read_write_preflight)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    content = content.replace(marker, replacement, 1)
+
+with open(target, "w") as f:
+    f.write(content)
+print("build-all: patched vmproxy with fail-closed NTFS3 read/write eligibility preflight")
 PYEOF
 }
 

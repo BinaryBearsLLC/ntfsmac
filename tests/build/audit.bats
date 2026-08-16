@@ -34,12 +34,12 @@ setup() {
 @test "trimmed package list matches the KEEP decisions exactly" {
   run sort "$TRIMMED"
   [ "$status" -eq 0 ]
-  expected=$'bash\nblkid\ncryptsetup\nlsblk\nlvm2\nmount\nnfs-utils\nntfs-3g\nsquashfs-tools'
+  expected=$'bash\nblkid\ncryptsetup\nlsblk\nlvm2\nmount\nnfs-utils\nntfs-3g\nntfs-3g-progs\nsquashfs-tools'
   [ "$output" = "$expected" ]
 }
 
 @test "trimmed list excludes every cut package" {
-  for pkg in btrfs-progs mdadm ntfs-3g-progs zfs; do
+  for pkg in btrfs-progs mdadm zfs; do
     run grep -Fx "$pkg" "$TRIMMED"
     [ "$status" -ne 0 ]
   done
