@@ -749,6 +749,14 @@ verification, arm64 inspection, the complete source gates, and `hdiutil verify` 
 exact candidate for the read-only-truth and clean read/write repeats; it is not acceptance evidence
 until installed.
 
+The installed corrected candidate passed the first half of that repeat. The app binary matched the
+built candidate byte-for-byte; one click created the real private NFS session, the paired runtime
+mount reported `ntfs,ro,norecover`, and the popover immediately showed yellow `Mounted read-only`
+with concise Windows recovery guidance. No write was attempted. GUI Unmount removed the host NFS
+mount and guest session; diagnostics returned healthy with bridge down and zero security sessions.
+The read-only false-green defect is therefore closed on packaged hardware. BB-01 still requires a
+known-clean read/write round trip and the authenticated no-state/no-PF-anchor teardown proof.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
@@ -786,12 +794,12 @@ Preserve the minimal popover and do not mix identity/signing migration into the 
 
 Build and install one fresh DMG, then run the packaged retest in this order:
 
-1. **BB-01 — onboarding passed, mount-mode package repeat required:** install corrected DMG
-   `e9a549…fbdc5`, which contains `06dcd03`.
+1. **BB-01 — onboarding and packaged read-only truth passed:** corrected DMG `e9a549…fbdc5`
+   containing `06dcd03` correctly presented the rw-NFS/ro-guest fixture as yellow/read-only.
    The consent/progress/Full Disk Access gate and first-click session startup already passed on
-   `f02a2c…c5e2`. First use the same read-only fixture and require a yellow read-only state rather
-   than green. Then use a known-clean NTFS fixture and require the first Mount to land read/write,
-   complete a write/reread check, unmount, and prove zero security state/PF child anchors.
+   `f02a2c…c5e2`. Next use a known-clean NTFS fixture and require the first Mount to land
+   read/write, complete a write/reread check, unmount, and prove zero security state/PF child
+   anchors.
 2. **BB-03 — complete:** installed keyboard traversal and the independently read-back Launch at
    login enable/disable cycle passed on `bdfcd6…92fed`; do not repeat unless related code changes.
 3. **BB-P1-06 and save panel:** mount once with NTFS3, attempt Verified Copy with the known symlink
