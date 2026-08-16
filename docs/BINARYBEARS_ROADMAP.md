@@ -824,9 +824,11 @@ Build and install one fresh DMG, then run the packaged retest in this order:
    do not repeat unless onboarding, helper identity, mount reconciliation, or teardown changes.
 2. **BB-03 — complete:** installed keyboard traversal and the independently read-back Launch at
    login enable/disable cycle passed on `bdfcd6…92fed`; do not repeat unless related code changes.
-3. **BB-P1-06 and save panel:** mount once with NTFS3, attempt Verified Copy with the known symlink
-   fixture, and require the specific preflight before any copy. Enter an existing destination name
-   and require ntfsmac's no-overwrite explanation without a native Replace offer or mutation.
+3. **BB-P1-06 and save panel — partially repeated:** the corrected packaged app rejected a local
+   directory containing a nested symlink with the specific NTFS3 warning before destination
+   publication, with no new partial. The existing-destination repeat still exposed AppKit's native
+   `Replace` offer. Cancel preserved the destination exactly, but BB-P1-06 remains `FAIL` until the
+   save panel prevents that misleading offer and the packaged repeat passes without mutation.
 4. **BB-P1-07 dirty policy:** use only the disposable dirty fixture. Both default `ntfs-3g` and
    explicit NTFS3 must refuse a writable mount, show concise Windows recovery guidance, publish no
    green row, and leave zero VM/PF/session residue. Repair with Windows `chkdsk`, fully shut down,
