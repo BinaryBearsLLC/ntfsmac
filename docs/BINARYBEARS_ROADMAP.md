@@ -809,6 +809,13 @@ path, static libblkid verification, hypervisor-entitlement checks, and an exact 
 package manifest. The live ledger intentionally remains 25 `PASS`, 3 `FAIL`, and 2 `BLOCKED`
 until a DMG built from these changes passes the three focused packaged repeats.
 
+The packaged candidate was built from documentation head `8ae12df` with source fixes `8408f4f`
+and `e635bb9`. Its SHA-256 is
+`6a9cb9cfb20abfd03a40e7c917e39affeba981a81dd68935ff971dd81ffbfb1d`. Strict deep bundle
+verification, `hdiutil verify`, arm64 app/helper inspection, aarch64 Linux vmproxy inspection, the
+embedded runtime-v2 contract, and the embedded NTFS3 refusal path all pass. It remains an ad-hoc
+compatibility artifact and is not ledger acceptance evidence until installed and exercised below.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears

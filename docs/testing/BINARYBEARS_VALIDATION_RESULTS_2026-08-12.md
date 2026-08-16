@@ -258,6 +258,12 @@ contract checks. These are source/build results only. The public ledger remains 
 `FAIL`, and 2 `BLOCKED` until BB-P1-06, BB-P1-07, and BB-F01 pass on the rebuilt DMG. No personal
 path, account, device serial, local screenshot path, or signing credential is retained here.
 
+The exact DMG candidate built from `8ae12df` has SHA-256
+`6a9cb9cfb20abfd03a40e7c917e39affeba981a81dd68935ff971dd81ffbfb1d`. Its strict deep ad-hoc
+signature, disk-image checksum, executable architectures, embedded runtime-v2 marker, and embedded
+NTFS3 fail-closed message were independently verified. Installation and hardware results remain
+pending.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence
