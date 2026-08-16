@@ -345,6 +345,14 @@ zero NFS mounts, zero security sessions, no backend or network-helper process, a
 `NO_ACTIVE_MOUNTS` summary with one known-clean removable NTFS fixture present. This closes the
 artifact/install baseline only; no live packaged regression is credited yet.
 
+The installed direct-CLI regression then mounted the known-clean fixture with the default
+`ntfs-3g` driver. Authoritative NFS state, schema-6 diagnostics, backend processes, and the public
+summary agreed on one mount and one enforced private session. Direct CLI Unmount authenticated
+before mutation, returned `SESSION_REMOVED`, and restored zero NFS mounts, backend processes,
+diagnostic sessions, and public sessions. The final authenticated audit found no security state
+file or PF child anchor. This closes the packaged privilege-order and standalone-reconciliation
+regression; only BB-P1-07 and BB-F01 remain as mandatory live blocker repeats.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence

@@ -936,11 +936,14 @@ baseline is verified. Run the packaged retest in this order:
    publication, with no new partial. The final candidate intercepted an existing name before
    AppKit's Replace flow: the panel stayed open with direct no-overwrite guidance, destination
    size/hash stayed unchanged, and no copy or partial started. BB-P1-06 is `PASS`.
-4. **Direct CLI teardown/reconciliation — source fixes ready:** packaged fallback cleanup exposed
+4. **Direct CLI teardown/reconciliation — complete:** packaged fallback cleanup exposed
    that direct CLI unmount did not self-elevate and standalone `pf-teardown.sh` did not resolve its
    backend status binary. The orphan was recovered with authenticated zero-state/PF/public-summary
-   evidence. Rebuild, mount through direct CLI, unmount through direct CLI, require the expected
-   authentication before mutation, and prove zero mount/backend/state/anchor/public sessions.
+   evidence. The final installed candidate then mounted a known-clean fixture through direct CLI
+   with one enforced private session. Direct CLI Unmount authenticated before mutation, returned
+   `SESSION_REMOVED`, and reached zero mount/backend/diagnostic/public sessions. The authenticated
+   final audit found no state file or PF child anchor. Do not repeat unless CLI privilege ordering,
+   teardown, or reconciliation changes.
 5. **BB-P1-07 dirty policy — source fix ready:** on the same unrepaired disposable volume,
    default `ntfs-3g` landed read-only with the corrected yellow recovery state, while explicit
    NTFS3 mounted read/write with no fallback. No payload write was issued. Treat this as a policy
