@@ -838,9 +838,10 @@ Build and install one fresh DMG, then run the packaged retest in this order:
    default `ntfs-3g`, physically removing only USB_8GB left its NFS mount, VM, security session,
    and green row alive for more than 30 seconds even though physical enumeration lost it
    immediately. Manual stale-row Unmount performed exact selective teardown and preserved
-   MobileData; final normal Unmount reached zero. The automatic physical-presence path still needs
-   correction and another packaged two-drive repeat. A controlled backend-stall cell remains
-   optional when that fixture is available.
+   MobileData; final normal Unmount reached zero, and the authenticated root check found no state
+   files or PF child anchors. The automatic physical-presence path still needs correction and
+   another packaged two-drive repeat. A controlled backend-stall cell remains optional when that
+   fixture is available.
 6. Run strict signature verification, `hdiutil verify`, Bats `297/297`, Swift `270/270`, and the
    authenticated zero-state/PF check; only then convert the three remaining ledger rows from FAIL
    to PASS.
