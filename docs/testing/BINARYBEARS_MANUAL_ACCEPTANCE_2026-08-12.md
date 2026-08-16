@@ -138,19 +138,29 @@ Pass only when the commit is the intended candidate, architecture is `arm64`,
 
 This checkpoint changes system state and starts only after the existing install has no active
 mount. Use the candidate DMG, drag the app to `/Applications`, then right-click **Open** if macOS
-requires explicit approval. Approve only the expected `com.khr898.ntfsmac.helper` authorization.
+requires explicit approval. The first-run card must explain that a privileged helper is required
+and that macOS will request an administrator password. Confirm no password prompt appears before
+the operator explicitly clicks **Install Helper…**, then approve only the expected
+`com.khr898.ntfsmac.helper` authorization.
 
 Pass when:
 
-- the first-run flow reaches the normal popover;
+- helper installation and bundled CLI staging show a bounded progress state rather than an error
+  card or a frozen interface;
+- with a supported disposable drive connected, the Full Disk Access step names the technical
+  helper service and keeps checking after System Settings opens;
+- after enabling the helper, the normal popover appears automatically and the first **Mount**
+  succeeds without a retry or app relaunch;
 - `/usr/local/ntfsmac/bin/ntfsmac help` lists `copy`, `verify`, `diagnose`, and `opengui`;
 - `sudo launchctl print system/com.khr898.ntfsmac.helper` finds exactly one service;
 - Settings and diagnostic JSON report the same release/build;
 - no global Gatekeeper/SIP change, Accessibility permission, Homebrew install, or manual `sudo`
   mount shim was required.
 
-If Full Disk Access is requested, enable exactly the helper service shown by the app, return to the
-popover, and retry. A denial or cancel must remain recoverable rather than showing a false install.
+If Full Disk Access is requested, enable exactly the helper service shown by the app and return to
+ntfsmac. The setup gate must verify permission before exposing Mount; it must not consume a failed
+first Mount as the permission probe. A denial or cancel must remain recoverable rather than showing
+a false install.
 
 ### BB-01 upgrade-cache self-heal
 

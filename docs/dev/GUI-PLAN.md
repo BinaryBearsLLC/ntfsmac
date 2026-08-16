@@ -48,7 +48,7 @@ This table describes the current integrated GUI, not the original aspirational p
 | Shipped | One-click mount/unmount and multiple concurrent drive rows |
 | Source-fixed — packaged retest pending | Dirty/hibernated NTFS fails closed with no read/write override and concise Windows recovery guidance |
 | Shipped | Diagnose summary, inline Hide, and Command-click privacy-safe JSON export |
-| Shipped | First-run helper/CLI staging, helper reinstall, and confirmed complete uninstall |
+| Shipped | Consent-first helper install, progress-backed CLI staging, pre-mount Full Disk Access verification, helper reinstall, and confirmed complete uninstall |
 | Shipped | In-popover Settings with Back, canonical version/build, Launch at login, contextual help, and adaptive menu-bar icon |
 | Shipped — matrix incomplete | Three compact SECURITY rows consume the live transaction's fixed states/reasons and provide Hide/Show. Missing, malformed, or unavailable evidence fails closed to `unknown`; the remaining packaged hardware matrix is tracked in the roadmap. |
 | Shipped | Each verified mounted-drive row exposes Open in Finder and uses that row's observed mount point |

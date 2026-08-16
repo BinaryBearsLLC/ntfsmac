@@ -396,8 +396,9 @@ above and re-run.
 
 1. Click the menu-bar icon, then close it and run `ntfsmac opengui`; both actions must reveal the
    same popover without Accessibility permission or a simulated click. If the privileged helper
-   isn't installed yet, you'll get a real
-   `SMJobBless` auth prompt (admin password) — approve it. The packaged app then stages its
+   isn't installed yet, the app must first explain why it is needed and that macOS will request
+   an administrator password. A real `SMJobBless` prompt may appear only after the explicit
+   **Install Helper…** action. The packaged app then stages its
    bundled CLI/runtime through the helper; no separate Homebrew or manual CLI install is required
    for this GUI pass.
 2. Popover should show your drive in the list (the same filtered `anylinuxfs list` data Part A's
@@ -405,9 +406,11 @@ above and re-run.
    is still `ntfs-3g`. In a separate disposable-data run, open the adjacent compact menu, select
    `NTFS3 (Experimental)…`, verify the Windows shutdown/Fast Startup/`chkdsk` preflight, and
    confirm diagnostics record `ntfs3` with no silent fallback.
-   If Full Disk Access is required, macOS lists the component as
+   Before Mount becomes available, the setup gate performs a non-mutating one-block raw-device
+   access check. If Full Disk Access is required, macOS lists the component as
    `com.khr898.ntfsmac.helper`; this is the technical service name of **ntfsmac Helper**, not an
-   unrelated package. Enable that exact entry, return to ntfsmac, and retry the mount.
+   unrelated package. Enable that exact entry and return to ntfsmac; the gate must recheck and
+   reveal the normal popover automatically, so the first Mount is not lost to authorization.
 3. Icon should pulse blue while mounting, then turn green with the drive shown as mounted, a
    per-drive Unmount action, and measured **Private VM link**, **VPN-safe route**, and **PF policy
    enforced** rows. Their state/reason codes must match CLI diagnostics; unavailable or malformed

@@ -27,6 +27,11 @@ not `USER`, causing anylinuxfs `init-rootfs` to fail before filesystem access. B
 reconciliation, BB-01 first-run initialization, and the BB-P1-06 NTFS3 symlink limitation remain
 focused correction-and-retest gates rather than hidden inside those completed lifecycle cells.
 BB-03 keyboard and login-item behavior passed its corrected packaged retest on 2026-08-16.
+The subsequent BB-01 replay confirmed clean removal, but the installed candidate exposed Mount
+before Full Disk Access was ready: enabling the permission consumed the first Mount request and
+required a manual retry. Source commit `33ce2af` replaces that behavior with a consent-first helper
+install, visible setup progress, and a non-mutating pre-mount permission gate; packaged validation
+is still required.
 
 The post-sync wiring audit and its focused recovery branches are recorded in
 [BinaryBears Upstream Regression Audit — 2026-08-05](audits/UPSTREAM_REGRESSION_AUDIT_2026-08-05.md).
@@ -712,8 +717,13 @@ of 2026-08-16.
 The subsequent BB-01 clean-install preflight also passes: the in-app uninstall removed helper,
 CLI/runtime, user runtime cache/logs, mounts, VM/network processes, session-state files, and PF
 child anchors. The app process/bundle and preferences remain intentionally user-level. BB-01 stays
-open until the first mount from the freshly replaced app succeeds with that empty cache and the
-final unmount/teardown returns to zero state.
+open: the following clean replay requested Full Disk Access only after the first Mount was clicked,
+and enabling it did not resume that operation. Commit `33ce2af` now keeps the normal popover gated,
+explains the administrator prompt before the explicit helper-install action, shows bounded helper
+and CLI preparation progress, probes one raw 512-byte block read-only, and rechecks permission after
+System Settings opens. It also versions the XPC protocol independently of the CLI payload so an
+older helper cannot be mistaken for one supporting the new preflight. Source gates pass at Bats
+`297/297` and Swift `269/269`; a new packaged first-run/mount/teardown repeat remains required.
 
 ## Approved BinaryBears production direction
 
@@ -744,16 +754,19 @@ animated with restraint, accessible, and fast.
 
 ## Exact next-agent handoff
 
-Start from `dev` at blocker commits `3c4f23a` and `864abd8` plus the following documentation
-commits. Do not push unless explicitly authorized. Expected source gates are Bats `297/297` and
-Swift `260/260`.
+Start from `dev` at blocker commits `3c4f23a`, `864abd8`, and first-run correction `33ce2af` plus
+the following documentation commits. Do not push unless explicitly authorized. Expected source
+gates are Bats `297/297` and Swift `269/269`.
 Preserve the minimal popover and do not mix identity/signing migration into the blocker retest.
 
 Build and install one fresh DMG, then run the packaged retest in this order:
 
-1. **BB-01 — clean preflight passed:** quit the retained app, replace it from `bdfcd6…92fed`,
-   approve the helper and Full Disk Access once, mount the first NTFS device without relaunching,
-   unmount, then prove zero security state/PF child anchors.
+1. **BB-01 — clean preflight passed, new package required:** build and record a DMG containing
+   `33ce2af`, quit the retained app, and replace it. Require the helper explanation before any
+   password prompt, click **Install Helper…** once, observe progress, enable exactly the named
+   Full Disk Access helper, and require the normal popover to unlock automatically. The first
+   NTFS **Mount** must then succeed without a retry or relaunch; unmount and prove zero security
+   state/PF child anchors.
 2. **BB-03 — complete:** installed keyboard traversal and the independently read-back Launch at
    login enable/disable cycle passed on `bdfcd6…92fed`; do not repeat unless related code changes.
 3. **BB-P1-06 and save panel:** mount once with NTFS3, attempt Verified Copy with the known symlink
