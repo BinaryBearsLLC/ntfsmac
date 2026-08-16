@@ -85,6 +85,14 @@ This is the live ledger for the assisted acceptance run defined in
 - The immediate operator-authenticated teardown returned `BB-01-RO-ROOT: PASS`: no security state
   files or PF child anchors remained. BB-01 now lacks only the known-clean read/write round trip and
   its final canonical teardown.
+- The second physical NTFS fixture then mounted through the installed corrected app with paired
+  host NFS and guest NTFS evidence, no guest `ro`, a green read/write GUI row, and one enforced
+  private session. A new 4194304-byte payload was flushed and reread; source and destination
+  matched byte-for-byte and shared SHA-256
+  `1fcf0ede8d2a38580f47eb7651f2dc72429a684e873d301df2b632fdf254395c`. The scoped payload was
+  removed. GUI Unmount left no host/guest mount or scoped artifact; diagnostics were healthy with
+  bridge down and zero sessions. Only the final operator-authenticated state/PF check remains for
+  BB-01.
 - Host: Apple Silicon with Hypervisor support, macOS 26.6.1.
 - Local evidence folder: `ntfsmac-acceptance-20260812-190259` on the operator's Desktop. It is
   intentionally not committed because it contains local volume/device identifiers.

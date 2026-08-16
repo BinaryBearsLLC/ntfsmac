@@ -759,6 +759,14 @@ known-clean read/write round trip and the authenticated no-state/no-PF-anchor te
 The operator-authenticated follow-up then confirmed no security state file or PF child anchor, so
 only the known-clean read/write round trip and its final teardown remain for BB-01.
 
+That known-clean repeat now also passes on the installed corrected candidate. The second physical
+NTFS fixture mounted through `diskNsM.local:/mnt/...`; paired guest status omitted `ro`, the GUI
+showed green `Mounted read/write`, and security reported one enforced private session. A fresh
+4 MiB payload was flushed, reread byte-for-byte, and matched SHA-256 before its scoped cleanup.
+GUI Unmount returned host/guest mounts to zero, lowered the bridge, and left no scoped payload.
+Only the final operator-authenticated no-state/no-PF-anchor check remains before BB-01 becomes
+`PASS`.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
@@ -799,9 +807,9 @@ Build and install one fresh DMG, then run the packaged retest in this order:
 1. **BB-01 — onboarding and packaged read-only truth passed:** corrected DMG `e9a549…fbdc5`
    containing `06dcd03` correctly presented the rw-NFS/ro-guest fixture as yellow/read-only.
    The consent/progress/Full Disk Access gate and first-click session startup already passed on
-   `f02a2c…c5e2`. Next use a known-clean NTFS fixture and require the first Mount to land
-   read/write, complete a write/reread check, unmount, and prove zero security state/PF child
-   anchors.
+   `f02a2c…c5e2`. The known-clean fixture also landed read/write and passed its 4 MiB byte/hash
+   round trip plus non-root teardown. Run only the final authenticated zero-state/PF check, then
+   mark BB-01 `PASS`.
 2. **BB-03 — complete:** installed keyboard traversal and the independently read-back Launch at
    login enable/disable cycle passed on `bdfcd6…92fed`; do not repeat unless related code changes.
 3. **BB-P1-06 and save panel:** mount once with NTFS3, attempt Verified Copy with the known symlink
