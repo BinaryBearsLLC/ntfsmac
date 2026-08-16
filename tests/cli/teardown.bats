@@ -78,6 +78,24 @@ STATE
   [ -f "$NTFSMAC_SECURITY_STATE_DIR/disk3s1.state" ]
 }
 
+@test "standalone reconciliation resolves anylinuxfs before deciding a session is stale" {
+  write_state disk2s1 172.27.1.2 A1B2 1
+  cat > "$STUB_DIR/anylinuxfs" <<STUB
+#!/bin/bash
+echo "\$@" >> "$STUB_DIR/anylinuxfs.calls"
+exit 0
+STUB
+  chmod +x "$STUB_DIR/anylinuxfs"
+
+  PATH="$STUB_DIR:$PATH" run "$SCRIPT"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"STALE_SESSIONS_REMOVED"* ]]
+  [ ! -f "$NTFSMAC_SECURITY_STATE_DIR/disk2s1.state" ]
+  run cat "$STUB_DIR/anylinuxfs.calls"
+  [ "$output" = "status" ]
+}
+
 @test "--all removes every recorded session without a global PF flush" {
   write_state disk2s1 172.27.1.2 A1B2 1
   write_state disk3s1 172.27.1.6 C3D4 0

@@ -852,6 +852,14 @@ Focused Bats passes `16/16`. The first full run is intentionally not green (`299
 diagnostic tests observed the live residual session; restart recovery plus a clean `301/301` rerun
 are the next gates. Do not mount another fixture before recovery.
 
+The first installed recovery attempt correctly failed closed as `STATUS_UNAVAILABLE` and retained
+the orphan. `pf-teardown.sh` did not resolve `anylinuxfs` before sourcing the transaction library,
+so standalone reconciliation could never acquire backend status without injected context. The
+source fix now resolves the installed binary and has a focused passing regression. Because the
+currently installed artifact predates that fix, perform one explicit trusted-binary recovery,
+prove zero state/anchors/public sessions, then rerun all 302 Bats tests after the new regression is
+included. Rebuild/reinstall only after those source gates pass.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears

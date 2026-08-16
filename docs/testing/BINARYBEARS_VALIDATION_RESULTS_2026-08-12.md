@@ -308,6 +308,15 @@ The full Bats run reached `299/301`; its only two failures were diagnostic expec
 correctly observed this still-live residual session. Recovery and a clean `301/301` rerun remain
 required before committing acceptance status.
 
+Restarting the helper did not alter the orphan, and the installed standalone reconciliation then
+returned `STATUS_UNAVAILABLE`, preserving the state as designed. A second source defect was found:
+`pf-teardown.sh` sourced the transaction library without first resolving the installed
+`anylinuxfs` status binary. Its no-argument recovery therefore had no authoritative status source.
+The entrypoint now resolves and exports the same vendored binary contract used by mount/unmount.
+The new standalone-reconciliation regression passes, as do all `16/16` unmount tests when run in
+their isolated file. The installed artifact still needs one explicit-path recovery because it
+predates this second fix; no new mount is permitted before that audit passes.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence

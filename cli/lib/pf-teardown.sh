@@ -7,6 +7,13 @@
 set -u
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+# Standalone reconciliation must resolve the same installed backend status source used by mount
+# and unmount. Without this, SECURITY_ANYLINUXFS_BIN is empty and the no-argument recovery path
+# can only return STATUS_UNAVAILABLE, even when the installed binary is healthy.
+# shellcheck source=resolve-vendor-bin.sh
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/resolve-vendor-bin.sh"
+export ANYLINUXFS_BIN="${NTFSMAC_ANYLINUXFS_BIN:-$(resolve_vendor_bin anylinuxfs || true)}"
 # shellcheck source=security-transaction.sh
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/security-transaction.sh"

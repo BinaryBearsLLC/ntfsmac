@@ -201,6 +201,12 @@ NFS first and then mistake the unreadable record for `NO_SESSION_STATE`, leaving
 The GUI path is unchanged because its privileged helper already enters the same script as root.
 Regression test: `tests/cli/unmount.bats` — "self-elevates before direct CLI unmount".
 
+Fixed: the standalone no-argument `pf-teardown.sh` recovery now resolves the installed
+`anylinuxfs` binary before asking for authoritative backend status. Previously it always returned
+`STATUS_UNAVAILABLE` unless a caller happened to inject the path, safely retaining stale state but
+making installed reconciliation ineffective. Regression test: `tests/cli/teardown.bats` —
+"standalone reconciliation resolves anylinuxfs".
+
 Expected: mount succeeds read-write (unless the drive genuinely has a dirty NTFS journal, in
 which case it must fail closed with Windows recovery guidance — see "force a dirty-journal test" below if you want to
 verify that path specifically), the write/read/remove round-trips, `diagnose --json` reports
