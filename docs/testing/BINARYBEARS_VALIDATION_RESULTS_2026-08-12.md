@@ -280,6 +280,11 @@ and no scoped artifact. This passes the candidate's fresh runtime-v2 initializat
 `ntfs-3g` round-trip sub-gate. The authenticated state/PF teardown remains pending, and the three
 focused blocker rows are not converted by this sub-gate.
 
+The operator-authenticated teardown then returned `BB-FINAL-V2-ROOT: PASS`: no security state
+files or PF child anchors remained. The candidate's fresh runtime-v2 initialization, known-clean
+read/write round trip, normal GUI unmount, and privileged teardown cell is complete. It does not
+replace the still-required existing-destination, unsafe-state refusal, or hot-unplug repeats.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence

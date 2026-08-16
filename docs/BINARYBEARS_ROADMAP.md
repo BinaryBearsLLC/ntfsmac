@@ -831,6 +831,11 @@ Unmount then reached zero mounts/sessions, bridge down, no backend/network-helpe
 scoped artifact. This closes the fresh runtime-v2 and clean compatibility-driver sub-gate; the
 authenticated state/PF teardown and the three focused blocker repeats remain open.
 
+The authenticated follow-up also passed with no security state file or PF child anchor. This
+completes the candidate's runtime-v2/clean-mount cell. Continue with BB-P1-06 existing-destination
+presentation, BB-P1-07 unsafe-state refusal, and BB-F01 two-drive hot unplug; do not credit the
+clean-mount result for those distinct behaviors.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
