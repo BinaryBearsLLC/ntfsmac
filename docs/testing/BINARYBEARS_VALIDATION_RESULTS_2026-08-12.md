@@ -236,6 +236,28 @@ the final normal unmount reached zero ntfsmac mounts/sessions with the bridge do
 therefore did not satisfy the automatic fail-closed requirement and BB-F01 remains `FAIL`. The
 operator-authenticated final check also confirmed no security state files or PF child anchors.
 
+### Remaining-blocker source candidate — 2026-08-16
+
+The final BB-F01 authenticated result is `PASS — no security state files or PF child anchors`.
+This closes the manual recovery teardown only; it does not convert BB-F01 because automatic
+hot-unplug handling failed before that recovery.
+
+Commits `8408f4f` and `e635bb9` provide three focused source corrections for a new packaged repeat:
+
+1. physically absent devices are excluded from NFS liveness `stat` probes so already-authoritative
+   removal evidence can reach exact selective teardown without waiting on a stale kernel path;
+2. the native save panel cancels a confirmed existing filename before AppKit can display Replace,
+   keeps the panel onscreen, and preserves later no-overwrite validation layers;
+3. opt-in read/write NTFS3 runs the non-mutating `ntfs-3g.probe --readwrite` inside the guest and
+   fails closed on every nonzero result. The Alpine package contract is revision 2 and requires the
+   probe binary, so an older cache cannot silently bypass the check.
+
+The complete automated gates pass Bats `300/300` and Swift `271/271`; the real vendored rebuild
+also passes its Rust tests, architecture, entitlement, static-link, rootfs-manifest, and runtime-
+contract checks. These are source/build results only. The public ledger remains 25 `PASS`, 3
+`FAIL`, and 2 `BLOCKED` until BB-P1-06, BB-P1-07, and BB-F01 pass on the rebuilt DMG. No personal
+path, account, device serial, local screenshot path, or signing credential is retained here.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence

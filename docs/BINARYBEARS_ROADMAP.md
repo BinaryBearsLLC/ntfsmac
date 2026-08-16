@@ -33,6 +33,11 @@ before Full Disk Access was ready: enabling the permission consumed the first Mo
 required a manual retry. Source commit `33ce2af` replaces that behavior with a consent-first helper
 install, visible setup progress, and a non-mutating pre-mount permission gate; packaged validation
 passed on the corrected candidate.
+Focused source corrections for the three remaining failures are now implemented: the save panel
+intercepts an existing name before AppKit can offer Replace; opt-in read/write NTFS3 uses a
+non-mutating mountability probe from a versioned Alpine v2 runtime; and hot-unplug reconciliation
+never probes a stale NFS path after physical absence is already authoritative. These changes pass
+the complete source gates but remain packaged-retest candidates, not live acceptance evidence.
 
 The post-sync wiring audit and its focused recovery branches are recorded in
 [BinaryBears Upstream Regression Audit — 2026-08-05](audits/UPSTREAM_REGRESSION_AUDIT_2026-08-05.md).
@@ -770,6 +775,40 @@ BB-01 could become `PASS`.
 That final check returned `BB-01-RW-ROOT: PASS` with no security state file or PF child anchor.
 BB-01 is therefore fully `PASS` on the installed corrected candidate.
 
+## 2026-08-16 remaining-blocker source correction
+
+Commits `8408f4f` and `e635bb9` trace the repeated packaged failures to three independent
+mechanisms and correct them without changing the minimal popover, helper identity, signing model,
+or P2 scope:
+
+- **BB-F01:** physical enumeration completed, but the snapshot then ran `stat` against the stale
+  NFS mount. A removed soft-NFS endpoint can keep that syscall blocked in the kernel even after the
+  child process is signalled, so reconciliation never received its already-known
+  `PHYSICAL_DEVICE_MISSING` result. Liveness probes now exclude physically absent devices while
+  still checking every surviving mount. Exact per-device helper teardown remains the controller's
+  response; no global unmount or PF flush was added.
+- **BB-P1-06:** `panel(_:validate:)` occurs too late to prevent AppKit's native Replace sheet in
+  this flow. The save-panel delegate now rejects a confirmed existing filename in
+  `panel(_:userEnteredFilename:confirmed:)`, leaves the panel open with fixed no-overwrite copy,
+  and retains both later validation layers for race-resistant defense in depth.
+- **BB-P1-07:** NTFS3 did not share the compatibility driver's `norecover` policy and accepted a
+  read/write mount that ntfs-3g classified as unsafe/read-only. Before an opt-in read/write NTFS3
+  mount, guest vmproxy now runs `ntfs-3g.probe --readwrite`; any nonzero result fails closed with
+  concise Windows full-shutdown/Fast Startup/`chkdsk` guidance. Explicit read-only NTFS3 and other
+  filesystems are unchanged. Alpine's `ntfs-3g-progs` package is retained solely to provide that
+  non-mutating probe; ntfsmac never invokes its repair tools.
+
+Because the guest package contract changed, the application-owned Alpine cache is now revision 2
+(`...-r2`, marker `ntfsmac-alpine-v2`). A v1 cache remains untouched beside it for rollback and
+cannot be mistaken for a runtime containing the probe. Completion checks require the real
+`/usr/bin/ntfs-3g.probe` binary before a v2 cache is reusable.
+
+Automated evidence is Bats `300/300`, Swift `271/271`, a real host/guest rebuild, Rust probe-
+selection coverage, an arm64 host `anylinuxfs`, an aarch64 Linux `vmproxy` containing the refusal
+path, static libblkid verification, hypervisor-entitlement checks, and an exact generated rootfs
+package manifest. The live ledger intentionally remains 25 `PASS`, 3 `FAIL`, and 2 `BLOCKED`
+until a DMG built from these changes passes the three focused packaged repeats.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
@@ -808,10 +847,9 @@ animated with restraint, accessible, and fast.
 
 ## Exact next-agent handoff
 
-Start from `dev` at blocker commits `3c4f23a`, `864abd8`, first-run correction `33ce2af`, and
-guest/host mount-mode reconciliation `06dcd03` plus
-the following documentation commits. Do not push unless explicitly authorized. Expected source
-gates are Bats `297/297` and Swift `270/270`.
+Start from `dev` with the earlier blocker commits plus `8408f4f` (hot-unplug/save panel),
+`e635bb9` (NTFS3/runtime v2), and their following documentation commit. Do not push unless
+explicitly authorized. Expected source gates are Bats `300/300` and Swift `271/271`.
 Preserve the minimal popover and do not mix identity/signing migration into the blocker retest.
 
 Build and install one fresh DMG, then run the packaged retest in this order:
@@ -824,25 +862,27 @@ Build and install one fresh DMG, then run the packaged retest in this order:
    do not repeat unless onboarding, helper identity, mount reconciliation, or teardown changes.
 2. **BB-03 — complete:** installed keyboard traversal and the independently read-back Launch at
    login enable/disable cycle passed on `bdfcd6…92fed`; do not repeat unless related code changes.
-3. **BB-P1-06 and save panel — partially repeated:** the corrected packaged app rejected a local
+3. **BB-P1-06 and save panel — source fix ready:** the previous packaged app rejected a local
    directory containing a nested symlink with the specific NTFS3 warning before destination
    publication, with no new partial. The existing-destination repeat still exposed AppKit's native
-   `Replace` offer. Cancel preserved the destination exactly, but BB-P1-06 remains `FAIL` until the
-   save panel prevents that misleading offer and the packaged repeat passes without mutation.
-4. **BB-P1-07 dirty policy — disagreement reproduced:** on the same unrepaired disposable volume,
+   `Replace` offer. The new delegate hook prevents that offer in automated coverage. Repeat with an
+   existing destination: the panel must remain open, show the fixed no-overwrite message, start no
+   copy, create no partial, and preserve the existing destination byte-for-byte.
+4. **BB-P1-07 dirty policy — source fix ready:** on the same unrepaired disposable volume,
    default `ntfs-3g` landed read-only with the corrected yellow recovery state, while explicit
    NTFS3 mounted read/write with no fallback. No payload write was issued. Treat this as a policy
-   failure, not as NTFS3 recovery evidence. A deterministic cross-driver refusal plus the Windows
-   `chkdsk`/full-shutdown and clean mount/hash/unmount/reread repeat remain required.
-5. **BB-F01/backend timeout — packaged repeat failed:** with USB_8GB on NTFS3 and MobileData on
+   failure, not as NTFS3 recovery evidence. The new runtime v2 probe must refuse explicit read/write
+   NTFS3 before a host NFS mount/session is published and show concise recovery guidance. Then
+   repair/clean on Windows and repeat mount/hash/unmount/Windows reread.
+5. **BB-F01 hot unplug — source fix ready:** with USB_8GB on NTFS3 and MobileData on
    default `ntfs-3g`, physically removing only USB_8GB left its NFS mount, VM, security session,
    and green row alive for more than 30 seconds even though physical enumeration lost it
    immediately. Manual stale-row Unmount performed exact selective teardown and preserved
    MobileData; final normal Unmount reached zero, and the authenticated root check found no state
-   files or PF child anchors. The automatic physical-presence path still needs correction and
-   another packaged two-drive repeat. A controlled backend-stall cell remains optional when that
-   fixture is available.
-6. Run strict signature verification, `hdiutil verify`, Bats `297/297`, Swift `270/270`, and the
+   files or PF child anchors. Repeat the two-drive no-I/O removal: the removed row must leave green
+   promptly and its exact mount/VM/security state must disappear automatically while the survivor
+   remains mounted and enforced. A controlled backend-stall cell remains optional when available.
+6. Run strict signature verification, `hdiutil verify`, Bats `300/300`, Swift `271/271`, and the
    authenticated zero-state/PF check; only then convert the three remaining ledger rows from FAIL
    to PASS.
 7. **Resource-gated qualification:** run the controlled TV comparison and extended GPT/low-space/

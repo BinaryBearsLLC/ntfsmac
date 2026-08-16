@@ -250,8 +250,8 @@ developed from `dev` and reviewed back into `dev` through its own focused branch
 | Priority | Status | Direction |
 | --- | --- | --- |
 | Completed foundation | ✅ Shipped | Multi-drive NTFS/ext support, MBR detection, in-popover Settings, adaptive icon and help, privacy-safe CLI/GUI diagnostics, version reporting, and helper reinstall/uninstall lifecycle |
-| P0 | 🟡 Source fixes complete; packaged retest pending | Runtime pinning, audited updates, per-session PF/VPN security, complete helper user identity, and host-NFS/guest-filesystem mount reconciliation are implemented; the corrected empty-cache, read-only-truth, and hot-unplug package still needs hardware confirmation |
-| P1 | 🟡 Source fixes complete; packaged retest pending | Verified Copy, NTFS3 preflight, fail-closed dirty-volume handling, and no-overwrite panel validation are implemented; the corrected DMG still needs the focused same-device/Windows repeat |
+| P0 | 🟡 Source fixes complete; packaged retest pending | Runtime pinning, audited updates, per-session PF/VPN security, complete helper user identity, host/guest mount truth, and physically-aware hot-unplug teardown are implemented; the corrected hot-unplug package still needs hardware confirmation |
+| P1 | 🟡 Source fixes complete; packaged retest pending | Verified Copy, pre-Replace no-overwrite validation, NTFS3 symlink preflight, and a shared fail-closed read/write eligibility probe are implemented; the corrected DMG still needs the focused same-device/Windows repeat |
 | P2 | ⬜ Same-product modern variant planned | A future modern helper lifecycle will ship as a second compatibility artifact of the same BinaryBears product, built and released beside the current variant from one repository and shared roadmap |
 | P3 | ✅ Packaged validation complete | Open in Finder, notifications, resilient Eject All, the professional DMG, full keyboard traversal, and Launch at login enable/disable pass on the installed package |
 

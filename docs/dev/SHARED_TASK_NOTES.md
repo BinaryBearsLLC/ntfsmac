@@ -787,6 +787,10 @@ still-open VM-boot gate and an end-to-end "connect a real NTFS drive" walkthroug
   to the trimmed list. Wiring a passphrase param through the XPC mount surface is now an open
   item for Phase 2 (`2-mount`) / Phase 3 — PLAN.md's `mount(device, driver, tuning)` signature
   doesn't have one yet; flag when those units are reached.
+  **Revised 2026-08-16 after packaged BB-P1-07:** retain `ntfs-3g-progs` as the tenth package
+  because it supplies the non-mutating `ntfs-3g.probe --readwrite` check now required before an
+  opt-in NTFS3 read/write mount. The runtime cache contract is v2 so prior caches lacking the probe
+  stay separate. ntfsmac does not call the package's repair utilities.
 - `v-audit` also found: `anylinuxfs/Cargo.toml` pins `libkrun` as a normal crates.io version
   (`1.19.3`), not a git dependency — `CLAUDE.md`'s "Cargo.lock exact commit" note assumed a git
   source. Cargo.lock is still the source of truth either way; just flagging the mechanism
