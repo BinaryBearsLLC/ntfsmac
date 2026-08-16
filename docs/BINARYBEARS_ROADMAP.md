@@ -23,15 +23,16 @@ current Apple Silicon host; broader host/device coverage remains recorded separa
 The final BB-F02 safe-eject/uninstall cell passed on 2026-08-14, including the authenticated
 no-state/no-PF-anchor teardown proof. The initially accepted BB-01 install cell was reopened after
 the later empty-cache first mount proved that the launchd helper supplies `HOME` and invoker IDs but
-not `USER`, causing anylinuxfs `init-rootfs` to fail before filesystem access. BB-F01 hot-unplug
-reconciliation, BB-01 first-run initialization, and the BB-P1-06 NTFS3 symlink limitation remain
-focused correction-and-retest gates rather than hidden inside those completed lifecycle cells.
+not `USER`, causing anylinuxfs `init-rootfs` to fail before filesystem access. BB-01 now passes its
+corrected packaged onboarding, read-only truth, clean read/write round trip, and authenticated
+teardown. BB-F01 hot-unplug reconciliation plus the BB-P1-06/BB-P1-07 driver-policy repeats remain
+focused correction-and-retest gates rather than hidden inside completed lifecycle cells.
 BB-03 keyboard and login-item behavior passed its corrected packaged retest on 2026-08-16.
 The subsequent BB-01 replay confirmed clean removal, but the installed candidate exposed Mount
 before Full Disk Access was ready: enabling the permission consumed the first Mount request and
 required a manual retry. Source commit `33ce2af` replaces that behavior with a consent-first helper
 install, visible setup progress, and a non-mutating pre-mount permission gate; packaged validation
-is still required.
+passed on the corrected candidate.
 
 The post-sync wiring audit and its focused recovery branches are recorded in
 [BinaryBears Upstream Regression Audit — 2026-08-05](audits/UPSTREAM_REGRESSION_AUDIT_2026-08-05.md).
@@ -764,8 +765,10 @@ NTFS fixture mounted through `diskNsM.local:/mnt/...`; paired guest status omitt
 showed green `Mounted read/write`, and security reported one enforced private session. A fresh
 4 MiB payload was flushed, reread byte-for-byte, and matched SHA-256 before its scoped cleanup.
 GUI Unmount returned host/guest mounts to zero, lowered the bridge, and left no scoped payload.
-Only the final operator-authenticated no-state/no-PF-anchor check remains before BB-01 becomes
-`PASS`.
+At that point only the final operator-authenticated no-state/no-PF-anchor check remained before
+BB-01 could become `PASS`.
+That final check returned `BB-01-RW-ROOT: PASS` with no security state file or PF child anchor.
+BB-01 is therefore fully `PASS` on the installed corrected candidate.
 
 ## Approved BinaryBears production direction
 
@@ -784,6 +787,15 @@ Production releases will later use a BinaryBears Developer ID and Apple notariza
 identifier/helper-label migration, signing identity, entitlements, update/uninstall behavior, and
 old-install cleanup require a dedicated rebranding migration. Apple credentials and notarization
 secrets belong only in local Keychain/GitHub encrypted secrets, never in Git.
+
+The production identity gate includes the Full Disk Access presentation observed on 2026-08-16.
+The compatibility helper is a standalone SMJobBless `TOOL`; even though its embedded plist already
+declares `CFBundleDisplayName=ntfsmac Helper`, System Settings shows the raw
+`com.khr898.ntfsmac.helper` label and a generic tool icon because there is no resource bundle from
+which to resolve an icon. The compatibility rebrand must at minimum remove every `khr898` identity
+and use the BinaryBears reverse-DNS label. A friendly helper name and branded icon in System
+Settings are explicit P2/SMAppService acceptance targets and must be proved on installed macOS,
+not inferred from plist keys that the OS may ignore.
 
 P2 is no longer an unrelated app. It is the modern compatibility variant of the same BinaryBears
 product: one name, one public repository, one roadmap, and one release pipeline should produce both
@@ -804,12 +816,12 @@ Preserve the minimal popover and do not mix identity/signing migration into the 
 
 Build and install one fresh DMG, then run the packaged retest in this order:
 
-1. **BB-01 — onboarding and packaged read-only truth passed:** corrected DMG `e9a549…fbdc5`
+1. **BB-01 — complete:** corrected DMG `e9a549…fbdc5`
    containing `06dcd03` correctly presented the rw-NFS/ro-guest fixture as yellow/read-only.
    The consent/progress/Full Disk Access gate and first-click session startup already passed on
    `f02a2c…c5e2`. The known-clean fixture also landed read/write and passed its 4 MiB byte/hash
-   round trip plus non-root teardown. Run only the final authenticated zero-state/PF check, then
-   mark BB-01 `PASS`.
+   round trip plus non-root teardown. The final authenticated zero-state/PF check also passed;
+   do not repeat unless onboarding, helper identity, mount reconciliation, or teardown changes.
 2. **BB-03 — complete:** installed keyboard traversal and the independently read-back Launch at
    login enable/disable cycle passed on `bdfcd6…92fed`; do not repeat unless related code changes.
 3. **BB-P1-06 and save panel:** mount once with NTFS3, attempt Verified Copy with the known symlink
@@ -825,7 +837,8 @@ Build and install one fresh DMG, then run the packaged retest in this order:
    available, verify the same bounded unknown-to-cleanup transition without waiting for a
    240-second CLI watchdog.
 6. Run strict signature verification, `hdiutil verify`, Bats `297/297`, Swift `270/270`, and the
-   authenticated zero-state/PF check; only then convert the five ledger rows from FAIL to PASS.
+   authenticated zero-state/PF check; only then convert the three remaining ledger rows from FAIL
+   to PASS.
 7. **Resource-gated qualification:** run the controlled TV comparison and extended GPT/low-space/
    controller/OS/system-volume matrix only when those external resources are actually available.
 
