@@ -164,6 +164,26 @@ private func waitForPhase(
     #expect(throws: Never.self) {
         try delegate.validateFreshDestination(fixture.mountPoint.appendingPathComponent("new.bin"))
     }
+
+
+    let panel = NSSavePanel()
+    panel.directoryURL = fixture.mountPoint
+    #expect(delegate.panel(
+        panel,
+        userEnteredFilename: existing.lastPathComponent,
+        confirmed: true
+    ) == nil)
+    #expect(panel.message == VerifiedCopySavePanelDelegate.existingDestinationMessage)
+    #expect(delegate.panel(
+        panel,
+        userEnteredFilename: "new.bin",
+        confirmed: true
+    ) == "new.bin")
+    #expect(delegate.panel(
+        panel,
+        userEnteredFilename: existing.lastPathComponent,
+        confirmed: false
+    ) == existing.lastPathComponent)
 }
 
 @Test func validatorRejectsBrokenDestinationSymlinksAndParentSymlinkEscapes() throws {

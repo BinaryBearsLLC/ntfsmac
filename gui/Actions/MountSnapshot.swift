@@ -282,8 +282,17 @@ public struct RealMountSnapshotProvider: MountSnapshotProviding {
         let physicallyPresent = physicalResult.flatMap { result in
             result.exitCode == 0 ? ExternalPhysicalDeviceParser.parse(result.output) : nil
         }
+        // Physical absence is already authoritative failure evidence. Never `stat` an NFS mount
+        // whose backing USB partition has disappeared: that syscall can remain blocked in the
+        // kernel even after its child process receives TERM/KILL, preventing this snapshot from
+        // returning and therefore preventing the exact helper teardown. Keep probing surviving
+        // devices so an unrelated live mount still gets its normal backend-health check.
+        let livenessCandidates = Self.livenessProbeCandidates(
+            observed,
+            physicallyPresentDeviceIDs: physicallyPresent
+        )
         let unresponsive = runner == nil
-            ? await Self.unresponsiveMounts(observed, statPath: statPath, timeout: probeTimeout)
+            ? await Self.unresponsiveMounts(livenessCandidates, statPath: statPath, timeout: probeTimeout)
             : []
         let sourcesSucceeded = statusResult.exitCode == 0 && mountResult.exitCode == 0
         let everyStatusMountWasPaired = statusMounts.allSatisfy { statusMount in
@@ -334,6 +343,14 @@ public struct RealMountSnapshotProvider: MountSnapshotProviding {
         await Task.detached(priority: .userInitiated) {
             RealCommandRunner().run(executablePath, arguments, timeout: timeout)
         }.value
+    }
+
+    nonisolated static func livenessProbeCandidates(
+        _ mounts: [ObservedMount],
+        physicallyPresentDeviceIDs: Set<String>?
+    ) -> [ObservedMount] {
+        guard let physicallyPresentDeviceIDs else { return mounts }
+        return mounts.filter { physicallyPresentDeviceIDs.contains($0.deviceIdentifier) }
     }
 
     private nonisolated static func unresponsiveMounts(

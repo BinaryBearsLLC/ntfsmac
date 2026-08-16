@@ -237,6 +237,9 @@ public enum VerifiedCopySelectionValidator {
 /// overflow menu. There is no permanent page or global copy control in the popover.
 @MainActor
 final class VerifiedCopySavePanelDelegate: NSObject, NSOpenSavePanelDelegate {
+    static let existingDestinationMessage =
+        "That destination already exists. Choose a new name; Verified Copy never overwrites."
+
     func validateFreshDestination(_ url: URL) throws {
         var information = stat()
         if Darwin.lstat(url.path, &information) == 0 {
@@ -246,6 +249,31 @@ final class VerifiedCopySavePanelDelegate: NSObject, NSOpenSavePanelDelegate {
 
     func panel(_ sender: Any, validate url: URL) throws {
         try validateFreshDestination(url)
+    }
+
+    func panel(
+        _ sender: Any,
+        userEnteredFilename filename: String,
+        confirmed okFlag: Bool
+    ) -> String? {
+        // AppKit may call this repeatedly while the user types. Validate only an actual Save
+        // confirmation, exactly as the delegate contract recommends.
+        guard okFlag, let savePanel = sender as? NSSavePanel,
+              let directoryURL = savePanel.directoryURL
+        else { return filename }
+
+        let prospectiveDestination = directoryURL.appendingPathComponent(filename)
+        var information = stat()
+        guard Darwin.lstat(prospectiveDestination.path, &information) == 0 else {
+            return filename
+        }
+
+        // Returning nil here leaves the save panel open and cancels this Save attempt before
+        // AppKit displays its generic destructive Replace confirmation. The later validate and
+        // selection checks remain as race-resistant defense in depth.
+        savePanel.message = Self.existingDestinationMessage
+        NSSound.beep()
+        return nil
     }
 }
 

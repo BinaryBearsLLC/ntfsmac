@@ -123,6 +123,28 @@ private struct SnapshotCommandRunner: PrivilegedCommandRunning {
     #expect(ExternalPhysicalDeviceParser.parse(output) == Set(["disk4s1", "disk7s2"]))
 }
 
+@Test func livenessProbeSkipsPhysicallyRemovedMountButKeepsSurvivor() {
+    let removed = ObservedMount(
+        deviceIdentifier: "disk6s1",
+        mountPoint: "/Volumes/Removed"
+    )
+    let survivor = ObservedMount(
+        deviceIdentifier: "disk7s2",
+        mountPoint: "/Volumes/Survivor"
+    )
+
+    let candidates = RealMountSnapshotProvider.livenessProbeCandidates(
+        [removed, survivor],
+        physicallyPresentDeviceIDs: Set([survivor.deviceIdentifier])
+    )
+
+    #expect(candidates == [survivor])
+    #expect(RealMountSnapshotProvider.livenessProbeCandidates(
+        [removed, survivor],
+        physicallyPresentDeviceIDs: nil
+    ) == [removed, survivor])
+}
+
 @MainActor
 @Test func tableOnlyNtfsmacMountIsInconsistentRatherThanAuthoritativeGreen() async {
     let runner = SnapshotCommandRunner(
