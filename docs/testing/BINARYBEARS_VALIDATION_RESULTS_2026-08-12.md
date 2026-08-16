@@ -261,8 +261,13 @@ path, account, device serial, local screenshot path, or signing credential is re
 The exact DMG candidate built from `8ae12df` has SHA-256
 `6a9cb9cfb20abfd03a40e7c917e39affeba981a81dd68935ff971dd81ffbfb1d`. Its strict deep ad-hoc
 signature, disk-image checksum, executable architectures, embedded runtime-v2 marker, and embedded
-NTFS3 fail-closed message were independently verified. Installation and hardware results remain
-pending.
+NTFS3 fail-closed message were independently verified. The candidate was then installed and
+launched on 2026-08-16. The installed GUI executable matched the DMG staging executable byte for
+byte. Before the first mount, the helper was running, authoritative host and diagnostic state both
+reported zero mounts and zero security sessions, no backend or network-helper process was active,
+and the application-owned revision-2 Alpine runtime correctly reported `not_initialized` rather
+than reusing an older cache. One known-clean removable NTFS fixture was present. This is a clean
+installed baseline, not yet a hardware-mount acceptance result.
 
 ## Findings corrected in the working tree
 

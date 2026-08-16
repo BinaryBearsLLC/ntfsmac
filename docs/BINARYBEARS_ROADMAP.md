@@ -816,6 +816,13 @@ verification, `hdiutil verify`, arm64 app/helper inspection, aarch64 Linux vmpro
 embedded runtime-v2 contract, and the embedded NTFS3 refusal path all pass. It remains an ad-hoc
 compatibility artifact and is not ledger acceptance evidence until installed and exercised below.
 
+The candidate was installed and launched on 2026-08-16. Its installed GUI executable exactly
+matched the staged artifact. The pre-mount baseline was clean: helper running, zero host mounts,
+zero security sessions, no backend/network-helper process, and revision-2 Alpine state
+`not_initialized`. A known-clean removable NTFS fixture was available for the first initialization.
+The next gate is one GUI Mount request followed by authoritative host/diagnostic convergence; the
+baseline alone does not convert any live ledger row.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
