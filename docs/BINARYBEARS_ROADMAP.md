@@ -844,6 +844,14 @@ diagnostic summary remained at one security session even though that cleanup rep
 `NO_SESSION_STATE`. Keep BB-P1-06 unconverted until an authenticated state/PF audit classifies this
 as stale presentation or real residue; if residue exists, recover it before any next mount.
 
+The authenticated audit found one real root-owned `diskNsM.state` file and no PF child anchor.
+Direct CLI unmount lacked mount's root self-elevation, so it removed the NFS/backend and then
+mistook the inaccessible `0700` state directory for `NO_SESSION_STATE`. The source candidate now
+self-elevates before unmount begins; GUI behavior is unchanged because the helper is already root.
+Focused Bats passes `16/16`. The first full run is intentionally not green (`299/301`) because two
+diagnostic tests observed the live residual session; restart recovery plus a clean `301/301` rerun
+are the next gates. Do not mount another fixture before recovery.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears

@@ -195,6 +195,12 @@ path. It now rejects anything that isn't a `diskNsM` device or a `/Volumes/...` 
 on the GUI side). Regression test: `tests/cli/unmount.bats` — "rejects a garbage target instead
 of faking success".
 
+Fixed: direct CLI `unmount` now self-elevates before removing the backend, matching direct CLI
+`mount`. Security session records are root-owned `0700/0600`; an unprivileged unmount could remove
+NFS first and then mistake the unreadable record for `NO_SESSION_STATE`, leaving a stale session.
+The GUI path is unchanged because its privileged helper already enters the same script as root.
+Regression test: `tests/cli/unmount.bats` — "self-elevates before direct CLI unmount".
+
 Expected: mount succeeds read-write (unless the drive genuinely has a dirty NTFS journal, in
 which case it must fail closed with Windows recovery guidance — see "force a dirty-journal test" below if you want to
 verify that path specifically), the write/read/remove round-trips, `diagnose --json` reports

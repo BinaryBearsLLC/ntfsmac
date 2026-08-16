@@ -27,6 +27,15 @@ usage() {
 }
 
 cmd_unmount() {
+  # Mount creates root-owned 0700/0600 security state and applies PF/route ownership as root.
+  # A direct CLI unmount must therefore run the complete backend + security transaction at the
+  # same privilege level. Without this guard an unprivileged caller can remove the NFS/backend
+  # first, then misread the inaccessible state directory as NO_SESSION_STATE and strand the
+  # record/public summary. The GUI already enters here through its root helper, so it is unchanged.
+  if [[ $EUID -ne 0 && "${NTFSMAC_SKIP_ROOT_CHECK:-}" != "1" ]]; then
+    exec sudo "$0" "$@"
+  fi
+
   if [[ -z "$ANYLINUXFS_BIN" ]]; then
     echo "unmount: FATAL — anylinuxfs binary not found at any known install path (try reinstalling: sudo bash install.sh, or 'ntfsmac diagnose')" >&2
     return 1

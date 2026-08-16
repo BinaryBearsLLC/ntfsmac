@@ -297,6 +297,17 @@ reported one security session while the CLI reported `NO_SESSION_STATE`. An auth
 required to distinguish a stale public summary from real PF/state residue before converting the
 ledger row or proceeding.
 
+The authenticated audit confirmed that `diskNsM.state` remained while no matching PF child anchor
+remained; the public one-session summary was therefore reporting real owned state, not merely stale
+presentation. Source inspection found that direct CLI mount self-elevated but direct CLI unmount
+did not. Because the state directory is root-only, unmount removed NFS/backend first and then
+misclassified the unreadable record as `NO_SESSION_STATE`. The CLI unmount candidate now
+self-elevates before any backend mutation, while the GUI/helper path is unchanged because it is
+already root. Its focused Bats file passes `16/16`, including the new privilege-order regression.
+The full Bats run reached `299/301`; its only two failures were diagnostic expectations that
+correctly observed this still-live residual session. Recovery and a clean `301/301` rerun remain
+required before committing acceptance status.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence

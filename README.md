@@ -137,6 +137,10 @@ ntfsmac uninstall                     # remove CLI/runtime/helper components
 ntfsmac help
 ```
 
+Direct CLI `mount` and `unmount` authenticate with `sudo` so raw-device access and the complete
+root-owned PF/route session are created and removed in one transaction. The packaged GUI already
+runs those operations through its privileged helper and does not add a second CLI password prompt.
+
 ntfsmac accepts partitions in `diskNsN` form, never a whole disk such as `disk4`. Device identifiers are independently validated in the CLI and privileged helper against `^disk[0-9]+s[0-9]+$` before they reach a shell command.
 
 The lower layers also expose an experimental NTFS3 choice for controlled testing:

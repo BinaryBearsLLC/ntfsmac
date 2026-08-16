@@ -25,6 +25,7 @@ STUB
 
   export PATH="$STUB_DIR:$PATH"
   export NTFSMAC_SECURITY_STATE_DIR="$STUB_DIR/security-state"
+  export NTFSMAC_SKIP_ROOT_CHECK=1
 }
 
 teardown() {
@@ -129,6 +130,25 @@ STUB
   [[ "$output" == *"failed to verify host mount removal"* ]]
   [[ "$output" == *"security protection retained"* ]]
   [ -f "$NTFSMAC_SECURITY_STATE_DIR/disk2s1.state" ]
+}
+
+@test "self-elevates before direct CLI unmount so root-owned security state stays visible" {
+  cat > "$STUB_DIR/sudo" <<STUB
+#!/bin/bash
+echo "\$@" >> "$STUB_DIR/sudo.calls"
+exit 0
+STUB
+  chmod +x "$STUB_DIR/sudo"
+
+  unset NTFSMAC_SKIP_ROOT_CHECK
+  run "$SCRIPT" disk2s1
+
+  [ "$status" -eq 0 ]
+  [ -f "$STUB_DIR/sudo.calls" ]
+  run cat "$STUB_DIR/sudo.calls"
+  [[ "$output" == *"unmount.sh"* ]]
+  [[ "$output" == *"disk2s1"* ]]
+  [ ! -f "$CALL_LOG" ]
 }
 
 @test "a wedged anylinuxfs unmount gets killed and reported instead of hanging forever" {
