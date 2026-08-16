@@ -89,15 +89,19 @@ public enum AnyLinuxFSStatusParser {
                   validateDevice(device)
             else { return nil }
 
-            let driver = info
+            let fields = info
                 .split(separator: ",", omittingEmptySubsequences: true)
                 .map { $0.trimmingCharacters(in: .whitespaces) }
-                .first
+            let driver = fields.first
             return ObservedMount(
                 deviceIdentifier: device,
                 mountPoint: MountTableParser.decodeEscapes(mountPoint),
                 fsDriver: driver,
-                isReadOnly: nil
+                // The host NFS client can remain read/write while the guest filesystem beneath
+                // the export is read-only (for example ntfs-3g `ro,norecover`). Preserve that
+                // independent guest truth here; RealMountSnapshotProvider still returns nil in
+                // its final snapshot unless the host mount table pairs this runtime row.
+                isReadOnly: fields.contains("ro") || fields.contains("read-only")
             )
         }
     }
@@ -253,7 +257,10 @@ public struct RealMountSnapshotProvider: MountSnapshotProviding {
                 deviceIdentifier: statusMount.deviceIdentifier,
                 mountPoint: statusMount.mountPoint,
                 fsDriver: statusMount.fsDriver,
-                isReadOnly: tableMount?.isReadOnly
+                // Read-only at either layer makes the user-visible volume read-only. Looking
+                // only at `(nfs, ...)` caused a real false-green state: the NFS client was rw,
+                // while anylinuxfs truthfully reported the guest NTFS mount as `ro,norecover`.
+                isReadOnly: tableMount.map { $0.isReadOnly || statusMount.isReadOnly == true }
             )
         }
 

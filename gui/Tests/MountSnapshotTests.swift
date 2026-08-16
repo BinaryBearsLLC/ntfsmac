@@ -87,6 +87,8 @@ private struct SnapshotCommandRunner: PrivilegedCommandRunning {
     #expect(mounts[0].deviceIdentifier == "disk6s1")
     #expect(mounts[0].mountPoint == "/Volumes/My Drive")
     #expect(mounts[0].fsDriver == "ntfs-3g")
+    #expect(mounts[0].isReadOnly == false)
+    #expect(mounts[1].isReadOnly == true)
     #expect(mounts.allSatisfy { !$0.mountPoint.contains("user") })
 }
 
@@ -141,6 +143,31 @@ private struct SnapshotCommandRunner: PrivilegedCommandRunning {
     #expect(snapshot.mounts.count == 1)
     #expect(snapshot.isAuthoritative == false)
     #expect(snapshot.warningCode == "MOUNT_STATE_INCONSISTENT")
+}
+
+@MainActor
+@Test func guestReadOnlyOverridesAReadWriteNfsClientMount() async {
+    let runner = SnapshotCommandRunner(
+        status: CommandResult(
+            output: "/dev/disk6s1 on /Volumes/Media (ntfs, ro, norecover, uid=502, gid=20, mounted by local-user) VM[cpus: 1, ram: 512 MiB]",
+            exitCode: 0
+        ),
+        mount: CommandResult(
+            output: "disk6s1.local:/mnt/Media on /Volumes/Media (nfs, nodev, nosuid, soft, mounted by local-user)",
+            exitCode: 0
+        )
+    )
+    let provider = RealMountSnapshotProvider(
+        runner: runner,
+        anylinuxfsPath: "/test/anylinuxfs",
+        mountPath: "/test/mount"
+    )
+
+    let snapshot = await provider.snapshot()
+
+    #expect(snapshot.isAuthoritative)
+    #expect(snapshot.mounts.count == 1)
+    #expect(snapshot.mounts[0].isReadOnly == true)
 }
 
 @MainActor
