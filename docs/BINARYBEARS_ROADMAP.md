@@ -834,11 +834,13 @@ Build and install one fresh DMG, then run the packaged retest in this order:
    NTFS3 mounted read/write with no fallback. No payload write was issued. Treat this as a policy
    failure, not as NTFS3 recovery evidence. A deterministic cross-driver refusal plus the Windows
    `chkdsk`/full-shutdown and clean mount/hash/unmount/reread repeat remain required.
-5. **BB-F01/backend timeout:** with two disposable drives mounted and no I/O, physically remove one.
-   It must stop showing green on the first failed proof, automatically tear down only its owned
-   session, remove its row, and preserve the other drive. If a controlled backend stall is
-   available, verify the same bounded unknown-to-cleanup transition without waiting for a
-   240-second CLI watchdog.
+5. **BB-F01/backend timeout — packaged repeat failed:** with USB_8GB on NTFS3 and MobileData on
+   default `ntfs-3g`, physically removing only USB_8GB left its NFS mount, VM, security session,
+   and green row alive for more than 30 seconds even though physical enumeration lost it
+   immediately. Manual stale-row Unmount performed exact selective teardown and preserved
+   MobileData; final normal Unmount reached zero. The automatic physical-presence path still needs
+   correction and another packaged two-drive repeat. A controlled backend-stall cell remains
+   optional when that fixture is available.
 6. Run strict signature verification, `hdiutil verify`, Bats `297/297`, Swift `270/270`, and the
    authenticated zero-state/PF check; only then convert the three remaining ledger rows from FAIL
    to PASS.
