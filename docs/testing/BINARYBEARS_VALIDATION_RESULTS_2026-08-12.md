@@ -43,6 +43,12 @@ This is the live ledger for the assisted acceptance run defined in
   focus. The native blue focus indicator was visible only as keyboard accessibility state. The
   subsequent Launch-at-login enable/readback/disable cycle also passed independently, closing
   BB-03.
+- BB-01 clean-install preparation then passed: the in-app complete uninstall removed the CLI
+  prefix/link, helper binary/plist/job, runtime cache/logs, NFS mounts, and VM/network processes.
+  An authenticated check returned `BB-01-CLEAN: PASS` with no session-state files or PF child
+  anchors. The still-running app bundle and its user preferences were deliberately retained, as
+  specified by the uninstall UI. BB-01 remains `FAIL` until this same process quits, the app is
+  replaced from the candidate DMG, and the first empty-cache mount succeeds without a relaunch.
 - Host: Apple Silicon with Hypervisor support, macOS 26.6.1.
 - Local evidence folder: `ntfsmac-acceptance-20260812-190259` on the operator's Desktop. It is
   intentionally not committed because it contains local volume/device identifiers.

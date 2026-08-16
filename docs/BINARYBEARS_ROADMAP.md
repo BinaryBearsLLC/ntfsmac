@@ -709,6 +709,12 @@ enable/readback/disable then also passed: macOS independently reported the app r
 registration and disabled after removal while preserving the privileged helper. BB-03 is `PASS` as
 of 2026-08-16.
 
+The subsequent BB-01 clean-install preflight also passes: the in-app uninstall removed helper,
+CLI/runtime, user runtime cache/logs, mounts, VM/network processes, session-state files, and PF
+child anchors. The app process/bundle and preferences remain intentionally user-level. BB-01 stays
+open until the first mount from the freshly replaced app succeeds with that empty cache and the
+final unmount/teardown returns to zero state.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
@@ -745,9 +751,9 @@ Preserve the minimal popover and do not mix identity/signing migration into the 
 
 Build and install one fresh DMG, then run the packaged retest in this order:
 
-1. **BB-01:** complete uninstall, remove only the disposable runtime cache, install the DMG, approve
-   the helper once, mount the first NTFS device without a second launch, unmount, then prove zero
-   security state/PF child anchors.
+1. **BB-01 — clean preflight passed:** quit the retained app, replace it from `bdfcd6…92fed`,
+   approve the helper and Full Disk Access once, mount the first NTFS device without relaunching,
+   unmount, then prove zero security state/PF child anchors.
 2. **BB-03 — complete:** installed keyboard traversal and the independently read-back Launch at
    login enable/disable cycle passed on `bdfcd6…92fed`; do not repeat unless related code changes.
 3. **BB-P1-06 and save panel:** mount once with NTFS3, attempt Verified Copy with the known symlink
