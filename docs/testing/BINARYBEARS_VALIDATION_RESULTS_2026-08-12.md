@@ -57,6 +57,10 @@ This is the live ledger for the assisted acceptance run defined in
   Its XPC protocol revision also forces replacement of an older helper with the same CLI payload.
   Bats `297/297` and Swift `269/269` pass; this is source evidence only until a rebuilt DMG repeats
   the clean first-run/mount/unmount/zero-state sequence.
+- Candidate DMG SHA-256 `f02a2c0de0a635516e20928b2e69245f761fa4a1518010e637eac3938549c5e2`
+  was built from documentation head `3ef125e`; the app passes strict deep signature verification
+  and the image passes `hdiutil verify`. BB-01 remains `FAIL` until this artifact is installed and
+  completes the consent, progress, FDA, first-Mount, unmount, and authenticated zero-state gates.
 - Host: Apple Silicon with Hypervisor support, macOS 26.6.1.
 - Local evidence folder: `ntfsmac-acceptance-20260812-190259` on the operator's Desktop. It is
   intentionally not committed because it contains local volume/device identifiers.

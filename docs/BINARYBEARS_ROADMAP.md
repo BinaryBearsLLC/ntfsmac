@@ -724,6 +724,10 @@ and CLI preparation progress, probes one raw 512-byte block read-only, and reche
 System Settings opens. It also versions the XPC protocol independently of the CLI payload so an
 older helper cannot be mistaken for one supporting the new preflight. Source gates pass at Bats
 `297/297` and Swift `269/269`; a new packaged first-run/mount/teardown repeat remains required.
+The replacement DMG was then built from documentation head `3ef125e`, SHA-256
+`f02a2c0de0a635516e20928b2e69245f761fa4a1518010e637eac3938549c5e2`; strict deep signature
+verification and `hdiutil verify` both pass. This is a candidate artifact, not BB-01 acceptance
+evidence until the installed onboarding and first mount pass.
 
 ## Approved BinaryBears production direction
 
@@ -761,7 +765,7 @@ Preserve the minimal popover and do not mix identity/signing migration into the 
 
 Build and install one fresh DMG, then run the packaged retest in this order:
 
-1. **BB-01 — clean preflight passed, new package required:** build and record a DMG containing
+1. **BB-01 — clean preflight passed, candidate ready:** install DMG `f02a2c…c5e2` containing
    `33ce2af`, quit the retained app, and replace it. Require the helper explanation before any
    password prompt, click **Install Helper…** once, observe progress, enable exactly the named
    Full Disk Access helper, and require the normal popover to unlock automatically. The first
