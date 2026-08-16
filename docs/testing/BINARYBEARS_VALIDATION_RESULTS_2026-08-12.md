@@ -36,8 +36,13 @@ This is the live ledger for the assisted acceptance run defined in
   Settings were skipped. BB-03 therefore remains `FAIL`. Follow-up source commit `864abd8` adds
   explicit focus participation to every interactive popover surface and passes Swift `260/260`;
   its DMG was built and verified from documentation head `2e0ae09` with SHA-256
-  `bdfcd62b8a7070639a4476301461ca4f630d7b1ade5edfe150161c1e28292fed`. It still requires a newly
-  installed manual repeat.
+  `bdfcd62b8a7070639a4476301461ca4f630d7b1ade5edfe150161c1e28292fed`.
+- On 2026-08-16 the installed follow-up candidate passed forward and reverse Full Keyboard Access
+  traversal for the exercised mounted popover and Settings surface: Open, Unmount, the drive
+  overflow control, Refresh, Security Show/Hide, Settings/Back, Diagnose, and Quit all accepted
+  focus. The native blue focus indicator was visible only as keyboard accessibility state. BB-03
+  remains `FAIL` solely until the corrected packaged Launch-at-login enable/readback/disable cycle
+  passes.
 - Host: Apple Silicon with Hypervisor support, macOS 26.6.1.
 - Local evidence folder: `ntfsmac-acceptance-20260812-190259` on the operator's Desktop. It is
   intentionally not committed because it contains local volume/device identifiers.

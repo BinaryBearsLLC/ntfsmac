@@ -702,8 +702,10 @@ These are source fixes, not packaged evidence. BB-01, BB-03, BB-P1-06, BB-P1-07,
 The 2026-08-15 keyboard follow-up candidate was built from `864abd8`/`2e0ae09` as
 `dist/ntfsmac.dmg`, SHA-256
 `bdfcd62b8a7070639a4476301461ca4f630d7b1ade5edfe150161c1e28292fed`. Its strict app signature,
-DMG checksum, clean runtime rebuild, and Swift `260/260` gate pass. Installation and keyboard
-traversal remain manual evidence and are not inferred from successful packaging.
+DMG checksum, clean runtime rebuild, and Swift `260/260` gate pass. On 2026-08-16 its installed
+forward/reverse keyboard traversal reached every required main, drive, security, footer, Settings,
+menu, and Back control. The BB-03 keyboard sub-gate therefore passes; packaged Launch-at-login
+enable/readback/disable remains the only open BB-03 sub-gate.
 
 ## Approved BinaryBears production direction
 
@@ -744,9 +746,9 @@ Build and install one fresh DMG, then run the packaged retest in this order:
 1. **BB-01:** complete uninstall, remove only the disposable runtime cache, install the DMG, approve
    the helper once, mount the first NTFS device without a second launch, unmount, then prove zero
    security state/PF child anchors.
-2. **BB-03:** with Full Keyboard Access temporarily enabled, traverse the first Mount, Diagnose,
-   Quit, Settings, menus, and Back controls; restore the host setting. Toggle Launch at login on,
-   confirm its system state, toggle it off, and confirm removal.
+2. **BB-03:** keyboard traversal passed on the installed `bdfcd6…92fed` candidate. Restore the
+   host's original Full Keyboard Access setting, toggle Launch at login on, confirm its system
+   readback, toggle it off, and confirm removal. Only then close BB-03.
 3. **BB-P1-06 and save panel:** mount once with NTFS3, attempt Verified Copy with the known symlink
    fixture, and require the specific preflight before any copy. Enter an existing destination name
    and require ntfsmac's no-overwrite explanation without a native Replace offer or mutation.
