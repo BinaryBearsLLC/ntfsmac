@@ -330,6 +330,14 @@ The complete Swift suite also passed `271/271`. Source gates are closed for a re
 evidence remains limited to the three focused cells: direct CLI teardown/reconciliation,
 BB-P1-07 unsafe-state refusal, and BB-F01 selective hot-unplug recovery.
 
+The final teardown candidate DMG was then rebuilt successfully and has SHA-256
+`a00677da68b76cbb68bef6fd0b936fe8e6d04470397085fad2fbeb884f30c637`. The compressed image passes
+`hdiutil verify`; its application passes strict deep ad-hoc signature verification; the GUI and
+helper are arm64; and the bundled static vmproxy is AArch64. Independent source-to-bundle hash
+checks prove that this image contains both the privileged direct-CLI unmount fix and the standalone
+status-binary resolution fix. Installation and the three remaining packaged live cells are still
+pending, so this artifact verification does not convert BB-P1-07 or BB-F01 by itself.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence
