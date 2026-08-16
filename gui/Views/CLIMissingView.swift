@@ -39,47 +39,63 @@ public struct CLIMissingView: View {
             HStack(spacing: 9) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.ntfsRed.opacity(0.14))
-                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.ntfsRed.opacity(0.28)))
-                    ErrorTriangleGlyph(color: .ntfsRed)
+                        .fill(setupColor.opacity(0.14))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(setupColor.opacity(0.28)))
+                    if stager.lastFailureReason == nil {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        ErrorTriangleGlyph(color: .ntfsRed)
+                    }
                 }
                 .frame(width: 28, height: 28)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text("ntfsmac").font(.system(size: 13, weight: .semibold))
-                    Text("Setup required").font(.system(size: 11)).foregroundStyle(Color.ntfsRed.opacity(0.75))
+                    Text(stager.lastFailureReason == nil ? "Finishing setup" : "Setup required")
+                        .font(.system(size: 11))
+                        .foregroundStyle((stager.lastFailureReason == nil ? Color.secondary : Color.ntfsRed).opacity(0.75))
                 }
                 Spacer()
-                Circle().fill(Color.ntfsRed).frame(width: 9, height: 9)
+                Circle().fill(stager.lastFailureReason == nil ? Color.ntfsYellow : Color.ntfsRed).frame(width: 9, height: 9)
             }
             .padding(.horizontal, 14)
             .padding(.top, 12)
             .padding(.bottom, 10)
 
             VStack(alignment: .leading, spacing: 5) {
-                Text("Setup incomplete")
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundStyle(Color.ntfsRed.opacity(0.95))
-                Text(stager.lastFailureReason ?? "Finishing setup automatically — this only takes a moment. If it doesn't clear on its own, click Retry.")
+                if stager.lastFailureReason == nil {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Preparing ntfsmac…")
+                            .font(.system(size: 12.5, weight: .semibold))
+                    }
+                } else {
+                    Text("Setup incomplete")
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Color.ntfsRed.opacity(0.95))
+                }
+                Text(stager.lastFailureReason ?? "Installing the bundled command-line components. This only takes a moment.")
                     .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(12)
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.ntfsRed.opacity(0.09)))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.ntfsRed.opacity(0.2)))
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(setupColor.opacity(0.09)))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(setupColor.opacity(0.2)))
             .padding(.horizontal, 10)
 
-            VStack(spacing: 6) {
-                Button {
-                    Task { await stager.retry() }
-                } label: {
-                    Text("Retry").frame(maxWidth: .infinity)
+            if stager.lastFailureReason != nil {
+                VStack(spacing: 6) {
+                    Button {
+                        Task { await stager.retry() }
+                    } label: {
+                        Text("Retry").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                    .focusable(true)
                 }
-                .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                .focusable(true)
+                .padding(10)
             }
-            .padding(10)
 
             Divider().padding(.horizontal, 14)
 
@@ -110,5 +126,9 @@ public struct CLIMissingView: View {
             await stager.stageIfNeeded()
             checker.check()
         }
+    }
+
+    private var setupColor: Color {
+        stager.lastFailureReason == nil ? .ntfsYellow : .ntfsRed
     }
 }

@@ -2,7 +2,9 @@ import SwiftUI
 import AppKit
 
 /// First-run helper-install prompt (GUI-PLAN.md "App shape": "No windows except Preferences and
-/// the first-run helper prompt"). Kicks off `installIfNeeded()` on appear; denial/failure renders
+/// the first-run helper prompt"). Performs a read-only registration check on appear, but never
+/// requests administrator authorization until the user explicitly chooses Install Helper.
+/// Denial/failure renders
 /// `ui/prototype.html`'s "Error — Helper Missing" card (comp lines 636-711) — red icon-box header,
 /// message card, primary "Install Helper…" pill, and a footer so Quit/Settings stay reachable even
 /// before the helper exists (previously this view had no footer at all — a real dead end).
@@ -43,8 +45,21 @@ public struct FirstRunView: View {
             case .notChecked, .checking:
                 ProgressView("Checking privileged helper…")
                     .frame(maxWidth: .infinity)
+            case .readyToInstall:
+                setupCard
+                Button {
+                    Task { await installer.installAfterConsent() }
+                } label: {
+                    HStack(spacing: 6) {
+                        InstallHelperGlyph()
+                        Text("Install Helper…")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glassPrimary())
+                .focusable(true)
             case .installing:
-                ProgressView("Waiting for authorization…")
+                ProgressView("Installing privileged helper…")
                     .frame(maxWidth: .infinity)
             case .installed:
                 Label("Privileged helper installed", systemImage: "checkmark.seal.fill")
@@ -52,7 +67,7 @@ public struct FirstRunView: View {
             case .denied(let message), .failed(let message):
                 errorCard(message: message)
                 Button {
-                    Task { await installer.install() }
+                    Task { await installer.installAfterConsent() }
                 } label: {
                     HStack(spacing: 6) {
                         InstallHelperGlyph()
@@ -104,7 +119,7 @@ public struct FirstRunView: View {
         .frame(width: 300)
         .fixedSize(horizontal: false, vertical: true)
         .task {
-            await installer.installIfNeeded()
+            await installer.checkWithoutInstalling()
         }
     }
 
@@ -131,7 +146,7 @@ public struct FirstRunView: View {
         switch installer.state {
         case .denied, .failed: .ntfsRed
         case .installed: .ntfsGreen
-        case .notChecked, .checking, .installing: .secondary
+        case .notChecked, .checking, .readyToInstall, .installing: .secondary
         }
     }
 
@@ -140,8 +155,23 @@ public struct FirstRunView: View {
         case .denied, .failed: "Setup required"
         case .installed: "Privileged helper installed"
         case .notChecked, .checking: "Checking privileged helper…"
-        case .installing: "Waiting for authorization…"
+        case .readyToInstall: "Setup required"
+        case .installing: "Installing privileged helper…"
         }
+    }
+
+    private var setupCard: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("Install the privileged helper")
+                .font(.system(size: 12.5, weight: .semibold))
+            Text("ntfsmac uses a small helper to mount and unmount drives safely. macOS will ask for an administrator password after you continue.")
+                .font(.system(size: 11.5))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.secondary.opacity(0.08)))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.secondary.opacity(0.16)))
     }
 
     private func errorCard(message: String) -> some View {

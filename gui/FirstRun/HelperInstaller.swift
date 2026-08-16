@@ -139,6 +139,7 @@ extension HelperClient: StaleHelperDetecting {}
 public enum HelperInstallState: Equatable, Sendable {
     case notChecked
     case checking
+    case readyToInstall
     case installed
     case installing
     case denied(String)
@@ -149,7 +150,7 @@ public enum HelperInstallState: Equatable, Sendable {
     public var isDeniedOrFailed: Bool {
         switch self {
         case .denied, .failed: true
-        case .notChecked, .checking, .installed, .installing: false
+        case .notChecked, .checking, .readyToInstall, .installed, .installing: false
         }
     }
 }
@@ -175,7 +176,7 @@ public final class HelperInstaller: ObservableObject {
         staleDetector: any StaleHelperDetecting = HelperClient(),
         quarantineStripper: any QuarantineStripping = RealQuarantineStripper(),
         label: String = helperMachServiceName,
-        expectedVersion: String = GeneratedCLIManifest.expectedTreeHashHex,
+        expectedVersion: String = helperBuildIdentity(cliTreeHash: GeneratedCLIManifest.expectedTreeHashHex),
         staleCheckTimeoutNanoseconds: UInt64 = 5_000_000_000
     ) {
         self.service = service
@@ -184,6 +185,46 @@ public final class HelperInstaller: ObservableObject {
         self.label = label
         self.expectedVersion = expectedVersion
         self.staleCheckTimeoutNanoseconds = staleCheckTimeoutNanoseconds
+    }
+
+    /// First-launch inspection that never invokes `SMJobBless` and therefore can never display
+    /// an unexpected administrator-password prompt. A missing or stale helper becomes an
+    /// explicit, user-actionable state; only `installAfterConsent()` may continue from there.
+    public func checkWithoutInstalling() async {
+        switch state {
+        case .checking, .installing, .denied, .failed:
+            return
+        case .notChecked, .readyToInstall, .installed:
+            break
+        }
+        state = .checking
+        let alreadyInstalled = await runOffCooperativePool { [service, label] in
+            service.isInstalled(label: label)
+        }
+        guard alreadyInstalled else {
+            state = .readyToInstall
+            return
+        }
+        state = await isRegisteredHelperCurrent() ? .installed : .readyToInstall
+    }
+
+    /// Explicit first-run action. Rechecks the registration after the user has chosen Install,
+    /// clears a stale helper if necessary, then follows the same single `SMJobBless` path used by
+    /// Preferences. No privileged prompt is reachable before this method is called by a button.
+    public func installAfterConsent() async {
+        guard state != .installing else { return }
+        state = .checking
+        let alreadyInstalled = await runOffCooperativePool { [service, label] in
+            service.isInstalled(label: label)
+        }
+        if alreadyInstalled {
+            if await isRegisteredHelperCurrent() {
+                state = .installed
+                return
+            }
+            await uninstallStaleHelper()
+        }
+        await install()
     }
 
     /// First-run entry point: detect already-installed and skip (Do clause) — never re-prompts
@@ -210,7 +251,7 @@ public final class HelperInstaller: ObservableObject {
     /// first-time install takes.
     public func installIfNeeded() async {
         switch state {
-        case .checking, .installing, .denied, .failed:
+        case .checking, .readyToInstall, .installing, .denied, .failed:
             return
         case .notChecked, .installed:
             break
@@ -235,13 +276,17 @@ public final class HelperInstaller: ObservableObject {
         // failure next, with no trail pointing back at the actual root cause. Best-effort
         // discard-and-continue is still correct (SMJobBless's own install path recovers
         // regardless), but it should leave a diagnostic trail.
+        await uninstallStaleHelper()
+        await install()
+    }
+
+    private func uninstallStaleHelper() async {
         let staleUninstallResult = await withStaleCheckTimeout { [staleDetector] in try await staleDetector.uninstallHelper() }
         if let staleUninstallResult {
             helperInstallerLog.notice("stale helper uninstall: exitCode=\(staleUninstallResult.exitCode, privacy: .public) output=\(staleUninstallResult.output, privacy: .public)")
         } else {
             helperInstallerLog.notice("stale helper uninstall: no response within timeout (wedged or predates uninstallHelper)")
         }
-        await install()
     }
 
     public func reset() {

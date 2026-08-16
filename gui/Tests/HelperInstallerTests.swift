@@ -158,6 +158,29 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
 }
 
 @MainActor
+@Test func passiveFirstRunCheckNeverBlessesAMissingHelper() async {
+    let service = CountingInstallService(alreadyInstalled: false, outcome: .installed)
+    let installer = HelperInstaller(service: service, label: "com.khr898.ntfsmac.helper")
+
+    await installer.checkWithoutInstalling()
+
+    #expect(installer.state == .readyToInstall)
+    #expect(service.blessCallCount == 0)
+}
+
+@MainActor
+@Test func explicitConsentInstallsAfterPassiveCheck() async {
+    let service = CountingInstallService(alreadyInstalled: false, outcome: .installed)
+    let installer = HelperInstaller(service: service, label: "com.khr898.ntfsmac.helper")
+
+    await installer.checkWithoutInstalling()
+    await installer.installAfterConsent()
+
+    #expect(installer.state == .installed)
+    #expect(service.blessCallCount == 1)
+}
+
+@MainActor
 @Test func installIfNeededSelfHealsWhenRegisteredHelperReportsAMismatchedVersion() async {
     // Simulates a daemon left running from a previous build: `SMJobCopyDictionary` sees it as
     // "installed", but its baked-in hash is stale. Real fix: clear it out via its own still-live

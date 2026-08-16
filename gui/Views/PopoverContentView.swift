@@ -68,6 +68,7 @@ public struct PopoverContentView: View {
     @ObservedObject public var helperUninstaller: HelperUninstaller
     @ObservedObject public var cliInstallChecker: CLIInstallChecker
     @ObservedObject public var cliAutoStager: CLIAutoStager
+    @ObservedObject public var fullDiskAccessController: FullDiskAccessController
     @ObservedObject public var settings: Settings
     @StateObject private var navigation: PopoverNavigation
     @StateObject private var verifiedCopyController: VerifiedCopyController
@@ -77,7 +78,6 @@ public struct PopoverContentView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var diagnosePresentation = DiagnosePanelPresentation()
     @State private var securityPresentation = SecurityIndicatorsPresentation()
-    @State private var showFDAPrompt = false
     @State private var finderErrorMessage: String?
 
     public init(
@@ -91,6 +91,7 @@ public struct PopoverContentView: View {
         helperUninstaller: HelperUninstaller,
         cliInstallChecker: CLIInstallChecker,
         cliAutoStager: CLIAutoStager,
+        fullDiskAccessController: FullDiskAccessController = FullDiskAccessController(),
         settings: Settings,
         finderOpener: FinderOpener,
         helperClient: HelperClient,
@@ -106,6 +107,7 @@ public struct PopoverContentView: View {
         self.helperUninstaller = helperUninstaller
         self.cliInstallChecker = cliInstallChecker
         self.cliAutoStager = cliAutoStager
+        self.fullDiskAccessController = fullDiskAccessController
         self.settings = settings
         self.finderOpener = finderOpener
         self.helperClient = helperClient
@@ -140,6 +142,7 @@ public struct PopoverContentView: View {
             helperUninstaller: HelperUninstaller(),
             cliInstallChecker: cliInstallChecker,
             cliAutoStager: cliAutoStager,
+            fullDiskAccessController: FullDiskAccessController(),
             settings: settings,
             finderOpener: finderOpener,
             helperClient: helperClient,
@@ -155,20 +158,6 @@ public struct PopoverContentView: View {
                     installer: helperInstaller,
                     uninstaller: helperUninstaller,
                     onBack: navigation.showMain
-                )
-            } else if showFDAPrompt {
-                FDAPromptView(
-                    onOpenSettings: {
-                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
-                            NSWorkspace.shared.open(url)
-                        }
-                        showFDAPrompt = false
-                        mountController.clearError()
-                    },
-                    onCancel: {
-                        showFDAPrompt = false
-                        mountController.clearError()
-                    }
                 )
             // Helper install is a self-contained SMJobBless/XPC flow that doesn't touch the CLI
             // tree at all — gating it behind `cliInstallChecker.isInstalled` would block the
@@ -191,13 +180,20 @@ public struct PopoverContentView: View {
                     onOpenSettings: navigation.showSettings,
                     onQuit: quit
                 )
+            } else if !fullDiskAccessController.isGranted {
+                FullDiskAccessSetupView(
+                    controller: fullDiskAccessController,
+                    deviceID: driveScanner.drives.first?.identifier,
+                    onQuit: quit
+                )
             } else {
                 mainContent
             }
         }
         .onChange(of: mountController.errorMessage) { newValue in
             if newValue == "FDA_REQUIRED" {
-                showFDAPrompt = true
+                fullDiskAccessController.reset()
+                mountController.clearError()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .ntfsmacOpenSettings)) { _ in
@@ -653,66 +649,5 @@ private struct EjectAllReportView: View {
         .glassCard()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Eject All per-drive results")
-    }
-}
-
-enum FDAPromptCopy {
-    static let helperServiceName = "com.khr898.ntfsmac.helper"
-    static let instructions = "macOS lists ntfsmac Helper under its technical service name, \(helperServiceName), and may show a generic executable icon because the helper is a standalone privileged tool. Enable that exact entry in Full Disk Access. If it is not listed, add it with the '+' button."
-}
-
-/// A modal prompt guiding the user to grant Full Disk Access to the privileged helper daemon.
-struct FDAPromptView: View {
-    let onOpenSettings: () -> Void
-    let onCancel: () -> Void
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        VStack(spacing: 16) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(Color.ntfsYellow.opacity(0.14))
-                        .overlay(Circle().strokeBorder(Color.ntfsYellow.opacity(0.3)))
-                        .frame(width: 40, height: 40)
-                    Image(systemName: "lock.shield.fill")
-                        .font(.system(size: 18))
-                        .foregroundStyle(Color.ntfsYellow)
-                }
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Full Disk Access Required")
-                        .font(.system(size: 14, weight: .semibold))
-                    Text("ntfsmac needs permission to mount drives.")
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            
-            Text(FDAPromptCopy.instructions)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            
-            HStack(spacing: 8) {
-                Button("Cancel") {
-                    onCancel()
-                }
-                .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                .focusable(true)
-                
-                Spacer()
-                
-                Button("Open Settings") {
-                    onOpenSettings()
-                }
-                .buttonStyle(.glassPrimary())
-                .focusable(true)
-            }
-        }
-        .padding(20)
-        .frame(width: 340)
     }
 }

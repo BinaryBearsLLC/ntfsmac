@@ -34,6 +34,14 @@ func applyInvokerIdentityEnvironment(
 /// invocation, in both the CLI (`cli/lib/validate-device.sh`) and here, independently.
 public let deviceNamePattern = "^disk[0-9]+s[0-9]+$"
 
+/// Bump whenever the XPC selector surface changes. The CLI tree hash alone cannot distinguish a
+/// newly packaged GUI from an older helper when only Swift/helper code changed.
+public let helperProtocolRevision = 2
+
+public func helperBuildIdentity(cliTreeHash: String) -> String {
+    "xpc\(helperProtocolRevision):\(cliTreeHash)"
+}
+
 public func validateDevice(_ device: String) -> Bool {
     device.range(of: deviceNamePattern, options: .regularExpression) != nil
 }
@@ -194,6 +202,11 @@ public struct CommandResult: Codable, Sendable {
 /// each is read-only and explicitly Don't-listed as privileged in their own units
 /// (`3-drive-detect`, `3-status-speed`, `3-diagnose-ui` all call the CLI directly, unprivileged).
 @objc public protocol HelperXPCProtocol {
+    /// Performs a non-mutating Full Disk Access preflight against the exact external partition
+    /// the GUI detected. The helper reads one 512-byte block from the raw device into
+    /// `/dev/null`; success proves the helper can open the disk before any mount is attempted.
+    func checkDeviceAccess(device: String, reply: @escaping (Data?, String?) -> Void)
+
     /// `device` is re-validated against `deviceNamePattern` inside the helper before any shell
     /// call — never trusts the caller (§3). `driver`'s raw value must match `FsDriver`.
     /// `readOnly`: appends `ro` to the NFS client mount options (`cli/lib/nfs-mount.sh`'s
@@ -233,8 +246,8 @@ public struct CommandResult: Codable, Sendable {
     /// produces; nothing else is accepted regardless of what the GUI sends.
     func stageCLI(installScriptPath: String, reply: @escaping (Data?, String?) -> Void)
 
-    /// Reports the CLI tree hash this specific running helper binary was built with
-    /// (`expectedCLITreeHash`, same value `stageCLI` gates on). Has nothing to do with staging —
+    /// Reports the XPC protocol revision plus the CLI tree hash this specific running helper was
+    /// built with. Has nothing to do with staging —
     /// it exists so `HelperInstaller` can tell "a helper is registered" (`SMJobCopyDictionary`,
     /// which only proves *some* job exists under the label — see its own doc comment) apart from
     /// "the registered helper is *this build's* helper." A daemon left running from a previous
@@ -495,6 +508,20 @@ public final class HelperService: NSObject, HelperXPCProtocol {
         reply(data, nil)
     }
 
+    public func checkDeviceAccess(device: String, reply: @escaping (Data?, String?) -> Void) {
+        Self.mutationLock.lock()
+        defer { Self.mutationLock.unlock() }
+        guard validateDevice(device) else {
+            reply(nil, "rejected: device \"\(device)\" does not match \(deviceNamePattern)")
+            return
+        }
+        let result = runner.run(
+            "/bin/dd",
+            ["if=/dev/r\(device)", "of=/dev/null", "bs=512", "count=1"]
+        )
+        encode(result, reply: reply)
+    }
+
     public func mount(device: String, driver: String, mountPoint: String?, readOnly: Bool, reply: @escaping (Data?, String?) -> Void) {
         Self.mutationLock.lock()
         defer { Self.mutationLock.unlock() }
@@ -663,7 +690,7 @@ public final class HelperService: NSObject, HelperXPCProtocol {
     }
 
     public func version(reply: @escaping (String?) -> Void) {
-        reply(expectedCLITreeHash)
+        reply(helperBuildIdentity(cliTreeHash: expectedCLITreeHash))
     }
 
     public func uninstallHelper(reply: @escaping (Data?, String?) -> Void) {

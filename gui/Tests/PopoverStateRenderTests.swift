@@ -88,6 +88,7 @@ private func renderPopover(
         helperUninstaller: HelperUninstaller(),
         cliInstallChecker: cliInstallChecker,
         cliAutoStager: CLIAutoStager(checker: cliInstallChecker),
+        fullDiskAccessController: FullDiskAccessController(initialState: .granted),
         settings: Settings(defaults: UserDefaults(suiteName: UUID().uuidString)!),
         finderOpener: FinderOpener(),
         helperClient: HelperClient(),

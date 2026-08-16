@@ -85,8 +85,10 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
 
         let cliInstallChecker = CLIInstallChecker()
         let cliAutoStager = CLIAutoStager(checker: cliInstallChecker)
+        let fullDiskAccessController = FullDiskAccessController()
         let helperUninstaller = HelperUninstaller(onUninstallComplete: {
             helperInstaller.reset()
+            fullDiskAccessController.reset()
             cliInstallChecker.check()
         })
         let navigation = PopoverNavigation()
@@ -104,6 +106,7 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
             helperUninstaller: helperUninstaller,
             cliInstallChecker: cliInstallChecker,
             cliAutoStager: cliAutoStager,
+            fullDiskAccessController: fullDiskAccessController,
             settings: settings,
             finderOpener: FinderOpener(),
             helperClient: helperClient,
@@ -134,6 +137,7 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
                 Task { @MainActor in
                     if state == .installing || state == .notChecked {
                         cliAutoStager.reset()
+                        fullDiskAccessController.reset()
                     }
                     guard state == .installed else { return }
                     await cliAutoStager.stageIfNeeded()

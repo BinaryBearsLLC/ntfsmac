@@ -21,6 +21,7 @@ extension HelperClient: CLIStaging {}
 @MainActor
 public final class CLIAutoStager: ObservableObject {
     @Published public private(set) var lastFailureReason: String?
+    @Published public private(set) var isStaging = false
 
     private let helper: any CLIStaging
     private let checker: CLIInstallChecker
@@ -64,6 +65,7 @@ public final class CLIAutoStager: ObservableObject {
     public func reset() {
         didAttempt = false
         lastFailureReason = nil
+        isStaging = false
     }
 
     /// Bounded retry for the *connection*, not the install: right after a fresh `SMJobBless`,
@@ -78,6 +80,9 @@ public final class CLIAutoStager: ObservableObject {
     private static let connectionRetryAttempts = 6
 
     private func attemptStage() async {
+        guard !isStaging else { return }
+        isStaging = true
+        defer { isStaging = false }
         checker.check()
         guard let resourcesURL = bundleResourcesURL else {
             lastFailureReason = "ntfsmac.app is missing its bundled setup resources — reinstall the app."

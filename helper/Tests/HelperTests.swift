@@ -153,7 +153,46 @@ private func awaitReply(_ body: (@escaping (Data?, String?) -> Void) -> Void) as
     #expect(decoded.exitCode == original.exitCode)
 }
 
+@Test func helperBuildIdentityIncludesProtocolRevisionAndCLITree() async {
+    let cliHash = "test-cli-tree"
+    let service = HelperService(runner: FakeRunner(), expectedCLITreeHash: cliHash)
+    let reported = await withCheckedContinuation { continuation in
+        service.version { continuation.resume(returning: $0) }
+    }
+
+    #expect(reported == helperBuildIdentity(cliTreeHash: cliHash))
+    #expect(reported != cliHash, "a helper-only protocol change must invalidate an older helper")
+}
+
 // MARK: - HelperService in-helper device rejection (never touches the runner)
+
+@Test func checkDeviceAccessReadsOneRawBlockWithoutMutation() async throws {
+    let runner = FakeRunner()
+    let service = HelperService(runner: runner)
+    let (data, error) = await awaitReply { reply in
+        service.checkDeviceAccess(device: "disk12s3", reply: reply)
+    }
+    #expect(error == nil)
+    let result = try JSONDecoder().decode(CommandResult.self, from: #require(data))
+    #expect(result.exitCode == 0)
+    #expect(runner.calls == [
+        FakeRunner.Call(
+            executablePath: "/bin/dd",
+            arguments: ["if=/dev/rdisk12s3", "of=/dev/null", "bs=512", "count=1"]
+        )
+    ])
+}
+
+@Test func checkDeviceAccessRejectsInvalidDeviceWithoutRunningAnything() async {
+    let runner = FakeRunner()
+    let service = HelperService(runner: runner)
+    let (data, error) = await awaitReply { reply in
+        service.checkDeviceAccess(device: "/dev/disk2s1", reply: reply)
+    }
+    #expect(data == nil)
+    #expect(error == "rejected: device \"/dev/disk2s1\" does not match \(deviceNamePattern)")
+    #expect(runner.calls.isEmpty)
+}
 
 @Test func mountRejectsInvalidDeviceWithoutRunningAnything() async {
     let runner = FakeRunner()
