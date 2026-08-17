@@ -404,6 +404,12 @@ unreliable backend exit status and before host-NFS observation. Its focused moun
 `29/29`; the complete Bats gate passes `307/307`, including a regression whose backend deliberately
 returns success with the refusal marker. A rebuilt DMG and same-dirty-fixture repeat are required.
 
+The rebuilt classification candidate was produced from documentation head `4f35144`; DMG SHA-256
+is `402d232091bd835b3ceb85b85531c2cbacdeb7f550bea7f0c68c558c8c0cb117`. The image passes
+`hdiutil verify`; its app passes strict deep ad-hoc verification; GUI/helper are arm64; vmproxy is
+static AArch64; and the corrected mount wrapper matches its source byte for byte. Swift `272/272`
+also passed during packaging. This is the exact next install candidate, not a BB-P1-07 pass.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence

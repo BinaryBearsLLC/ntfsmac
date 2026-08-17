@@ -912,6 +912,12 @@ the marker independently of backend status and before host-mount observation. Fo
 pass `29/29` and the complete Bats gate passes `307/307`, including false-success classification.
 BB-P1-07 remains `FAIL` pending a newly packaged repeat on the unchanged dirty fixture.
 
+The rebuilt classification candidate was produced from documentation head `4f35144`; its DMG
+SHA-256 is `402d232091bd835b3ceb85b85531c2cbacdeb7f550bea7f0c68c558c8c0cb117`. `hdiutil verify`, strict
+deep ad-hoc verification, arm64 GUI/helper inspection, static AArch64 vmproxy inspection, exact
+source-to-bundle mount-wrapper hashing, and the packaging Swift `272/272` gate all pass. Install
+this exact artifact for the unchanged dirty-fixture repeat.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
@@ -961,9 +967,9 @@ Preserve the minimal popover and do not mix identity/signing migration into the 
 The installed DMG
 `a00677da68b76cbb68bef6fd0b936fe8e6d04470397085fad2fbeb884f30c637` proved the direct CLI fixes
 but contains the insufficient runtime-v2 probe. Do not use it to repeat BB-P1-07. Install the
-verified runtime-v3 DMG
-`9b0429f0dab20aa170cce51b22858faa9f85ea6b9984c35599fb150051da9036`, launch it, verify the exact
-installed bundle, and continue:
+runtime-v3 classification DMG
+`402d232091bd835b3ceb85b85531c2cbacdeb7f550bea7f0c68c558c8c0cb117`, launch it, verify the exact
+installed mount wrapper, and continue:
 
 1. **BB-01 — complete:** corrected DMG `e9a549…fbdc5`
    containing `06dcd03` correctly presented the rw-NFS/ro-guest fixture as yellow/read-only.
