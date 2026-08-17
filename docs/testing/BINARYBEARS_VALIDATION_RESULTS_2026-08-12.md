@@ -420,6 +420,11 @@ mounts, zero backend/network-helper processes, zero public security sessions, an
 unmounted. Record this as `BB-P1-07-DIRTY-USER: PASS`; BB-P1-07 remains `FAIL` until the
 authenticated state/PF audit and the Windows-repaired Mac mount/hash/Windows-reread cycle pass.
 
+The authenticated follow-up returned `BB-P1-07-DIRTY-ROOT: PASS`: no root-owned security state
+file and no scoped PF child anchor remained. The complete dirty-refusal subcell is therefore
+`PASS`. The fixture may now be repaired on Windows; BB-P1-07 remains `FAIL` only for the clean
+Windows repair plus Mac NTFS3 write/hash/unmount and Windows reread/hash/filesystem-check cycle.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence

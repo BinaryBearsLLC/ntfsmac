@@ -926,6 +926,10 @@ The authenticated state/PF audit remains required before repair. BB-P1-07 itself
 until Windows repairs the fixture and the subsequent Mac NTFS3 mount/hash/unmount plus Windows
 reread/hash/`chkdsk` pass.
 
+The authenticated audit then returned `BB-P1-07-DIRTY-ROOT: PASS`, with no root-owned state file
+or scoped PF child anchor. The dirty-refusal cell is fully `PASS`. Proceed to Windows repair and
+the clean cross-platform data cycle; do not repeat the dirty fixture unless the preflight changes.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
