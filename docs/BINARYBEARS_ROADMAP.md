@@ -1035,15 +1035,20 @@ installed mount wrapper, and continue:
    Mac NTFS3 256 MiB write, reread, hash, unmount, and cleanup passed; and Windows matched the
    exact size/SHA-256 with a clean dirty query and read-only CHKDSK. Do not repeat unless NTFS3
    preflight, driver policy, runtime contents, or mount/unmount handling changes.
-6. **BB-F01 hot unplug — source fix ready:** with USB_8GB on NTFS3 and MobileData on
+6. **BB-F01 hot unplug — second source fix ready:** with USB_8GB on NTFS3 and MobileData on
    default `ntfs-3g`, physically removing only USB_8GB left its NFS mount, VM, security session,
    and green row alive for more than 30 seconds even though physical enumeration lost it
    immediately. Manual stale-row Unmount performed exact selective teardown and preserved
    MobileData; final normal Unmount reached zero, and the authenticated root check found no state
-   files or PF child anchors. Repeat the two-drive no-I/O removal: the removed row must leave green
-   promptly and its exact mount/VM/security state must disappear automatically while the survivor
-   remains mounted and enforced. A controlled backend-stall cell remains optional when available.
-7. Run strict signature verification, `hdiutil verify`, Bats `307/307`, Swift `272/272`, and the
+   files or PF child anchors. The first fix skipped direct liveness probes for physically absent
+   devices but still awaited runtime status before consuming that evidence. Commit `392d65c` now
+   reads physical inventory and the host NFS table first, can clean a host-observed CLI mount not
+   yet cached by the GUI, and preserves live siblings; Swift `274/274`, Bats `307/307`, and the
+   release build pass. Package it, then repeat the two-drive no-I/O removal: the removed row must
+   leave green promptly and its exact mount/VM/security state must disappear automatically while
+   the survivor remains mounted and enforced. A controlled backend-stall cell remains optional
+   when available.
+7. Run strict signature verification, `hdiutil verify`, Bats `307/307`, Swift `274/274`, and the
    authenticated zero-state/PF check around BB-F01; only then convert the remaining ledger row
    from FAIL to PASS.
 8. **Resource-gated qualification:** run the controlled TV comparison and extended GPT/low-space/

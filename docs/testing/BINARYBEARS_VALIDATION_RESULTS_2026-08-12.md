@@ -462,6 +462,30 @@ BB-F01 selective two-drive hot-unplug reconciliation is the sole measured failur
 blocked rows remain BB-P1-05 controlled TV playback and the BB-P1-08 extended resource matrix;
 they are not silently credited as passes.
 
+## BB-F01 packaged replay and second correction — 2026-08-17
+
+The final installed runtime-v3 candidate started BB-F01 with MobileData on default `ntfs-3g` and
+USB_8GB on explicit NTFS3. Host truth showed two private NFS mounts, two VM sessions, two enforced
+security sessions, and the requested driver split. No Finder or payload I/O was used. After the
+operator physically removed only USB_8GB, external physical enumeration immediately retained only
+MobileData, but the removed drive's NFS mount, VM, security session, and healthy two-session
+diagnostic state remained. Manual CLI Unmount of only the absent USB device returned
+`SESSION_REMOVED`, removed its exact NFS/VM/session, and preserved MobileData as the sole mounted,
+enforced session. A GUI refresh then showed that survivor correctly; normal helper Unmount reached
+zero mounts, backend processes, and public sessions with the bridge down. BB-F01 remains `FAIL`
+because recovery was selective but not automatic.
+
+Source inspection found that production snapshots awaited `anylinuxfs status` alongside host
+physical and mount-table reads. A stale NFS backend can block that runtime-status path, preventing
+the controller from consuming physical absence that macOS had already proved. Commit `392d65c`
+now reads external physical inventory and the kernel NFS table first; their validated
+`<device>.local` identity can trigger exact cleanup without waiting for runtime status. The
+controller also includes observed host identities so an unplugged CLI-created mount is cleaned
+even before the GUI caches it, while a physically present sibling remains verified. Focused tests,
+the full Swift suite (`274/274`), the full Bats suite (`307/307`), and a release build pass. This is
+source evidence only; BB-F01 requires a newly packaged two-drive physical repeat plus authenticated
+state/PF cleanup before it can become `PASS`.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence
