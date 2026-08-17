@@ -384,6 +384,15 @@ revision 3, requires `ntfsinfo`, and its vmproxy contains the classified refusal
 has not yet been installed or exercised, so this artifact evidence does not change BB-P1-07 or
 BB-F01.
 
+That exact runtime-v3 candidate is now installed. The running GUI started after bundle replacement;
+its GUI executable, helper, four changed CLI libraries, and static vmproxy match the staged app
+byte for byte. The system helper also matches the bundled helper, strict deep signature verification
+passes, and the staged `/usr/local` runtime contains the revision-3 contract, `ntfsinfo`
+requirement, and classified refusal marker. The pre-test baseline has zero NFS mounts, backend
+processes, and public security sessions; the unchanged dirty fixture is present and unmounted.
+This closes only the install/baseline gate. The next evidence is the explicit packaged NTFS3
+read/write request on that fixture.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence

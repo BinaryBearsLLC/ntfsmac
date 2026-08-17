@@ -896,6 +896,13 @@ arm64; vmproxy is static AArch64 and contains the classified refusal marker; the
 the expected app, Applications link, background, and `.DS_Store`; and all changed bundled scripts
 match their sources byte for byte. This is the exact next install candidate, not acceptance proof.
 
+That exact runtime-v3 candidate is now installed and running. The installed GUI, helper, four
+changed CLI libraries, and vmproxy match the staged application byte for byte; the system helper
+also matches the bundle. Strict deep signature verification passes, and `/usr/local` contains the
+same revision-3 contract plus the classified marker. The dirty fixture remains unmodified and
+unmounted. Baseline evidence is zero NFS mounts, zero backend processes, and zero public security
+sessions. Proceed directly to the explicit packaged NTFS3 refusal; do not repair the fixture first.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
