@@ -733,5 +733,5 @@ private final class ExitSinkProbe: @unchecked Sendable {
     // the test process, which is the production behavior and intentionally not exercised here.
     let service = HelperService(runner: FakeRunner())
     _ = service
-    #expect(true)
+    #expect(Bool(true))
 }

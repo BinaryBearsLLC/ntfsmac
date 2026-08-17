@@ -531,6 +531,24 @@ BB-F01 is `PASS`. The current ledger is 28 `PASS`, zero `FAIL`, and two resource
 BB-P1-05 controlled TV playback and BB-P1-08 extended hardware/OS/resource qualification. No
 measured product defect remains open at this checkpoint.
 
+## GitHub Actions portability follow-up — 2026-08-17
+
+The first push of the closure checkpoint (`98dd96b`) completed the shell/Bats and vendored-Rust
+jobs successfully. The GUI job built successfully and executed all 275 Swift tests, but its only
+failure was the wall-clock assertion in `productionDriveScanTerminatesAStalledProbe`: the hosted
+runner completed both real bounded timeout paths in 1.111 seconds while the test required less than
+one second. The expected empty drive list and fixed `timed out` result were otherwise produced.
+
+The test remains a real-process stalled-probe check, but its assertion is now explicitly a
+bounded-completion safety guard rather than a latency benchmark. The three-second ceiling allows
+hosted-runner scheduling contention around two concurrent probes and their bounded TERM/SIGKILL
+grace windows while still failing a lost bounded-return contract. Before correction, the original
+test passed 20/20 local focused repeats; after correction it passed 30/30 focused repeats, followed
+by `swift build` and the complete Swift suite (`275/275`). Product code and the BB-F01 hardware
+result are unchanged. The unrelated compiler note for the intentional construction-only helper
+test was also silenced with the compiler-recommended non-constant spelling; it never contributed
+to the failed conclusion.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence

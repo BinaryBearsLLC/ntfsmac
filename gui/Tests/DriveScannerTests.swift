@@ -283,7 +283,12 @@ private let sampleExtOutput = """
 
     await scanner.refresh()
 
-    #expect(startedAt.duration(to: clock.now) < .seconds(1))
+    let elapsed = startedAt.duration(to: clock.now)
+    // This is a bounded-completion guard, not a latency benchmark. The runner has two concurrent
+    // probes plus bounded TERM/SIGKILL grace waits; a busy hosted CI machine can delay their task
+    // scheduling beyond one second even though both timeout paths complete correctly. Three
+    // seconds still fails decisively if the production scan loses its bounded-return contract.
+    #expect(elapsed < .seconds(3), "stalled production probes did not return within the safety bound")
     #expect(scanner.drives.isEmpty)
     #expect(scanner.lastError?.contains("timed out") == true)
 }
