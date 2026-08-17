@@ -364,6 +364,18 @@ the intended `ntfs-3g.probe` preflight, so this is a real eligibility-probe fals
 than a stale installation. BB-P1-07 remains `FAIL` pending a reliable classified refusal and concise
 recovery guidance; the dirty fixture must remain unrepaired for that repeat.
 
+Read-only guest inspection then isolated the missing signal without modifying the fixture.
+`ntfs-3g.probe --readwrite` returned success, normal `ntfsinfo --mft` returned nonzero, and forced
+read-only inspection reported the `DIRTY` volume flag. Source commit `d599264` therefore requires
+both checks before any opt-in read/write NTFS3 mount, fails closed if either check is unavailable or
+nonzero, publishes `unsafe_windows_state`, and replaces the backend transcript with fixed Windows
+recovery guidance. The application-owned Alpine contract is revision 3 and requires both binaries.
+Complete source gates pass Bats `307/307`, Swift `272/272`, ShellCheck (apart from the repository's
+expected dynamic-source notices), syntax checks, privacy scan, and a real host/guest rebuild. This
+is source evidence only: BB-P1-07 remains `FAIL` until the runtime-v3 DMG refuses the still-dirty
+hardware fixture before guest NTFS3 mount, leaves no session residue, and subsequently passes the
+Windows-repaired mount/hash/reread sequence.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence

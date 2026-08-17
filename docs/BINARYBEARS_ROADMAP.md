@@ -875,6 +875,20 @@ candidate byte for byte, its strict deep signature passes, and the pre-test base
 mounts, sessions, and backend processes. Packaged behavior remains uncredited until the direct
 CLI, BB-P1-07, and BB-F01 cells pass on the installed application.
 
+The packaged direct-CLI regression subsequently passed its authenticated mount/unmount and final
+zero-state/PF audit. The BB-P1-07 dirty-volume repeat then exposed a narrower safety-signal defect:
+Windows direct USB passthrough and forced read-only guest inspection both confirmed the same
+physical volume was dirty, but `ntfs-3g.probe --readwrite` returned success. Normal read-only
+`ntfsinfo --mft` returned nonzero on that fixture, while forced read-only inspection reported the
+`DIRTY` flag. Source commit `d599264` now requires both checks before an opt-in read/write NTFS3
+mount, fails closed if either is unavailable or nonzero, publishes the fixed
+`unsafe_windows_state` category, and suppresses the raw VM transcript in favor of concise Windows
+recovery guidance. The application-owned Alpine cache contract is revision 3 and requires both
+guest binaries. Full source evidence passes Bats `307/307`, Swift `272/272`, ShellCheck, syntax and
+privacy checks, and a complete real host/guest rebuild. BB-P1-07 remains `FAIL` until this exact
+runtime-v3 behavior passes on the still-unrepaired fixture and the later Windows-clean data cycle
+also passes; BB-F01 remains the other mandatory live repeat.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
@@ -914,14 +928,16 @@ animated with restraint, accessible, and fast.
 ## Exact next-agent handoff
 
 Start from `dev` with the earlier blocker commits plus `8408f4f` (hot-unplug/save panel),
-`e635bb9` (NTFS3/runtime v2), `58e6998` (privileged direct CLI unmount), and `ac42b7c`
-(standalone reconciliation). Do not push unless explicitly authorized. Current source gates are
-Bats `302/302` and Swift `271/271`.
+`e635bb9` (initial NTFS3 preflight), `58e6998` (privileged direct CLI unmount), `ac42b7c`
+(standalone reconciliation), and `d599264` (hardware-derived dual NTFS3 preflight/runtime v3).
+Do not push unless explicitly authorized. Current source gates are Bats `307/307` and Swift
+`272/272`; syntax, ShellCheck, privacy, and the real host/guest build also pass.
 Preserve the minimal popover and do not mix identity/signing migration into the blocker retest.
 
-The already-built DMG
-`a00677da68b76cbb68bef6fd0b936fe8e6d04470397085fad2fbeb884f30c637` is installed and its clean
-baseline is verified. Run the packaged retest in this order:
+The installed DMG
+`a00677da68b76cbb68bef6fd0b936fe8e6d04470397085fad2fbeb884f30c637` proved the direct CLI fixes
+but contains the insufficient runtime-v2 probe. Do not use it to repeat BB-P1-07. Build and verify
+a runtime-v3 DMG from the current documented head, install that exact artifact, and continue:
 
 1. **BB-01 — complete:** corrected DMG `e9a549…fbdc5`
    containing `06dcd03` correctly presented the rw-NFS/ro-guest fixture as yellow/read-only.
@@ -944,16 +960,13 @@ baseline is verified. Run the packaged retest in this order:
    `SESSION_REMOVED`, and reached zero mount/backend/diagnostic/public sessions. The authenticated
    final audit found no state file or PF child anchor. Do not repeat unless CLI privilege ordering,
    teardown, or reconciliation changes.
-5. **BB-P1-07 dirty policy — packaged probe false negative:** on the same unrepaired disposable volume,
-   default `ntfs-3g` landed read-only with the corrected yellow recovery state, while explicit
-   NTFS3 mounted read/write with no fallback. No payload write was issued. Treat this as a policy
-   failure, not as NTFS3 recovery evidence. The final runtime-v2 package contained and executed the
-   intended `ntfs-3g.probe` eligibility path, but that probe accepted the Windows-confirmed dirty
-   fixture and NTFS3 then failed with the raw backend transcript. No host mount, backend, or session
-   remained. Replace the insufficient eligibility signal with a reliable classified refusal before
-   a guest NTFS3 mount is attempted, retain concise Windows guidance, then repeat on the still-dirty
-   fixture. Only after that refusal passes, repair/clean on Windows and repeat mount/hash/unmount/
-   Windows reread.
+5. **BB-P1-07 dirty policy — runtime-v3 packaged repeat required:** keep the same disposable
+   volume unrepaired. The runtime-v2 package's single probe accepted the Windows-confirmed dirty
+   fixture; source commit `d599264` adds the measured second read-only check. Install the new DMG,
+   request explicit read/write NTFS3, and require refusal before guest NTFS3 mount, fixed concise
+   guidance, `unsafe_windows_state`, and zero NFS/backend/security residue. Only after that refusal
+   passes, repair/clean the fixture on Windows and repeat Mac NTFS3 mount/hash/unmount followed by
+   Windows reread/hash/`chkdsk`.
 6. **BB-F01 hot unplug — source fix ready:** with USB_8GB on NTFS3 and MobileData on
    default `ntfs-3g`, physically removing only USB_8GB left its NFS mount, VM, security session,
    and green row alive for more than 30 seconds even though physical enumeration lost it
@@ -962,7 +975,7 @@ baseline is verified. Run the packaged retest in this order:
    files or PF child anchors. Repeat the two-drive no-I/O removal: the removed row must leave green
    promptly and its exact mount/VM/security state must disappear automatically while the survivor
    remains mounted and enforced. A controlled backend-stall cell remains optional when available.
-7. Run strict signature verification, `hdiutil verify`, Bats `302/302`, Swift `271/271`, and the
+7. Run strict signature verification, `hdiutil verify`, Bats `307/307`, Swift `272/272`, and the
    authenticated zero-state/PF check; only then convert the two remaining ledger rows from FAIL
    to PASS.
 8. **Resource-gated qualification:** run the controlled TV comparison and extended GPT/low-space/
