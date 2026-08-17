@@ -918,6 +918,14 @@ deep ad-hoc verification, arm64 GUI/helper inspection, static AArch64 vmproxy in
 source-to-bundle mount-wrapper hashing, and the packaging Swift `272/272` gate all pass. Install
 this exact artifact for the unchanged dirty-fixture repeat.
 
+That exact artifact is installed and has now passed the dirty-refusal user-visible subcell. The
+packaged CLI emitted fixed concise Windows recovery guidance, no backend transcript and no
+fallback; diagnostics reported `unsafe_windows_state`; independent checks found zero NFS mounts,
+zero backend/network-helper processes, zero public sessions, and the unchanged fixture unmounted.
+The authenticated state/PF audit remains required before repair. BB-P1-07 itself remains `FAIL`
+until Windows repairs the fixture and the subsequent Mac NTFS3 mount/hash/unmount plus Windows
+reread/hash/`chkdsk` pass.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
@@ -992,11 +1000,10 @@ installed mount wrapper, and continue:
    `SESSION_REMOVED`, and reached zero mount/backend/diagnostic/public sessions. The authenticated
    final audit found no state file or PF child anchor. Do not repeat unless CLI privilege ordering,
    teardown, or reconciliation changes.
-5. **BB-P1-07 dirty policy — runtime-v3 packaged repeat required:** keep the same disposable
-   volume unrepaired. The runtime-v2 package's single probe accepted the Windows-confirmed dirty
-   fixture; source commit `d599264` adds the measured second read-only check. Install the new DMG,
-   request explicit read/write NTFS3, and require refusal before guest NTFS3 mount, fixed concise
-   guidance, `unsafe_windows_state`, and zero NFS/backend/security residue. Only after that refusal
+5. **BB-P1-07 dirty policy — refusal passed; root/clean cycle pending:** the runtime-v2 package's
+   single probe accepted the Windows-confirmed dirty fixture. Runtime v3 plus `3fd3ddd` now refuses
+   it with fixed guidance, `unsafe_windows_state`, no transcript/fallback, and zero user-visible
+   mount/backend/public-session residue. Perform the authenticated state/PF audit. Only after that
    passes, repair/clean the fixture on Windows and repeat Mac NTFS3 mount/hash/unmount followed by
    Windows reread/hash/`chkdsk`.
 6. **BB-F01 hot unplug — source fix ready:** with USB_8GB on NTFS3 and MobileData on

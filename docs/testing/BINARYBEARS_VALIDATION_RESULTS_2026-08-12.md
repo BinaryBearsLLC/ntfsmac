@@ -410,6 +410,16 @@ is `402d232091bd835b3ceb85b85531c2cbacdeb7f550bea7f0c68c558c8c0cb117`. The image
 static AArch64; and the corrected mount wrapper matches its source byte for byte. Swift `272/272`
 also passed during packaging. This is the exact next install candidate, not a BB-P1-07 pass.
 
+That exact classification candidate is installed and its GUI, helper, mount wrapper, staged CLI,
+and system helper match the verified artifact. After removing macOS's native read-only auto-mount,
+the explicit packaged read/write NTFS3 request on the still-dirty fixture now passes the refusal
+subcell: it emitted the experimental warning, prepared and released transport, produced only the
+fixed `NTFS3 read/write refused` recovery guidance, and did not expose a raw VM transcript or
+fallback. Independent user-visible checks found `failure_category=unsafe_windows_state`, zero NFS
+mounts, zero backend/network-helper processes, zero public security sessions, and the fixture
+unmounted. Record this as `BB-P1-07-DIRTY-USER: PASS`; BB-P1-07 remains `FAIL` until the
+authenticated state/PF audit and the Windows-repaired Mac mount/hash/Windows-reread cycle pass.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence
