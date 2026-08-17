@@ -376,6 +376,14 @@ is source evidence only: BB-P1-07 remains `FAIL` until the runtime-v3 DMG refuse
 hardware fixture before guest NTFS3 mount, leaves no session residue, and subsequently passes the
 Windows-repaired mount/hash/reread sequence.
 
+The runtime-v3 packaged candidate was then built from documentation head `bdd79da`; DMG SHA-256 is
+`9b0429f0dab20aa170cce51b22858faa9f85ea6b9984c35599fb150051da9036`. `hdiutil verify`, strict
+deep ad-hoc bundle verification, arm64 GUI/helper inspection, static AArch64 vmproxy inspection,
+mounted-image layout checks, and source-to-bundle hashes all pass. The bundled runtime contract is
+revision 3, requires `ntfsinfo`, and its vmproxy contains the classified refusal marker. The image
+has not yet been installed or exercised, so this artifact evidence does not change BB-P1-07 or
+BB-F01.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence

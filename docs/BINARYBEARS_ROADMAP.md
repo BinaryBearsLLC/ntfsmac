@@ -889,6 +889,13 @@ privacy checks, and a complete real host/guest rebuild. BB-P1-07 remains `FAIL` 
 runtime-v3 behavior passes on the still-unrepaired fixture and the later Windows-clean data cycle
 also passes; BB-F01 remains the other mandatory live repeat.
 
+The runtime-v3 candidate was built from documentation head `bdd79da`; its DMG SHA-256 is
+`9b0429f0dab20aa170cce51b22858faa9f85ea6b9984c35599fb150051da9036`. The image passes
+`hdiutil verify`; the application passes strict deep ad-hoc signature verification; GUI/helper are
+arm64; vmproxy is static AArch64 and contains the classified refusal marker; the mounted image has
+the expected app, Applications link, background, and `.DS_Store`; and all changed bundled scripts
+match their sources byte for byte. This is the exact next install candidate, not acceptance proof.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
@@ -936,8 +943,10 @@ Preserve the minimal popover and do not mix identity/signing migration into the 
 
 The installed DMG
 `a00677da68b76cbb68bef6fd0b936fe8e6d04470397085fad2fbeb884f30c637` proved the direct CLI fixes
-but contains the insufficient runtime-v2 probe. Do not use it to repeat BB-P1-07. Build and verify
-a runtime-v3 DMG from the current documented head, install that exact artifact, and continue:
+but contains the insufficient runtime-v2 probe. Do not use it to repeat BB-P1-07. Install the
+verified runtime-v3 DMG
+`9b0429f0dab20aa170cce51b22858faa9f85ea6b9984c35599fb150051da9036`, launch it, verify the exact
+installed bundle, and continue:
 
 1. **BB-01 — complete:** corrected DMG `e9a549…fbdc5`
    containing `06dcd03` correctly presented the rw-NFS/ro-guest fixture as yellow/read-only.
