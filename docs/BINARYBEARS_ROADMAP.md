@@ -903,6 +903,15 @@ same revision-3 contract plus the classified marker. The dirty fixture remains u
 unmounted. Baseline evidence is zero NFS mounts, zero backend processes, and zero public security
 sessions. Proceed directly to the explicit packaged NTFS3 refusal; do not repair the fixture first.
 
+The first packaged runtime-v3 request reached the new guest refusal and released its prepared
+transport with zero NFS, backend, or public security residue. It nevertheless surfaced generic
+`mount_not_observed` guidance because upstream anylinuxfs returned process status 0 after vmproxy
+refused the mount, while the wrapper inspected the classified marker only on nonzero exits. No raw
+transcript escaped, but the required fixed refusal was lost. Source commit `3fd3ddd` now recognizes
+the marker independently of backend status and before host-mount observation. Focused mount tests
+pass `29/29` and the complete Bats gate passes `307/307`, including false-success classification.
+BB-P1-07 remains `FAIL` pending a newly packaged repeat on the unchanged dirty fixture.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
@@ -943,9 +952,10 @@ animated with restraint, accessible, and fast.
 
 Start from `dev` with the earlier blocker commits plus `8408f4f` (hot-unplug/save panel),
 `e635bb9` (initial NTFS3 preflight), `58e6998` (privileged direct CLI unmount), `ac42b7c`
-(standalone reconciliation), and `d599264` (hardware-derived dual NTFS3 preflight/runtime v3).
-Do not push unless explicitly authorized. Current source gates are Bats `307/307` and Swift
-`272/272`; syntax, ShellCheck, privacy, and the real host/guest build also pass.
+(standalone reconciliation), `d599264` (hardware-derived dual NTFS3 preflight/runtime v3), and
+`3fd3ddd` (classified refusal independent of false backend success). Do not push unless explicitly
+authorized. Current source gates are Bats `307/307` and Swift `272/272`; syntax, ShellCheck,
+privacy, and the real host/guest build also pass.
 Preserve the minimal popover and do not mix identity/signing migration into the blocker retest.
 
 The installed DMG

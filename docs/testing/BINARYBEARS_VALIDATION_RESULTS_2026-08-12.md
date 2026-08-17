@@ -393,6 +393,17 @@ processes, and public security sessions; the unchanged dirty fixture is present 
 This closes only the install/baseline gate. The next evidence is the explicit packaged NTFS3
 read/write request on that fixture.
 
+That packaged request proved the new guest checks refused the dirty volume and released the
+prepared transport, with zero NFS mount, backend process, or public security session afterward.
+However, upstream anylinuxfs returned process status 0 after vmproxy's refusal. The shell wrapper
+looked for the classified marker only on a nonzero backend exit, removed the captured transcript,
+and then emitted generic `mount_not_observed` guidance. No raw VM transcript escaped, but the
+required `unsafe_windows_state` result and actionable refusal copy were lost. BB-P1-07 therefore
+remains `FAIL`. Source commit `3fd3ddd` classifies the fixed refusal marker independently of the
+unreliable backend exit status and before host-NFS observation. Its focused mount suite passes
+`29/29`; the complete Bats gate passes `307/307`, including a regression whose backend deliberately
+returns success with the refusal marker. A rebuilt DMG and same-dirty-fixture repeat are required.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence
