@@ -353,6 +353,17 @@ diagnostic sessions, and public sessions. The final authenticated audit found no
 file or PF child anchor. This closes the packaged privilege-order and standalone-reconciliation
 regression; only BB-P1-07 and BB-F01 remain as mandatory live blocker repeats.
 
+For the final packaged BB-P1-07 repeat, Windows in a VM received the disposable USB device through
+direct USB passthrough rather than a shared folder or network volume. Windows identified one local
+removable NTFS partition on a physical USB MBR disk and confirmed its dirty bit. After safe handoff,
+macOS exposed the same 15930490880-byte NTFS partition and its native driver mounted it read-only;
+that native mount was removed without a write. Explicit read/write NTFS3 then failed with no host
+NFS mount, backend, or security session left behind, but it still attempted the guest NTFS3 mount
+and exposed the long raw backend transcript. The packaged runtime and cached vmproxy both contain
+the intended `ntfs-3g.probe` preflight, so this is a real eligibility-probe false negative rather
+than a stale installation. BB-P1-07 remains `FAIL` pending a reliable classified refusal and concise
+recovery guidance; the dirty fixture must remain unrepaired for that repeat.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence

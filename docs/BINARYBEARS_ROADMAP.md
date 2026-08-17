@@ -944,12 +944,16 @@ baseline is verified. Run the packaged retest in this order:
    `SESSION_REMOVED`, and reached zero mount/backend/diagnostic/public sessions. The authenticated
    final audit found no state file or PF child anchor. Do not repeat unless CLI privilege ordering,
    teardown, or reconciliation changes.
-5. **BB-P1-07 dirty policy — source fix ready:** on the same unrepaired disposable volume,
+5. **BB-P1-07 dirty policy — packaged probe false negative:** on the same unrepaired disposable volume,
    default `ntfs-3g` landed read-only with the corrected yellow recovery state, while explicit
    NTFS3 mounted read/write with no fallback. No payload write was issued. Treat this as a policy
-   failure, not as NTFS3 recovery evidence. The new runtime v2 probe must refuse explicit read/write
-   NTFS3 before a host NFS mount/session is published and show concise recovery guidance. Then
-   repair/clean on Windows and repeat mount/hash/unmount/Windows reread.
+   failure, not as NTFS3 recovery evidence. The final runtime-v2 package contained and executed the
+   intended `ntfs-3g.probe` eligibility path, but that probe accepted the Windows-confirmed dirty
+   fixture and NTFS3 then failed with the raw backend transcript. No host mount, backend, or session
+   remained. Replace the insufficient eligibility signal with a reliable classified refusal before
+   a guest NTFS3 mount is attempted, retain concise Windows guidance, then repeat on the still-dirty
+   fixture. Only after that refusal passes, repair/clean on Windows and repeat mount/hash/unmount/
+   Windows reread.
 6. **BB-F01 hot unplug — source fix ready:** with USB_8GB on NTFS3 and MobileData on
    default `ntfs-3g`, physically removing only USB_8GB left its NFS mount, VM, security session,
    and green row alive for more than 30 seconds even though physical enumeration lost it
