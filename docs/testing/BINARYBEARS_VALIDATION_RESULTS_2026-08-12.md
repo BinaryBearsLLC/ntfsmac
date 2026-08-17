@@ -488,9 +488,26 @@ source evidence only, so BB-F01 remains `FAIL`.
 The complete GUI build from documentation head `6fbcae5` produced DMG SHA-256
 `a5eb696c2b3305e4faa3889532d7c59dd1296ede44878afe6a7742d0a1fddbc0`. `hdiutil verify` and strict
 deep ad-hoc signature verification pass; the GUI and helper are arm64 Mach-O, and guest vmproxy is
-static AArch64. The build repeated Swift `274/274` and the real host/guest runtime build. This exact
-artifact has not yet been installed; BB-F01 still requires its identical two-drive physical repeat
-plus authenticated state/PF cleanup before it can become `PASS`.
+static AArch64. The build repeated Swift `274/274` and the real host/guest runtime build.
+
+That exact artifact was then installed and its GUI initiated a normal default-`ntfs-3g` mount of
+MobileData. Host NFS truth, runtime status, and schema-6 diagnostics proved that the mount completed
+with one enforced security session, but the popover remained indefinitely on `Mounting...` and did
+not publish the mounted row. A live process sample identified several post-mount snapshot and drive
+scan tasks blocked inside `RealCommandRunner.run(..., timeout:)`: their child commands were no
+longer present in the process table, but Foundation's background `waitUntilExit()` had not returned.
+After the configured timeout, that implementation ended with an unbounded `DispatchGroup.wait()`,
+so the advertised bounded probe could still freeze the GUI permanently.
+
+Commit `d513c3f` replaces the background `waitUntilExit()` completion path with `Process`'s
+termination handler and makes the TERM and SIGKILL grace waits independently bounded. A regression
+test requires an uncooperative child that ignores TERM to return timeout status within the fixed
+bound. Swift `275/275` and Bats `307/307` pass. The complete host/guest build then produced DMG
+SHA-256 `ef3ffc661c52be7d2743575ad40d74f9ba7a4e732c1ea51e9e824554fe06267f`; strict deep ad-hoc
+signature verification and `hdiutil verify` pass. This is packaged source evidence only: the new
+artifact still requires installation, successful GUI mount-state convergence, and the exact
+two-drive BB-F01 physical repeat plus authenticated state/PF cleanup before BB-F01 can become
+`PASS`.
 
 ## Findings corrected in the working tree
 

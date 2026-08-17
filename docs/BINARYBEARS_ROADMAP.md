@@ -37,8 +37,12 @@ passed on the corrected candidate.
 The save panel now intercepts an existing name before AppKit can offer Replace. Opt-in read/write
 NTFS3 uses dual read-only eligibility checks from a versioned Alpine v3 runtime, and its packaged
 same-device dirty-refusal/repair/clean-write/Windows-reread sequence passes. Hot-unplug
-reconciliation never probes a stale NFS path after physical absence is already authoritative;
-that source correction still requires the focused BB-F01 packaged hardware repeat.
+reconciliation never probes a stale NFS path after physical absence is already authoritative.
+The first packaged replay of that correction exposed a separate bounded-runner defect: a completed
+child could leave Foundation's `waitUntilExit()` suspended and the timeout path then waited without
+a final bound, freezing the popover on `Mounting...`. Commit `d513c3f` uses asynchronous termination
+notification with bounded TERM/KILL grace periods. That correction still requires the focused
+BB-F01 packaged hardware repeat.
 
 The post-sync wiring audit and its focused recovery branches are recorded in
 [BinaryBears Upstream Regression Audit — 2026-08-05](audits/UPSTREAM_REGRESSION_AUDIT_2026-08-05.md).
@@ -995,10 +999,10 @@ animated with restraint, accessible, and fast.
 Start from `dev` with the earlier blocker commits plus `8408f4f` (hot-unplug/save panel),
 `e635bb9` (initial NTFS3 preflight), `58e6998` (privileged direct CLI unmount), `ac42b7c`
 (standalone reconciliation), `d599264` (hardware-derived dual NTFS3 preflight/runtime v3), and
-`3fd3ddd` (classified refusal independent of false backend success), plus `392d65c` (host-first
-physical-removal teardown). Do not push unless explicitly authorized. Current source gates are
-Bats `307/307` and Swift `274/274`; syntax, privacy, the release build, and the complete real
-host/guest build also pass.
+`3fd3ddd` (classified refusal independent of false backend success), `392d65c` (host-first
+physical-removal teardown), and `d513c3f` (fully bounded GUI probe completion). Do not push unless
+explicitly authorized. Current gates are Bats `307/307`, Swift `275/275`, complete real host/guest
+build, release packaging, strict deep ad-hoc signature verification, and `hdiutil verify`.
 Preserve the minimal popover and do not mix identity/signing migration into the blocker retest.
 
 The installed DMG
@@ -1010,9 +1014,11 @@ installed mount wrapper, and continue:
 
 BB-P1-07 passed on that installed runtime-v3 artifact. For BB-F01, replace it with the candidate
 built from documentation head `6fbcae5`: DMG SHA-256
-`a5eb696c2b3305e4faa3889532d7c59dd1296ede44878afe6a7742d0a1fddbc0`. The image passes
-`hdiutil verify`; the app passes strict deep ad-hoc signature verification; GUI and helper are
-arm64 Mach-O; guest vmproxy is static AArch64. Nothing from this build has been installed yet.
+`a5eb696c2b3305e4faa3889532d7c59dd1296ede44878afe6a7742d0a1fddbc0`. That build was installed,
+but its first GUI mount completed in the backend while the popover remained indefinitely on
+`Mounting...`; do not use it for the final BB-F01 replay. Replacement head `d513c3f` produced DMG
+SHA-256 `ef3ffc661c52be7d2743575ad40d74f9ba7a4e732c1ea51e9e824554fe06267f`, which passes the full
+build and verification gates above and is ready for installation.
 
 1. **BB-01 — complete:** corrected DMG `e9a549…fbdc5`
    containing `06dcd03` correctly presented the rw-NFS/ro-guest fixture as yellow/read-only.
@@ -1042,7 +1048,7 @@ arm64 Mach-O; guest vmproxy is static AArch64. Nothing from this build has been 
    Mac NTFS3 256 MiB write, reread, hash, unmount, and cleanup passed; and Windows matched the
    exact size/SHA-256 with a clean dirty query and read-only CHKDSK. Do not repeat unless NTFS3
    preflight, driver policy, runtime contents, or mount/unmount handling changes.
-6. **BB-F01 hot unplug — second source fix ready:** with USB_8GB on NTFS3 and MobileData on
+6. **BB-F01 hot unplug — third source fix packaged:** with USB_8GB on NTFS3 and MobileData on
    default `ntfs-3g`, physically removing only USB_8GB left its NFS mount, VM, security session,
    and green row alive for more than 30 seconds even though physical enumeration lost it
    immediately. Manual stale-row Unmount performed exact selective teardown and preserved
@@ -1051,11 +1057,16 @@ arm64 Mach-O; guest vmproxy is static AArch64. Nothing from this build has been 
    devices but still awaited runtime status before consuming that evidence. Commit `392d65c` now
    reads physical inventory and the host NFS table first, can clean a host-observed CLI mount not
    yet cached by the GUI, and preserves live siblings; Swift `274/274`, Bats `307/307`, and the
-   release build pass. Package it, then repeat the two-drive no-I/O removal: the removed row must
-   leave green promptly and its exact mount/VM/security state must disappear automatically while
-   the survivor remains mounted and enforced. A controlled backend-stall cell remains optional
-   when available.
-7. Run strict signature verification, `hdiutil verify`, Bats `307/307`, Swift `274/274`, and the
+   release build pass. The resulting installed artifact then completed a MobileData GUI mount in
+   the backend, but its post-mount snapshot remained blocked inside Foundation process completion
+   even after the probe child had disappeared. Commit `d513c3f` removes the background
+   `waitUntilExit()` dependency and bounds every TERM/KILL grace wait. Its replacement DMG is
+   `ef3ffc…267f`; Swift `275/275`, Bats `307/307`, the complete host/guest build, signature checks,
+   and image verification pass. Install it, then repeat the two-drive no-I/O removal: the removed
+   row must leave green promptly and its exact mount/VM/security state must disappear automatically
+   while the survivor remains mounted and enforced. A controlled backend-stall cell remains
+   optional when available.
+7. Run strict signature verification, `hdiutil verify`, Bats `307/307`, Swift `275/275`, and the
    authenticated zero-state/PF check around BB-F01; only then convert the remaining ledger row
    from FAIL to PASS.
 8. **Resource-gated qualification:** run the controlled TV comparison and extended GPT/low-space/
