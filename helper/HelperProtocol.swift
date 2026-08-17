@@ -400,25 +400,28 @@ public struct RealCommandRunner: PrivilegedCommandRunning {
             return CommandResult(output: "helper: failed to launch \(executablePath): \(error)", exitCode: -1)
         }
 
-        let processGroup = DispatchGroup()
-        processGroup.enter()
-        DispatchQueue.global(qos: .utility).async {
-            process.waitUntilExit()
-            processGroup.leave()
-        }
+        // Do not put `waitUntilExit()` on a background queue here. Live BB-F01 replay exposed a
+        // Foundation failure mode where the child had already disappeared from the process table
+        // but `waitUntilExit()` never returned. The timeout path then blocked forever in its final
+        // unbounded group wait, leaving the GUI permanently on "Mounting..." after a successful
+        // mount. A termination handler is the native asynchronous completion signal and lets every
+        // post-timeout wait remain bounded even if Foundation fails to publish process completion.
+        let processFinished = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in processFinished.signal() }
 
         var timedOut = false
         let timeoutMilliseconds = max(1, Int(timeout * 1_000))
-        if processGroup.wait(timeout: .now() + .milliseconds(timeoutMilliseconds)) == .timedOut {
+        if processFinished.wait(timeout: .now() + .milliseconds(timeoutMilliseconds)) == .timedOut {
             timedOut = true
             process.terminate()
             // A process stuck in a kernel-backed device operation may ignore SIGTERM. Keep the
-            // caller bounded and escalate only that exact child after a short grace period.
-            if processGroup.wait(timeout: .now() + .milliseconds(250)) == .timedOut {
+            // caller bounded and escalate only that exact child after a short grace period. The
+            // final wait is also bounded: an uninterruptible child must never wedge the caller.
+            if processFinished.wait(timeout: .now() + .milliseconds(250)) == .timedOut {
                 if process.isRunning {
                     _ = Darwin.kill(process.processIdentifier, SIGKILL)
                 }
-                processGroup.wait()
+                _ = processFinished.wait(timeout: .now() + .milliseconds(250))
             }
         }
 

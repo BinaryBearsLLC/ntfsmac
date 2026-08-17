@@ -33,6 +33,22 @@ private func awaitReply(_ body: (@escaping (Data?, String?) -> Void) -> Void) as
     }
 }
 
+// MARK: - bounded command execution
+
+@Test func boundedRunnerReturnsAfterEscalatingAnUncooperativeChild() {
+    let started = Date()
+    let result = RealCommandRunner().run(
+        "/bin/sh",
+        ["-c", "trap '' TERM; while :; do sleep 1; done"],
+        timeout: 0.05
+    )
+    let elapsed = Date().timeIntervalSince(started)
+
+    #expect(result.exitCode == RealCommandRunner.timeoutExitCode)
+    #expect(result.output.contains("command timed out"))
+    #expect(elapsed < 1.5, "the timeout path must never finish with an unbounded wait")
+}
+
 // MARK: - Invoking-user environment
 
 @Test func helperChildEnvironmentUsesCompleteInvokingUserIdentity() {
