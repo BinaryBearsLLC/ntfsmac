@@ -46,16 +46,16 @@ This table describes the current integrated GUI, not the original aspirational p
 | --- | --- |
 | Shipped | Auto-detect NTFS, MBR `Windows_NTFS`, ext2, ext3, and ext4 partitions |
 | Shipped | One-click mount/unmount and multiple concurrent drive rows |
-| Source-fixed — packaged retest pending | Dirty/hibernated NTFS fails closed with no read/write override and concise Windows recovery guidance |
+| Shipped — extended matrix incomplete | Dirty NTFS fails closed with no read/write override and concise Windows recovery guidance; Fast Startup and a genuinely hibernated removable-volume fixture remain resource-gated |
 | Shipped | Diagnose summary, inline Hide, and Command-click privacy-safe JSON export |
 | Shipped | Consent-first helper install, progress-backed CLI staging, pre-mount Full Disk Access verification, helper reinstall, and confirmed complete uninstall |
 | Shipped | In-popover Settings with Back, canonical version/build, Launch at login, contextual help, and adaptive menu-bar icon |
 | Shipped — matrix incomplete | Three compact SECURITY rows consume the live transaction's fixed states/reasons and provide Hide/Show. Missing, malformed, or unavailable evidence fails closed to `unknown`; the remaining packaged hardware matrix is tracked in the roadmap. |
 | Shipped | Each verified mounted-drive row exposes Open in Finder and uses that row's observed mount point |
 | Resolved | Global transfer telemetry was removed because bridge-wide counters cannot truthfully attribute concurrent traffic per drive; the minimal UI shows no speed row |
-| Shipped — qualification incomplete | NTFS3 has an explicit one-mount menu choice, Experimental warning/preflight, no silent fallback, and privacy-safe driver/result diagnostics; hardware qualification remains open. |
-| Implemented — matrix incomplete | Live mount-state reconciliation pairs anylinuxfs session evidence with the host NFS mount table, polls every five seconds, refreshes on lifecycle actions, and fails closed to yellow/unknown on disagreement. GUI unmount and external NFS/Finder disconnect passed on one packaged device; the remaining matrix is tracked in the 2026-08-11 audit. |
-| Shipped — qualification incomplete | Verified Copy is a per-drive overflow action for verified read/write mounts. It validates the exact destination volume, invokes the unprivileged CLI with literal argv, shows compact progress/result state, and cancels the whole process group; post-reconnect/Windows media proof remains open. |
+| Shipped — extended matrix incomplete | NTFS3 has an explicit one-mount menu choice, Experimental warning/preflight, no silent fallback, privacy-safe driver/result diagnostics, and a passing dirty-refusal/repair/clean-write/Windows-reread cycle; broader devices and OS versions remain resource-gated. |
+| Shipped — extended matrix incomplete | Live mount-state reconciliation pairs physical inventory, host NFS truth, and bounded runtime probes, polls every five seconds, refreshes on lifecycle actions, and fails closed to yellow/unknown on disagreement. GUI/CLI unmount, external NFS/Finder disconnect, restart, concurrent devices, and selective physical hot-unplug pass on the installed package; broader hardware remains resource-gated. |
+| Shipped — extended media check blocked | Verified Copy is a per-drive overflow action for verified read/write mounts. It validates the exact destination volume, invokes the unprivileged CLI with literal argv, shows compact progress/result state, and cancels the whole process group; cross-OS hash proof passes, while controlled TV playback remains resource-gated. |
 | Shipped | Default-off local mount/unmount/error notifications, persisted only after macOS grants permission |
 | Shipped | Eject All attempts every drive, reports per-drive results, and retains recovery controls for failures |
 
@@ -111,8 +111,11 @@ The P0 remediation implements this contract in source: helper success is provisi
 reconciles at launch/popover open/every five seconds/Refresh/after helper completion, and an
 incomplete or inconsistent snapshot preserves recovery controls in yellow `unknown` rather than
 publishing green. On 2026-08-11 one packaged device passed GUI unmount, Finder network-share
-disconnect, and an external NFS unmount with complete VM/PF/route reconciliation. CLI→GUI,
-crash/restart, physical eject/hot-unplug, and concurrent-device cells remain required.
+disconnect, and an external NFS unmount with complete VM/PF/route reconciliation. The later
+packaged matrix also passed CLI-to-GUI discovery, restart recovery, concurrent devices, and
+selective physical hot-unplug: the absent device left the GUI and backend automatically while the
+live sibling and its enforced security session remained. Broader device/controller/OS coverage
+remains resource-gated rather than being inferred from the tested host.
 
 Writability is also a two-layer fact. The host NFS client and the guest filesystem beneath its
 export can disagree: a writable NFS client does not make a guest `ntfs,ro` mount writable. The

@@ -254,7 +254,7 @@ developed from `dev` and reviewed back into `dev` through its own focused branch
 | Priority | Status | Direction |
 | --- | --- | --- |
 | Completed foundation | ✅ Shipped | Multi-drive NTFS/ext support, MBR detection, in-popover Settings, adaptive icon and help, privacy-safe CLI/GUI diagnostics, version reporting, and helper reinstall/uninstall lifecycle |
-| P0 | 🟡 Source fixes complete; packaged retest pending | Runtime pinning, audited updates, per-session PF/VPN security, complete helper user identity, host/guest mount truth, and physically-aware hot-unplug teardown are implemented; the corrected hot-unplug package still needs hardware confirmation |
+| P0 | ✅ Packaged hardware validation complete | Runtime pinning, audited updates, per-session PF/VPN security, complete helper user identity, host/guest mount truth, and physically-aware selective hot-unplug teardown pass on the installed package |
 | P1 | ✅ Packaged hardware validation complete | Verified Copy, pre-Replace no-overwrite validation, NTFS3 symlink preflight, and dual read-only NTFS3 eligibility checks pass; the same-device cycle proved concise dirty-state refusal, Windows repair, clean Mac NTFS3 write/hash/unmount, and matching Windows reread/CHKDSK |
 | P2 | ⬜ Same-product modern variant planned | A future modern helper lifecycle will ship as a second compatibility artifact of the same BinaryBears product, built and released beside the current variant from one repository and shared roadmap |
 | P3 | ✅ Packaged validation complete | Open in Finder, notifications, resilient Eject All, the professional DMG, full keyboard traversal, and Launch at login enable/disable pass on the installed package |
@@ -263,7 +263,7 @@ The roadmap records explicit A/B options where evidence is still missing. In par
 `ntfs-3g` remains the compatibility-first default; NTFS3 does not become the default without a
 documented, repeatable hardware and integrity test matrix.
 
-After the remaining BB-F01 packaged hot-unplug retest, BinaryBears will perform a dedicated
+With every measured acceptance row passing, the next review unit is the dedicated BinaryBears
 production rebrand: the approved
 new icon across app/README/DMG/site, BinaryBears identifiers, Developer ID signing, Apple
 notarization, dual-variant GitHub Actions releases, and a restrained macOS-style GitHub Pages site.

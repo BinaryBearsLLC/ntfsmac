@@ -25,9 +25,9 @@ no-state/no-PF-anchor teardown proof. The initially accepted BB-01 install cell 
 the later empty-cache first mount proved that the launchd helper supplies `HOME` and invoker IDs but
 not `USER`, causing anylinuxfs `init-rootfs` to fail before filesystem access. BB-01 now passes its
 corrected packaged onboarding, read-only truth, clean read/write round trip, and authenticated
-teardown. BB-P1-06 and BB-P1-07 now pass their corrected packaged repeats; BB-F01 hot-unplug
-reconciliation is the sole measured failure remaining rather than being hidden inside completed
-lifecycle cells.
+teardown. BB-P1-06, BB-P1-07, and BB-F01 now pass their corrected packaged repeats. The current
+ledger has no measured failure; BB-P1-05 controlled TV playback and the BB-P1-08 extended resource
+matrix remain explicitly blocked rather than being inferred from narrower passing evidence.
 BB-03 keyboard and login-item behavior passed its corrected packaged retest on 2026-08-16.
 The subsequent BB-01 replay confirmed clean removal, but the installed candidate exposed Mount
 before Full Disk Access was ready: enabling the permission consumed the first Mount request and
@@ -41,8 +41,9 @@ reconciliation never probes a stale NFS path after physical absence is already a
 The first packaged replay of that correction exposed a separate bounded-runner defect: a completed
 child could leave Foundation's `waitUntilExit()` suspended and the timeout path then waited without
 a final bound, freezing the popover on `Mounting...`. Commit `d513c3f` uses asynchronous termination
-notification with bounded TERM/KILL grace periods. That correction still requires the focused
-BB-F01 packaged hardware repeat.
+notification with bounded TERM/KILL grace periods. The focused installed-package BB-F01 repeat
+then passed automatic selective teardown, GUI convergence, survivor preservation, final normal
+unmount, and the authenticated zero-state/PF audit.
 
 The post-sync wiring audit and its focused recovery branches are recorded in
 [BinaryBears Upstream Regression Audit — 2026-08-05](audits/UPSTREAM_REGRESSION_AUDIT_2026-08-05.md).
@@ -955,15 +956,36 @@ Windows then reread `BB-P1-07-clean-ntfs3-20260817-133935/mac-ntfs3-256MiB.bin` 
 directly attached USB device at exactly 268435456 bytes and SHA-256
 `48c0a5b3b2ead4b640bceb4978be331159ec6ca0322ddc72372f850e27a7c207`. The dirty query reported
 clean; read-only CHKDSK exited 0, found no filesystem problem, required no action, and reported zero
-bad sectors. BB-P1-07 is therefore `PASS`. The current ledger is 27 `PASS`, one measured `FAIL`
-(BB-F01), and two resource `BLOCKED` rows.
+bad sectors. BB-P1-07 is therefore `PASS`.
+
+## BB-F01 closure checkpoint — 2026-08-17
+
+The installed candidate from `d513c3f`, DMG SHA-256
+`ef3ffc661c52be7d2743575ad40d74f9ba7a4e732c1ea51e9e824554fe06267f`, completed the exact
+two-drive no-I/O repeat. MobileData mounted with default `ntfs-3g`; USB_8GB mounted with explicit
+NTFS3. Host NFS truth, runtime state, schema-6 diagnostics, and the GUI agreed on two mounted
+devices and two enforced security sessions. The bounded-runner correction also proved the first
+GUI mount no longer remained stuck on `Mounting...` after its backend completed.
+
+After only USB_8GB was physically removed, authoritative enumeration lost it immediately. Its NFS
+mount, VM, and security session remained through the first 10-second observation, then disappeared
+automatically by the 12-second observation. MobileData stayed mounted, read/write, and enforced;
+diagnostics stayed healthy with exactly one mount/session. The open popover independently removed
+the absent row without Refresh and retained only the truthful MobileData row and security state.
+Normal GUI Unmount of MobileData completed within the first one-second poll. Final diagnostics
+reported zero NFS mounts and security sessions, bridge down, inactive transport, and
+`NO_ACTIVE_MOUNTS`; no scoped backend process remained. The operator-authenticated audit then
+reported no security state files or PF child anchors.
+
+BB-F01 is `PASS`. The packaged acceptance ledger is now 28 `PASS`, zero `FAIL`, and two resource
+`BLOCKED` rows. The blocked rows remain BB-P1-05 controlled TV playback and BB-P1-08 extended
+resource qualification; they are not blockers caused by a known measured product defect.
 
 ## Approved BinaryBears production direction
 
-After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
-product integration and GitHub distribution source while `main` continues to mirror upstream for
-comparison and clean contributions. Distribution remains free, open source, and release-based on
-GitHub.
+With the blocker candidate passing packaged validation, `dev` is the canonical BinaryBears product
+integration and GitHub distribution source while `main` continues to mirror upstream for comparison
+and clean contributions. Distribution remains free, open source, and release-based on GitHub.
 
 The approved replacement app icon is a 500×500 PNG with alpha, SHA-256
 `fcfddbb98d4745fa1e34fd7778283d348a613fa8f5be0a7f500b38cf05eeddc3`. Import it under a neutral
@@ -996,14 +1018,15 @@ animated with restraint, accessible, and fast.
 
 ## Exact next-agent handoff
 
-Start from `dev` with the earlier blocker commits plus `8408f4f` (hot-unplug/save panel),
+Start from the current local `dev` with the earlier blocker commits plus `8408f4f` (hot-unplug/save panel),
 `e635bb9` (initial NTFS3 preflight), `58e6998` (privileged direct CLI unmount), `ac42b7c`
 (standalone reconciliation), `d599264` (hardware-derived dual NTFS3 preflight/runtime v3), and
 `3fd3ddd` (classified refusal independent of false backend success), `392d65c` (host-first
 physical-removal teardown), and `d513c3f` (fully bounded GUI probe completion). Do not push unless
 explicitly authorized. Current gates are Bats `307/307`, Swift `275/275`, complete real host/guest
 build, release packaging, strict deep ad-hoc signature verification, and `hdiutil verify`.
-Preserve the minimal popover and do not mix identity/signing migration into the blocker retest.
+Preserve the minimal popover. All measured blocker repeats are complete; the next implementation
+unit is the separately reviewed BinaryBears identity/signing/release migration.
 
 The installed DMG
 `a00677da68b76cbb68bef6fd0b936fe8e6d04470397085fad2fbeb884f30c637` proved the direct CLI fixes
@@ -1017,8 +1040,8 @@ built from documentation head `6fbcae5`: DMG SHA-256
 `a5eb696c2b3305e4faa3889532d7c59dd1296ede44878afe6a7742d0a1fddbc0`. That build was installed,
 but its first GUI mount completed in the backend while the popover remained indefinitely on
 `Mounting...`; do not use it for the final BB-F01 replay. Replacement head `d513c3f` produced DMG
-SHA-256 `ef3ffc661c52be7d2743575ad40d74f9ba7a4e732c1ea51e9e824554fe06267f`, which passes the full
-build and verification gates above and is ready for installation.
+SHA-256 `ef3ffc661c52be7d2743575ad40d74f9ba7a4e732c1ea51e9e824554fe06267f`; its installation and
+focused BB-F01 repeat now pass as recorded in the closure checkpoint above.
 
 1. **BB-01 — complete:** corrected DMG `e9a549…fbdc5`
    containing `06dcd03` correctly presented the rw-NFS/ro-guest fixture as yellow/read-only.
@@ -1048,34 +1071,27 @@ build and verification gates above and is ready for installation.
    Mac NTFS3 256 MiB write, reread, hash, unmount, and cleanup passed; and Windows matched the
    exact size/SHA-256 with a clean dirty query and read-only CHKDSK. Do not repeat unless NTFS3
    preflight, driver policy, runtime contents, or mount/unmount handling changes.
-6. **BB-F01 hot unplug — third source fix packaged:** with USB_8GB on NTFS3 and MobileData on
-   default `ntfs-3g`, physically removing only USB_8GB left its NFS mount, VM, security session,
-   and green row alive for more than 30 seconds even though physical enumeration lost it
-   immediately. Manual stale-row Unmount performed exact selective teardown and preserved
-   MobileData; final normal Unmount reached zero, and the authenticated root check found no state
-   files or PF child anchors. The first fix skipped direct liveness probes for physically absent
-   devices but still awaited runtime status before consuming that evidence. Commit `392d65c` now
-   reads physical inventory and the host NFS table first, can clean a host-observed CLI mount not
-   yet cached by the GUI, and preserves live siblings; Swift `274/274`, Bats `307/307`, and the
-   release build pass. The resulting installed artifact then completed a MobileData GUI mount in
-   the backend, but its post-mount snapshot remained blocked inside Foundation process completion
-   even after the probe child had disappeared. Commit `d513c3f` removes the background
-   `waitUntilExit()` dependency and bounds every TERM/KILL grace wait. Its replacement DMG is
-   `ef3ffc…267f`; Swift `275/275`, Bats `307/307`, the complete host/guest build, signature checks,
-   and image verification pass. Install it, then repeat the two-drive no-I/O removal: the removed
-   row must leave green promptly and its exact mount/VM/security state must disappear automatically
-   while the survivor remains mounted and enforced. A controlled backend-stall cell remains
-   optional when available.
-7. Run strict signature verification, `hdiutil verify`, Bats `307/307`, Swift `275/275`, and the
-   authenticated zero-state/PF check around BB-F01; only then convert the remaining ledger row
-   from FAIL to PASS.
+6. **BB-F01 hot unplug — complete:** the installed `d513c3f` candidate passed bounded GUI mount
+   convergence and the two-drive no-I/O removal. The absent NTFS3 device's NFS/VM/security state
+   disappeared automatically between the 10- and 12-second observations, its green row vanished
+   without Refresh, and the default-`ntfs-3g` sibling remained mounted and enforced. Normal survivor
+   Unmount reached zero mounts/sessions with the bridge down; the authenticated audit found no state
+   file or PF child anchor. Do not repeat unless physical-presence reconciliation, bounded command
+   execution, mount/unmount handling, security teardown, or GUI truth publication changes.
+7. **Production migration — next review unit:** import the approved icon under a neutral repository
+   filename, generate every app/DMG/site representation, migrate BinaryBears identifiers with an
+   explicit upgrade/uninstall strategy, add Developer ID signing and notarization through Keychain
+   or encrypted GitHub secrets, and make fork Actions publish the compatibility DMG. Reopen and
+   revalidate packaging, onboarding, helper identity, Full Disk Access presentation, upgrade,
+   uninstall, and BB-P3-05. Keep the P2 artifact out of this first migration while designing the
+   workflow so it can later build both same-product variants.
 8. **Resource-gated qualification:** run the controlled TV comparison and extended GPT/low-space/
    controller/OS/system-volume matrix only when those external resources are actually available.
 
-Once steps 1–7 pass, begin the rebranding/production migration as a new review unit: replace the
-icon everywhere, migrate BinaryBears identifiers safely, sign/notarize, update Actions/releases,
-and revalidate the professional DMG. That change intentionally reopens BB-P3-05. Implement the P2
-variant later in the same product/release pipeline, not as an unrelated application.
+Steps 1–6 pass. Execute step 7 next as a focused rebranding/production review unit. That change
+intentionally reopens the affected install, identity, signing, upgrade/uninstall, and BB-P3-05
+gates. Implement the P2 variant later in the same product/release pipeline, not as an unrelated
+application.
 
 ## Delivery sequence
 
