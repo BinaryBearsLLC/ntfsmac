@@ -2,7 +2,7 @@
 # tests/build/package-app.bats — build/package-app.sh acceptance checks.
 #
 # Assembles dist/ntfsmac.app from the swift build release binaries + gui/Info.plist +
-# gui/Resources/AppIcon.icns + the privileged helper. Ad-hoc signs everything (L4).
+# gui/Resources/AppIcon.icns + the privileged helper. Local fixtures use ad-hoc signing.
 
 setup() {
   REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
@@ -41,8 +41,9 @@ teardown() {
   [ -f "$APP/Contents/Info.plist" ]
   [ -f "$APP/Contents/MacOS/ntfsmac-gui" ]
   [ -f "$APP/Contents/Resources/AppIcon.icns" ]
+  [ -f "$APP/Contents/Resources/HelperIcon.png" ]
   [ -f "$APP/Contents/Resources/cli-src/cli/pf/ntfsmac.anchor.tmpl" ]
-  [ -f "$APP/Contents/Library/LaunchServices/com.khr898.ntfsmac.helper" ]
+  [ -f "$APP/Contents/Library/LaunchServices/com.binarybears.ntfsmac.helper" ]
 }
 
 @test "Contents/Info.plist declares CFBundleExecutable matching the launcher binary" {
@@ -81,7 +82,7 @@ teardown() {
   run "$SCRIPT"
   [ "$status" -eq 0 ]
 
-  run codesign -dv "$APP/Contents/Library/LaunchServices/com.khr898.ntfsmac.helper"
+  run codesign -dv "$APP/Contents/Library/LaunchServices/com.binarybears.ntfsmac.helper"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Signature=adhoc"* ]]
 
@@ -106,9 +107,11 @@ teardown() {
   [ "$status" -eq 0 ]
 }
 
-@test "still ad-hoc only — never a real Developer ID / paid cert signing identity (L4)" {
-  run grep -E -- '-s\s+"?[A-Za-z0-9]' "$SCRIPT"
-  [ "$status" -ne 0 ]
+@test "defaults to ad-hoc signing and accepts an explicit release identity" {
+  run grep -F 'SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"' "$SCRIPT"
+  [ "$status" -eq 0 ]
+  run grep -F -- '--options runtime' "$SCRIPT"
+  [ "$status" -eq 0 ]
 }
 
 @test "fails clearly when the swift release binaries are missing" {

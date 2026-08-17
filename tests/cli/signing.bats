@@ -13,7 +13,8 @@ setup() {
   cp /bin/echo "$BIN_DIR/anylinuxfs"
   cp /bin/cat "$BIN_DIR/gvproxy"
   cp /bin/ls "$BIN_DIR/init-rootfs"
-  chmod +x "$BIN_DIR/anylinuxfs" "$BIN_DIR/gvproxy" "$BIN_DIR/init-rootfs"
+  cp /bin/date "$BIN_DIR/vmnet-helper"
+  chmod +x "$BIN_DIR/anylinuxfs" "$BIN_DIR/gvproxy" "$BIN_DIR/init-rootfs" "$BIN_DIR/vmnet-helper"
 
   export NTFSMAC_VENDOR_BIN_DIR="$BIN_DIR"
 }
@@ -38,10 +39,13 @@ teardown() {
   [[ "$output" == *"OK — $BIN_DIR/anylinuxfs"* ]]
   [[ "$output" == *"OK — $BIN_DIR/gvproxy"* ]]
   [[ "$output" == *"OK — $BIN_DIR/init-rootfs"* ]]
+  [[ "$output" == *"OK — $BIN_DIR/vmnet-helper"* ]]
 }
 
-@test "never signs vmnet-helper or vmproxy" {
-  run grep -E '"vmnet-helper"|"vmproxy"' "$SIGN_SCRIPT"
+@test "signs the macOS vmnet helper but never the Linux-only vmproxy" {
+  run grep -F 'SIGNABLE=(anylinuxfs gvproxy init-rootfs vmnet-helper)' "$SIGN_SCRIPT"
+  [ "$status" -eq 0 ]
+  run grep -E '^SIGNABLE=.*vmproxy' "$SIGN_SCRIPT"
   [ "$status" -ne 0 ]
 }
 
@@ -57,6 +61,9 @@ teardown() {
 
   run codesign -d --entitlements - --xml "$BIN_DIR/gvproxy"
   [[ "$output" != *"com.apple.security.hypervisor"* ]]
+
+  run codesign -d --entitlements - --xml "$BIN_DIR/vmnet-helper"
+  [[ "$output" == *"com.apple.security.virtualization"* ]]
 }
 
 @test "verify-signature.sh confirms the hypervisor entitlement is present" {
@@ -65,12 +72,13 @@ teardown() {
   run "$VERIFY_SCRIPT"
   [ "$status" -eq 0 ]
   [[ "$output" == *"carries the hypervisor entitlement"* ]]
+  [[ "$output" == *"carries the virtualization entitlement"* ]]
 }
 
-@test "still ad-hoc only — never a real Developer ID / paid cert signing identity (L4)" {
-  run grep -E -- '-s\s+"?[A-Za-z0-9]' "$SIGN_SCRIPT"
-  [ "$status" -ne 0 ]
-  run grep -c -- 'codesign' "$SIGN_SCRIPT"
+@test "defaults to ad-hoc signing and accepts an explicit release identity" {
+  run grep -F 'SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"' "$SIGN_SCRIPT"
+  [ "$status" -eq 0 ]
+  run grep -F -- '--options runtime' "$SIGN_SCRIPT"
   [ "$status" -eq 0 ]
 }
 

@@ -1,11 +1,10 @@
 #!/bin/bash
-# build/make-dmg.sh — wraps build/package-app.sh's dist/ntfsmac.app into an ad-hoc DMG
-# (L4: GUI ships DMG-only, never a Homebrew cask — no notarization, no paid Developer ID).
+# build/make-dmg.sh — wraps build/package-app.sh's dist/ntfsmac.app into a DMG.
 #
 # The writable staging image is configured through Finder, then converted to the final
 # compressed image. Nothing here re-signs the .app (that already happened in
-# package-app.sh); Gatekeeper's ad-hoc-signature warning on first open is expected and
-# documented (right-click → Open), per PLAN.md R3.
+# package-app.sh). Official builds additionally sign the final disk image with the same
+# BinaryBears Developer ID identity before notarization.
 #
 # hdiutil writes its output to a space-free, off-volume temp path, then a plain `cp` lands
 # the finished .dmg in dist/. Real bug, reproduced: writing UDZO output straight to dist/
@@ -21,8 +20,11 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 
 APP="${NTFSMAC_APP_BUNDLE:-$REPO_ROOT/dist/ntfsmac.app}"
-DMG_OUT="${NTFSMAC_DMG_OUT:-$REPO_ROOT/dist/ntfsmac.dmg}"
+PRODUCT_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$REPO_ROOT/gui/Info.plist")"
+DMG_OUT="${NTFSMAC_DMG_OUT:-$REPO_ROOT/dist/ntfsmac-${PRODUCT_VERSION}-Apple-Silicon.dmg}"
 VOLUME_NAME="${NTFSMAC_DMG_VOLUME_NAME:-ntfsmac Installer}"
+SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
+SIGNING_KEYCHAIN="${SIGNING_KEYCHAIN:-}"
 BACKGROUND_RENDERER="$SCRIPT_DIR/render-dmg-background.swift"
 FINDER_LAYOUT="$SCRIPT_DIR/configure-dmg.applescript"
 
@@ -108,6 +110,17 @@ main() {
     exit 1
   fi
 
+  # Finder's layout update removes a pre-existing .VolumeIcon.icns while rebuilding the volume
+  # metadata, so apply the approved icon only after that update has completed.
+  if ! cp "$APP/Contents/Resources/AppIcon.icns" "$mount_dir/.VolumeIcon.icns"; then
+    echo "make-dmg: HARD-STOP — failed to apply the ntfsmac DMG volume icon" >&2
+    exit 1
+  fi
+  if ! xcrun SetFile -a C "$mount_dir"; then
+    echo "make-dmg: HARD-STOP — failed to mark the DMG volume with its custom icon" >&2
+    exit 1
+  fi
+
   sync
   if ! hdiutil detach "$mount_dir" -quiet; then
     echo "make-dmg: HARD-STOP — writable image detach failed" >&2
@@ -133,6 +146,15 @@ main() {
   if ! cp "$tmp_dmg" "$DMG_OUT"; then
     echo "make-dmg: HARD-STOP — failed to copy built DMG to $DMG_OUT" >&2
     exit 1
+  fi
+
+  if [[ "$SIGNING_IDENTITY" != "-" ]]; then
+    local -a sign_args=(-s "$SIGNING_IDENTITY" --force --timestamp)
+    [[ -z "$SIGNING_KEYCHAIN" ]] || sign_args+=(--keychain "$SIGNING_KEYCHAIN")
+    if ! codesign "${sign_args[@]}" "$DMG_OUT"; then
+      echo "make-dmg: HARD-STOP — failed to sign $DMG_OUT" >&2
+      exit 1
+    fi
   fi
 
   echo "make-dmg: done — $DMG_OUT"

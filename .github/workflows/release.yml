@@ -1,0 +1,209 @@
+name: Release notarized DMG
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semantic version to release, for example 3.0.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-v${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Sign, notarize, and create draft
+    runs-on: macos-26
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    env:
+      NOTARY_PROFILE: ntfsmac-notary-${{ github.run_id }}
+      RELEASE_VERSION: ${{ inputs.version }}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Validate and check out the signed release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/heads/dev" ]]; then
+            echo "::error::Run this workflow from dev."
+            exit 1
+          fi
+          if [[ ! "$RELEASE_VERSION" =~ ^3\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version must be a v3 X.Y.Z version without the v prefix."
+            exit 1
+          fi
+
+          release_tag="v${RELEASE_VERSION}"
+          git show-ref --verify --quiet "refs/tags/${release_tag}" || {
+            echo "::error::Signed tag ${release_tag} does not exist."
+            exit 1
+          }
+          git config --local gpg.format ssh
+          git config --local gpg.ssh.allowedSignersFile "$GITHUB_WORKSPACE/.github/allowed_signers"
+          git verify-tag "$release_tag"
+
+          tag_commit="$(git rev-list -n 1 "$release_tag")"
+          dev_commit="$(git rev-parse origin/dev)"
+          if [[ "$tag_commit" != "$dev_commit" ]]; then
+            echo "::error::Tag ${release_tag} must point to the exact validated origin/dev commit."
+            exit 1
+          fi
+
+          git checkout --detach "$release_tag"
+          app_version="$(plutil -extract CFBundleShortVersionString raw -o - gui/Info.plist)"
+          app_build="$(plutil -extract CFBundleVersion raw -o - gui/Info.plist)"
+          helper_version="$(plutil -extract CFBundleShortVersionString raw -o - helper/Info.plist)"
+          helper_build="$(plutil -extract CFBundleVersion raw -o - helper/Info.plist)"
+          if [[ "$RELEASE_VERSION" != "$app_version" || "$app_version" != "$helper_version" ||
+                "$app_build" != "$helper_build" ]]; then
+            echo "::error::Requested, app, and helper versions/builds do not match."
+            exit 1
+          fi
+          printf 'RELEASE_TAG=%s\n' "$release_tag" >> "$GITHUB_ENV"
+
+      - name: Validate Apple release secrets
+        shell: bash
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          required=(
+            APPLE_CERTIFICATE_P12_BASE64
+            APPLE_CERTIFICATE_PASSWORD
+            APPLE_SIGNING_IDENTITY
+            APPLE_API_KEY_BASE64
+            APPLE_API_KEY_ID
+            APPLE_API_ISSUER_ID
+          )
+          for name in "${required[@]}"; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Required repository secret $name is not configured."
+              exit 1
+            fi
+          done
+          if [[ "$APPLE_SIGNING_IDENTITY" != "Developer ID Application: BinaryBears LLC (SQY8T23X8N)" ]]; then
+            echo "::error::APPLE_SIGNING_IDENTITY is not the BinaryBears release identity."
+            exit 1
+          fi
+
+      - name: Install build and test dependencies
+        run: |
+          brew install bats-core shellcheck llvm lld umoci xz util-linux gettext pkg-config
+          echo "/opt/homebrew/opt/llvm/bin" >> "$GITHUB_PATH"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-musl
+
+      - name: Run release source gates
+        run: |
+          find . \( -name '*.sh' -o -name '*.command' \) -not -path './vendor/src/*' -print0 |
+            xargs -0 shellcheck -S warning
+          ./build/sync-brand-assets.sh
+          git diff --exit-code -- gui/Resources/AppIcon-source.png gui/Resources/AppIcon.icns gui/Resources/HelperIcon.png
+          ./tests/run-all.sh
+          swift test --disable-sandbox
+
+      - name: Import the Developer ID certificate
+        shell: bash
+        env:
+          APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          certificate_path="$RUNNER_TEMP/developer-id.p12"
+          keychain_path="$RUNNER_TEMP/ntfsmac-signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          printf '%s' "$APPLE_CERTIFICATE_P12_BASE64" | /usr/bin/base64 --decode > "$certificate_path"
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          existing_keychains=()
+          while IFS= read -r existing_keychain; do
+            existing_keychain="${existing_keychain#\"}"
+            existing_keychain="${existing_keychain%\"}"
+            existing_keychains+=("$existing_keychain")
+          done < <(security list-keychains -d user)
+          security list-keychains -d user -s "$keychain_path" "${existing_keychains[@]}"
+          security import "$certificate_path" -k "$keychain_path" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s \
+            -k "$keychain_password" "$keychain_path"
+          security find-identity -v -p codesigning "$keychain_path" | grep -F -- "$APPLE_SIGNING_IDENTITY"
+          rm -f "$certificate_path"
+          printf 'SIGNING_KEYCHAIN=%s\n' "$keychain_path" >> "$GITHUB_ENV"
+
+      - name: Store temporary notarization credentials
+        shell: bash
+        env:
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          umask 077
+          api_key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+          printf '%s' "$APPLE_API_KEY_BASE64" | /usr/bin/base64 --decode > "$api_key_path"
+          xcrun notarytool store-credentials "$NOTARY_PROFILE" \
+            --key "$api_key_path" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER_ID" \
+            --keychain "$SIGNING_KEYCHAIN"
+          rm -f "$api_key_path"
+
+      - name: Build, sign, notarize, and verify
+        env:
+          SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: ./build/notarize-release.sh
+
+      - name: Create the draft GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          dmg_path="dist/ntfsmac-${RELEASE_VERSION}-Apple-Silicon.dmg"
+          gh release create "$RELEASE_TAG" \
+            "$dmg_path" \
+            "${dmg_path}.sha256" \
+            --draft \
+            --verify-tag \
+            --generate-notes \
+            --title "ntfsmac ${RELEASE_VERSION}"
+
+      - name: Remove temporary credentials
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/developer-id.p12" "$RUNNER_TEMP"/AuthKey_*.p8
+          keychain_path="${SIGNING_KEYCHAIN:-$RUNNER_TEMP/ntfsmac-signing.keychain-db}"
+          if [[ -f "$keychain_path" ]]; then
+            security delete-keychain "$keychain_path" || true
+          fi

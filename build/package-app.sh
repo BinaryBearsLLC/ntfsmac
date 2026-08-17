@@ -1,12 +1,11 @@
 #!/bin/bash
-# build/package-app.sh — assembles dist/ntfsmac.app (Phase 3 exit criterion, PLAN.md §4:
-# "ships as an ad-hoc-signed DMG that runs on a fresh M-series machine").
+# build/package-app.sh — assembles dist/ntfsmac.app.
 #
 # Release-builds the gui + helper SPM executables, lays them into a real .app bundle
 # (Contents/MacOS, Contents/Resources, Contents/Library/LaunchServices for the raw
-# SMJobBless helper tool), then ad-hoc signs (`codesign -s -`, L4 — never a real identity)
-# the helper binary, the gui binary, and finally the outer bundle, in that order (inner
-# code must be signed before the bundle that contains it).
+# SMJobBless helper tool), then signs the helper and outer app in that order. Local builds
+# default to ad-hoc; official releases supply the BinaryBears Developer ID identity and use
+# Hardened Runtime plus Apple's trusted timestamp.
 #
 # Bundles vendor/bin/* + cli/{commands,lib,pf} + install.sh into Contents/Resources/cli-src/
 # (REPO_ROOT-relative layout install.sh already expects, unchanged) — explicit product
@@ -24,6 +23,8 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 RELEASE_DIR="${NTFSMAC_SWIFT_RELEASE_DIR:-$REPO_ROOT/.build/release}"
 OUT_DIR="${NTFSMAC_APP_OUT_DIR:-$REPO_ROOT/dist}"
 APP="$OUT_DIR/ntfsmac.app"
+SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
+SIGNING_KEYCHAIN="${SIGNING_KEYCHAIN:-}"
 
 GUI_BIN_NAME="ntfsmac-gui"
 HELPER_BIN_NAME="ntfsmac-helper"
@@ -232,6 +233,10 @@ SWIFT
     echo "package-app: HARD-STOP — failed to copy gui/Resources/AppIcon.icns" >&2
     exit 1
   fi
+  if ! cp "$REPO_ROOT/gui/Resources/HelperIcon.png" "$APP/Contents/Resources/HelperIcon.png"; then
+    echo "package-app: HARD-STOP — failed to copy gui/Resources/HelperIcon.png" >&2
+    exit 1
+  fi
   if ! cp "$helper_bin" "$APP/Contents/Library/LaunchServices/$helper_label"; then
     echo "package-app: HARD-STOP — failed to copy $helper_bin" >&2
     exit 1
@@ -248,8 +253,19 @@ SWIFT
   fi
   rm -rf "$cli_stage"
 
-  echo "package-app: ad-hoc signing helper binary"
-  if ! codesign -s - --force --identifier "$helper_label" "$APP/Contents/Library/LaunchServices/$helper_label" 2>&1; then
+  local -a helper_sign_args=(-s "$SIGNING_IDENTITY" --force --timestamp=none --identifier "$helper_label")
+  local -a app_sign_args=(-s "$SIGNING_IDENTITY" --force --timestamp=none)
+  if [[ "$SIGNING_IDENTITY" != "-" ]]; then
+    helper_sign_args=(-s "$SIGNING_IDENTITY" --force --options runtime --timestamp --identifier "$helper_label")
+    app_sign_args=(-s "$SIGNING_IDENTITY" --force --options runtime --timestamp)
+    if [[ -n "$SIGNING_KEYCHAIN" ]]; then
+      helper_sign_args=(-s "$SIGNING_IDENTITY" --force --options runtime --timestamp --keychain "$SIGNING_KEYCHAIN" --identifier "$helper_label")
+      app_sign_args=(-s "$SIGNING_IDENTITY" --force --options runtime --timestamp --keychain "$SIGNING_KEYCHAIN")
+    fi
+  fi
+
+  echo "package-app: signing helper binary with $SIGNING_IDENTITY"
+  if ! codesign "${helper_sign_args[@]}" "$APP/Contents/Library/LaunchServices/$helper_label" 2>&1; then
     echo "package-app: HARD-STOP — failed to sign helper binary" >&2
     exit 1
   fi
@@ -257,8 +273,8 @@ SWIFT
   # The gui binary is intentionally not signed standalone here: it has no adjacent Info.plist
   # at this point (no meaningful identifier to set), and the outer-bundle sign below fully
   # re-signs it anyway once Contents/Info.plist is in place.
-  echo "package-app: ad-hoc signing outer bundle"
-  if ! codesign -s - --force "$APP" 2>&1; then
+  echo "package-app: signing outer bundle with $SIGNING_IDENTITY"
+  if ! codesign "${app_sign_args[@]}" "$APP" 2>&1; then
     echo "package-app: HARD-STOP — failed to sign $APP" >&2
     exit 1
   fi

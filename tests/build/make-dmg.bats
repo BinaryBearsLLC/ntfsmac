@@ -2,7 +2,7 @@
 # tests/build/make-dmg.bats — build/make-dmg.sh acceptance checks.
 #
 # Wraps an already-assembled .app bundle (build/package-app.sh's output) into an
-# ad-hoc, DMG-only distributable (L4: DMG-only, never a Homebrew cask).
+# DMG-only distributable. Fixture builds omit the optional Developer ID signature.
 
 setup() {
   REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
@@ -15,8 +15,9 @@ setup() {
   # A minimal but real .app shape — make-dmg.sh only cares that it's a directory
   # named *.app with something inside, not that it's fully signed (that's
   # package-app.sh's job, covered separately in package-app.bats).
-  mkdir -p "$APP/Contents/MacOS"
+  mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
   cp /bin/echo "$APP/Contents/MacOS/ntfsmac-gui"
+  cp "$REPO_ROOT/gui/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
   export NTFSMAC_APP_BUNDLE="$APP"
   export NTFSMAC_DMG_OUT="$OUT_DIR/ntfsmac.dmg"
@@ -44,6 +45,7 @@ teardown() {
   [ "$(readlink "$MOUNT_DIR/Applications")" = "/Applications" ]
   [ -f "$MOUNT_DIR/.DS_Store" ]
   [ -f "$MOUNT_DIR/.background/ntfsmac-dmg-background.png" ]
+  [ -f "$MOUNT_DIR/.VolumeIcon.icns" ]
 
   run sips -g pixelWidth -g pixelHeight \
     "$MOUNT_DIR/.background/ntfsmac-dmg-background.png"
