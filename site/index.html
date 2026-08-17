@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="ntfsmac by BinaryBears — read and write NTFS drives on Apple Silicon Macs.">
+    <meta name="theme-color" content="#067ce7">
+    <title>ntfsmac by BinaryBears</title>
+    <link rel="icon" href="assets/ntfsmac-icon.png">
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="ntfsmac home">
+        <img src="assets/ntfsmac-icon.png" alt="" width="38" height="38">
+        <span>ntfsmac</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="#features">Features</a>
+        <a href="#install">Install</a>
+        <a href="#privacy">Privacy</a>
+        <a href="https://github.com/BinaryBearsLLC/ntfsmac">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Open source · macOS · Apple Silicon</p>
+          <h1>ntfsmac <span>by BinaryBears</span></h1>
+          <p class="lede">Mount NTFS drives read/write from a focused native menu-bar app, with
+            isolated networking and diagnostics you can actually inspect.</p>
+          <div class="actions">
+            <a class="button primary" id="release-link" href="https://github.com/BinaryBearsLLC/ntfsmac/releases">View releases</a>
+            <a class="button secondary" href="https://github.com/BinaryBearsLLC/ntfsmac">Source code</a>
+          </div>
+          <p class="release-status" id="release-status">v3.0.0 is in preparation.</p>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="glow"></div>
+          <img src="assets/ntfsmac-icon.png" alt="" width="420" height="420">
+        </div>
+      </section>
+
+      <section class="requirements" aria-label="System requirements">
+        <div><strong>Apple Silicon</strong><span>M-series Mac</span></div>
+        <div><strong>macOS 13+</strong><span>Ventura or newer</span></div>
+        <div><strong>Local control</strong><span>No account or telemetry</span></div>
+      </section>
+
+      <section class="section split" id="features">
+        <div>
+          <p class="eyebrow">Small app, serious boundary</p>
+          <h2>Your NTFS drive in the menu bar.</h2>
+          <p>ntfsmac runs the filesystem in a lightweight Linux virtual machine and exposes the
+            result locally to macOS. The interface keeps mount state, safety checks and recovery
+            close at hand.</p>
+          <ul class="checklist">
+            <li>NTFS read/write with explicit mount and unmount controls</li>
+            <li>Per-mount network isolation and firewall status</li>
+            <li>Built-in diagnostics and complete uninstall</li>
+            <li>Simple release check that always sends you to GitHub</li>
+          </ul>
+        </div>
+        <figure class="app-shot">
+          <img src="assets/ntfsmac-mounted.png" alt="ntfsmac menu showing a mounted NTFS drive and security status">
+          <figcaption>Native controls with visible security state.</figcaption>
+        </figure>
+      </section>
+
+      <section class="section" id="install">
+        <p class="eyebrow">Installation</p>
+        <h2>Three deliberate steps.</h2>
+        <div class="steps">
+          <article><span>1</span><h3>Download</h3><p>Get the latest signed Apple Silicon DMG from GitHub Releases.</p></article>
+          <article><span>2</span><h3>Move</h3><p>Drag <strong>ntfsmac</strong> to Applications and open it.</p></article>
+          <article><span>3</span><h3>Authorize</h3><p>Approve ntfsmac Helper and Full Disk Access when macOS asks.</p></article>
+        </div>
+        <p class="note">Upgrading from an older build replaces the previous helper. macOS may ask
+          you to approve Full Disk Access again.</p>
+      </section>
+
+      <section class="section privacy" id="privacy">
+        <div>
+          <p class="eyebrow">Security &amp; privacy</p>
+          <h2>No telemetry. No silent updater.</h2>
+        </div>
+        <div>
+          <p>The app checks GitHub at most once every 24 hours for the latest published release.
+            It never downloads or installs updates on its own. Automatic network errors stay
+            silent and mount operations do not depend on the check.</p>
+          <div class="doc-links">
+            <a href="https://github.com/BinaryBearsLLC/ntfsmac/blob/dev/SECURITY.md">Security policy</a>
+            <a href="https://github.com/BinaryBearsLLC/ntfsmac/blob/dev/CONTRIBUTING.md">Contributing</a>
+            <a href="https://github.com/BinaryBearsLLC/ntfsmac/blob/dev/LICENSE">MIT license</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>ntfsmac by BinaryBears</span>
+      <span>Open source under the MIT License.</span>
+    </footer>
+  </body>
+</html>
