@@ -133,7 +133,7 @@ run_anylinuxfs_mount() {
   # Start the bounded backend as a background job so the transaction layer can observe the new
   # vmnet /30 and repair an exact VPN-captured guest route before anylinuxfs performs its own
   # NFS readiness check. The job still runs through the same watchdog and preserves live output.
-  local security_prepare_available="0" mount_job mount_result="0"
+  local security_prepare_available="0" mount_job mount_result="0" unsafe_windows_state="0"
   local progress_output="-" capture_ntfs3_output="0"
   if [[ "$fs_driver" == "ntfs3" && -z "$read_only" ]]; then
     progress_output="$(mktemp "${TMPDIR:-/tmp}/ntfsmac-ntfs3-mount.XXXXXX")" || {
@@ -156,13 +156,19 @@ run_anylinuxfs_mount() {
     security_prepare_mount_transport "$device" "$mount_job" || true
   fi
   wait "$mount_job" || mount_result=$?
-  if [[ "$mount_result" != "0" ]]; then
+  # Upstream anylinuxfs can report success even after vmproxy rejects the guest mount. Classify
+  # ntfsmac's fixed fail-closed marker independently of that unreliable process exit status and
+  # before the generic host-NFS observation check can replace the actionable refusal.
+  if [[ "$capture_ntfs3_output" == "1" ]] \
+    && grep -Fq 'NTFSMAC_NTFS3_RW_UNSAFE' "$progress_output"; then
+    unsafe_windows_state="1"
+  fi
+  if [[ "$mount_result" != "0" || "$unsafe_windows_state" == "1" ]]; then
     if [[ "$security_prepare_available" == "1" ]] \
       && declare -F security_abort_prepared_mount >/dev/null 2>&1; then
       security_abort_prepared_mount "$device" || true
     fi
-    if [[ "$capture_ntfs3_output" == "1" ]] \
-      && grep -Fq 'NTFSMAC_NTFS3_RW_UNSAFE' "$progress_output"; then
+    if [[ "$unsafe_windows_state" == "1" ]]; then
       NTFSMAC_MOUNT_FAILURE_CATEGORY="unsafe_windows_state"
       echo "mount: NTFS3 read/write refused — Windows left this volume in an unsafe state. Run chkdsk, disable Fast Startup, then fully shut down Windows." >&2
     elif [[ "$mount_result" == "124" ]]; then

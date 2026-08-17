@@ -102,12 +102,12 @@ STUB
   [ "$status" -eq 0 ]
 }
 
-@test "unsafe read-write NTFS3 failure hides backend transcript and publishes fixed guidance" {
+@test "unsafe read-write NTFS3 marker overrides an unreliable successful backend exit" {
   cat > "$STUB_DIR/anylinuxfs" <<STUB
 #!/bin/bash
 echo "internal VM transcript that must stay hidden"
 echo "Linux: Error: NTFSMAC_NTFS3_RW_UNSAFE: volume requires Windows checking" >&2
-exit 1
+exit 0
 STUB
   chmod +x "$STUB_DIR/anylinuxfs"
 
