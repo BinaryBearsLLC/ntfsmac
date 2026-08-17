@@ -29,31 +29,31 @@ hardware or controlled playback environment is available.
 - [x] Preserve the pre-rebrand source at `archive/dev-pre-v3-rebrand` and signed tag
   `dev-pre-v3-rebrand-20260817`, both resolving to `98dd96b`.
 - [x] Keep fork `main` as the independent upstream mirror; do not merge it into the v3 rebrand.
-- [ ] Keep the visible product name exactly **ntfsmac**.
-- [ ] Use **ntfsmac by BinaryBears** only for README and website marketing.
-- [ ] Change production identifiers to `com.binarybears.ntfsmac` and
+- [x] Keep the visible product name exactly **ntfsmac**.
+- [x] Use **ntfsmac by BinaryBears** only for README and website marketing.
+- [x] Change production identifiers to `com.binarybears.ntfsmac` and
   `com.binarybears.ntfsmac.helper`.
-- [ ] Apply the approved ntfsmac icon to the app, DMG, README, and site.
-- [ ] Add the gear-marked helper variant inside the app's permission guidance.
-- [ ] Retain the original author and license notices in this repository.
+- [x] Apply the approved ntfsmac icon to the app, DMG, README, and site.
+- [x] Add the gear-marked helper variant inside the app's permission guidance.
+- [x] Retain the original author and license notices in this repository.
 
 ### Migration and update behavior
 
-- [ ] Detect and remove the old `com.khr898.ntfsmac.helper` before blessing the v3 helper.
-- [ ] Migrate only safe preferences: notification opt-in and confirmed launch-at-login intent.
-- [ ] Re-probe Full Disk Access for the new helper and never inherit stale permission state.
-- [ ] Add a manual update check plus an automatic check limited to once every 24 hours.
-- [ ] Read only the latest published stable GitHub Release and open its GitHub page; never download,
+- [x] Detect and remove the old `com.khr898.ntfsmac.helper` before blessing the v3 helper.
+- [x] Migrate only safe preferences: notification opt-in and confirmed launch-at-login intent.
+- [x] Re-probe Full Disk Access for the new helper and never inherit stale permission state.
+- [x] Add a manual update check plus an automatic check limited to once every 24 hours.
+- [x] Read only the latest published stable GitHub Release and open its GitHub page; never download,
   install, track, or run a background update service.
 
 ### Release and public project
 
-- [ ] Keep local contributor builds ad-hoc and credential-free.
-- [ ] Developer ID sign and notarize official BinaryBears releases.
+- [x] Keep local contributor builds ad-hoc and credential-free.
+- [x] Prepare Developer ID signing and notarization for official BinaryBears releases.
 - [ ] Produce `ntfsmac-3.0.0-Apple-Silicon.dmg` and its SHA-256 file from a signed v3 tag.
 - [ ] Create a draft GitHub Release, test that exact downloaded DMG, then publish without rebuilding.
 - [ ] Publish the static, analytics-free GitHub Pages site.
-- [ ] Complete repository/privacy audit and enable concise issue templates.
+- [x] Complete the tracked-tree privacy audit and enable concise issue templates.
 
 ### v3 release gate
 
