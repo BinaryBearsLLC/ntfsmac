@@ -995,9 +995,10 @@ animated with restraint, accessible, and fast.
 Start from `dev` with the earlier blocker commits plus `8408f4f` (hot-unplug/save panel),
 `e635bb9` (initial NTFS3 preflight), `58e6998` (privileged direct CLI unmount), `ac42b7c`
 (standalone reconciliation), `d599264` (hardware-derived dual NTFS3 preflight/runtime v3), and
-`3fd3ddd` (classified refusal independent of false backend success). Do not push unless explicitly
-authorized. Current source gates are Bats `307/307` and Swift `272/272`; syntax, ShellCheck,
-privacy, and the real host/guest build also pass.
+`3fd3ddd` (classified refusal independent of false backend success), plus `392d65c` (host-first
+physical-removal teardown). Do not push unless explicitly authorized. Current source gates are
+Bats `307/307` and Swift `274/274`; syntax, privacy, the release build, and the complete real
+host/guest build also pass.
 Preserve the minimal popover and do not mix identity/signing migration into the blocker retest.
 
 The installed DMG
@@ -1006,6 +1007,12 @@ but contains the insufficient runtime-v2 probe. Do not use it to repeat BB-P1-07
 runtime-v3 classification DMG
 `402d232091bd835b3ceb85b85531c2cbacdeb7f550bea7f0c68c558c8c0cb117`, launch it, verify the exact
 installed mount wrapper, and continue:
+
+BB-P1-07 passed on that installed runtime-v3 artifact. For BB-F01, replace it with the candidate
+built from documentation head `6fbcae5`: DMG SHA-256
+`a5eb696c2b3305e4faa3889532d7c59dd1296ede44878afe6a7742d0a1fddbc0`. The image passes
+`hdiutil verify`; the app passes strict deep ad-hoc signature verification; GUI and helper are
+arm64 Mach-O; guest vmproxy is static AArch64. Nothing from this build has been installed yet.
 
 1. **BB-01 — complete:** corrected DMG `e9a549…fbdc5`
    containing `06dcd03` correctly presented the rw-NFS/ro-guest fixture as yellow/read-only.

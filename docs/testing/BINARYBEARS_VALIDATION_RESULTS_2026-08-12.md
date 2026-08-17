@@ -483,8 +483,14 @@ now reads external physical inventory and the kernel NFS table first; their vali
 controller also includes observed host identities so an unplugged CLI-created mount is cleaned
 even before the GUI caches it, while a physically present sibling remains verified. Focused tests,
 the full Swift suite (`274/274`), the full Bats suite (`307/307`), and a release build pass. This is
-source evidence only; BB-F01 requires a newly packaged two-drive physical repeat plus authenticated
-state/PF cleanup before it can become `PASS`.
+source evidence only, so BB-F01 remains `FAIL`.
+
+The complete GUI build from documentation head `6fbcae5` produced DMG SHA-256
+`a5eb696c2b3305e4faa3889532d7c59dd1296ede44878afe6a7742d0a1fddbc0`. `hdiutil verify` and strict
+deep ad-hoc signature verification pass; the GUI and helper are arm64 Mach-O, and guest vmproxy is
+static AArch64. The build repeated Swift `274/274` and the real host/guest runtime build. This exact
+artifact has not yet been installed; BB-F01 still requires its identical two-drive physical repeat
+plus authenticated state/PF cleanup before it can become `PASS`.
 
 ## Findings corrected in the working tree
 
