@@ -935,6 +935,12 @@ exit 0 and no filesystem problem or bad sector, and reported the volume clean af
 repair subcell is `PASS`. Continue with the clean Mac NTFS3 data cycle and Windows reread; do not
 set the dirty bit again.
 
+The clean Mac repeat then mounted with guest `ntfs3`, private `soft` NFS, and one enforced session.
+A new 256 MiB payload was flushed and reread from the fixture; byte comparison and SHA-256 matched
+`48c0a5b3b2ead4b640bceb4978be331159ec6ca0322ddc72372f850e27a7c207`. The clean Mac mount/write
+subcell is `PASS`. Require packaged unmount plus authenticated cleanup, then Windows reread/hash and
+read-only filesystem check before converting BB-P1-07 itself.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears

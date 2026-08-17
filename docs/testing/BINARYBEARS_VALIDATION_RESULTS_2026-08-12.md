@@ -431,6 +431,15 @@ passthrough. The dirty query confirmed it dirty before repair; `chkdsk /F /X` co
 clean. The Windows-repair subcell is `PASS`. BB-P1-07 now requires the clean Mac NTFS3 write/hash/
 unmount followed by Windows reread/hash and final read-only filesystem check.
 
+After safe Windows eject and Mac handoff, the packaged candidate mounted the clean fixture with
+guest `ntfs3`, one private `soft` NFS session, and enforced security. A newly generated 256 MiB
+payload was copied into `BB-P1-07-clean-ntfs3-20260817-133935/mac-ntfs3-256MiB.bin`, flushed, and
+reread through the mounted filesystem. Source and destination sizes were both 268435456 bytes;
+`cmp` and SHA-256 both matched
+`48c0a5b3b2ead4b640bceb4978be331159ec6ca0322ddc72372f850e27a7c207`. Record the clean Mac
+mount/write subcell as `PASS`. The packaged unmount/root cleanup and Windows reread/hash/filesystem
+check remain before BB-P1-07 can close.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence
