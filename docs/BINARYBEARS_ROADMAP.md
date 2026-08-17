@@ -930,6 +930,11 @@ The authenticated audit then returned `BB-P1-07-DIRTY-ROOT: PASS`, with no root-
 or scoped PF child anchor. The dirty-refusal cell is fully `PASS`. Proceed to Windows repair and
 the clean cross-platform data cycle; do not repeat the dirty fixture unless the preflight changes.
 
+Windows direct USB passthrough then confirmed the fixture dirty, completed `chkdsk /F /X` with
+exit 0 and no filesystem problem or bad sector, and reported the volume clean afterward. The
+repair subcell is `PASS`. Continue with the clean Mac NTFS3 data cycle and Windows reread; do not
+set the dirty bit again.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears

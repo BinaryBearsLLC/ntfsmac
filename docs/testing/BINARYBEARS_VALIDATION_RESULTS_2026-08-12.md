@@ -425,6 +425,12 @@ file and no scoped PF child anchor remained. The complete dirty-refusal subcell 
 `PASS`. The fixture may now be repaired on Windows; BB-P1-07 remains `FAIL` only for the clean
 Windows repair plus Mac NTFS3 write/hash/unmount and Windows reread/hash/filesystem-check cycle.
 
+Windows then reacquired the same uniquely selected removable NTFS volume through direct USB
+passthrough. The dirty query confirmed it dirty before repair; `chkdsk /F /X` completed with exit
+0, found no filesystem problem or bad sector, and the following dirty query reported the volume
+clean. The Windows-repair subcell is `PASS`. BB-P1-07 now requires the clean Mac NTFS3 write/hash/
+unmount followed by Windows reread/hash and final read-only filesystem check.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence
