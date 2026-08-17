@@ -40,7 +40,8 @@ run_with_progress_terminate_tree() {
 }
 
 # run_with_progress <timeout_secs> <heartbeat_secs> <label> <outfile|-> <cmd...>
-#   <outfile>: capture <cmd>'s stdout there (caller reads it after a 0 return); pass "-" to
+#   <outfile>: capture <cmd>'s stdout there (caller reads it after a 0 return); set
+#              RUN_WITH_PROGRESS_CAPTURE_STDERR=1 to capture stderr there as well. Pass "-" to
 #              let <cmd> inherit this script's real stdout/stderr instead (used for anylinuxfs
 #              mount/unmount, whose own live "macOS: ..." progress lines must stay visible,
 #              not get buffered until the whole thing finishes).
@@ -53,6 +54,8 @@ run_with_progress() {
 
   if [[ "$outfile" == "-" ]]; then
     "$@" &
+  elif [[ "${RUN_WITH_PROGRESS_CAPTURE_STDERR:-0}" == "1" ]]; then
+    "$@" > "$outfile" 2>&1 &
   else
     "$@" > "$outfile" 2>/dev/null &
   fi

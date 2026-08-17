@@ -23,6 +23,12 @@ teardown() { rm -rf "$FIXTURE_DIR"; }
   [ "$output" = "backend_timeout" ]
 }
 
+@test "accepts the privacy-safe unsafe Windows state category" {
+  run bash -c "source '$SCRIPT'; mount_diagnostics_publish ntfs3 unsafe_windows_state; mount_diagnostics_load; printf '%s\n' \"\$MOUNT_DIAGNOSTICS_FAILURE\""
+  [ "$status" -eq 0 ]
+  [ "$output" = "unsafe_windows_state" ]
+}
+
 @test "unknown keys and free-form failure text fail closed" {
   printf 'schema=1\nselected_driver=ntfs3\nfailure_category=Windows volume dirty\n' > "$NTFSMAC_MOUNT_DIAGNOSTICS_FILE"
   run bash -c "source '$SCRIPT'; mount_diagnostics_load"

@@ -102,6 +102,42 @@ STUB
   [ "$status" -eq 0 ]
 }
 
+@test "unsafe read-write NTFS3 failure hides backend transcript and publishes fixed guidance" {
+  cat > "$STUB_DIR/anylinuxfs" <<STUB
+#!/bin/bash
+echo "internal VM transcript that must stay hidden"
+echo "Linux: Error: NTFSMAC_NTFS3_RW_UNSAFE: volume requires Windows checking" >&2
+exit 1
+STUB
+  chmod +x "$STUB_DIR/anylinuxfs"
+
+  run "$SCRIPT" --fs-driver ntfs3 disk2s1
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"NTFS3 read/write refused"* ]]
+  [[ "$output" == *"Run chkdsk"* ]]
+  [[ "$output" != *"internal VM transcript"* ]]
+  [[ "$output" != *"NTFSMAC_NTFS3_RW_UNSAFE"* ]]
+  run grep -F 'failure_category=unsafe_windows_state' "$NTFSMAC_MOUNT_DIAGNOSTICS_FILE"
+  [ "$status" -eq 0 ]
+}
+
+@test "unexpected read-write NTFS3 failure retains diagnostic backend output" {
+  cat > "$STUB_DIR/anylinuxfs" <<STUB
+#!/bin/bash
+echo "unexpected NTFS3 backend failure"
+exit 9
+STUB
+  chmod +x "$STUB_DIR/anylinuxfs"
+
+  run "$SCRIPT" --fs-driver ntfs3 disk2s1
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"unexpected NTFS3 backend failure"* ]]
+  run grep -F 'failure_category=backend_failed' "$NTFSMAC_MOUNT_DIAGNOSTICS_FILE"
+  [ "$status" -eq 0 ]
+}
+
 @test "passes a custom mount point through when given" {
   run "$SCRIPT" disk2s1 /Volumes/MyDrive
   [ "$status" -eq 0 ]

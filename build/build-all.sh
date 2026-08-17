@@ -112,9 +112,12 @@ PYEOF
 # probe utility to determine read/write mountability. The probe never repairs or writes the
 # volume. Read-only NTFS3 requests and every other filesystem remain unchanged.
 #
-# `ntfs-3g.probe` is provided by Alpine's ntfs-3g-progs package, now retained in the audited
-# guest package list for this single safety dependency. As with the other runtime fixes, patch
-# only the disposable CACHE_DIR copy and leave the pinned anylinuxfs submodule untouched.
+# `ntfs-3g.probe` and `ntfsinfo` are provided by Alpine's ntfs-3g-progs package, now retained in
+# the audited guest package list for these read-only safety checks. Real hardware proved that
+# `ntfs-3g.probe --readwrite` alone ignores Windows' scheduled-check/dirty flag even though the
+# kernel NTFS3 driver refuses it. `ntfsinfo --mft` opens the volume read-only and returns nonzero
+# for that state, so both checks must pass. As with the other runtime fixes, patch only the
+# disposable CACHE_DIR copy and leave the pinned anylinuxfs submodule untouched.
 patch_vmproxy_ntfs3_read_write_preflight() {
   local target="$CACHE_DIR/vmproxy/src/main.rs"
 
@@ -146,14 +149,37 @@ method_replacement = method_marker + '''
             return Ok(());
         }
 
-        let status = Command::new("/usr/bin/ntfs-3g.probe")
+        let probe_status = Command::new("/usr/bin/ntfs-3g.probe")
             .args(["--readwrite", &self.disk_path])
             .status()
-            .context("Failed to run the NTFS3 read/write safety probe")?;
-        if !status.success() {
+            .map_err(|error| anyhow::anyhow!(
+                "NTFSMAC_NTFS3_RW_UNSAFE: eligibility probe unavailable ({error})"
+            ))?;
+        if !probe_status.success() {
             anyhow::bail!(
-                "NTFS volume is dirty, hibernated, or otherwise unsafe for read/write; fully shut down Windows, disable Fast Startup, and run chkdsk (probe exit code {})",
-                status
+                "NTFSMAC_NTFS3_RW_UNSAFE: NTFS volume is hibernated or otherwise unsafe for read/write (probe exit code {})",
+                probe_status
+                    .code()
+                    .map(|code| code.to_string())
+                    .unwrap_or_else(|| "unknown".to_owned())
+            );
+        }
+
+        // ntfs-3g deliberately does not treat the scheduled-check/dirty volume flag as a
+        // read/write probe failure, while the kernel NTFS3 driver rejects it. `ntfsinfo` uses
+        // NTFS_MNT_RDONLY; without --force it returns nonzero for that exact unsafe state.
+        let info_status = Command::new("/usr/bin/ntfsinfo")
+            .args(["--mft", &self.disk_path])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map_err(|error| anyhow::anyhow!(
+                "NTFSMAC_NTFS3_RW_UNSAFE: volume-state check unavailable ({error})"
+            ))?;
+        if !info_status.success() {
+            anyhow::bail!(
+                "NTFSMAC_NTFS3_RW_UNSAFE: NTFS volume requires Windows checking before read/write (ntfsinfo exit code {})",
+                info_status
                     .code()
                     .map(|code| code.to_string())
                     .unwrap_or_else(|| "unknown".to_owned())

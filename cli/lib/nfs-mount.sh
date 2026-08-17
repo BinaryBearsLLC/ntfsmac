@@ -134,12 +134,22 @@ run_anylinuxfs_mount() {
   # vmnet /30 and repair an exact VPN-captured guest route before anylinuxfs performs its own
   # NFS readiness check. The job still runs through the same watchdog and preserves live output.
   local security_prepare_available="0" mount_job mount_result="0"
+  local progress_output="-" capture_ntfs3_output="0"
+  if [[ "$fs_driver" == "ntfs3" && -z "$read_only" ]]; then
+    progress_output="$(mktemp "${TMPDIR:-/tmp}/ntfsmac-ntfs3-mount.XXXXXX")" || {
+      NTFSMAC_MOUNT_FAILURE_CATEGORY="runtime_unavailable"
+      echo "mount: could not create private NTFS3 preflight output" >&2
+      return 1
+    }
+    capture_ntfs3_output="1"
+  fi
   if declare -F security_begin_prepared_mount >/dev/null 2>&1 \
     && declare -F security_prepare_mount_transport >/dev/null 2>&1; then
     security_begin_prepared_mount "$device" || true
     security_prepare_available="1"
   fi
-  run_with_progress "${NTFSMAC_MOUNT_TIMEOUT:-240}" 15 "mount" - \
+  local RUN_WITH_PROGRESS_CAPTURE_STDERR="$capture_ntfs3_output"
+  run_with_progress "${NTFSMAC_MOUNT_TIMEOUT:-240}" 15 "mount" "$progress_output" \
     "$ANYLINUXFS_BIN" "${args[@]}" &
   mount_job=$!
   if [[ "$security_prepare_available" == "1" ]]; then
@@ -151,12 +161,25 @@ run_anylinuxfs_mount() {
       && declare -F security_abort_prepared_mount >/dev/null 2>&1; then
       security_abort_prepared_mount "$device" || true
     fi
-    if [[ "$mount_result" == "124" ]]; then
+    if [[ "$capture_ntfs3_output" == "1" ]] \
+      && grep -Fq 'NTFSMAC_NTFS3_RW_UNSAFE' "$progress_output"; then
+      NTFSMAC_MOUNT_FAILURE_CATEGORY="unsafe_windows_state"
+      echo "mount: NTFS3 read/write refused — Windows left this volume in an unsafe state. Run chkdsk, disable Fast Startup, then fully shut down Windows." >&2
+    elif [[ "$mount_result" == "124" ]]; then
       NTFSMAC_MOUNT_FAILURE_CATEGORY="backend_timeout"
     else
       NTFSMAC_MOUNT_FAILURE_CATEGORY="backend_failed"
+      [[ "$capture_ntfs3_output" != "1" ]] || cat "$progress_output" >&2
     fi
+    [[ "$capture_ntfs3_output" != "1" ]] || rm -f "$progress_output"
     return 1
+  fi
+
+  # Preserve the one stable success line needed by the GUI to resolve any backend-normalized
+  # mount point, without exposing NTFS3's internal VM transcript.
+  if [[ "$capture_ntfs3_output" == "1" ]]; then
+    grep -F ' was mounted as ' "$progress_output" || true
+    rm -f "$progress_output"
   fi
 
   # Don't trust anylinuxfs's own exit code alone: a crashed guest VM (e.g. the guest init

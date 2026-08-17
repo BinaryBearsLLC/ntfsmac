@@ -26,6 +26,16 @@ setup() {
   rm -f "$outfile"
 }
 
+@test "optionally captures stderr beside stdout for classified backend failures" {
+  local outfile
+  outfile="$(mktemp)"
+  RUN_WITH_PROGRESS_CAPTURE_STDERR=1 run_with_progress 5 2 "test" "$outfile" \
+    bash -c 'echo normal; echo classified-marker >&2; exit 7' || rc=$?
+  [ "${rc:-0}" -eq 7 ]
+  [ "$(cat "$outfile")" = $'normal\nclassified-marker' ]
+  rm -f "$outfile"
+}
+
 @test "kills a hanging command after the timeout and returns 124 with a clear message" {
   run run_with_progress 1 1 "test-label" - sleep 30
   [ "$status" -eq 124 ]

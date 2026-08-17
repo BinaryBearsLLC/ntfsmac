@@ -51,11 +51,12 @@ runtime_alpine_load() {
     return 1
   fi
 
-  # Revision 2 changes the guest package contract by adding the read-only
-  # `ntfs-3g.probe` safety preflight required by opt-in NTFS3 read/write mounts. Keep this
-  # application-owned revision in both the directory and marker so installations with the
-  # earlier, otherwise identical base image cannot silently reuse a rootfs missing the probe.
-  ALPINE_RUNTIME_REVISION="2"
+  # Revision 3 completes the guest package contract for opt-in NTFS3 read/write safety:
+  # `ntfs-3g.probe` checks hibernation/logfile eligibility and read-only `ntfsinfo` rejects the
+  # scheduled-check/dirty flag that the kernel NTFS3 driver enforces but ntfs-3g intentionally
+  # ignores. Keep this application-owned revision in both the directory and marker so an earlier,
+  # otherwise identical base image cannot silently reuse a rootfs missing either required tool.
+  ALPINE_RUNTIME_REVISION="3"
   ALPINE_RUNTIME_TAG="$tag"
   ALPINE_RUNTIME_DIGEST="$digest"
   # containers/image rejects a Docker reference containing both tag and digest. The pull uses the
@@ -101,7 +102,7 @@ runtime_alpine_cache_state() {
     return 0
   fi
 
-  for required in bin/bash usr/bin/ntfs-3g.probe usr/sbin/rpc.nfsd usr/local/bin/entrypoint.sh vmproxy; do
+  for required in bin/bash usr/bin/ntfs-3g.probe usr/bin/ntfsinfo usr/sbin/rpc.nfsd usr/local/bin/entrypoint.sh vmproxy; do
     if [[ ! -e "$base/rootfs/$required" ]]; then
       printf 'incomplete\n'
       return 0

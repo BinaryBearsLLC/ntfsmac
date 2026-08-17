@@ -20,6 +20,8 @@ public enum MountFailureCopy {
     public static func conciseMessage(for output: String) -> String? {
         let normalized = output.lowercased()
         let unsafeMarkers = [
+            "ntfs3 read/write refused",
+            "ntfsmac_ntfs3_rw_unsafe",
             "volume is dirty",
             "dirty bit is set",
             "unclean file system",

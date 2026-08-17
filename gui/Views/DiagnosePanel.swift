@@ -428,6 +428,7 @@ public enum DiagnoseSummary {
             case "in_progress": value = "In progress"; status = .informational
             case "invalid_request": value = "Invalid request"; status = .warning
             case "runtime_unavailable": value = "Runtime unavailable"; status = .warning
+            case "unsafe_windows_state": value = "Unsafe Windows state"; status = .warning
             case "backend_failed": value = "Backend failed"; status = .warning
             case "backend_timeout": value = "Backend timed out"; status = .warning
             case "mount_not_observed": value = "Mount not observed"; status = .warning

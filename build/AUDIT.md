@@ -134,15 +134,16 @@ decision, not because it changed the package list — it didn't.
 | `mount` | **KEEP** | Used extensively and unconditionally: `/bin/mount` direct invocation (`vmproxy/src/main.rs:974`), `mount -t nfs -o ...` (`anylinuxfs/src/cmd_mount.rs:1056`, `anylinuxfs/src/fsutil.rs:322`), `mount -t tmpfs` for `/tmp`/`/run` setup in every guest script (`diskutil/mod.rs:1143-1144`, `main.rs:680`). Core requirement. |
 | `nfs-utils` | **KEEP** (settled, L-rule) | Provides `rpc.nfsd`, explicitly required for the NFS export step of the mount flow (PLAN.md §2.2 step 5). Real APKINDEX shows it transitively pulls `rpcbind` and `python3` — both resolved automatically by `apk add nfs-utils`, no manual addition needed to the trimmed list. |
 | `ntfs-3g` | **KEEP** (settled, L-rule) | Default driver (L1). Provides `mount.ntfs-3g`, `mount.ntfs`, `lowntfs-3g` — the actual FUSE mount binaries invoked for the default driver path. |
-| `ntfs-3g-progs` | **KEEP** (added after packaged BB-P1-07) | Provides `/usr/bin/ntfs-3g.probe`, the upstream read-only probe used before an opt-in read/write NTFS3 mount. Real hardware showed NTFS3 accepting the same unsafe Windows state that default ntfs-3g correctly landed read-only. `build-all.sh` patches the disposable vmproxy build copy to run `ntfs-3g.probe --readwrite` before NTFS3; the probe never repairs or writes the volume and any nonzero result fails closed. The package also contains repair tools, but ntfsmac does not invoke them. |
+| `ntfs-3g-progs` | **KEEP** (added after packaged BB-P1-07) | Provides `/usr/bin/ntfs-3g.probe` and `/usr/bin/ntfsinfo`, the upstream read-only checks used before an opt-in read/write NTFS3 mount. Real hardware proved that `ntfs-3g.probe --readwrite` returns success for Windows' scheduled-check/dirty flag even though the kernel NTFS3 driver rejects it; on the same fixture normal read-only `ntfsinfo --mft` returned nonzero and forced read-only inspection reported `Volume Flags: ... DIRTY`. `build-all.sh` patches only the disposable vmproxy build copy to require both checks before NTFS3. Neither repairs nor writes the volume; any nonzero or unavailable result fails closed. Other repair tools in the package remain uninvoked. |
 | `squashfs-tools` | **KEEP** — caught by audit, not assumption | Initially looked like a cut candidate (squashfs mounting is a kernel driver capability, not a userspace-tool need). Real evidence overturned that: `init-rootfs/main.go:345` embeds `unsquashfs -mem 32M -d $MOD_PATH modules.squashfs` into the **guest's own first-boot `vm-setup.sh`** (written via `writeSetupScript`, `main.go:325-350`), which unpacks the kernel-modules squashfs archive into `/lib/modules/$(uname -r)` at guest first boot. `unsquashfs` (from `squashfs-tools`) must be present in the guest image for this step to succeed. This is exactly the kind of transitive requirement PLAN.md warns not to cut on name alone. |
 | `zfs` | **CUT** | No source reference beyond its own package-list line. ZFS is a filesystem type ntfsmac doesn't support. Its Alpine package deps (`libzfs`, `libnvpair`, etc.) are exclusive to it — nothing else in the trimmed set needs them. |
 
 **Net result: 13 → 10 packages.** `bash blkid cryptsetup lsblk lvm2 mount nfs-utils ntfs-3g ntfs-3g-progs squashfs-tools`
 
-The package-contract change also increments ntfsmac's Alpine runtime cache revision from v1 to
-v2 (`...-r2`). Existing v1 caches remain beside the new directory for rollback, but can never be
-mistaken for a runtime containing `ntfs-3g.probe`.
+The original package-contract change incremented ntfsmac's Alpine runtime cache from v1 to v2 for
+`ntfs-3g.probe`. The measured dirty-flag false negative now increments it again to v3 (`...-r3`),
+whose completeness contract requires both `ntfs-3g.probe` and `ntfsinfo`. Existing v1/v2 caches
+remain beside the new directory for rollback but cannot be mistaken for the completed preflight.
 written to `build/alpine-packages.trimmed.txt`.
 
 ## Cargo feature flags (real, read from the actual `Cargo.toml` files)

@@ -25,6 +25,7 @@ make_initialized_cache() {
   printf '%s' "$ALPINE_RUNTIME_VERSION" > "$base/rootfs.ver"
   : > "$base/rootfs/bin/bash"
   : > "$base/rootfs/usr/bin/ntfs-3g.probe"
+  : > "$base/rootfs/usr/bin/ntfsinfo"
   : > "$base/rootfs/usr/sbin/rpc.nfsd"
   : > "$base/rootfs/usr/local/bin/entrypoint.sh"
   : > "$base/rootfs/vmproxy"
@@ -34,20 +35,20 @@ make_initialized_cache() {
 @test "derives one digest-only pull reference plus tag-aware cache and marker from sources.lock" {
   [[ "$ALPINE_RUNTIME_REF" == "docker.io/library/alpine@sha256:"* ]]
   [[ "$ALPINE_RUNTIME_BASE_DIR" == "alpine-${ALPINE_RUNTIME_TAG}-"* ]]
-  [[ "$ALPINE_RUNTIME_BASE_DIR" == *"-r2" ]]
-  [[ "$ALPINE_RUNTIME_VERSION" == "ntfsmac-alpine-v2|"* ]]
+  [[ "$ALPINE_RUNTIME_BASE_DIR" == *"-r3" ]]
+  [[ "$ALPINE_RUNTIME_VERSION" == "ntfsmac-alpine-v3|"* ]]
   [[ "$ALPINE_RUNTIME_VERSION" == *"digest=${ALPINE_RUNTIME_DIGEST}"* ]]
   [[ "$ALPINE_RUNTIME_VERSION" == *"anylinuxfs="* ]]
   [[ "$ALPINE_RUNTIME_REF" != *"latest"* ]]
   [[ "$ALPINE_RUNTIME_REF" != *":${ALPINE_RUNTIME_TAG}@"* ]]
 }
 
-@test "v2 package contract never reuses the prior v1 cache" {
+@test "v3 package contract never reuses the prior v2 cache" {
   local current_base previous_base
   current_base="$(runtime_alpine_cache_path "$TEST_HOME")"
-  previous_base="${current_base%-r2}"
+  previous_base="${current_base%-r3}-r2"
   mkdir -p "$previous_base/rootfs"
-  printf 'ntfsmac-alpine-v1' > "$previous_base/rootfs.ver"
+  printf 'ntfsmac-alpine-v2' > "$previous_base/rootfs.ver"
 
   run runtime_alpine_prepare_cache "$TEST_HOME"
 
@@ -55,6 +56,16 @@ make_initialized_cache() {
   [[ "$output" == *"first run"* ]]
   [ -d "$previous_base/rootfs" ]
   [ ! -e "$current_base" ]
+}
+
+@test "v3 cache is incomplete without the read-only dirty-flag inspector" {
+  make_initialized_cache
+  rm "$(runtime_alpine_cache_path "$TEST_HOME")/rootfs/usr/bin/ntfsinfo"
+
+  run runtime_alpine_cache_state "$TEST_HOME"
+
+  [ "$status" -eq 0 ]
+  [ "$output" = "incomplete" ]
 }
 
 @test "clean initialization is reported without touching disk or starting a download" {

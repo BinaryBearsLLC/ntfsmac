@@ -240,6 +240,22 @@ private final class RecordingMountNotifier: MountEventNotifying {
 }
 
 @MainActor
+@Test func classifiedNTFS3RefusalUsesTheSameConciseRecoveryCopy() async {
+    let fake = FakeHelper()
+    fake.mountResult = .success(CommandResult(
+        output: "mount: NTFS3 read/write refused — Windows left this volume in an unsafe state. Run chkdsk, disable Fast Startup, then fully shut down Windows.",
+        exitCode: 1
+    ))
+    let appState = AppState()
+    let controller = MountController(helper: fake, appState: appState)
+
+    await controller.mount(sampleDrive)
+
+    #expect(appState.state == .error)
+    #expect(controller.errorMessage == MountFailureCopy.unsafeWindowsVolume)
+}
+
+@MainActor
 @Test func unmountWithNothingMountedNeverCallsHelper() async {
     let fake = FakeHelper()
     let appState = AppState()

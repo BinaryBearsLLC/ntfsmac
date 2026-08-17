@@ -63,6 +63,8 @@ setup() {
     target="$CACHE_DIR/vmproxy/src/main.rs"
     grep -F "fn verify_ntfs3_read_write_eligibility" "$target"
     grep -F "Command::new(\"/usr/bin/ntfs-3g.probe\")" "$target"
+    grep -F "Command::new(\"/usr/bin/ntfsinfo\")" "$target"
+    grep -F "NTFSMAC_NTFS3_RW_UNSAFE" "$target"
     grep -F "dsk.verify_ntfs3_read_write_eligibility()?" "$target"
     grep -F "test_ntfs3_read_write_probe_selection" "$target"
     test "$(grep -c "fn verify_ntfs3_read_write_eligibility" "$target")" -eq 1
