@@ -25,19 +25,20 @@ no-state/no-PF-anchor teardown proof. The initially accepted BB-01 install cell 
 the later empty-cache first mount proved that the launchd helper supplies `HOME` and invoker IDs but
 not `USER`, causing anylinuxfs `init-rootfs` to fail before filesystem access. BB-01 now passes its
 corrected packaged onboarding, read-only truth, clean read/write round trip, and authenticated
-teardown. BB-F01 hot-unplug reconciliation plus the BB-P1-06/BB-P1-07 driver-policy repeats remain
-focused correction-and-retest gates rather than hidden inside completed lifecycle cells.
+teardown. BB-P1-06 and BB-P1-07 now pass their corrected packaged repeats; BB-F01 hot-unplug
+reconciliation is the sole measured failure remaining rather than being hidden inside completed
+lifecycle cells.
 BB-03 keyboard and login-item behavior passed its corrected packaged retest on 2026-08-16.
 The subsequent BB-01 replay confirmed clean removal, but the installed candidate exposed Mount
 before Full Disk Access was ready: enabling the permission consumed the first Mount request and
 required a manual retry. Source commit `33ce2af` replaces that behavior with a consent-first helper
 install, visible setup progress, and a non-mutating pre-mount permission gate; packaged validation
 passed on the corrected candidate.
-Focused source corrections for the three remaining failures are now implemented: the save panel
-intercepts an existing name before AppKit can offer Replace; opt-in read/write NTFS3 uses a
-non-mutating mountability probe from a versioned Alpine v2 runtime; and hot-unplug reconciliation
-never probes a stale NFS path after physical absence is already authoritative. These changes pass
-the complete source gates but remain packaged-retest candidates, not live acceptance evidence.
+The save panel now intercepts an existing name before AppKit can offer Replace. Opt-in read/write
+NTFS3 uses dual read-only eligibility checks from a versioned Alpine v3 runtime, and its packaged
+same-device dirty-refusal/repair/clean-write/Windows-reread sequence passes. Hot-unplug
+reconciliation never probes a stale NFS path after physical absence is already authoritative;
+that source correction still requires the focused BB-F01 packaged hardware repeat.
 
 The post-sync wiring audit and its focused recovery branches are recorded in
 [BinaryBears Upstream Regression Audit — 2026-08-05](audits/UPSTREAM_REGRESSION_AUDIT_2026-08-05.md).
@@ -946,6 +947,13 @@ healthy diagnostics, and an authenticated no-state/no-PF-anchor audit all passed
 clean Mac NTFS3 cell is `PASS`. Only the Windows reread/hash and final read-only filesystem check
 remain before BB-P1-07 can become `PASS`.
 
+Windows then reread `BB-P1-07-clean-ntfs3-20260817-133935/mac-ntfs3-256MiB.bin` from the same
+directly attached USB device at exactly 268435456 bytes and SHA-256
+`48c0a5b3b2ead4b640bceb4978be331159ec6ca0322ddc72372f850e27a7c207`. The dirty query reported
+clean; read-only CHKDSK exited 0, found no filesystem problem, required no action, and reported zero
+bad sectors. BB-P1-07 is therefore `PASS`. The current ledger is 27 `PASS`, one measured `FAIL`
+(BB-F01), and two resource `BLOCKED` rows.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears
@@ -1020,12 +1028,13 @@ installed mount wrapper, and continue:
    `SESSION_REMOVED`, and reached zero mount/backend/diagnostic/public sessions. The authenticated
    final audit found no state file or PF child anchor. Do not repeat unless CLI privilege ordering,
    teardown, or reconciliation changes.
-5. **BB-P1-07 dirty policy — refusal passed; root/clean cycle pending:** the runtime-v2 package's
-   single probe accepted the Windows-confirmed dirty fixture. Runtime v3 plus `3fd3ddd` now refuses
-   it with fixed guidance, `unsafe_windows_state`, no transcript/fallback, and zero user-visible
-   mount/backend/public-session residue. Perform the authenticated state/PF audit. Only after that
-   passes, repair/clean the fixture on Windows and repeat Mac NTFS3 mount/hash/unmount followed by
-   Windows reread/hash/`chkdsk`.
+5. **BB-P1-07 — complete:** the runtime-v2 package's single probe accepted the Windows-confirmed
+   dirty fixture. Runtime v3 plus `3fd3ddd` refused it with fixed guidance,
+   `unsafe_windows_state`, no transcript/fallback, and zero user-visible mount/backend/public-
+   session residue. The authenticated cleanup passed; Windows repaired the same device; the clean
+   Mac NTFS3 256 MiB write, reread, hash, unmount, and cleanup passed; and Windows matched the
+   exact size/SHA-256 with a clean dirty query and read-only CHKDSK. Do not repeat unless NTFS3
+   preflight, driver policy, runtime contents, or mount/unmount handling changes.
 6. **BB-F01 hot unplug — source fix ready:** with USB_8GB on NTFS3 and MobileData on
    default `ntfs-3g`, physically removing only USB_8GB left its NFS mount, VM, security session,
    and green row alive for more than 30 seconds even though physical enumeration lost it
@@ -1035,8 +1044,8 @@ installed mount wrapper, and continue:
    promptly and its exact mount/VM/security state must disappear automatically while the survivor
    remains mounted and enforced. A controlled backend-stall cell remains optional when available.
 7. Run strict signature verification, `hdiutil verify`, Bats `307/307`, Swift `272/272`, and the
-   authenticated zero-state/PF check; only then convert the two remaining ledger rows from FAIL
-   to PASS.
+   authenticated zero-state/PF check around BB-F01; only then convert the remaining ledger row
+   from FAIL to PASS.
 8. **Resource-gated qualification:** run the controlled TV comparison and extended GPT/low-space/
    controller/OS/system-volume matrix only when those external resources are actually available.
 
