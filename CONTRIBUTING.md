@@ -1,57 +1,47 @@
 # Contributing
 
-## Before you start
+Focused fixes and improvements are welcome. No contributor license agreement is required.
 
-Start with the canonical
-[`BinaryBears roadmap`](docs/BINARYBEARS_ROADMAP.md) and
-[`branch workflow`](docs/BRANCHING.md), then read
-[`docs/dev/PLAN.md`](docs/dev/PLAN.md) for the historical architecture/build plan and, for GUI
-work, [`docs/dev/GUI-PLAN.md`](docs/dev/GUI-PLAN.md) for the current behavior contract.
-[`CLAUDE.md`](CLAUDE.md) /
-[`AGENTS.md`](AGENTS.md) has the non-negotiables (driver default, transport, signing, privilege
-boundary) — don't re-litigate those in a PR without discussion first.
+## Before starting
 
-## Setup
+Read the short [roadmap](docs/BINARYBEARS_ROADMAP.md), [branch policy](docs/BRANCHING.md), and the
+non-negotiables in [CLAUDE.md](CLAUDE.md). The current GUI contract is
+[docs/dev/GUI-PLAN.md](docs/dev/GUI-PLAN.md); `docs/dev/PLAN.md` is the historical build plan.
 
-- Apple Silicon Mac, macOS 13.0+. No Intel fallback is supported or planned.
-- Clone with submodules: `git clone --recurse-submodules <repo-url>` (or
-  `git submodule update --init` after a plain clone — `vendor/src/anylinuxfs` is a
-  submodule).
-- CLI build/install: `./install.sh` (refuses non-arm64, ad-hoc signs, strips quarantine
-  xattrs).
-- GUI build: `swift build` via `Package.swift`, or open in Xcode.
-- Interactive release build: double-click `build.command`, or run
-  `./build.command [cli|gui|both]`. It reuses the repository's existing build scripts and
-  writes verified CLI and/or GUI artifacts under `dist/`; it does not install them. Missing
-  command-line dependencies are offered for installation only after explicit confirmation;
-  full Xcode remains an Apple/App Store installation.
+Important invariants:
 
-## Testing
+- Apple Silicon and macOS 13+ only.
+- `ntfs-3g` remains the default; NTFS3 is explicit and experimental.
+- NFS over the private vmnet link; no SMB or loopback design.
+- NFS remains `soft` for hot-unplug safety.
+- Privileged UI operations use the XPC helper, never raw `sudo`.
+- Partition identifiers are validated before every shell boundary.
 
-- Manual test guide (real hardware, outside a sandboxed agent environment):
-  [`docs/dev/TESTING.md`](docs/dev/TESTING.md).
-- Automated: `.github/workflows/ci.yml` runs on push/PR.
+## Setup and tests
 
-## Making changes
+```sh
+git clone --recurse-submodules https://github.com/BinaryBearsLLC/ntfsmac.git
+cd ntfsmac
+git switch dev
+swift build
+swift test
+tests/run-all.sh
+```
 
-- Keep the CLI and GUI in sync with `PLAN.md`/`docs/dev/GUI-PLAN.md` — if a change drifts from what
-  those docs specify, update the doc in the same PR, don't silently diverge.
-- Update roadmap status only when the implementation and its stated evidence are both present.
-  A lower-layer primitive or passing unit test is not automatically a shipped user-facing feature.
-- Every mount/unmount/pf/route control change must keep going through the SMJobBless XPC
-  helper — see [`SECURITY.md`](SECURITY.md).
-- Device identifiers must stay validated against `^disk[0-9]+s[0-9]+$` in both CLI and
-  GUI/helper before any shell invocation.
+`./build.command` creates local ad-hoc artifacts under `dist/`. Contributors do not need or receive
+BinaryBears signing/notarization credentials.
+
+Use the manual hardware guide only when the change touches packaging, helper lifecycle, mounts, or
+real device behavior: [docs/dev/TESTING.md](docs/dev/TESTING.md).
 
 ## Pull requests
 
-- Conventional commit-style messages (`feat:`, `fix:`, `refactor:`, …).
-- Pull requests for BinaryBears roadmap work start from and target `BinaryBearsLLC/ntfsmac:dev`.
-  The fork's `main` intentionally mirrors current upstream. Upstream
-  submissions to `khr898/ntfsmac` are a separate maintainer decision and should preserve upstream
-  scope and attribution.
-- Keep one roadmap deliverable per focused branch/PR; include documentation and test evidence in
-  that same review unit.
-- Note which `PLAN.md`/`docs/dev/GUI-PLAN.md` unit(s) the change addresses, if any.
-- Security-sensitive changes (XPC helper, privilege boundary, pf/route handling) should call
-  that out explicitly in the PR description.
+- Branch from and target `dev` for BinaryBears work.
+- Keep one coherent outcome per pull request and use conventional commit prefixes.
+- Explain user-visible behavior, security-boundary impact, and exact validation performed.
+- Update status documents only when the implementation and stated evidence both exist.
+- Never commit build output, local evidence folders, private device data, credentials, personal
+  filesystem paths, or generated diagnostic logs.
+
+Upstream proposals use a clean branch rooted at `upstream/main`; they are a separate maintainer
+decision and must exclude BinaryBears-only branding and roadmap work.

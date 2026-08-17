@@ -1,99 +1,52 @@
-<div align="center">
-  <img src="gui/Resources/AppIcon-source.png" alt="ntfsmac app icon" width="112">
-  <h1>ntfsmac — BinaryBears Edition</h1>
-  <p><strong>Read and write NTFS, ext2, ext3, and ext4 volumes on Apple Silicon macOS.</strong></p>
-  <p>A native menu-bar app and CLI powered by a dedicated Linux microVM — no kernel extension and no SIP changes.</p>
+# ntfsmac by BinaryBears
 
-  <p>
-    <a href="https://github.com/BinaryBearsLLC/ntfsmac/actions/workflows/ci.yml"><img src="https://github.com/BinaryBearsLLC/ntfsmac/actions/workflows/ci.yml/badge.svg?branch=dev" alt="CI status"></a>
-    <img src="https://img.shields.io/badge/macOS-13%2B-111111?logo=apple" alt="macOS 13 or newer">
-    <img src="https://img.shields.io/badge/Apple%20Silicon-arm64-111111?logo=apple" alt="Apple Silicon arm64">
-    <img src="https://img.shields.io/badge/fork-BinaryBears-6f42c1" alt="BinaryBears fork">
-    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
-  </p>
-
-  <p>
-    <a href="#why-ntfsmac">Why ntfsmac</a> ·
-    <a href="#binarybears-improvements">Fork improvements</a> ·
-    <a href="#screenshots">Screenshots</a> ·
-    <a href="#quick-start">Quick start</a> ·
-    <a href="#architecture">Architecture</a> ·
-    <a href="#roadmap">Roadmap</a> ·
-    <a href="docs/BRANCHING.md">Branch workflow</a>
-  </p>
-</div>
-
-> [!IMPORTANT]
-> This README documents the [`BinaryBearsLLC/ntfsmac`](https://github.com/BinaryBearsLLC/ntfsmac)
-> fork's `dev` branch. The fork's `main` branch intentionally mirrors current upstream for clean
-> comparison and contribution work. ntfsmac was created by [khr898](https://github.com/khr898),
-> who remains the original author and upstream maintainer. The original project is available at
-> [`khr898/ntfsmac`](https://github.com/khr898/ntfsmac). BinaryBears-specific additions are
-> identified below; all original-project credit is preserved.
-
-## Why ntfsmac
-
-macOS can read NTFS volumes but does not provide native NTFS write support. ntfsmac takes a virtualization-first approach: [`anylinuxfs`](https://github.com/nohajc/anylinuxfs) runs `ntfs-3g` inside a lightweight `libkrun` Linux microVM, then exposes the filesystem to macOS through NFS over a private `/30` `vmnet` link.
-
-The same microVM path supports ext2, ext3, and ext4. The guest kernel handles those filesystems using its built-in ext4 driver, with the actual type detected by `blkid`.
-
-- No kernel extension
-- No SIP modification
-- No proprietary filesystem driver
-- No raw `sudo` command launched by the GUI
-- One shared mount engine for the menu-bar app and CLI
-
-### Requirements
-
-| Requirement | Support |
-| --- | --- |
-| Mac | Apple Silicon (`arm64`) only |
-| macOS | 13.0 Ventura or newer |
-| Filesystems | NTFS (`ntfs-3g` default; NTFS3 explicit experimental opt-in), ext2, ext3, ext4 |
-| Distribution | Ad-hoc signed; not notarized |
-
-## BinaryBears improvements
-
-The BinaryBears fork builds on the original project with a more complete, verifiable desktop experience and stronger operational diagnostics.
-
-| Area | Improvements over the initial base version |
-| --- | --- |
-| UI and UX | Settings live inside the menu-bar popover; the icon adapts correctly to the menu bar; contextual tooltips clarify actions; Diagnose and SECURITY have presentation-only **Hide** controls; the app prevents duplicate instances; version and build appear directly in Settings. |
-| Drive handling | NTFS detection also recognizes MBR `Windows_NTFS` volumes; ext2/3/4 are supported through the shared mount path; multiple drives can be mounted concurrently with per-drive status. |
-| Diagnostics | Text and JSON reports use the same canonical fields; **Command-click Diagnose** opens a save panel for the same developer-oriented JSON report. It identifies expected and detected host-runtime versions, audited source commits, the installed Alpine/cache version and guest `ntfs-3g`/`nfs-utils` packages, app/build, system, helper, kernel and mount health, the selected filesystem driver/failure category, and measured privacy-safe security/transport results. |
-| Helper lifecycle | First run explains the administrator-password request before an explicit helper install, shows progress while the backend is prepared, and verifies Full Disk Access with a non-mutating raw-device probe before enabling Mount. A lazy XPC connection avoids stale startup state; helper reinstall and confirmed uninstall stay inside the popover and report success or actionable failure. |
-| Build and release | The interactive [`build.command`](build.command) verifies prerequisites, builds CLI and/or GUI, runs relevant tests, packages artifacts under `dist/`, and validates bundle structure, architecture, and ad-hoc signatures. |
-| Security honesty | **Private VM link**, **VPN-safe route**, and **PF policy enforced** consume the same measured fixed states and reason codes as CLI diagnostics. Missing or malformed evidence remains **unknown**, never green. |
-
-## Screenshots
-
-<div align="center">
-  <table>
-    <tr>
-      <td align="center" valign="top">
-        <img src="docs/screenshots/binarybears-mounted.png" alt="BinaryBears ntfsmac mounted drive popover" width="360">
-      </td>
-      <td align="center" valign="top">
-        <img src="docs/screenshots/binarybears-settings.png" alt="BinaryBears ntfsmac settings inside the popover" width="360">
-      </td>
-    </tr>
-    <tr>
-      <td align="center"><sub>Mounted drive, available devices, and conservative SECURITY status.</sub></td>
-      <td align="center"><sub>In-popover Settings with canonical app version and helper controls.</sub></td>
-    </tr>
-  </table>
-</div>
+Native Apple Silicon NTFS read/write for macOS, without kernel extensions or disabling SIP.
 
 > [!NOTE]
-> The question marks in this earlier mounted-drive screenshot are intentional fail-closed states.
-> Current builds replace them only when the privileged mount transaction publishes valid measured
-> evidence; absent or malformed evidence still remains `unknown`, never green.
+> BinaryBears `v3.0.0` is being prepared on `dev`. Until a public v3 release appears on
+> [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases), builds from this branch
+> are development candidates rather than published BinaryBears releases.
 
-## Quick start
+ntfsmac runs the filesystem driver inside a small Linux microVM and exposes the mounted volume to
+macOS over a private NFS link. `ntfs-3g` is the compatibility-first default; NTFS3 is an explicit
+experimental choice.
 
-### Build the BinaryBears fork
+## Highlights
 
-Clone this fork and use its guided builder:
+- Native SwiftUI menu-bar app named **ntfsmac**.
+- Read/write NTFS on Apple Silicon, plus ext2/ext3/ext4 support.
+- No kernel extension, Reduced Security mode, or SIP changes.
+- Privileged operations isolated behind a reviewed XPC helper.
+- Private `/30` vmnet transport with measured PF and route state.
+- Verified Copy and Verify commands with flush, reread, and SHA-256 manifests.
+- Privacy-safe diagnostics that are never uploaded automatically.
+- Optional release check that only opens the matching GitHub Release.
+
+## Requirements
+
+- Apple Silicon Mac.
+- macOS 13 Ventura or newer.
+- An external partition in a supported filesystem.
+- Administrator approval for the privileged helper and Full Disk Access for that helper.
+
+Intel Macs are not supported.
+
+## Install
+
+### Official BinaryBears release
+
+When `v3.0.0` is published:
+
+1. Download `ntfsmac-3.0.0-Apple-Silicon.dmg` from
+   [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases).
+2. Open the DMG and drag `ntfsmac.app` to Applications.
+3. Launch **ntfsmac** and approve the guided helper setup.
+4. In Full Disk Access, enable the entry identified in the app's instructions.
+
+Official BinaryBears DMGs are Developer ID signed, notarized by Apple, stapled, and published with
+a SHA-256 checksum. Draft releases are not final downloads.
+
+### Build from source
 
 ```sh
 git clone --branch dev --recurse-submodules https://github.com/BinaryBearsLLC/ntfsmac.git
@@ -101,189 +54,100 @@ cd ntfsmac
 ./build.command
 ```
 
-Choose **CLI**, **GUI**, or **both** when prompted. You can also select a target directly:
+Local builds use ad-hoc signing by default and require no Apple credentials. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow.
+
+## Use
+
+Open `ntfsmac.app`, select a detected drive, and choose **Mount**. The normal Mount action always
+uses `ntfs-3g`. The adjacent menu offers **NTFS3 (Experimental)** for controlled testing after
+Windows Fast Startup, dirty-volume, and `chkdsk` guidance.
+
+The CLI remains available for scripted and diagnostic use:
 
 ```sh
-./build.command cli
-./build.command gui
-./build.command both
-```
-
-The builder explains missing prerequisites before changing anything, asks before installing supported dependencies, runs the applicable checks, and writes verified artifacts to `dist/`. It does not install the CLI into `/usr/local` automatically.
-
-### Original upstream distribution
-
-The original project maintains its own Homebrew tap and release channel. These commands install the upstream build, not the BinaryBears fork:
-
-```sh
-brew tap khr898/ntfsmac
-brew install ntfsmac
+ntfsmac list
+ntfsmac mount disk4s1
+ntfsmac mount --fs-driver ntfs3 disk4s1
+ntfsmac unmount disk4s1
 ntfsmac diagnose
 ```
 
-Visit the [upstream releases](https://github.com/khr898/ntfsmac/releases) for upstream GUI artifacts.
+Only partition identifiers matching `diskNsN` are accepted. A whole disk such as `disk4` is
+rejected independently by the CLI and helper.
 
-## Usage
-
-```sh
-ntfsmac mount <disk identifier>       # for example: disk4s1
-ntfsmac unmount <disk identifier>
-ntfsmac copy --verify <source> <dest> # owned copy, reread, SHA-256 manifest verification
-ntfsmac verify <source> <destination> # verify an existing file, tree, or symlink
-ntfsmac diagnose                      # human-readable, read-only report
-ntfsmac diagnose --json               # privacy-safe structured report
-ntfsmac opengui                       # launch/reveal the menu-bar popover
-ntfsmac uninstall                     # remove CLI/runtime/helper components
-ntfsmac help
-```
-
-Direct CLI `mount` and `unmount` authenticate with `sudo` so raw-device access and the complete
-root-owned PF/route session are created and removed in one transaction. The packaged GUI already
-runs those operations through its privileged helper and does not add a second CLI password prompt.
-
-ntfsmac accepts partitions in `diskNsN` form, never a whole disk such as `disk4`. Device identifiers are independently validated in the CLI and privileged helper against `^disk[0-9]+s[0-9]+$` before they reach a shell command.
-
-The lower layers also expose an experimental NTFS3 choice for controlled testing:
+### Verified Copy
 
 ```sh
-ntfsmac mount --fs-driver ntfs3 disk4s1
+ntfsmac copy --verify /path/to/source /Volumes/DRIVE/destination
+ntfsmac verify /path/to/source /Volumes/DRIVE/destination
 ```
 
-`ntfs-3g` remains the default because it has the broader compatibility profile. NTFS3 can be
-faster, but it refuses some dirty, hibernated, or Windows Fast Startup volumes and has other
-documented tradeoffs. Read the
-[pinned anylinuxfs NTFS notes](https://github.com/nohajc/anylinuxfs/blob/8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3/docs/important-notes.md#ntfs)
-before using it. The GUI keeps the normal **Mount** button on `ntfs-3g`; an adjacent compact menu
-offers **NTFS3 (Experimental)** for that mount only after displaying the Windows shutdown,
-Fast Startup, and `chkdsk` preflight. There is no automatic fallback. The BinaryBears fork has not
-yet completed its NTFS3 hardware qualification.
+Verified Copy writes to a recoverable partial destination, flushes it, rereads it, and publishes
+the final name only after the deterministic SHA-256 manifest matches. The result proves the bytes
+read at that time; it cannot guarantee against later media failure.
 
-Verified Copy publishes a destination only after a flush, reread, and deterministic SHA-256
-manifest match. It refuses implicit overwrite and retains a recoverable partial destination after
-failure. The match validates the bytes read at that time; it does not guarantee against later
-media failure or verify every macOS metadata field. A Finder copy is not implicitly verified.
-On filesystems where macOS materializes excluded metadata as `._*` AppleDouble sidecars, the
-manifest omits only valid destination-only metadata sidecars paired with a copied entry; real
-source entries with the same naming pattern remain byte-verified.
-For a verified read/write mount, the drive row's compact `…` menu exposes **Verified Copy…**; its
-native picker is constrained to that exact mounted volume, shows only a transient status card, and
-can cancel the complete copy process group without adding a permanent copy page to the popover.
+### Diagnostics
 
-### Developer diagnostics from the GUI
+- Click **Diagnose** for a plain-language summary.
+- Command-click **Diagnose** to export the privacy-safe JSON report.
+- Review the report before attaching it to an issue. ntfsmac never uploads it automatically.
 
-- Click **Diagnose** for an inline, plain-language health summary.
-- Hold **Command (⌘)** while clicking **Diagnose** to run the same read-only JSON diagnosis and choose where to save it.
-- The report separates versions approved by the build from versions actually detected on the Mac,
-  and explicitly marks components or guest packages that are not installed or cannot be read.
-- When an ntfsmac NFS mount is active, the report fails closed unless its synthetic endpoint
-  resolves inside the private vmnet pool, routes through the bridge, remains `soft`, and no
-  loopback helper/listener is detected.
-- Review the file, then attach it manually to a bug report if appropriate. ntfsmac never uploads it.
+Reports omit usernames, volume labels, device identifiers, serial numbers, mount paths, IP
+addresses, DNS servers, route tables, and VPN provider details.
 
-Reports intentionally omit usernames, serial numbers, volume labels, device identifiers, mount paths, IP addresses, DNS servers, route tables, and VPN provider or interface names. See [SECURITY.md](SECURITY.md) for the reporting policy.
-
-## Architecture
+## How it works
 
 ```mermaid
 flowchart LR
-    UI["SwiftUI menu-bar app"]
-    CLI["ntfsmac CLI"]
-    Helper["Privileged XPC helper"]
-    VM["Pinned anylinuxfs source + libkrun microVM"]
-    FS["ntfs-3g default / NTFS3 opt-in / ext4"]
-    NFS["Soft NFS mount on macOS"]
-    Disk["External partition"]
-
-    UI -->|validated request| Helper
-    CLI -->|shared command layer| VM
-    Helper -->|privileged host operations| VM
-    VM --> FS
-    FS --> Disk
-    VM -->|private /30 vmnet link| NFS
+    UI["ntfsmac menu-bar app"] -->|validated request| Helper["Privileged XPC helper"]
+    CLI["ntfsmac CLI"] --> Runtime["Pinned anylinuxfs + libkrun microVM"]
+    Helper --> Runtime
+    Runtime --> Driver["ntfs-3g / NTFS3 / ext"]
+    Driver --> Disk["External partition"]
+    Runtime -->|private vmnet /30| NFS["Soft NFS mount on macOS"]
 ```
 
-Mount, unmount, packet-filter, and route operations initiated by the GUI go through the XPC helper; the app does not shell out to `sudo`. The NFS client uses a soft mount so a failed guest cannot block filesystem calls indefinitely. For the full design and invariants, read [docs/dev/PLAN.md](docs/dev/PLAN.md).
+Mount, unmount, PF, and route operations initiated by the app always go through the helper; the UI
+never shells out to `sudo`. NFS remains `soft` to avoid an indefinitely blocked macOS filesystem
+call after hot-unplug or guest failure.
 
-## Security model
+## Security and updates
 
-- Partition identifiers are allow-listed before shell invocation.
-- The Linux guest uses a dedicated private `/30` `vmnet` link for the NFS path.
-- Each active mount owns a direct-child PF policy, one PF enable reference, and only the exact
-  VPN-bypass host route it needed. The wrapper applies that measured policy after the new vmnet
-  link appears and before the backend NFS readiness check can complete; teardown is per session.
-- Privileged GUI operations are restricted to the helper's XPC protocol.
-- Vendored source revisions and runtime inputs are pinned and verified by the build system. The
-  Alpine tag is verified against its arm64 digest, and both packaged runtime binaries must contain
-  the immutable digest-only pull reference.
-- SECURITY indicators use an explicit `unknown` state and never equate missing data with enforcement.
-  Their public status file contains fixed aggregate states/reasons only; session details stay in
-  root-only records.
+The three SECURITY rows use measured, reason-coded state and fail closed to `unknown` when evidence
+is missing. See [SECURITY.md](SECURITY.md) for the reporting boundary.
 
-The project is currently ad-hoc signed (`codesign -s -`) and is not notarized. macOS may therefore require the user to approve the app and its helper. Review [SECURITY.md](SECURITY.md) before installation or vulnerability reporting.
+The optional update check contacts only GitHub's public latest-release endpoint, at most once every
+24 hours. It never downloads or installs anything: if a newer stable SemVer release exists, the app
+offers to open that release in the browser. Automatic network failures remain silent.
 
-## Troubleshooting
+## Project status
 
-### A drive does not appear
+The current fork baseline completed its measured P0/P1 acceptance ledger with no remaining measured
+failure. Two resource-dependent extended cells remain explicitly blocked, not silently counted as
+passes. `v3.0.0` is the production rebrand and release gate; P2 helper modernization starts only
+after that release is published and its downloaded DMG is revalidated.
 
-ntfsmac mounts partitions, not whole disks. In `diskutil list`, the external device must contain at least one child identifier such as `disk4s1`. A filesystem written directly to a raw whole disk has no mountable `diskNsN` slice and must be backed up and repartitioned on a suitable system before ntfsmac can enumerate it.
-
-### The first mount takes longer
-
-On first use, anylinuxfs downloads and initializes the exact Alpine Linux arm64 image identified by
-the tag and SHA-256 digest in `build/sources.lock` (typically about 50–150 MB), then reuses that
-versioned local environment on later mounts. An older `~/.anylinuxfs/alpine` cache is preserved and
-the pinned cache is initialized beside it; upgrades likewise use a new directory, so rollback data
-is never silently removed. A download happens only when a mount actually needs a missing or safely
-reinitialized runtime, not while installing, diagnosing, or opening Settings.
-
-### Diagnose before filing a bug
-
-```sh
-ntfsmac diagnose
-ntfsmac diagnose --json
-```
-
-Include the privacy-safe JSON report, macOS version, Mac model, and a reproducible description. Do not publish security vulnerabilities; follow [SECURITY.md](SECURITY.md).
-
-## Roadmap
-
-The [canonical BinaryBears roadmap](docs/BINARYBEARS_ROADMAP.md) separates shipped work,
-lower-layer foundations, hardware validation, and future product decisions. Each deliverable is
-developed from `dev` and reviewed back into `dev` through its own focused branch and pull request.
-
-| Priority | Status | Direction |
-| --- | --- | --- |
-| Completed foundation | ✅ Shipped | Multi-drive NTFS/ext support, MBR detection, in-popover Settings, adaptive icon and help, privacy-safe CLI/GUI diagnostics, version reporting, and helper reinstall/uninstall lifecycle |
-| P0 | ✅ Packaged hardware validation complete | Runtime pinning, audited updates, per-session PF/VPN security, complete helper user identity, host/guest mount truth, and physically-aware selective hot-unplug teardown pass on the installed package |
-| P1 | ✅ Packaged hardware validation complete | Verified Copy, pre-Replace no-overwrite validation, NTFS3 symlink preflight, and dual read-only NTFS3 eligibility checks pass; the same-device cycle proved concise dirty-state refusal, Windows repair, clean Mac NTFS3 write/hash/unmount, and matching Windows reread/CHKDSK |
-| P2 | ⬜ Same-product modern variant planned | A future modern helper lifecycle will ship as a second compatibility artifact of the same BinaryBears product, built and released beside the current variant from one repository and shared roadmap |
-| P3 | ✅ Packaged validation complete | Open in Finder, notifications, resilient Eject All, the professional DMG, full keyboard traversal, and Launch at login enable/disable pass on the installed package |
-
-The roadmap records explicit A/B options where evidence is still missing. In particular,
-`ntfs-3g` remains the compatibility-first default; NTFS3 does not become the default without a
-documented, repeatable hardware and integrity test matrix.
-
-With every measured acceptance row passing, the next review unit is the dedicated BinaryBears
-production rebrand: the approved
-new icon across app/README/DMG/site, BinaryBears identifiers, Developer ID signing, Apple
-notarization, dual-variant GitHub Actions releases, and a restrained macOS-style GitHub Pages site.
-The project remains free, open source, and distributed through GitHub.
-
-Repository synchronization and contribution branches follow the documented
-[BinaryBears branch workflow](docs/BRANCHING.md): `main` mirrors upstream, `dev` is the fork's
-integration branch, and upstream candidates are rebuilt independently from `upstream/main`.
+- [Roadmap](docs/BINARYBEARS_ROADMAP.md)
+- [Validation ledger](docs/testing/BINARYBEARS_VALIDATION_RESULTS_2026-08-12.md)
+- [Branch policy](docs/BRANCHING.md)
+- [Release process](docs/RELEASE.md)
 
 ## Contributing
 
-Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), then read [CLAUDE.md](CLAUDE.md) (mirrored for tooling through [AGENTS.md](AGENTS.md)) before changing architecture, dependencies, signing, or the privileged boundary.
+Focused bug fixes and improvements are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md), open an
+issue when useful, and target BinaryBears work to `dev`. No CLA is required.
 
 ## Credits
 
-- **Original creator and upstream maintainer:** [khr898](https://github.com/khr898)
-- **Original repository:** [`khr898/ntfsmac`](https://github.com/khr898/ntfsmac)
-- **BinaryBears fork and additional UI/UX/CLI work:** [`BinaryBearsLLC/ntfsmac`](https://github.com/BinaryBearsLLC/ntfsmac)
-- **Core filesystem runtime:** [`nohajc/anylinuxfs`](https://github.com/nohajc/anylinuxfs) and its upstream dependencies
+ntfsmac was created by [Kaveen (khr898)](https://github.com/khr898), who remains the original
+author and upstream maintainer. The original repository is
+[`khr898/ntfsmac`](https://github.com/khr898/ntfsmac). BinaryBears maintains this fork and its
+additional product, reliability, diagnostics, and release work.
+
+The runtime builds on [`nohajc/anylinuxfs`](https://github.com/nohajc/anylinuxfs) and the upstream
+components listed in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
 ## License
 
-Released under the [MIT License](LICENSE). Copyright and attribution remain with their respective authors and contributors.
+MIT. The original copyright and license notice are preserved in [LICENSE](LICENSE).

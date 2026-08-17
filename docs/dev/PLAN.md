@@ -1,6 +1,12 @@
 # ntfsmac — Full Build Plan
 
 > [!IMPORTANT]
+> This is the historical implementation plan for the original compatibility build. For the
+> BinaryBears v3 production identity, Developer ID signing, notarization, and release policy,
+> [`../RELEASE.md`](../RELEASE.md) and [`../BINARYBEARS_ROADMAP.md`](../BINARYBEARS_ROADMAP.md)
+> supersede the older ad-hoc-only release constraints below. Local builds remain ad-hoc.
+
+> [!IMPORTANT]
 > **Status audit (2026-08-11):** this is the historical architecture and implementation plan that
 > produced the original CLI/GUI foundation. It is not the current BinaryBears product roadmap and
 > should not be used to infer that every lower-layer primitive is live in the shipped mount flow.

@@ -21,10 +21,9 @@ recipe. Match what's already built; don't re-design.
   launches vmnet-helper with `--operation-mode=shared`; do not call that strict network isolation
   unless effective PF/route evidence proves the narrower claim.
 - **NFS mount mode stays `soft`** — never switch to `hard`, it's what prevents a kernel panic on hot-unplug.
-- **Signing today:** the current compatibility artifact stays ad-hoc (`codesign -s -`) until the
-  dedicated BinaryBears production-rebrand migration. That future phase is explicitly approved to
-  use BinaryBears Developer ID signing and Apple notarization; credentials must stay in Keychain or
-  GitHub encrypted secrets and never enter Git. Do not mix that migration into unrelated fixes.
+- **Signing:** local and contributor builds stay ad-hoc (`codesign -s -`). Official BinaryBears
+  releases are Developer ID signed and Apple-notarized by the dedicated release path; credentials
+  stay in Keychain or GitHub encrypted secrets and never enter Git.
 - **Every control that mounts/unmounts/touches pf/route goes through a reviewed XPC helper** — the
   current compatibility artifact uses SMJobBless; the future P2 variant may use SMAppService. Never
   add a raw `sudo` shell-out from Swift UI code.

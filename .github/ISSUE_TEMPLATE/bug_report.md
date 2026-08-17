@@ -1,46 +1,29 @@
 ---
 name: Bug report
-about: Report a problem with ntfsmac
+about: Report a reproducible ntfsmac problem
 title: "[Bug] "
 labels: bug
 assignees: ''
 ---
 
-## Describe the bug
+## What happened?
 
-A clear, concise description of what's wrong.
+Describe the problem and the smallest reproduction.
 
-## Steps to reproduce
+## What did you expect?
 
-1. Run `ntfsmac ...`
-2. ...
-3. See error
-
-## Expected behavior
-
-What you expected to happen instead.
-
-## Actual behavior
-
-What actually happened. Include full terminal output/error messages if possible.
-
-## Diagnostics
-
-Please run and paste the output of:
-
-```
-ntfsmac diagnose
-```
+Describe the expected result.
 
 ## Environment
 
+- ntfsmac version:
 - macOS version:
-- Mac model / chip (must be Apple Silicon — Intel is not supported):
-- ntfsmac version (`ntfsmac --version` or the tag/commit you built from):
-- Install method: Homebrew tap / built from source / GUI DMG
-- NTFS driver used (ntfs-3g default, or `--fs-driver ntfs3`):
+- Apple Silicon model:
+- filesystem and driver (`ntfs-3g`, NTFS3, or ext):
+- install method (official DMG or source build):
 
-## Additional context
+## Diagnostics
 
-Anything else relevant — e.g. external drive model, whether the drive has a dirty
-NTFS journal, whether this started after a macOS update, etc.
+Attach a privacy-reviewed `ntfsmac diagnose` export when relevant. Remove personal paths, serials,
+volume labels, device identifiers, credentials, and unrelated logs. Report suspected security
+issues through the private process in `SECURITY.md`, not here.

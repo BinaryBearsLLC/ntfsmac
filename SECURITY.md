@@ -1,42 +1,42 @@
-# Security Policy
+# Security policy
 
-ntfsmac runs a privileged XPC helper (SMJobBless) that can mount/unmount filesystems and
-touch `pf`/route state, and drives a Linux microVM over a dedicated private `/30` vmnet link. Treat
-anything in `helper/`, `gui/Helper/`, `gui/FirstRun/`, and the mount/unmount CLI paths as
-security-sensitive.
+ntfsmac mounts filesystems through a privileged XPC helper and a pinned Linux microVM. Changes to
+the helper, caller validation, mount lifecycle, PF/route state, update checks, or release signing
+are security-sensitive.
 
-The live root mount transaction now owns and measures one PF child anchor, PF enable reference,
-and optional exact VPN-bypass route per session before the backend NFS readiness check can
-complete. The current GUI still intentionally reports its three SECURITY indicators as `unknown`
-because reason-coded transaction evidence is not yet wired into those rows. `unknown` describes
-the UI evidence boundary, not the absence of the lower-layer transaction. See the
-[BinaryBears security roadmap](docs/BINARYBEARS_ROADMAP.md#p0--trust-reproducibility-and-truthful-security).
+## Report a vulnerability
 
-## Reporting a vulnerability
+Do not open a public issue for a suspected vulnerability. Use this repository's
+[private security advisory](../../security/advisories/new) and include:
 
-Please **do not** open a public GitHub issue for a suspected vulnerability. Instead, email
-the maintainer directly or use GitHub's private
-[security advisory](../../security/advisories/new) form for this repo. Include:
+- affected component and ntfsmac version;
+- concise reproduction steps and macOS/Apple Silicon environment;
+- expected impact;
+- a privacy-reviewed diagnostic excerpt when relevant.
 
-- Affected component (CLI, GUI, XPC helper, or the vendored microVM path).
-- Steps to reproduce, and the macOS/hardware combination it was found on.
-- Impact you'd expect (e.g. privilege escalation, arbitrary mount target, network bridge
-  escape).
+Do not attach drive serials, volume labels, device identifiers, personal paths, credentials, or
+unredacted local logs.
 
-Expect an acknowledgment within a few days. This is a solo-maintained project — response
-time isn't SLA-backed, but security reports get priority over feature work.
+## Security boundary
 
-## Scope notes
+- Device names are validated against `^disk[0-9]+s[0-9]+$` in both the client and helper.
+- App-initiated mount, unmount, PF, and route mutations go only through the XPC helper. The app
+  never shells out to `sudo`.
+- Every active mount owns its security state. Teardown must not flush global PF state, remove a
+  default route, or release another mount's resources.
+- SECURITY rows consume measured reason-coded evidence and become `unknown` when evidence is
+  unavailable or untrusted.
+- Diagnostics are local, opt-in exports and omit identifying disk/network/user details.
 
-- **Signing:** ad-hoc only (`codesign -s -`), no notarization. That's a known, accepted
-  trust-model limitation (see `CLAUDE.md`'s non-negotiables) — reports that just restate
-  "this isn't notarized" without a concrete exploit path aren't actionable findings.
-- **Device validation:** every command path validates device identifiers against
-  `^disk[0-9]+s[0-9]+$` before any shell invocation, in both the CLI and the GUI/helper. A
-  bypass of that check is a valid, high-priority report.
-- **Privilege boundary:** every mount/unmount/pf/route action must route through the
-  SMJobBless XPC helper. A code path that shells out to `sudo` directly from GUI code, or an
-  XPC caller-identity check that can be spoofed, is a valid, high-priority report.
-- **Session ownership:** PF anchors, PF enable references, and VPN-bypass routes are per mount.
-  Teardown must never flush global PF state, delete a default route, or release another active
-  session's resources. Cleanup that cannot be proven stays retryable and non-green.
+The v3 compatibility helper uses SMJobBless. macOS may display its technical service label
+`com.binarybears.ntfsmac.helper` and a generic executable icon in Full Disk Access; the app names
+that exact entry rather than implying it can control System Settings presentation.
+
+## Signing and releases
+
+Contributor and ordinary local builds remain ad-hoc signed. Official BinaryBears releases must be
+Developer ID signed, notarized, stapled, Gatekeeper-assessed, and published with a SHA-256 checksum.
+Apple credentials live only in Keychain or encrypted GitHub Actions secrets.
+
+The update checker contacts GitHub's public API no more than once every 24 hours, sends no analytics
+or device data, ignores drafts/prereleases, and can only open a release page in the user's browser.

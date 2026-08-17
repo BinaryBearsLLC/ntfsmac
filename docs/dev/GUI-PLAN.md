@@ -1,5 +1,9 @@
 # ntfsmac GUI — Feature & Button Plan
 
+> BinaryBears v3 keeps the visible application name **ntfsmac**. Settings also includes a minimal
+> GitHub release check; it never downloads or installs software. The SMJobBless compatibility
+> helper may appear in System Settings by its technical label, which the setup UI names explicitly.
+
 > Custom SwiftUI menu-bar app (no Dock icon). Wraps the CLI + pf security layer via an XPC helper.
 > Companion to `PLAN.md` Phase 3 — that covers engineering scaffolding; this covers what the user sees and taps.
 > Current BinaryBears priorities and incomplete integrations live in
