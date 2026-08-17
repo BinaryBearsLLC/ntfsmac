@@ -183,9 +183,12 @@ public enum MountTableParser {
     }
 }
 
-/// Reads two independent, unprivileged sources. A status-only entry is retained as unverified;
-/// a `.local` mount-table entry can also recover a CLI-created mount if status output is briefly
-/// unavailable. Only a complete, mutually paired read is allowed to clear cached GUI rows.
+/// Reads two independent, unprivileged mount sources. A status-only entry is retained as
+/// unverified; a `.local` mount-table entry can also recover a CLI-created mount if status output
+/// is briefly unavailable. Physical enumeration and the host mount table are intentionally read
+/// first: when they prove an ntfsmac NFS mount lost its device, cleanup must not wait for
+/// `anylinuxfs status`, which may itself be blocked behind the stale NFS session. Only a complete,
+/// mutually paired normal read is allowed to clear cached GUI rows.
 @MainActor
 public struct RealMountSnapshotProvider: MountSnapshotProviding {
     private let runner: (any PrivilegedCommandRunning)?
@@ -224,14 +227,10 @@ public struct RealMountSnapshotProvider: MountSnapshotProviding {
             mountResult = runner.run(mountPath, ["-t", "nfs"])
             physicalResult = nil
         } else {
-            // Production polling must never block the menu-bar UI while Process waits. Each
-            // reconciliation waits for its own reads before scheduling the next poll, so a slow
-            // source cannot create an unbounded queue of subprocesses.
-            async let statusTask = Self.runOffMain(
-                anylinuxfsPath,
-                ["status"],
-                timeout: sourceTimeout
-            )
+            // Read the kernel mount table and physical inventory before asking the runtime for
+            // status. A physically removed NFS backend can make the runtime status path block;
+            // the two host sources already contain enough identity to tear down that exact
+            // session without touching a surviving drive.
             async let mountTask = Self.runOffMain(
                 mountPath,
                 ["-t", "nfs"],
@@ -242,7 +241,28 @@ public struct RealMountSnapshotProvider: MountSnapshotProviding {
                 ["list", "external", "physical"],
                 timeout: probeTimeout
             )
-            (statusResult, mountResult, physicalResult) = await (statusTask, mountTask, physicalTask)
+            (mountResult, physicalResult) = await (mountTask, physicalTask)
+
+            let earlyTableMounts = mountResult.exitCode == 0
+                ? MountTableParser.parse(mountResult.output)
+                : []
+            let earlyPhysicallyPresent = physicalResult.flatMap { result in
+                result.exitCode == 0 ? ExternalPhysicalDeviceParser.parse(result.output) : nil
+            }
+            if let physicalRemoval = Self.physicalRemovalSnapshot(
+                tableMounts: earlyTableMounts,
+                physicallyPresentDeviceIDs: earlyPhysicallyPresent
+            ) {
+                return physicalRemoval
+            }
+
+            // Normal reconciliation still pairs runtime and host truth. It runs off the main
+            // actor and remains bounded so a slow source cannot freeze the popover.
+            statusResult = await Self.runOffMain(
+                anylinuxfsPath,
+                ["status"],
+                timeout: sourceTimeout
+            )
         }
         let statusMounts = statusResult.exitCode == 0
             ? AnyLinuxFSStatusParser.parse(statusResult.output)
@@ -351,6 +371,35 @@ public struct RealMountSnapshotProvider: MountSnapshotProviding {
     ) -> [ObservedMount] {
         guard let physicallyPresentDeviceIDs else { return mounts }
         return mounts.filter { physicallyPresentDeviceIDs.contains($0.deviceIdentifier) }
+    }
+
+    /// The host NFS source embeds the validated `diskNsM` identity in `<device>.local`; paired
+    /// with successful external-physical enumeration, that is sufficient fail-closed evidence
+    /// for exact cleanup. Return every ntfsmac table mount so the controller can preserve live
+    /// siblings while selecting only absent identifiers.
+    nonisolated static func physicalRemovalSnapshot(
+        tableMounts: [NFSMountTableEntry],
+        physicallyPresentDeviceIDs: Set<String>?
+    ) -> MountSnapshot? {
+        guard let physicallyPresentDeviceIDs else { return nil }
+        let ntfsmacMounts = tableMounts.compactMap { mount -> ObservedMount? in
+            guard let device = mount.deviceIdentifier else { return nil }
+            return ObservedMount(
+                deviceIdentifier: device,
+                mountPoint: mount.mountPoint,
+                isReadOnly: mount.isReadOnly
+            )
+        }
+        guard ntfsmacMounts.contains(where: {
+            !physicallyPresentDeviceIDs.contains($0.deviceIdentifier)
+        }) else { return nil }
+
+        return MountSnapshot(
+            mounts: ntfsmacMounts.sorted { $0.deviceIdentifier < $1.deviceIdentifier },
+            isAuthoritative: false,
+            warningCode: "PHYSICAL_DEVICE_MISSING",
+            physicallyPresentDeviceIDs: physicallyPresentDeviceIDs
+        )
     }
 
     private nonisolated static func unresponsiveMounts(

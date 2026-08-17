@@ -214,7 +214,10 @@ public final class MountController: ObservableObject {
         let observedIDs = Set(snapshot.mounts.map(\.deviceIdentifier))
         var cleanupIDs: Set<String> = []
         let physicallyMissingIDs: Set<String> = snapshot.physicallyPresentDeviceIDs.map {
-            trackedIDs.subtracting($0)
+            // Host NFS identity is sufficient to clean a CLI-created session even if this GUI
+            // has not cached it yet. This also closes the launch/race window between the first
+            // mount snapshot and a physical disconnect.
+            trackedIDs.union(observedIDs).subtracting($0)
         } ?? []
         let backendFailureIDs = snapshot.unresponsiveDeviceIDs.intersection(trackedIDs)
 

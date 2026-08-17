@@ -14,6 +14,20 @@ private final class MutableSnapshotProvider: MountSnapshotProviding {
 }
 
 @MainActor
+private final class SequenceSnapshotProvider: MountSnapshotProviding {
+    private var values: [MountSnapshot]
+
+    init(_ values: [MountSnapshot]) {
+        self.values = values
+    }
+
+    func snapshot() async -> MountSnapshot {
+        guard values.count > 1 else { return values[0] }
+        return values.removeFirst()
+    }
+}
+
+@MainActor
 private final class SuccessfulHelper: HelperMounting {
     private(set) var unmountCalls: [String] = []
     var unmountResult = CommandResult(output: "unmounted", exitCode: 0)
@@ -145,6 +159,31 @@ private struct SnapshotCommandRunner: PrivilegedCommandRunning {
     ) == [removed, survivor])
 }
 
+@Test func physicalRemovalSnapshotUsesHostIdentityWithoutRuntimeStatus() {
+    let removed = NFSMountTableEntry(
+        source: "disk6s1.local:/mnt/Removed",
+        mountPoint: "/Volumes/Removed",
+        isReadOnly: false,
+        deviceIdentifier: "disk6s1"
+    )
+    let survivor = NFSMountTableEntry(
+        source: "disk7s2.local:/mnt/Survivor",
+        mountPoint: "/Volumes/Survivor",
+        isReadOnly: false,
+        deviceIdentifier: "disk7s2"
+    )
+
+    let snapshot = RealMountSnapshotProvider.physicalRemovalSnapshot(
+        tableMounts: [removed, survivor],
+        physicallyPresentDeviceIDs: Set(["disk7s2"])
+    )
+
+    #expect(snapshot?.warningCode == "PHYSICAL_DEVICE_MISSING")
+    #expect(snapshot?.isAuthoritative == false)
+    #expect(snapshot?.mounts.map(\.deviceIdentifier) == ["disk6s1", "disk7s2"])
+    #expect(snapshot?.physicallyPresentDeviceIDs == Set(["disk7s2"]))
+}
+
 @MainActor
 @Test func tableOnlyNtfsmacMountIsInconsistentRatherThanAuthoritativeGreen() async {
     let runner = SnapshotCommandRunner(
@@ -254,6 +293,47 @@ private struct SnapshotCommandRunner: PrivilegedCommandRunning {
     #expect(controller.mountedDrives.first { $0.id == removed.id }?.isVerified == false)
     #expect(controller.mountedDrives.first { $0.id == survivor.id }?.isVerified == true)
     #expect(appState.state == .mountedUnknown)
+}
+
+@MainActor
+@Test func physicalRemovalCleansUncachedCLIMountAndPreservesSurvivor() async {
+    let removed = Drive(identifier: "disk6s1", fsType: "ntfs", label: "Media", size: "120 GB")
+    let survivor = Drive(identifier: "disk7s2", fsType: "ntfs", label: "Backup", size: "32 GB")
+    let removedMount = ObservedMount(
+        deviceIdentifier: removed.id,
+        mountPoint: "/Volumes/Media",
+        fsDriver: "ntfs3",
+        isReadOnly: false
+    )
+    let survivorMount = ObservedMount(
+        deviceIdentifier: survivor.id,
+        mountPoint: "/Volumes/Backup",
+        fsDriver: "ntfs-3g",
+        isReadOnly: false
+    )
+    let provider = SequenceSnapshotProvider([
+        MountSnapshot(
+            mounts: [removedMount, survivorMount],
+            isAuthoritative: false,
+            warningCode: "PHYSICAL_DEVICE_MISSING",
+            physicallyPresentDeviceIDs: Set([survivor.id])
+        ),
+        MountSnapshot(
+            mounts: [survivorMount],
+            physicallyPresentDeviceIDs: Set([survivor.id])
+        ),
+    ])
+    let helper = SuccessfulHelper()
+    let appState = AppState()
+    let controller = MountController(helper: helper, snapshotProvider: provider, appState: appState)
+
+    // No prior GUI mount/reconcile: this is the CLI-mount race observed on hardware.
+    await controller.reconcile(knownDrives: [survivor])
+
+    #expect(helper.unmountCalls == [removed.id])
+    #expect(controller.mountedDriveIDs == Set([survivor.id]))
+    #expect(controller.mountedDrives.first?.isVerified == true)
+    #expect(appState.state == .mountedReadWrite)
 }
 
 @MainActor
