@@ -941,6 +941,11 @@ A new 256 MiB payload was flushed and reread from the fixture; byte comparison a
 subcell is `PASS`. Require packaged unmount plus authenticated cleanup, then Windows reread/hash and
 read-only filesystem check before converting BB-P1-07 itself.
 
+Packaged unmount then returned `SESSION_REMOVED`; zero NFS/backend/public sessions, bridge down,
+healthy diagnostics, and an authenticated no-state/no-PF-anchor audit all passed. The complete
+clean Mac NTFS3 cell is `PASS`. Only the Windows reread/hash and final read-only filesystem check
+remain before BB-P1-07 can become `PASS`.
+
 ## Approved BinaryBears production direction
 
 After the blocker candidate passes packaged validation, `dev` becomes the canonical BinaryBears

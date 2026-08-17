@@ -440,6 +440,13 @@ reread through the mounted filesystem. Source and destination sizes were both 26
 mount/write subcell as `PASS`. The packaged unmount/root cleanup and Windows reread/hash/filesystem
 check remain before BB-P1-07 can close.
 
+Packaged CLI unmount then completed after its bounded progress notice, returned
+`security_teardown=enforced reason=SESSION_REMOVED`, and reached zero NFS mounts, backend/network
+processes, diagnostic/public sessions, and bridge down. The authenticated follow-up returned
+`BB-P1-07-CLEAN-ROOT: PASS` with no security state file or PF child anchor. The clean Mac NTFS3
+mount/write/unmount cell is fully `PASS`; only Windows reread/hash and read-only filesystem check
+remain for BB-P1-07.
+
 ## Findings corrected in the working tree
 
 ### Mount watchdog descendant cleanup and timeout evidence
