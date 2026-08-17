@@ -141,10 +141,10 @@ STUB
   rm -rf "$outside"
 }
 
-@test "NTFSMAC_REPO defaults to khr898/ntfsmac (no YOURUSERNAME literal)" {
+@test "NTFSMAC_REPO defaults to the BinaryBears release repository" {
   run "$SCRIPT"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"khr898/ntfsmac"* ]]
+  [[ "$output" == *"BinaryBearsLLC/ntfsmac"* ]]
   run grep -c "YOURUSERNAME" "$SCRIPT"
   [ "$status" -ne 0 ]
 }

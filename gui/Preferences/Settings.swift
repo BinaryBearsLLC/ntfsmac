@@ -38,7 +38,7 @@ public struct RealLaunchAtLoginService: LaunchAtLoginStatusProviding {
         case .requiresApproval:
             return .requiresApproval
         case .notFound:
-            // A freshly replaced ad-hoc bundle can briefly be absent from Background Task
+            // A freshly replaced bundle can briefly be absent from Background Task
             // Management even though `mainApp.register()` is the documented way to add it.
             // Keep the toggle actionable; a real registration error is surfaced after the call.
             return .disabled
@@ -93,18 +93,19 @@ public final class Settings: ObservableObject {
         self.loginService = loginService
         self.notificationAuthorization = notificationAuthorization
 
-        let persisted = defaults.object(forKey: Keys.launchAtLogin) as? Bool ?? Defaults.launchAtLogin
+        let persisted = defaults.object(forKey: NtfsmacPreferenceKeys.launchAtLogin) as? Bool
+            ?? Defaults.launchAtLogin
         let registrationStatus = Self.registrationStatus(for: loginService, fallbackEnabled: persisted)
         let initialValue = registrationStatus == .enabled
 
         launchAtLogin = initialValue
         confirmedLaunchAtLogin = initialValue
         launchAtLoginMessage = Self.message(for: registrationStatus)
-        notificationsEnabled = defaults.object(forKey: Keys.notificationsEnabled) as? Bool
+        notificationsEnabled = defaults.object(forKey: NtfsmacPreferenceKeys.notificationsEnabled) as? Bool
             ?? Defaults.notificationsEnabled
         notificationsMessage = nil
-        defaults.set(initialValue, forKey: Keys.launchAtLogin)
-        defaults.set(notificationsEnabled, forKey: Keys.notificationsEnabled)
+        defaults.set(initialValue, forKey: NtfsmacPreferenceKeys.launchAtLogin)
+        defaults.set(notificationsEnabled, forKey: NtfsmacPreferenceKeys.notificationsEnabled)
     }
 
     /// Updates the real Service Management registration and then reads it back. The explicit
@@ -114,6 +115,17 @@ public final class Settings: ObservableObject {
         guard !isUpdatingLaunchAtLogin else { return }
         setPublishedLaunchAtLogin(enabled)
         beginLaunchAtLoginUpdate(enabled)
+    }
+
+    /// Re-registers a confirmed pre-v3 Launch-at-login choice for the new BinaryBears bundle.
+    /// The pending marker is cleared only after Service Management reports the new app enabled.
+    public func restoreMigratedLaunchAtLoginIntentIfNeeded() {
+        guard defaults.bool(forKey: NtfsmacPreferenceKeys.pendingLaunchAtLoginRestore) else { return }
+        if launchAtLogin {
+            defaults.removeObject(forKey: NtfsmacPreferenceKeys.pendingLaunchAtLoginRestore)
+            return
+        }
+        setLaunchAtLogin(true)
     }
 
     /// Reconciles changes made directly in System Settings while the app remains running.
@@ -209,7 +221,7 @@ public final class Settings: ObservableObject {
         notificationsEnabled = enabled
         notificationsMessage = message
         isUpdatingNotifications = false
-        defaults.set(enabled, forKey: Keys.notificationsEnabled)
+        defaults.set(enabled, forKey: NtfsmacPreferenceKeys.notificationsEnabled)
     }
 
     private func beginLaunchAtLoginUpdate(_ enabled: Bool) {
@@ -275,7 +287,10 @@ public final class Settings: ObservableObject {
         launchAtLoginMessage = failureMessage.map { "Could not update Launch at login: \($0)" }
             ?? Self.message(for: status)
         isUpdatingLaunchAtLogin = false
-        defaults.set(enabled, forKey: Keys.launchAtLogin)
+        defaults.set(enabled, forKey: NtfsmacPreferenceKeys.launchAtLogin)
+        if enabled {
+            defaults.removeObject(forKey: NtfsmacPreferenceKeys.pendingLaunchAtLoginRestore)
+        }
     }
 
     private func setPublishedLaunchAtLogin(_ enabled: Bool) {
@@ -313,8 +328,4 @@ public final class Settings: ObservableObject {
         public static let notificationsEnabled = false
     }
 
-    private enum Keys {
-        static let launchAtLogin = "com.khr898.ntfsmac.settings.launchAtLogin"
-        static let notificationsEnabled = "com.khr898.ntfsmac.settings.notificationsEnabled"
-    }
 }

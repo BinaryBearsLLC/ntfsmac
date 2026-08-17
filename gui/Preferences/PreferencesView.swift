@@ -28,6 +28,7 @@ public struct PreferencesView: View {
     @ObservedObject public var settings: Settings
     @ObservedObject public var installer: HelperInstaller
     @ObservedObject public var uninstaller: HelperUninstaller
+    @ObservedObject public var updateChecker: UpdateChecker
     public let onBack: (() -> Void)?
     public let productVersion: ProductVersion
 
@@ -38,7 +39,8 @@ public struct PreferencesView: View {
         settings: Settings,
         installer: HelperInstaller,
         uninstaller: HelperUninstaller,
-        onBack: (() -> Void)?
+        onBack: (() -> Void)?,
+        updateChecker: UpdateChecker = UpdateChecker()
     ) {
         self.init(
             settings: settings,
@@ -46,6 +48,7 @@ public struct PreferencesView: View {
             uninstaller: uninstaller,
             onBack: onBack,
             productVersion: .current(),
+            updateChecker: updateChecker,
             uninstallConfirmation: .init()
         )
     }
@@ -55,7 +58,8 @@ public struct PreferencesView: View {
         installer: HelperInstaller,
         uninstaller: HelperUninstaller,
         onBack: (() -> Void)?,
-        productVersion: ProductVersion
+        productVersion: ProductVersion,
+        updateChecker: UpdateChecker = UpdateChecker()
     ) {
         self.init(
             settings: settings,
@@ -63,6 +67,7 @@ public struct PreferencesView: View {
             uninstaller: uninstaller,
             onBack: onBack,
             productVersion: productVersion,
+            updateChecker: updateChecker,
             uninstallConfirmation: .init()
         )
     }
@@ -73,6 +78,7 @@ public struct PreferencesView: View {
         uninstaller: HelperUninstaller,
         onBack: (() -> Void)?,
         productVersion: ProductVersion,
+        updateChecker: UpdateChecker = UpdateChecker(),
         uninstallConfirmation: UninstallConfirmationPresentation
     ) {
         self.settings = settings
@@ -80,6 +86,7 @@ public struct PreferencesView: View {
         self.uninstaller = uninstaller
         self.onBack = onBack
         self.productVersion = productVersion
+        self.updateChecker = updateChecker
         _uninstallConfirmation = State(initialValue: uninstallConfirmation)
     }
 
@@ -163,6 +170,30 @@ public struct PreferencesView: View {
                 }
             }
 
+            row("Software update", updateSubtitle) {
+                if case .updateAvailable = updateChecker.state {
+                    Button("View on GitHub") {
+                        updateChecker.openAvailableRelease()
+                    }
+                    .focusable(true)
+                } else {
+                    HStack(spacing: 6) {
+                        if updateChecker.state == .checking {
+                            ProgressView().controlSize(.small)
+                        }
+                        Button("Check…") {
+                            Task {
+                                await updateChecker.checkManually(
+                                    currentVersion: productVersion.release
+                                )
+                            }
+                        }
+                        .focusable(true)
+                        .disabled(updateChecker.state == .checking)
+                    }
+                }
+            }
+
             Divider()
 
             row("Reinstall privileged helper", "Repair the SMJobBless XPC helper") {
@@ -228,6 +259,21 @@ public struct PreferencesView: View {
 
     private var notificationsSubtitle: String {
         settings.notificationsMessage ?? "Mount, unmount, and error results"
+    }
+
+    private var updateSubtitle: String {
+        switch updateChecker.state {
+        case .idle:
+            return "Checks published GitHub Releases only"
+        case .checking:
+            return "Checking GitHub Releases…"
+        case .upToDate:
+            return "Version \(productVersion.release) is up to date"
+        case .updateAvailable(let release):
+            return "Version \(release.version) is available"
+        case .failed(let message):
+            return message
+        }
     }
 
     /// Inline (in-popover) two-step confirmation — a native `confirmationDialog` would dismiss

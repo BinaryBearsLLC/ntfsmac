@@ -17,7 +17,7 @@ if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--print-tree-h
 
 final class HelperListenerDelegate: NSObject, NSXPCListenerDelegate {
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
-        guard verifyClientIdentity(pid: connection.processIdentifier, expectedIdentifier: "com.khr898.ntfsmac") else {
+        guard verifyClientIdentity(pid: connection.processIdentifier, expectedIdentifier: ntfsmacAppBundleIdentifier) else {
             return false
         }
         connection.exportedInterface = NSXPCInterface(with: HelperXPCProtocol.self)

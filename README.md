@@ -1,5 +1,7 @@
 # ntfsmac by BinaryBears
 
+<img src="brand/ntfsmac-icon.png" alt="ntfsmac app icon" width="144">
+
 Native Apple Silicon NTFS read/write for macOS, without kernel extensions or disabling SIP.
 
 > [!NOTE]

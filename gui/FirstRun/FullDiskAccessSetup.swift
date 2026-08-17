@@ -70,7 +70,7 @@ public final class FullDiskAccessController: ObservableObject {
 }
 
 enum FDAPromptCopy {
-    static let helperServiceName = "com.khr898.ntfsmac.helper"
+    static let helperServiceName = "com.binarybears.ntfsmac.helper"
     static let instructions = "macOS lists ntfsmac Helper under its technical service name, \(helperServiceName), and may show a generic executable icon because the helper is a standalone privileged tool. Enable that exact entry in Full Disk Access."
 }
 
@@ -185,15 +185,25 @@ public struct FullDiskAccessSetupView: View {
 
     private func authorizationCard(waiting: Bool) -> some View {
         VStack(alignment: .leading, spacing: 9) {
-            if waiting {
-                HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text("Waiting for Full Disk Access…")
+            HStack(spacing: 10) {
+                if let iconURL = Bundle.main.url(forResource: "HelperIcon", withExtension: "png"),
+                   let icon = NSImage(contentsOf: iconURL) {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 42, height: 42)
+                        .accessibilityHidden(true)
+                }
+                if waiting {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Waiting for Full Disk Access…")
+                            .font(.system(size: 12.5, weight: .semibold))
+                    }
+                } else {
+                    Text("Allow access for ntfsmac Helper")
                         .font(.system(size: 12.5, weight: .semibold))
                 }
-            } else {
-                Text("Allow access before mounting")
-                    .font(.system(size: 12.5, weight: .semibold))
             }
             Text(FDAPromptCopy.instructions)
                 .font(.system(size: 11.5))

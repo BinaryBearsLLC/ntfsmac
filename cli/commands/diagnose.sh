@@ -556,7 +556,7 @@ check_architecture() {
 
 check_helper_installed() {
   local helper_path
-  helper_path="${NTFSMAC_HELPER_PATH_OVERRIDE-/Library/PrivilegedHelperTools/com.khr898.ntfsmac.helper}"
+  helper_path="${NTFSMAC_HELPER_PATH_OVERRIDE-/Library/PrivilegedHelperTools/com.binarybears.ntfsmac.helper}"
   # The SMJobBless artifact is normally root:wheel 0544. An unprivileged caller therefore cannot
   # use `-x` to infer whether launchd/root can execute it; presence as a regular file is the honest
   # installation signal available to this read-only command.

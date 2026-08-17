@@ -102,7 +102,7 @@ public struct RealLocalNotificationScheduler: LocalNotificationScheduling {
         content.title = payload.title
         content.body = payload.body
         content.sound = .default
-        content.threadIdentifier = "com.khr898.ntfsmac.mount-events"
+        content.threadIdentifier = "com.binarybears.ntfsmac.mount-events"
         let request = UNNotificationRequest(
             identifier: "ntfsmac-\(UUID().uuidString)",
             content: content,

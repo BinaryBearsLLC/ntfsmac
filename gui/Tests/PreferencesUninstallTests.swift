@@ -23,7 +23,7 @@ import Testing
 
 @MainActor
 @Test func inlineUninstallConfirmationRendersInsideTheSettingsPopover() {
-    let defaults = UserDefaults(suiteName: "com.khr898.ntfsmac.tests.uninstall.\(UUID().uuidString)")!
+    let defaults = UserDefaults(suiteName: "com.binarybears.ntfsmac.tests.uninstall.\(UUID().uuidString)")!
     let view = PreferencesView(
         settings: Settings(defaults: defaults),
         installer: HelperInstaller(),
@@ -48,14 +48,14 @@ import Testing
     let productVersion = ProductVersion(release: "test", build: "test")
 
     let withoutBack = PreferencesView(
-        settings: Settings(defaults: UserDefaults(suiteName: "com.khr898.ntfsmac.tests.noback.\(UUID().uuidString)")!),
+        settings: Settings(defaults: UserDefaults(suiteName: "com.binarybears.ntfsmac.tests.noback.\(UUID().uuidString)")!),
         installer: HelperInstaller(),
         uninstaller: HelperUninstaller(),
         onBack: nil,
         productVersion: productVersion
     )
     let withBack = PreferencesView(
-        settings: Settings(defaults: UserDefaults(suiteName: "com.khr898.ntfsmac.tests.back.\(UUID().uuidString)")!),
+        settings: Settings(defaults: UserDefaults(suiteName: "com.binarybears.ntfsmac.tests.back.\(UUID().uuidString)")!),
         installer: HelperInstaller(),
         uninstaller: HelperUninstaller(),
         onBack: {},

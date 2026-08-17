@@ -18,7 +18,7 @@ teardown() {
   run "$SCRIPT"
 
   [ "$status" -eq 0 ]
-  [ "$(cat "$NTFSMAC_OPEN_CALLS")" = $'-b com.khr898.ntfsmac binarybears-ntfsmac://opengui\n-b com.khr898.ntfsmac binarybears-ntfsmac://opengui\n-b com.khr898.ntfsmac binarybears-ntfsmac://opengui' ]
+  [ "$(cat "$NTFSMAC_OPEN_CALLS")" = $'-b com.binarybears.ntfsmac binarybears-ntfsmac://opengui\n-b com.binarybears.ntfsmac binarybears-ntfsmac://opengui\n-b com.binarybears.ntfsmac binarybears-ntfsmac://opengui' ]
   [[ "$output" == *"popover requested"* ]]
 }
 

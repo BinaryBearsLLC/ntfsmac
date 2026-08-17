@@ -77,7 +77,8 @@ let package = Package(
                 "Actions/VerifiedCopyController.swift", "Views/VerifiedCopyStatusView.swift",
                 "FirstRun/HelperInstaller.swift", "FirstRun/FullDiskAccessSetup.swift", "Views/FirstRunView.swift",
                 "FirstRun/HelperUninstaller.swift", "FirstRun/CLIInstallChecker.swift", "Views/CLIMissingView.swift",
-                "Preferences/ProductVersion.swift", "Preferences/Settings.swift", "Preferences/PreferencesView.swift",
+                "Preferences/ProductVersion.swift", "Preferences/LegacyPreferenceMigration.swift",
+                "Preferences/Settings.swift", "Preferences/PreferencesView.swift", "Updates/UpdateChecker.swift",
                 "Style/Colors.swift", "Style/GlassTheme.swift", "Style/Icons.swift", "Style/PillButtons.swift",
                 "Style/TooltipCopy.swift",
                 "Views/PopoverContentView.swift",
@@ -88,7 +89,7 @@ let package = Package(
             dependencies: ["NtfsmacGUI"],
             path: "gui",
             exclude: [
-                "Helper", "Status", "State", "Drives", "Views", "Actions", "FirstRun", "Preferences",
+                "Helper", "Status", "State", "Drives", "Views", "Actions", "FirstRun", "Preferences", "Updates",
                 "Style", "Resources", "Info.plist", "Tests",
             ],
             sources: ["App/NtfsmacApp.swift", "App/DemoScaffold.swift"]

@@ -31,6 +31,41 @@ private struct FakeInstallService: HelperInstallService {
     func bless(label: String) -> HelperInstallOutcome { outcome }
 }
 
+private final class LegacyMigrationInstallService: HelperInstallService, @unchecked Sendable {
+    private let lock = NSLock()
+    private(set) var legacyLabel: String?
+    private(set) var newLabel: String?
+    private(set) var blessCount = 0
+
+    func isInstalled(label: String) -> Bool { false }
+
+    func bless(label: String) -> HelperInstallOutcome {
+        lock.withLock { blessCount += 1 }
+        return .failed("a separate bless must not run after migration")
+    }
+
+    func migrateLegacyHelper(legacyLabel: String, newLabel: String) -> HelperInstallOutcome? {
+        lock.withLock {
+            self.legacyLabel = legacyLabel
+            self.newLabel = newLabel
+        }
+        return .installed
+    }
+}
+
+@MainActor
+@Test func installMigratesThePreV3HelperBeforeBlessingSeparately() async {
+    let service = LegacyMigrationInstallService()
+    let installer = HelperInstaller(service: service)
+
+    await installer.install()
+
+    #expect(installer.state == .installed)
+    #expect(service.legacyLabel == legacyHelperMachServiceName)
+    #expect(service.newLabel == helperMachServiceName)
+    #expect(service.blessCount == 0)
+}
+
 /// Counts `stripQuarantine()` calls the same way `CountingInstallService` counts `bless()` —
 /// proving `install()` actually invokes it (and does so before `bless()`, matching the real
 /// fresh-machine failure mode: a still-quarantined embedded helper tool must be cleaned before
@@ -149,7 +184,7 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
     // `.installed` — proves the skip path is taken, not just that both paths happen to converge.
     let service = FakeInstallService(alreadyInstalled: true, outcome: .failed("bless() should not have been called"))
     let staleDetector = FakeStaleDetector(versionResult: .success(testExpectedVersion))
-    let installer = HelperInstaller(service: service, staleDetector: staleDetector, label: "com.khr898.ntfsmac.helper", expectedVersion: testExpectedVersion)
+    let installer = HelperInstaller(service: service, staleDetector: staleDetector, label: "com.binarybears.ntfsmac.helper", expectedVersion: testExpectedVersion)
 
     await installer.installIfNeeded()
 
@@ -160,7 +195,7 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
 @MainActor
 @Test func passiveFirstRunCheckNeverBlessesAMissingHelper() async {
     let service = CountingInstallService(alreadyInstalled: false, outcome: .installed)
-    let installer = HelperInstaller(service: service, label: "com.khr898.ntfsmac.helper")
+    let installer = HelperInstaller(service: service, label: "com.binarybears.ntfsmac.helper")
 
     await installer.checkWithoutInstalling()
 
@@ -171,7 +206,7 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
 @MainActor
 @Test func explicitConsentInstallsAfterPassiveCheck() async {
     let service = CountingInstallService(alreadyInstalled: false, outcome: .installed)
-    let installer = HelperInstaller(service: service, label: "com.khr898.ntfsmac.helper")
+    let installer = HelperInstaller(service: service, label: "com.binarybears.ntfsmac.helper")
 
     await installer.checkWithoutInstalling()
     await installer.installAfterConsent()
@@ -187,7 +222,7 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
     // `uninstallHelper`, then bless a fresh one — same one-auth-prompt path a first install takes.
     let service = CountingInstallService(alreadyInstalled: true, outcome: .installed)
     let staleDetector = FakeStaleDetector(versionResult: .success("old-build-hash"))
-    let installer = HelperInstaller(service: service, staleDetector: staleDetector, label: "com.khr898.ntfsmac.helper", expectedVersion: testExpectedVersion)
+    let installer = HelperInstaller(service: service, staleDetector: staleDetector, label: "com.binarybears.ntfsmac.helper", expectedVersion: testExpectedVersion)
 
     await installer.installIfNeeded()
 
@@ -202,7 +237,7 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
     // reads as stale exactly like a mismatched hash, not as "installed" by default.
     let service = CountingInstallService(alreadyInstalled: true, outcome: .installed)
     let staleDetector = FakeStaleDetector(versionResult: .failure(HelperClientError.proxyUnavailable))
-    let installer = HelperInstaller(service: service, staleDetector: staleDetector, label: "com.khr898.ntfsmac.helper", expectedVersion: testExpectedVersion)
+    let installer = HelperInstaller(service: service, staleDetector: staleDetector, label: "com.binarybears.ntfsmac.helper", expectedVersion: testExpectedVersion)
 
     await installer.installIfNeeded()
 
@@ -224,7 +259,7 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
     let installer = HelperInstaller(
         service: service,
         staleDetector: staleDetector,
-        label: "com.khr898.ntfsmac.helper",
+        label: "com.binarybears.ntfsmac.helper",
         expectedVersion: testExpectedVersion,
         staleCheckTimeoutNanoseconds: 50_000_000
     )
@@ -240,7 +275,7 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
 @Test func installStripsQuarantineBeforeEveryBlessAttempt() async {
     let service = FakeInstallService(alreadyInstalled: false, outcome: .installed)
     let stripper = FakeQuarantineStripper()
-    let installer = HelperInstaller(service: service, quarantineStripper: stripper, label: "com.khr898.ntfsmac.helper")
+    let installer = HelperInstaller(service: service, quarantineStripper: stripper, label: "com.binarybears.ntfsmac.helper")
 
     await installer.install()
     #expect(stripper.callCount == 1)
@@ -280,7 +315,7 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
 @MainActor
 @Test func installIfNeededBlessesWhenNotInstalled() async {
     let service = FakeInstallService(alreadyInstalled: false, outcome: .installed)
-    let installer = HelperInstaller(service: service, label: "com.khr898.ntfsmac.helper")
+    let installer = HelperInstaller(service: service, label: "com.binarybears.ntfsmac.helper")
 
     await installer.installIfNeeded()
 
@@ -290,7 +325,7 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
 @MainActor
 @Test func installSurfacesDenialAsPlainLanguageState() async {
     let service = FakeInstallService(alreadyInstalled: false, outcome: .denied("Authorization was cancelled."))
-    let installer = HelperInstaller(service: service, label: "com.khr898.ntfsmac.helper")
+    let installer = HelperInstaller(service: service, label: "com.binarybears.ntfsmac.helper")
 
     await installer.install()
 
@@ -300,7 +335,7 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
 @MainActor
 @Test func installSurfacesFailureAsPlainLanguageState() async {
     let service = FakeInstallService(alreadyInstalled: false, outcome: .failed("SMJobBless failed for an unknown reason."))
-    let installer = HelperInstaller(service: service, label: "com.khr898.ntfsmac.helper")
+    let installer = HelperInstaller(service: service, label: "com.binarybears.ntfsmac.helper")
 
     await installer.install()
 
@@ -313,7 +348,7 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
     // there's no separate reinstall method; calling install() again after a denial is that
     // reuse, and it must be able to recover to .installed.
     let service = FakeInstallService(alreadyInstalled: false, outcome: .installed)
-    let installer = HelperInstaller(service: service, label: "com.khr898.ntfsmac.helper")
+    let installer = HelperInstaller(service: service, label: "com.binarybears.ntfsmac.helper")
 
     await installer.install()
     #expect(installer.state == .installed)
@@ -328,7 +363,7 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
     // `.task { installIfNeeded() }`. A prior denial/failure must not cause a second `bless()`
     // call (and thus a second OS auth prompt) — only the explicit "Retry" button may do that.
     let service = CountingInstallService(alreadyInstalled: false, outcome: .denied("Authorization was denied — an administrator password is required."))
-    let installer = HelperInstaller(service: service, label: "com.khr898.ntfsmac.helper")
+    let installer = HelperInstaller(service: service, label: "com.binarybears.ntfsmac.helper")
 
     await installer.installIfNeeded()
     #expect(installer.state == .denied("Authorization was denied — an administrator password is required."))
@@ -341,7 +376,7 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
 @MainActor
 @Test func installIfNeededDoesNotReattemptBlessAfterFailure() async {
     let service = CountingInstallService(alreadyInstalled: false, outcome: .failed("SMJobBless failed for an unknown reason."))
-    let installer = HelperInstaller(service: service, label: "com.khr898.ntfsmac.helper")
+    let installer = HelperInstaller(service: service, label: "com.binarybears.ntfsmac.helper")
 
     await installer.installIfNeeded()
     #expect(service.blessCallCount == 1)
@@ -353,7 +388,7 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
 @MainActor
 @Test func secondInstallWhileFirstInFlightIsRejected() async {
     let blocking = BlockingInstallService()
-    let installer = HelperInstaller(service: blocking, label: "com.khr898.ntfsmac.helper")
+    let installer = HelperInstaller(service: blocking, label: "com.binarybears.ntfsmac.helper")
 
     let firstTask = Task { await installer.install() }
     // bless() runs on a real background thread (DispatchQueue.global), not MainActor-serialized

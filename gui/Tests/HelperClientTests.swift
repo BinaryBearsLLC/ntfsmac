@@ -20,7 +20,7 @@ private final class ConnectionFactoryProbe: @unchecked Sendable {
 @Test func helperClientDoesNotConnectBeforeTheFirstPrivilegedRequest() {
     let probe = ConnectionFactoryProbe()
     let client = HelperClient(
-        machServiceName: "com.khr898.ntfsmac.tests.lazy-helper",
+        machServiceName: "com.binarybears.ntfsmac.tests.lazy-helper",
         connectionFactory: probe.makeConnection(machServiceName:)
     )
 

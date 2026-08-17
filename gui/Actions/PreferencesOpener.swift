@@ -1,7 +1,7 @@
 import SwiftUI
 
 extension Notification.Name {
-    static let ntfsmacOpenSettings = Notification.Name("com.khr898.ntfsmac.open-settings")
+    static let ntfsmacOpenSettings = Notification.Name("com.binarybears.ntfsmac.open-settings")
 }
 
 /// Source-compatible adapter for callers of the former Preferences-window API. It no longer

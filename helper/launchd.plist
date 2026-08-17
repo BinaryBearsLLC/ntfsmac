@@ -3,15 +3,15 @@
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>com.khr898.ntfsmac.helper</string>
+	<string>com.binarybears.ntfsmac.helper</string>
 	<key>MachServices</key>
 	<dict>
-		<key>com.khr898.ntfsmac.helper</key>
+		<key>com.binarybears.ntfsmac.helper</key>
 		<true/>
 	</dict>
 	<key>ProgramArguments</key>
 	<array>
-		<string>/Library/PrivilegedHelperTools/com.khr898.ntfsmac.helper</string>
+		<string>/Library/PrivilegedHelperTools/com.binarybears.ntfsmac.helper</string>
 	</array>
 </dict>
 </plist>

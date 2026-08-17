@@ -7,7 +7,7 @@ import Testing
 // Uses an isolated UserDefaults suite per test (never the real .standard domain).
 
 private func makeIsolatedDefaults(_ testName: String) -> UserDefaults {
-    let suiteName = "com.khr898.ntfsmac.tests.\(testName).\(UUID().uuidString)"
+    let suiteName = "com.binarybears.ntfsmac.tests.\(testName).\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!
     defaults.removePersistentDomain(forName: suiteName)
     return defaults
@@ -164,7 +164,7 @@ private func waitForNotificationUpdate(_ settings: Settings) async {
 
     #expect(settings.notificationsEnabled)
     #expect(authorization.requestCount == 1)
-    #expect(defaults.bool(forKey: "com.khr898.ntfsmac.settings.notificationsEnabled"))
+    #expect(defaults.bool(forKey: "com.binarybears.ntfsmac.settings.notificationsEnabled"))
 }
 
 @MainActor
@@ -203,7 +203,7 @@ private func waitForNotificationUpdate(_ settings: Settings) async {
 
     #expect(!settings.notificationsEnabled)
     #expect(settings.notificationsMessage?.contains("notification request failed") == true)
-    #expect(!defaults.bool(forKey: "com.khr898.ntfsmac.settings.notificationsEnabled"))
+    #expect(!defaults.bool(forKey: "com.binarybears.ntfsmac.settings.notificationsEnabled"))
 }
 
 @MainActor
@@ -225,13 +225,13 @@ private func waitForNotificationUpdate(_ settings: Settings) async {
 
     #expect(settings.notificationsEnabled)
     #expect(settings.notificationsMessage == nil)
-    #expect(defaults.bool(forKey: "com.khr898.ntfsmac.settings.notificationsEnabled"))
+    #expect(defaults.bool(forKey: "com.binarybears.ntfsmac.settings.notificationsEnabled"))
 }
 
 @MainActor
 @Test func legacyServicesKeepTheOriginalDefaultsBackedBehavior() async {
     let defaults = makeIsolatedDefaults(#function)
-    defaults.set(true, forKey: "com.khr898.ntfsmac.settings.launchAtLogin")
+    defaults.set(true, forKey: "com.binarybears.ntfsmac.settings.launchAtLogin")
     let service = LegacyLoginService()
     let settings = Settings(defaults: defaults, loginService: service)
 
@@ -243,18 +243,18 @@ private func waitForNotificationUpdate(_ settings: Settings) async {
 
     #expect(!settings.launchAtLogin)
     #expect(service.requestedValues == [false])
-    #expect(!defaults.bool(forKey: "com.khr898.ntfsmac.settings.launchAtLogin"))
+    #expect(!defaults.bool(forKey: "com.binarybears.ntfsmac.settings.launchAtLogin"))
 }
 
 @MainActor
 @Test func serviceManagementStatusOverridesAStalePersistedValue() {
     let defaults = makeIsolatedDefaults(#function)
-    defaults.set(true, forKey: "com.khr898.ntfsmac.settings.launchAtLogin")
+    defaults.set(true, forKey: "com.binarybears.ntfsmac.settings.launchAtLogin")
 
     let settings = Settings(defaults: defaults, loginService: FakeLoginService(status: .disabled))
 
     #expect(!settings.launchAtLogin)
-    #expect(!defaults.bool(forKey: "com.khr898.ntfsmac.settings.launchAtLogin"))
+    #expect(!defaults.bool(forKey: "com.binarybears.ntfsmac.settings.launchAtLogin"))
 }
 
 @MainActor
@@ -269,7 +269,7 @@ private func waitForNotificationUpdate(_ settings: Settings) async {
     #expect(settings.launchAtLogin)
     #expect(service.status == .enabled)
     #expect(service.requestedValues == [true])
-    #expect(defaults.bool(forKey: "com.khr898.ntfsmac.settings.launchAtLogin"))
+    #expect(defaults.bool(forKey: "com.binarybears.ntfsmac.settings.launchAtLogin"))
 }
 
 @MainActor
@@ -282,7 +282,7 @@ private func waitForNotificationUpdate(_ settings: Settings) async {
 
     #expect(!settings.launchAtLogin)
     #expect(settings.launchAtLoginMessage?.contains("registration denied") == true)
-    #expect(!defaults.bool(forKey: "com.khr898.ntfsmac.settings.launchAtLogin"))
+    #expect(!defaults.bool(forKey: "com.binarybears.ntfsmac.settings.launchAtLogin"))
 }
 
 @MainActor
@@ -323,5 +323,5 @@ private func waitForNotificationUpdate(_ settings: Settings) async {
     settings.refreshLaunchAtLoginStatus()
 
     #expect(settings.launchAtLogin)
-    #expect(defaults.bool(forKey: "com.khr898.ntfsmac.settings.launchAtLogin"))
+    #expect(defaults.bool(forKey: "com.binarybears.ntfsmac.settings.launchAtLogin"))
 }

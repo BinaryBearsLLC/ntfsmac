@@ -33,7 +33,7 @@ main() {
   }
 
   local open_bin="${NTFSMAC_OPEN_BIN:-/usr/bin/open}"
-  local bundle_id="${NTFSMAC_GUI_BUNDLE_ID:-com.khr898.ntfsmac}"
+  local bundle_id="${NTFSMAC_GUI_BUNDLE_ID:-com.binarybears.ntfsmac}"
   local app_path="${NTFSMAC_GUI_APP_PATH:-}"
   local request_url="binarybears-ntfsmac://opengui"
   local -a request_args

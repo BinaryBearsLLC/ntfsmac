@@ -3,10 +3,10 @@ import ServiceManagement
 import HelperShared
 import os.log
 
-private let helperInstallerLog = Logger(subsystem: "com.khr898.ntfsmac", category: "HelperInstaller")
+private let helperInstallerLog = Logger(subsystem: "com.binarybears.ntfsmac", category: "HelperInstaller")
 
-/// Outcome of a real `SMJobBless` attempt (PLAN.md §3, L4/L5 — SMJobBless/ad-hoc signing is a
-/// HARD-STOP, never deviate to `SMAppService` or a raw `sudo` shell-out).
+/// Outcome of a real `SMJobBless` attempt. v3 deliberately keeps this compatibility mechanism;
+/// changing the helper architecture belongs to P2, never to an incidental repair.
 public enum HelperInstallOutcome: Equatable, Sendable {
     case installed
     case denied(String)
@@ -21,14 +21,17 @@ public enum HelperInstallOutcome: Equatable, Sendable {
 public protocol HelperInstallService: Sendable {
     func isInstalled(label: String) -> Bool
     func bless(label: String) -> HelperInstallOutcome
+    func migrateLegacyHelper(legacyLabel: String, newLabel: String) -> HelperInstallOutcome?
+}
+
+public extension HelperInstallService {
+    func migrateLegacyHelper(legacyLabel: String, newLabel: String) -> HelperInstallOutcome? { nil }
 }
 
 /// Strips `com.apple.quarantine` from this app's own bundle before every `bless()` attempt.
-/// Real-world failure this exists for: the DMG is ad-hoc-signed with no notarization (L4 — no
-/// paid Developer account) — on a *different* machine than it was built on, any quarantine-aware
-/// transfer (download, AirDrop, etc.) tags the DMG, and macOS propagates that tag onto every file
-/// Finder extracts from it, including the embedded helper tool. The user right-clicking "Open" on
-/// the outer .app only approves *that* launch; `SMJobBless` then copies the helper tool *out* of
+/// Real-world failure this exists for: quarantine-aware transfers can propagate a quarantine tag
+/// onto every file Finder extracts from a DMG, including the embedded helper tool. `SMJobBless`
+/// then copies the helper tool *out* of
 /// the bundle into `/Library/PrivilegedHelperTools/` as a standalone file, still quarantined —
 /// launchd's later attempt to actually run that daemon gets silently blocked by Gatekeeper (no
 /// dialog, since a background daemon has no interactive session to approve through). `bless()`
@@ -76,50 +79,101 @@ public struct RealHelperInstallService: HelperInstallService {
     /// deviation L4/L5 calls a HARD-STOP). Still functions on macOS 13+ despite the
     /// deprecation annotation.
     ///
-    /// Trust caveat (real, not new to this unit — same ad-hoc-signing tradeoff already
-    /// documented in `helper/Info.plist`/`main.swift`'s `verifyClientIdentity`): this only
+    /// This registration probe only
     /// checks that *some* job is registered under `label`, not that its on-disk binary still
-    /// matches this app's expected identifier. There's no stronger check realistically
-    /// available without a paid-cert trust chain (L4).
+    /// matches this app's expected identifier. The subsequent XPC identity check and official
+    /// release signature remain the authorization boundary.
     public func isInstalled(label: String) -> Bool {
         SMJobCopyDictionary(kSMDomainSystemLaunchd, label as CFString) != nil
     }
 
     public func bless(label: String) -> HelperInstallOutcome {
-        var authRef: AuthorizationRef?
-        // `kSMRightBlessPrivilegedHelper.withCString` keeps the C string alive for exactly the
-        // duration of `AuthorizationCreate` — not relying on `(kSMRightBlessPrivilegedHelper as
-        // NSString).utf8String`'s pointer surviving past the bridging expression, which the
-        // API contract never actually guarantees.
-        let status = kSMRightBlessPrivilegedHelper.withCString { namePtr -> OSStatus in
-            var authItem = AuthorizationItem(name: namePtr, valueLength: 0, value: nil, flags: 0)
-            return withUnsafeMutablePointer(to: &authItem) { itemPtr -> OSStatus in
-                var rights = AuthorizationRights(count: 1, items: itemPtr)
-                let flags: AuthorizationFlags = [.interactionAllowed, .extendRights, .preAuthorize]
-                return AuthorizationCreate(&rights, nil, flags, &authRef)
-            }
-        }
+        let authorization = authorization(for: [kSMRightBlessPrivilegedHelper])
+        guard let authRef = authorization.reference else { return authorization.failure! }
+        defer { AuthorizationFree(authRef, [.destroyRights]) }
+        return bless(label: label, authorization: authRef)
+    }
 
-        guard status == errAuthorizationSuccess, let authRef else {
-            switch status {
-            case errAuthorizationCanceled:
-                return .denied("Authorization was cancelled.")
-            case errAuthorizationDenied:
-                return .denied("Authorization was denied — an administrator password is required.")
-            default:
-                return .failed("Authorization request failed (status \(status)).")
-            }
-        }
+    /// Removes the pre-v3 job and blesses the new v3 helper under one explicit administrator
+    /// transaction. The old daemon correctly rejects the new app's identity, so it cannot be
+    /// asked to uninstall itself over its former XPC service.
+    public func migrateLegacyHelper(
+        legacyLabel: String,
+        newLabel: String
+    ) -> HelperInstallOutcome? {
+        guard isInstalled(label: legacyLabel) else { return nil }
+        let authorization = authorization(for: [
+            kSMRightModifySystemDaemons,
+            kSMRightBlessPrivilegedHelper,
+        ])
+        guard let authRef = authorization.reference else { return authorization.failure! }
         defer { AuthorizationFree(authRef, [.destroyRights]) }
 
+        var removalError: Unmanaged<CFError>?
+        guard SMJobRemove(
+            kSMDomainSystemLaunchd,
+            legacyLabel as CFString,
+            authRef,
+            true,
+            &removalError
+        ) else {
+            if let removalError {
+                return .failed(
+                    "Could not remove the previous ntfsmac Helper: "
+                        + (removalError.takeRetainedValue() as Error).localizedDescription
+                )
+            }
+            return .failed("Could not remove the previous ntfsmac Helper.")
+        }
+        return bless(label: newLabel, authorization: authRef)
+    }
+
+    private func bless(label: String, authorization: AuthorizationRef) -> HelperInstallOutcome {
         var cfError: Unmanaged<CFError>?
-        guard SMJobBless(kSMDomainSystemLaunchd, label as CFString, authRef, &cfError) else {
+        guard SMJobBless(kSMDomainSystemLaunchd, label as CFString, authorization, &cfError) else {
             if let cfError {
                 return .failed((cfError.takeRetainedValue() as Error).localizedDescription)
             }
             return .failed("SMJobBless failed for an unknown reason.")
         }
         return .installed
+    }
+
+    private func authorization(
+        for rightNames: [String]
+    ) -> (reference: AuthorizationRef?, failure: HelperInstallOutcome?) {
+        var authRef: AuthorizationRef?
+        let createStatus = AuthorizationCreate(nil, nil, [], &authRef)
+        guard createStatus == errAuthorizationSuccess, let authRef else {
+            return (nil, Self.authorizationFailure(status: createStatus))
+        }
+
+        let flags: AuthorizationFlags = [.interactionAllowed, .extendRights, .preAuthorize]
+        for rightName in rightNames {
+            let status = rightName.withCString { namePtr -> OSStatus in
+                var item = AuthorizationItem(name: namePtr, valueLength: 0, value: nil, flags: 0)
+                return withUnsafeMutablePointer(to: &item) { itemPtr -> OSStatus in
+                    var rights = AuthorizationRights(count: 1, items: itemPtr)
+                    return AuthorizationCopyRights(authRef, &rights, nil, flags, nil)
+                }
+            }
+            guard status == errAuthorizationSuccess else {
+                AuthorizationFree(authRef, [.destroyRights])
+                return (nil, Self.authorizationFailure(status: status))
+            }
+        }
+        return (authRef, nil)
+    }
+
+    private static func authorizationFailure(status: OSStatus) -> HelperInstallOutcome {
+        switch status {
+        case errAuthorizationCanceled:
+            return .denied("Authorization was cancelled.")
+        case errAuthorizationDenied:
+            return .denied("Authorization was denied — an administrator password is required.")
+        default:
+            return .failed("Authorization request failed (status \(status)).")
+        }
     }
 }
 
@@ -168,6 +222,7 @@ public final class HelperInstaller: ObservableObject {
     private let staleDetector: any StaleHelperDetecting
     private let quarantineStripper: any QuarantineStripping
     private let label: String
+    private let legacyLabel: String
     private let expectedVersion: String
     private let staleCheckTimeoutNanoseconds: UInt64
 
@@ -176,6 +231,7 @@ public final class HelperInstaller: ObservableObject {
         staleDetector: any StaleHelperDetecting = HelperClient(),
         quarantineStripper: any QuarantineStripping = RealQuarantineStripper(),
         label: String = helperMachServiceName,
+        legacyLabel: String = legacyHelperMachServiceName,
         expectedVersion: String = helperBuildIdentity(cliTreeHash: GeneratedCLIManifest.expectedTreeHashHex),
         staleCheckTimeoutNanoseconds: UInt64 = 5_000_000_000
     ) {
@@ -183,6 +239,7 @@ public final class HelperInstaller: ObservableObject {
         self.staleDetector = staleDetector
         self.quarantineStripper = quarantineStripper
         self.label = label
+        self.legacyLabel = legacyLabel
         self.expectedVersion = expectedVersion
         self.staleCheckTimeoutNanoseconds = staleCheckTimeoutNanoseconds
     }
@@ -327,8 +384,14 @@ public final class HelperInstaller: ObservableObject {
     public func install() async {
         guard state != .installing else { return }
         state = .installing
-        let outcome = await runOffCooperativePool { [service, label, quarantineStripper] in
+        let outcome = await runOffCooperativePool { [service, label, legacyLabel, quarantineStripper] in
             quarantineStripper.stripQuarantine()
+            if let migration = service.migrateLegacyHelper(
+                legacyLabel: legacyLabel,
+                newLabel: label
+            ) {
+                return migration
+            }
             return service.bless(label: label)
         }
         switch outcome {

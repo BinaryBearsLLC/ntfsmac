@@ -2,7 +2,7 @@ import Foundation
 import HelperShared
 import os.log
 
-private let helperClientLog = Logger(subsystem: "com.khr898.ntfsmac", category: "HelperClient")
+private let helperClientLog = Logger(subsystem: "com.binarybears.ntfsmac", category: "HelperClient")
 
 public enum HelperClientError: Error {
     case invalidDevice(String)

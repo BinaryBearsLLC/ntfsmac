@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
-	<string>com.khr898.ntfsmac.helper</string>
+	<string>com.binarybears.ntfsmac.helper</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>ntfsmac-helper</string>
+	<string>ntfsmac Helper</string>
 	<key>CFBundleDisplayName</key>
 	<string>ntfsmac Helper</string>
 	<!-- SMJobBless installs this as one standalone TOOL executable, not as a resource bundle.
@@ -17,18 +17,17 @@
 	<key>CFBundlePackageType</key>
 	<string>TOOL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.1</string>
+	<string>3.0.0</string>
 	<key>CFBundleVersion</key>
-	<string>090826</string>
+	<string>3.0.0</string>
 	<!--
-	SMJobBless authorizes the *installing app* to bless this helper. Ad-hoc signing (L4) means
-	there is no Team ID / trusted certificate chain to pin, so this only checks the identifier
-	the app itself is signed with — same caveat as verifyClientIdentity() in main.swift.
-	3-first-run-install is the unit that actually drives SMJobBless with this requirement.
+	SMJobBless authorizes the *installing app* to bless this helper. The identifier-only
+	compatibility requirement keeps local ad-hoc source builds usable; official artifacts are
+	separately required and verified to carry the BinaryBears Developer ID team identity.
 	-->
 	<key>SMAuthorizedClients</key>
 	<array>
-		<string>identifier "com.khr898.ntfsmac"</string>
+		<string>identifier "com.binarybears.ntfsmac"</string>
 	</array>
 </dict>
 </plist>

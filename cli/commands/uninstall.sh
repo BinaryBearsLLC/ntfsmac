@@ -123,22 +123,47 @@ remove_logs() {
 }
 
 remove_privileged_helper_if_root() {
-  local plist="${NTFSMAC_HELPER_PLIST:-/Library/LaunchDaemons/com.khr898.ntfsmac.helper.plist}"
-  local bin="${NTFSMAC_HELPER_BIN:-/Library/PrivilegedHelperTools/com.khr898.ntfsmac.helper}"
+  local plist="${NTFSMAC_HELPER_PLIST:-/Library/LaunchDaemons/com.binarybears.ntfsmac.helper.plist}"
+  local bin="${NTFSMAC_HELPER_BIN:-/Library/PrivilegedHelperTools/com.binarybears.ntfsmac.helper}"
+  local label="${NTFSMAC_HELPER_LABEL:-com.binarybears.ntfsmac.helper}"
+  local legacy_plist="" legacy_bin="" legacy_label=""
+
+  # Tests and embedding callers that redirect only the current helper must never fall through
+  # to real /Library legacy paths. Use real legacy defaults only for the ordinary uninstall;
+  # redirected callers can opt in with explicit legacy paths and label.
+  if [[ -n "${NTFSMAC_LEGACY_HELPER_PLIST+x}" || -n "${NTFSMAC_LEGACY_HELPER_BIN+x}" ]]; then
+    legacy_plist="${NTFSMAC_LEGACY_HELPER_PLIST:-}"
+    legacy_bin="${NTFSMAC_LEGACY_HELPER_BIN:-}"
+    legacy_label="${NTFSMAC_LEGACY_HELPER_LABEL:-com.khr898.ntfsmac.helper}"
+  elif [[ -z "${NTFSMAC_HELPER_PLIST+x}" && -z "${NTFSMAC_HELPER_BIN+x}" ]]; then
+    legacy_plist="/Library/LaunchDaemons/com.khr898.ntfsmac.helper.plist"
+    legacy_bin="/Library/PrivilegedHelperTools/com.khr898.ntfsmac.helper"
+    legacy_label="com.khr898.ntfsmac.helper"
+  fi
 
   if [[ "$(id -u)" -ne 0 ]]; then
     echo "uninstall: not running as root — the GUI's privileged helper (if installed) was left in place."
     echo "uninstall: re-run with 'sudo' to remove it too, or use the GUI's own Uninstall control in Preferences."
     return 0
   fi
-  if launchctl print system/com.khr898.ntfsmac.helper >/dev/null 2>&1; then
-    launchctl bootout system/com.khr898.ntfsmac.helper >/dev/null 2>&1
+  if launchctl print "system/$label" >/dev/null 2>&1; then
+    launchctl bootout "system/$label" >/dev/null 2>&1
   fi
   rm -f "$plist"
   rm -f "$bin"
-  tccutil reset SystemPolicyAllFiles com.khr898.ntfsmac.helper >/dev/null 2>&1 || true
-  tccutil reset All com.khr898.ntfsmac.helper >/dev/null 2>&1 || true
-  echo "uninstall: removed privileged helper (ran as root)"
+  tccutil reset SystemPolicyAllFiles "$label" >/dev/null 2>&1 || true
+  tccutil reset All "$label" >/dev/null 2>&1 || true
+
+  if [[ -n "$legacy_label" ]]; then
+    if launchctl print "system/$legacy_label" >/dev/null 2>&1; then
+      launchctl bootout "system/$legacy_label" >/dev/null 2>&1
+    fi
+    [[ -z "$legacy_plist" ]] || rm -f "$legacy_plist"
+    [[ -z "$legacy_bin" ]] || rm -f "$legacy_bin"
+    tccutil reset SystemPolicyAllFiles "$legacy_label" >/dev/null 2>&1 || true
+    tccutil reset All "$legacy_label" >/dev/null 2>&1 || true
+  fi
+  echo "uninstall: removed current and legacy privileged helpers (ran as root)"
 }
 
 cmd_uninstall() {

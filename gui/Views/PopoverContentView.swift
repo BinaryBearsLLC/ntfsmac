@@ -70,6 +70,7 @@ public struct PopoverContentView: View {
     @ObservedObject public var cliAutoStager: CLIAutoStager
     @ObservedObject public var fullDiskAccessController: FullDiskAccessController
     @ObservedObject public var settings: Settings
+    @ObservedObject public var updateChecker: UpdateChecker
     @StateObject private var navigation: PopoverNavigation
     @StateObject private var verifiedCopyController: VerifiedCopyController
     public let finderOpener: FinderOpener
@@ -93,6 +94,7 @@ public struct PopoverContentView: View {
         cliAutoStager: CLIAutoStager,
         fullDiskAccessController: FullDiskAccessController = FullDiskAccessController(),
         settings: Settings,
+        updateChecker: UpdateChecker = UpdateChecker(),
         finderOpener: FinderOpener,
         helperClient: HelperClient,
         navigation: PopoverNavigation
@@ -109,6 +111,7 @@ public struct PopoverContentView: View {
         self.cliAutoStager = cliAutoStager
         self.fullDiskAccessController = fullDiskAccessController
         self.settings = settings
+        self.updateChecker = updateChecker
         self.finderOpener = finderOpener
         self.helperClient = helperClient
         _navigation = StateObject(wrappedValue: navigation)
@@ -128,6 +131,7 @@ public struct PopoverContentView: View {
         cliInstallChecker: CLIInstallChecker,
         cliAutoStager: CLIAutoStager,
         settings: Settings,
+        updateChecker: UpdateChecker = UpdateChecker(),
         finderOpener: FinderOpener,
         helperClient: HelperClient
     ) {
@@ -144,6 +148,7 @@ public struct PopoverContentView: View {
             cliAutoStager: cliAutoStager,
             fullDiskAccessController: FullDiskAccessController(),
             settings: settings,
+            updateChecker: updateChecker,
             finderOpener: finderOpener,
             helperClient: helperClient,
             navigation: PopoverNavigation()
@@ -157,7 +162,8 @@ public struct PopoverContentView: View {
                     settings: settings,
                     installer: helperInstaller,
                     uninstaller: helperUninstaller,
-                    onBack: navigation.showMain
+                    onBack: navigation.showMain,
+                    updateChecker: updateChecker
                 )
             // Helper install is a self-contained SMJobBless/XPC flow that doesn't touch the CLI
             // tree at all — gating it behind `cliInstallChecker.isInstalled` would block the

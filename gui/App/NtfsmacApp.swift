@@ -5,7 +5,7 @@ import NtfsmacGUI
 import SwiftUI
 import os.log
 
-private let lifecycleLog = Logger(subsystem: "com.khr898.ntfsmac", category: "Lifecycle")
+private let lifecycleLog = Logger(subsystem: "com.binarybears.ntfsmac", category: "Lifecycle")
 
 /// Owns the menu-bar shell and the same long-lived model objects previously retained by
 /// `MenuBarExtra`. AppKit is used only because SwiftUI does not expose a supported way to present
@@ -51,7 +51,10 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
         guard singleInstanceGuard != nil else { return }
 
         let appState = AppState()
+        LegacyPreferenceMigrator.migrate()
         let settings = Settings()
+        settings.restoreMigratedLaunchAtLoginIntentIfNeeded()
+        let updateChecker = UpdateChecker()
         let eventNotifier = MountEventNotifier(isEnabled: { settings.notificationsEnabled })
         let driveScanner: DriveScanner
         let mountController: MountController
@@ -108,6 +111,7 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
             cliAutoStager: cliAutoStager,
             fullDiskAccessController: fullDiskAccessController,
             settings: settings,
+            updateChecker: updateChecker,
             finderOpener: FinderOpener(),
             helperClient: helperClient,
             navigation: navigation
@@ -148,6 +152,11 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
         driveScanner.startPolling()
         mountController.startPolling { driveScanner.drives }
         securityStatusReader.startPolling()
+        Task {
+            await updateChecker.checkAutomaticallyIfNeeded(
+                currentVersion: ProductVersion.current().release
+            )
+        }
 
         if pendingOpenRequest {
             pendingOpenRequest = false

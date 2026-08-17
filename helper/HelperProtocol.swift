@@ -165,7 +165,12 @@ public func resolveNtfsmacPrefix(fileManager: FileManager = .default) -> String 
     return installPrefix
 }
 
-public let helperMachServiceName = "com.khr898.ntfsmac.helper"
+public let ntfsmacAppBundleIdentifier = "com.binarybears.ntfsmac"
+public let helperMachServiceName = "com.binarybears.ntfsmac.helper"
+
+/// Pre-v3 helper identity. It remains only as an explicit one-way migration source and must never
+/// be used for a new install, XPC connection, diagnostic default, or packaged production identity.
+public let legacyHelperMachServiceName = "com.khr898.ntfsmac.helper"
 
 public enum FsDriver: String, Codable, Sendable {
     // Raw value matches `cli/commands/mount.sh`'s literal `--fs-driver` values (L1: ntfs-3g is

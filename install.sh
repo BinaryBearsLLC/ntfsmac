@@ -5,14 +5,12 @@
 # Refuses non-arm64 (L7). Runtime files are staged to a fresh inode, checked when Mach-O, and
 # atomically renamed into place. This avoids executing a partially overwritten binary and avoids
 # macOS retaining stale code-signature state on an in-place update. It does not change Gatekeeper,
-# SIP, provenance, or any system-wide policy. Verifies anylinuxfs's ad-hoc signature before
-# enabling it (build-all.sh already `codesign -s -`
-# signs anylinuxfs; gvproxy/vmnet-helper/vmproxy get formally signed by 2-signing, the
-# next unit — not duplicated here). NTFSMAC_REPO defaults to khr898/ntfsmac (L10 — the
-# repo owner placeholder must never appear literally in this file).
+# SIP, provenance, or any system-wide policy. Verifies the shipped macOS runtime signatures
+# before enabling them. NTFSMAC_REPO defaults to the BinaryBears release repository and can be
+# overridden for mirrors and tests.
 set -uo pipefail
 
-NTFSMAC_REPO="${NTFSMAC_REPO:-khr898/ntfsmac}"
+NTFSMAC_REPO="${NTFSMAC_REPO:-BinaryBearsLLC/ntfsmac}"
 REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 PREFIX="${NTFSMAC_PREFIX:-/usr/local/ntfsmac}"
 # Already-on-PATH convenience symlink (`ntfsmac` works with zero manual PATH setup) — a plain

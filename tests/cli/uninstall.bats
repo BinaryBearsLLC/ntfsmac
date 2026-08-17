@@ -14,8 +14,10 @@ setup() {
   # Scratch, never the real /usr/local/bin — a test run must never touch shared system state.
   export NTFSMAC_PATH_SYMLINK="$SCRATCH/path-bin/ntfsmac"
   export HOME="$SCRATCH/home"
-  export NTFSMAC_HELPER_PLIST="$SCRATCH/LaunchDaemons/com.khr898.ntfsmac.helper.plist"
-  export NTFSMAC_HELPER_BIN="$SCRATCH/PrivilegedHelperTools/com.khr898.ntfsmac.helper"
+  export NTFSMAC_HELPER_PLIST="$SCRATCH/LaunchDaemons/com.binarybears.ntfsmac.helper.plist"
+  export NTFSMAC_HELPER_BIN="$SCRATCH/PrivilegedHelperTools/com.binarybears.ntfsmac.helper"
+  export NTFSMAC_LEGACY_HELPER_PLIST="$SCRATCH/LaunchDaemons/com.khr898.ntfsmac.helper.plist"
+  export NTFSMAC_LEGACY_HELPER_BIN="$SCRATCH/PrivilegedHelperTools/com.khr898.ntfsmac.helper"
   mkdir -p "$NTFSMAC_PREFIX/bin" "$NTFSMAC_PREFIX/libexec/ntfsmac/lib" "$HOME/.anylinuxfs" "$HOME/Library/Logs"
   touch "$NTFSMAC_PREFIX/bin/anylinuxfs" "$NTFSMAC_PREFIX/bin/ntfsmac"
   touch "$HOME/.anylinuxfs/config.toml"
@@ -117,9 +119,10 @@ STUB
   [[ "$output" == *"not running as root"* ]]
 }
 
-@test "as root: removes the privileged helper's launchd plist and binary" {
+@test "as root: removes both BinaryBears and legacy privileged helpers" {
   mkdir -p "$(dirname "$NTFSMAC_HELPER_PLIST")" "$(dirname "$NTFSMAC_HELPER_BIN")"
-  touch "$NTFSMAC_HELPER_PLIST" "$NTFSMAC_HELPER_BIN"
+  touch "$NTFSMAC_HELPER_PLIST" "$NTFSMAC_HELPER_BIN" \
+    "$NTFSMAC_LEGACY_HELPER_PLIST" "$NTFSMAC_LEGACY_HELPER_BIN"
   cat > "$STUB_DIR/id" <<'STUB'
 #!/bin/bash
 echo 0
@@ -129,6 +132,8 @@ STUB
   [ "$status" -eq 0 ]
   [ ! -f "$NTFSMAC_HELPER_PLIST" ]
   [ ! -f "$NTFSMAC_HELPER_BIN" ]
+  [ ! -f "$NTFSMAC_LEGACY_HELPER_PLIST" ]
+  [ ! -f "$NTFSMAC_LEGACY_HELPER_BIN" ]
 }
 
 @test "self-elevates via sudo when not root, so the privileged helper actually gets removed" {
