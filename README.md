@@ -53,7 +53,11 @@ cd ntfsmac
 ./build.command
 ```
 
-Local builds use ad-hoc signing by default and require no Apple credentials. See
+GUI builds automatically create the standard `ntfsmac-X.Y.Z-Apple-Silicon.dmg` and the
+`ntfsmac-X.Y.Z-Legacy-Apple-Silicon.dmg` compatibility alternative. The standard product never
+uses the internal P2 project name. Pass `--no-legacy` after `gui` or `both` only when the Legacy
+artifact is deliberately not needed. Local builds use ad-hoc signing by default and require no
+Apple credentials. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow.
 
 ## Use
@@ -126,7 +130,9 @@ The current fork baseline completed its measured P0/P1 acceptance ledger with no
 failure. Two resource-dependent extended cells remain explicitly blocked, not silently counted as
 passes. `v3.0.0` was published on 2026-08-18 after the downloaded GitHub DMG passed checksum,
 Gatekeeper, install, mount, write/reread, and unmount validation. It remains the current supported
-line until a future P2 implementation is integrated, tested, and released.
+release. The source tree contains the `v3.1.0` dual-distribution candidate, but that candidate is
+not a published release until both artifacts complete their local and downloaded-DMG acceptance
+gates.
 
 - [Roadmap](docs/BINARYBEARS_ROADMAP.md)
 - [Validation ledger](docs/testing/BINARYBEARS_VALIDATION_RESULTS_2026-08-12.md)

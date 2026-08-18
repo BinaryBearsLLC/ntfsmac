@@ -25,8 +25,8 @@ public final class HelperClient: Sendable {
     // handler, both guarded by `connectionLock`.
     //
     // The connection is intentionally lazy. Creating/resuming it in `init` races first-run
-    // SMJobBless: the app constructs its clients before the helper exists, leaving their first
-    // real request attached to a failed bootstrap connection. The user then sees "couldn't
+    // helper registration: the app constructs its clients before the service exists, leaving
+    // their first real request attached to a failed bootstrap connection. The user then sees "couldn't
     // communicate with helper" immediately after authorizing a successful install. Creating it
     // at the first privileged request removes that race; an invalidated connection is still
     // rebuilt on the following call.

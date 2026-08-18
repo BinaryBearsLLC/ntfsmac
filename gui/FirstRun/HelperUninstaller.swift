@@ -1,5 +1,6 @@
 import Foundation
 import HelperShared
+import ServiceManagement
 
 /// Narrow seam over `HelperClient`'s two uninstall methods, same retroactive-conformance
 /// pattern as `HelperMounting` (`MountController.swift`) — `HelperClient` is a concrete class
@@ -10,7 +11,51 @@ public protocol HelperUninstalling {
     func uninstallHelper() async throws -> CommandResult
 }
 
-extension HelperClient: HelperUninstalling {}
+/// Production adapter. The Legacy helper removes its standalone launchd files and boots itself
+/// out over XPC. The modern helper only prepares root-owned retired artifacts; the app then asks
+/// SMAppService to unregister the embedded daemon so macOS owns the lifecycle atomically.
+@MainActor
+public final class RealHelperUninstallService: HelperUninstalling {
+    private let client: HelperClient
+
+    public init(client: HelperClient = HelperClient()) {
+        self.client = client
+    }
+
+    public func removeDependencies() async throws -> CommandResult {
+        try await client.removeDependencies()
+    }
+
+    public func uninstallHelper() async throws -> CommandResult {
+        let result = try await client.uninstallHelper()
+        guard result.exitCode == 0 else { return result }
+
+        #if NTFSMAC_LEGACY_HELPER
+        return result
+        #else
+        let service = SMAppService.daemon(plistName: modernHelperLaunchDaemonPlistName)
+        switch service.status {
+        case .notRegistered, .notFound:
+            return result
+        case .enabled, .requiresApproval:
+            do {
+                try await service.unregister()
+                return result
+            } catch {
+                return CommandResult(
+                    output: "Could not unregister ntfsmac Helper: \(error.localizedDescription)",
+                    exitCode: 1
+                )
+            }
+        @unknown default:
+            return CommandResult(
+                output: "Could not determine the ntfsmac Helper registration state.",
+                exitCode: 1
+            )
+        }
+        #endif
+    }
+}
 
 public enum HelperUninstallState: Equatable, Sendable {
     case idle
@@ -33,7 +78,7 @@ public final class HelperUninstaller: ObservableObject {
     private let onUninstallComplete: (@MainActor @Sendable () -> Void)?
 
     public init(
-        client: any HelperUninstalling = HelperClient(),
+        client: any HelperUninstalling = RealHelperUninstallService(),
         onUninstallComplete: (@MainActor @Sendable () -> Void)? = nil
     ) {
         self.client = client

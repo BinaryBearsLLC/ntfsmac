@@ -28,8 +28,10 @@ swift test
 tests/run-all.sh
 ```
 
-`./build.command` creates local ad-hoc artifacts under `dist/`. Contributors do not need or receive
-BinaryBears signing/notarization credentials.
+`./build.command` creates local ad-hoc artifacts under `dist/`. A GUI build produces both the
+standard SMAppService distribution and the explicitly labelled Legacy SMJobBless distribution by
+default; `./build.command gui --no-legacy` is the deliberate opt-out. Contributors do not need or
+receive BinaryBears signing/notarization credentials.
 
 Use the manual hardware guide only when the change touches packaging, helper lifecycle, mounts, or
 real device behavior: [docs/dev/TESTING.md](docs/dev/TESTING.md).

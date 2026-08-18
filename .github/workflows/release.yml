@@ -7,6 +7,11 @@ on:
         description: Semantic version to release, for example 3.0.0
         required: true
         type: string
+      include_legacy:
+        description: Also build and publish the Legacy SMJobBless compatibility DMG
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -25,6 +30,7 @@ jobs:
     env:
       NOTARY_PROFILE: ntfsmac-notary-${{ github.run_id }}
       RELEASE_VERSION: ${{ inputs.version }}
+      INCLUDE_LEGACY: ${{ inputs.include_legacy }}
 
     steps:
       - name: Check out the repository
@@ -68,9 +74,12 @@ jobs:
           app_build="$(plutil -extract CFBundleVersion raw -o - gui/Info.plist)"
           helper_version="$(plutil -extract CFBundleShortVersionString raw -o - helper/Info.plist)"
           helper_build="$(plutil -extract CFBundleVersion raw -o - helper/Info.plist)"
+          modern_helper_version="$(plutil -extract CFBundleShortVersionString raw -o - helper/Info-Modern.plist)"
+          modern_helper_build="$(plutil -extract CFBundleVersion raw -o - helper/Info-Modern.plist)"
           if [[ "$RELEASE_VERSION" != "$app_version" || "$app_version" != "$helper_version" ||
-                "$app_build" != "$helper_build" ]]; then
-            echo "::error::Requested, app, and helper versions/builds do not match."
+                "$app_version" != "$modern_helper_version" || "$app_build" != "$helper_build" ||
+                "$app_build" != "$modern_helper_build" ]]; then
+            echo "::error::Requested, app, and both helper versions/builds do not match."
             exit 1
           fi
           printf 'RELEASE_TAG=%s\n' "$release_tag" >> "$GITHUB_ENV"
@@ -127,7 +136,10 @@ jobs:
           ./build/sync-brand-assets.sh
           git diff --exit-code -- gui/Resources/AppIcon-source.png gui/Resources/AppIcon.icns gui/Resources/HelperIcon.png
           ./tests/run-all.sh
-          swift test --disable-sandbox
+          NTFSMAC_HELPER_VARIANT=modern swift test --disable-sandbox \
+            --scratch-path .build/ntfsmac-modern-tests
+          NTFSMAC_HELPER_VARIANT=legacy swift test --disable-sandbox \
+            --scratch-path .build/ntfsmac-legacy-tests
 
       - name: Import the Developer ID certificate
         shell: bash
@@ -190,9 +202,13 @@ jobs:
         run: |
           set -euo pipefail
           dmg_path="dist/ntfsmac-${RELEASE_VERSION}-Apple-Silicon.dmg"
+          assets=("$dmg_path" "${dmg_path}.sha256")
+          if [[ "$INCLUDE_LEGACY" == "true" ]]; then
+            legacy_dmg_path="dist/ntfsmac-${RELEASE_VERSION}-Legacy-Apple-Silicon.dmg"
+            assets+=("$legacy_dmg_path" "${legacy_dmg_path}.sha256")
+          fi
           gh release create "$RELEASE_TAG" \
-            "$dmg_path" \
-            "${dmg_path}.sha256" \
+            "${assets[@]}" \
             --draft \
             --verify-tag \
             --generate-notes \

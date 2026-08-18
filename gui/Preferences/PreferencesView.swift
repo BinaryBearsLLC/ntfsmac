@@ -1,4 +1,5 @@
 import SwiftUI
+import HelperShared
 
 /// MenuBarExtra uses a transient window. A native `confirmationDialog` dismisses that window as
 /// its destructive button is selected, which made the uninstall action appear to vanish before
@@ -110,6 +111,9 @@ public struct PreferencesView: View {
                             .font(.system(size: 9, weight: .regular))
                             .foregroundStyle(.secondary.opacity(0.72))
                             .accessibilityLabel("ntfsmac \(productVersion.settingsText)")
+                        Text(HelperDistributionVariant.current.settingsLabel)
+                            .font(.system(size: 9, weight: .regular))
+                            .foregroundStyle(.secondary.opacity(0.72))
                     }
                     HStack {
                         Button {
@@ -196,13 +200,25 @@ public struct PreferencesView: View {
 
             Divider()
 
-            row("Reinstall privileged helper", "Repair the SMJobBless XPC helper") {
+            row("Reinstall privileged helper", helperRepairSubtitle) {
                 HStack(spacing: 6) {
                     if installer.state == .installing {
                         ProgressView().controlSize(.small)
                     }
-                    Button("Reinstall…") {
-                        Task { await installer.install() }
+                    if case .requiresApproval = installer.state {
+                        Button("Approve…") {
+                            installer.openApprovalSettings()
+                        }
+                        .focusable(true)
+                    }
+                    Button(helperRequiresApproval ? "Refresh" : "Reinstall…") {
+                        Task {
+                            if helperRequiresApproval {
+                                await installer.installAfterConsent()
+                            } else {
+                                await installer.reinstallAfterConsent()
+                            }
+                        }
                     }
                     .focusable(true)
                 }
@@ -259,6 +275,20 @@ public struct PreferencesView: View {
 
     private var notificationsSubtitle: String {
         settings.notificationsMessage ?? "Mount, unmount, and error results"
+    }
+
+    private var helperRepairSubtitle: String {
+        switch HelperDistributionVariant.current {
+        case .modern:
+            return "Repair the bundled modern XPC helper"
+        case .legacy:
+            return "Repair the Legacy SMJobBless XPC helper"
+        }
+    }
+
+    private var helperRequiresApproval: Bool {
+        if case .requiresApproval = installer.state { return true }
+        return false
     }
 
     private var updateSubtitle: String {

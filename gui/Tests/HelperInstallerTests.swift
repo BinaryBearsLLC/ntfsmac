@@ -31,6 +31,47 @@ private struct FakeInstallService: HelperInstallService {
     func bless(label: String) -> HelperInstallOutcome { outcome }
 }
 
+private final class ApprovalInstallService: HelperInstallService, @unchecked Sendable {
+    private let lock = NSLock()
+    var approvalRequired: Bool
+    private(set) var blessCallCount = 0
+    private(set) var openSettingsCallCount = 0
+
+    init(approvalRequired: Bool) {
+        self.approvalRequired = approvalRequired
+    }
+
+    func isInstalled(label: String) -> Bool { false }
+    func requiresApproval(label: String) -> Bool { approvalRequired }
+
+    func bless(label: String) -> HelperInstallOutcome {
+        lock.withLock { blessCallCount += 1 }
+        return .requiresApproval("Approve ntfsmac in Login Items.")
+    }
+
+    func openApprovalSettings() {
+        lock.withLock { openSettingsCallCount += 1 }
+    }
+}
+
+private final class StaleModernInstallService: HelperInstallService, @unchecked Sendable {
+    private let lock = NSLock()
+    private(set) var unregisterCallCount = 0
+    private(set) var blessCallCount = 0
+
+    func isInstalled(label: String) -> Bool { true }
+
+    func unregister(label: String) -> HelperInstallOutcome? {
+        lock.withLock { unregisterCallCount += 1 }
+        return .installed
+    }
+
+    func bless(label: String) -> HelperInstallOutcome {
+        lock.withLock { blessCallCount += 1 }
+        return .installed
+    }
+}
+
 private final class LegacyMigrationInstallService: HelperInstallService, @unchecked Sendable {
     private let lock = NSLock()
     private(set) var legacyLabel: String?
@@ -204,6 +245,43 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
 }
 
 @MainActor
+@Test func passiveCheckSurfacesModernApprovalWithoutRegisteringAgain() async {
+    let service = ApprovalInstallService(approvalRequired: true)
+    let installer = HelperInstaller(service: service)
+
+    await installer.checkWithoutInstalling()
+
+    guard case .requiresApproval(let message) = installer.state else {
+        Issue.record("Expected requiresApproval, got \(installer.state)")
+        return
+    }
+    #expect(message.contains("Login Items"))
+    #expect(service.blessCallCount == 0)
+    #expect(installer.state.isDeniedOrFailed)
+}
+
+@MainActor
+@Test func approvalSettingsActionDelegatesToServiceManagementAdapter() {
+    let service = ApprovalInstallService(approvalRequired: true)
+    let installer = HelperInstaller(service: service)
+
+    installer.openApprovalSettings()
+
+    #expect(service.openSettingsCallCount == 1)
+}
+
+@MainActor
+@Test func registrationCanTransitionToModernApprovalState() async {
+    let service = ApprovalInstallService(approvalRequired: false)
+    let installer = HelperInstaller(service: service)
+
+    await installer.installAfterConsent()
+
+    #expect(installer.state == .requiresApproval("Approve ntfsmac in Login Items."))
+    #expect(service.blessCallCount == 1)
+}
+
+@MainActor
 @Test func explicitConsentInstallsAfterPassiveCheck() async {
     let service = CountingInstallService(alreadyInstalled: false, outcome: .installed)
     let installer = HelperInstaller(service: service, label: "com.binarybears.ntfsmac.helper")
@@ -227,6 +305,59 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
     await installer.installIfNeeded()
 
     #expect(staleDetector.uninstallCallCount == 1)
+    #expect(service.blessCallCount == 1)
+    #expect(installer.state == .installed)
+}
+
+@MainActor
+@Test func staleModernRegistrationIsUnregisteredBeforeReplacement() async {
+    let service = StaleModernInstallService()
+    let staleDetector = FakeStaleDetector(versionResult: .success("old-build-hash"))
+    let installer = HelperInstaller(
+        service: service,
+        staleDetector: staleDetector,
+        expectedVersion: testExpectedVersion
+    )
+
+    await installer.installAfterConsent()
+
+    #expect(staleDetector.uninstallCallCount == 1)
+    #expect(service.unregisterCallCount == 1)
+    #expect(service.blessCallCount == 1)
+    #expect(installer.state == .installed)
+}
+
+@MainActor
+@Test func settingsRepairReplacesEvenACurrentRegisteredHelper() async {
+    let service = StaleModernInstallService()
+    let currentDetector = FakeStaleDetector(versionResult: .success(testExpectedVersion))
+    let installer = HelperInstaller(
+        service: service,
+        staleDetector: currentDetector,
+        expectedVersion: testExpectedVersion
+    )
+
+    await installer.reinstallAfterConsent()
+
+    #expect(currentDetector.uninstallCallCount == 1)
+    #expect(service.unregisterCallCount == 1)
+    #expect(service.blessCallCount == 1)
+    #expect(installer.state == .installed)
+}
+
+@MainActor
+@Test func standardInstallAsksRetiredCompatibilityHelperToRemoveItself() async {
+    let service = CountingInstallService(alreadyInstalled: false, outcome: .installed)
+    let retiredDetector = FakeStaleDetector()
+    let installer = HelperInstaller(
+        service: service,
+        retiredHelperDetector: retiredDetector,
+        staleCheckTimeoutNanoseconds: 50_000_000
+    )
+
+    await installer.install()
+
+    #expect(retiredDetector.uninstallCallCount == 1)
     #expect(service.blessCallCount == 1)
     #expect(installer.state == .installed)
 }

@@ -25,8 +25,9 @@ recipe. Match what's already built; don't re-design.
   releases are Developer ID signed and Apple-notarized by the dedicated release path; credentials
   stay in Keychain or GitHub encrypted secrets and never enter Git.
 - **Every control that mounts/unmounts/touches pf/route goes through a reviewed XPC helper** — the
-  current compatibility artifact uses SMJobBless; the future P2 variant may use SMAppService. Never
-  add a raw `sudo` shell-out from Swift UI code.
+  standard macOS 13+ artifact uses SMAppService and the explicitly labelled Legacy artifact uses
+  SMJobBless. Both compile the same reviewed XPC implementation. Never add a raw `sudo` shell-out
+  from Swift UI code.
 - **Device names validated against `^disk[0-9]+s[0-9]+$`** before any shell invocation, in both CLI and GUI/helper.
 - **Platform:** Apple Silicon only. Don't add Intel fallback paths.
 - Security and connection stability outrank speed. Speed tuning (rsize/wsize/async export) is opt-in and documented as risk, never silently defaulted on.

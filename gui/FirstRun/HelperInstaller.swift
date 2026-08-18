@@ -5,27 +5,31 @@ import os.log
 
 private let helperInstallerLog = Logger(subsystem: "com.binarybears.ntfsmac", category: "HelperInstaller")
 
-/// Outcome of a real `SMJobBless` attempt. v3 deliberately keeps this compatibility mechanism;
-/// changing the helper architecture belongs to P2, never to an incidental repair.
+/// Outcome shared by the modern SMAppService registration and the Legacy SMJobBless path.
 public enum HelperInstallOutcome: Equatable, Sendable {
     case installed
+    case requiresApproval(String)
     case denied(String)
     case failed(String)
 }
 
-/// Seam over `ServiceManagement`'s real, synchronous, blocking C APIs — `SMJobCopyDictionary`/
-/// `SMJobBless` neither suspend nor come in an async flavor; they block the calling thread for
-/// the whole (potentially long, user-driven) admin auth prompt. `Sendable`-constrained so
-/// `HelperInstaller` can run this off the main actor without freezing the menu-bar UI for
-/// however long the user takes to authenticate.
+/// Seam over both ServiceManagement lifecycles. The Legacy calls are synchronous and may block
+/// for an administrator prompt; the standard registration can instead transition to a separate
+/// System Settings approval state. `Sendable` keeps both paths off the menu-bar main actor.
 public protocol HelperInstallService: Sendable {
     func isInstalled(label: String) -> Bool
+    func requiresApproval(label: String) -> Bool
     func bless(label: String) -> HelperInstallOutcome
     func migrateLegacyHelper(legacyLabel: String, newLabel: String) -> HelperInstallOutcome?
+    func unregister(label: String) -> HelperInstallOutcome?
+    func openApprovalSettings()
 }
 
 public extension HelperInstallService {
+    func requiresApproval(label: String) -> Bool { false }
     func migrateLegacyHelper(legacyLabel: String, newLabel: String) -> HelperInstallOutcome? { nil }
+    func unregister(label: String) -> HelperInstallOutcome? { nil }
+    func openApprovalSettings() {}
 }
 
 /// Strips `com.apple.quarantine` from this app's own bundle before every `bless()` attempt.
@@ -72,26 +76,48 @@ public struct RealQuarantineStripper: QuarantineStripping {
 public struct RealHelperInstallService: HelperInstallService {
     public init() {}
 
-    /// `SMJobCopyDictionary` is the documented, real way to check whether a `SMJobBless`-style
-    /// launchd job is already registered — deliberately not `SMAppService.status` (that's the
-    /// newer `SMAppService.daemon` API, a different install mechanism PLAN.md never adopted;
-    /// swapping to it here would be exactly the kind of signing/entitlement architecture
-    /// deviation L4/L5 calls a HARD-STOP). Still functions on macOS 13+ despite the
-    /// deprecation annotation.
-    ///
-    /// This registration probe only
-    /// checks that *some* job is registered under `label`, not that its on-disk binary still
-    /// matches this app's expected identifier. The subsequent XPC identity check and official
-    /// release signature remain the authorization boundary.
+    /// A registration probe is only lifecycle state, not an identity proof. The subsequent XPC
+    /// version exchange, helper-side caller validation, and release signatures remain the
+    /// authorization boundary in both distributions.
     public func isInstalled(label: String) -> Bool {
+        #if NTFSMAC_LEGACY_HELPER
         SMJobCopyDictionary(kSMDomainSystemLaunchd, label as CFString) != nil
+        #else
+        modernService.status == .enabled
+        #endif
+    }
+
+    public func requiresApproval(label: String) -> Bool {
+        #if NTFSMAC_LEGACY_HELPER
+        false
+        #else
+        modernService.status == .requiresApproval
+        #endif
     }
 
     public func bless(label: String) -> HelperInstallOutcome {
+        #if NTFSMAC_LEGACY_HELPER
         let authorization = authorization(for: [kSMRightBlessPrivilegedHelper])
         guard let authRef = authorization.reference else { return authorization.failure! }
         defer { AuthorizationFree(authRef, [.destroyRights]) }
         return bless(label: label, authorization: authRef)
+        #else
+        do {
+            try modernService.register()
+        } catch {
+            switch modernService.status {
+            case .enabled:
+                return .installed
+            case .requiresApproval:
+                return .requiresApproval(Self.modernApprovalMessage)
+            case .notRegistered, .notFound:
+                return .failed("Could not register ntfsmac Helper: \(error.localizedDescription)")
+            @unknown default:
+                return .failed("Could not determine the ntfsmac Helper approval state.")
+            }
+        }
+        return outcomeForModernStatus()
+        #endif
     }
 
     /// Removes the pre-v3 job and blesses the new v3 helper under one explicit administrator
@@ -101,6 +127,7 @@ public struct RealHelperInstallService: HelperInstallService {
         legacyLabel: String,
         newLabel: String
     ) -> HelperInstallOutcome? {
+        #if NTFSMAC_LEGACY_HELPER
         guard isInstalled(label: legacyLabel) else { return nil }
         let authorization = authorization(for: [
             kSMRightModifySystemDaemons,
@@ -126,8 +153,65 @@ public struct RealHelperInstallService: HelperInstallService {
             return .failed("Could not remove the previous ntfsmac Helper.")
         }
         return bless(label: newLabel, authorization: authRef)
+        #else
+        // A working v3 compatibility helper is asked to remove itself over its reviewed XPC
+        // surface by HelperInstaller. Any orphaned standalone files are removed later by the
+        // newly approved root daemon, never by this unprivileged app process.
+        return nil
+        #endif
     }
 
+    public func unregister(label: String) -> HelperInstallOutcome? {
+        #if NTFSMAC_LEGACY_HELPER
+        return nil
+        #else
+        switch modernService.status {
+        case .notRegistered, .notFound:
+            return .installed
+        case .enabled, .requiresApproval:
+            do {
+                try modernService.unregister()
+                return .installed
+            } catch {
+                return .failed("Could not unregister ntfsmac Helper: \(error.localizedDescription)")
+            }
+        @unknown default:
+            return .failed("Could not determine the ntfsmac Helper registration state.")
+        }
+        #endif
+    }
+
+    public func openApprovalSettings() {
+        #if !NTFSMAC_LEGACY_HELPER
+        SMAppService.openSystemSettingsLoginItems()
+        #endif
+    }
+
+    #if !NTFSMAC_LEGACY_HELPER
+    private var modernService: SMAppService {
+        SMAppService.daemon(plistName: modernHelperLaunchDaemonPlistName)
+    }
+
+    private static let modernApprovalMessage =
+        "Allow ntfsmac in System Settings > General > Login Items, then return and refresh."
+
+    private func outcomeForModernStatus() -> HelperInstallOutcome {
+        switch modernService.status {
+        case .enabled:
+            return .installed
+        case .requiresApproval:
+            return .requiresApproval(Self.modernApprovalMessage)
+        case .notRegistered:
+            return .failed("ntfsmac Helper was not registered.")
+        case .notFound:
+            return .failed("The bundled ntfsmac Helper service could not be found.")
+        @unknown default:
+            return .failed("Could not determine the ntfsmac Helper approval state.")
+        }
+    }
+    #endif
+
+    #if NTFSMAC_LEGACY_HELPER
     private func bless(label: String, authorization: AuthorizationRef) -> HelperInstallOutcome {
         var cfError: Unmanaged<CFError>?
         guard SMJobBless(kSMDomainSystemLaunchd, label as CFString, authorization, &cfError) else {
@@ -175,6 +259,7 @@ public struct RealHelperInstallService: HelperInstallService {
             return .failed("Authorization request failed (status \(status)).")
         }
     }
+    #endif
 }
 
 /// Narrow seam over `HelperClient`'s `version`/`uninstallHelper` — lets `HelperInstaller` tell a
@@ -194,6 +279,7 @@ public enum HelperInstallState: Equatable, Sendable {
     case notChecked
     case checking
     case readyToInstall
+    case requiresApproval(String)
     case installed
     case installing
     case denied(String)
@@ -203,23 +289,22 @@ public enum HelperInstallState: Equatable, Sendable {
     /// `NtfsmacApp.swift`) — the only two states where the user actually needs to act.
     public var isDeniedOrFailed: Bool {
         switch self {
-        case .denied, .failed: true
+        case .requiresApproval, .denied, .failed: true
         case .notChecked, .checking, .readyToInstall, .installed, .installing: false
         }
     }
 }
 
-/// Drives the privileged-helper install flow (GUI-PLAN.md v1 feature 8): exactly one auth
-/// prompt, detects already-installed and skips it, denial/mismatch surfaces a plain-language
-/// cause + lets the caller retry (red icon in `FirstRunView`). `install()` is the exact same
-/// path both first-run and the Preferences "Reinstall privileged helper" button use — this
-/// unit's Do clause requires that reuse, so there's deliberately no separate "reinstall" method.
+/// Drives the privileged-helper install flow (GUI-PLAN.md v1 feature 8). It detects an existing
+/// current helper, distinguishes modern approval from denial/failure, and reuses one install path
+/// for first run and Settings repair.
 @MainActor
 public final class HelperInstaller: ObservableObject {
     @Published public private(set) var state: HelperInstallState = .notChecked
 
     private let service: any HelperInstallService
     private let staleDetector: any StaleHelperDetecting
+    private let retiredHelperDetector: (any StaleHelperDetecting)?
     private let quarantineStripper: any QuarantineStripping
     private let label: String
     private let legacyLabel: String
@@ -229,6 +314,7 @@ public final class HelperInstaller: ObservableObject {
     public init(
         service: any HelperInstallService = RealHelperInstallService(),
         staleDetector: any StaleHelperDetecting = HelperClient(),
+        retiredHelperDetector: (any StaleHelperDetecting)? = nil,
         quarantineStripper: any QuarantineStripping = RealQuarantineStripper(),
         label: String = helperMachServiceName,
         legacyLabel: String = legacyHelperMachServiceName,
@@ -237,6 +323,7 @@ public final class HelperInstaller: ObservableObject {
     ) {
         self.service = service
         self.staleDetector = staleDetector
+        self.retiredHelperDetector = retiredHelperDetector
         self.quarantineStripper = quarantineStripper
         self.label = label
         self.legacyLabel = legacyLabel
@@ -244,17 +331,23 @@ public final class HelperInstaller: ObservableObject {
         self.staleCheckTimeoutNanoseconds = staleCheckTimeoutNanoseconds
     }
 
-    /// First-launch inspection that never invokes `SMJobBless` and therefore can never display
-    /// an unexpected administrator-password prompt. A missing or stale helper becomes an
-    /// explicit, user-actionable state; only `installAfterConsent()` may continue from there.
+    /// First-launch inspection is read-only and cannot display an authorization prompt or create
+    /// a Login Items approval request. Only `installAfterConsent()` may register a helper.
     public func checkWithoutInstalling() async {
         switch state {
         case .checking, .installing, .denied, .failed:
             return
-        case .notChecked, .readyToInstall, .installed:
+        case .notChecked, .readyToInstall, .requiresApproval, .installed:
             break
         }
         state = .checking
+        let approvalRequired = await runOffCooperativePool { [service, label] in
+            service.requiresApproval(label: label)
+        }
+        if approvalRequired {
+            state = .requiresApproval(Self.modernApprovalMessage)
+            return
+        }
         let alreadyInstalled = await runOffCooperativePool { [service, label] in
             service.isInstalled(label: label)
         }
@@ -265,12 +358,18 @@ public final class HelperInstaller: ObservableObject {
         state = await isRegisteredHelperCurrent() ? .installed : .readyToInstall
     }
 
-    /// Explicit first-run action. Rechecks the registration after the user has chosen Install,
-    /// clears a stale helper if necessary, then follows the same single `SMJobBless` path used by
-    /// Preferences. No privileged prompt is reachable before this method is called by a button.
+    /// Explicit first-run action. Rechecks registration after the user chooses Install, clears a
+    /// stale helper if necessary, and then uses the same lifecycle path as Settings repair.
     public func installAfterConsent() async {
         guard state != .installing else { return }
         state = .checking
+        let approvalRequired = await runOffCooperativePool { [service, label] in
+            service.requiresApproval(label: label)
+        }
+        if approvalRequired {
+            state = .requiresApproval(Self.modernApprovalMessage)
+            return
+        }
         let alreadyInstalled = await runOffCooperativePool { [service, label] in
             service.isInstalled(label: label)
         }
@@ -280,6 +379,30 @@ public final class HelperInstaller: ObservableObject {
                 return
             }
             await uninstallStaleHelper()
+            guard await unregisterStaleModernHelperIfNeeded() else { return }
+        }
+        await install()
+    }
+
+    /// Explicit Settings repair. Unlike first-run consent, this deliberately replaces an already
+    /// current helper: Legacy re-blesses its standalone tool, while the standard build unregisters
+    /// and re-registers its bundled daemon. Pending System Settings approval remains non-destructive.
+    public func reinstallAfterConsent() async {
+        guard state != .installing else { return }
+        state = .checking
+        let approvalRequired = await runOffCooperativePool { [service, label] in
+            service.requiresApproval(label: label)
+        }
+        if approvalRequired {
+            state = .requiresApproval(Self.modernApprovalMessage)
+            return
+        }
+        let alreadyInstalled = await runOffCooperativePool { [service, label] in
+            service.isInstalled(label: label)
+        }
+        if alreadyInstalled {
+            await uninstallStaleHelper()
+            guard await unregisterStaleModernHelperIfNeeded() else { return }
         }
         await install()
     }
@@ -308,12 +431,19 @@ public final class HelperInstaller: ObservableObject {
     /// first-time install takes.
     public func installIfNeeded() async {
         switch state {
-        case .checking, .readyToInstall, .installing, .denied, .failed:
+        case .checking, .readyToInstall, .requiresApproval, .installing, .denied, .failed:
             return
         case .notChecked, .installed:
             break
         }
         state = .checking
+        let approvalRequired = await runOffCooperativePool { [service, label] in
+            service.requiresApproval(label: label)
+        }
+        if approvalRequired {
+            state = .requiresApproval(Self.modernApprovalMessage)
+            return
+        }
         let alreadyInstalled = await runOffCooperativePool { [service, label] in service.isInstalled(label: label) }
         guard alreadyInstalled else {
             await install()
@@ -334,6 +464,7 @@ public final class HelperInstaller: ObservableObject {
         // discard-and-continue is still correct (SMJobBless's own install path recovers
         // regardless), but it should leave a diagnostic trail.
         await uninstallStaleHelper()
+        guard await unregisterStaleModernHelperIfNeeded() else { return }
         await install()
     }
 
@@ -346,8 +477,30 @@ public final class HelperInstaller: ObservableObject {
         }
     }
 
+    private func unregisterStaleModernHelperIfNeeded() async -> Bool {
+        let outcome = await runOffCooperativePool { [service, label] in
+            service.unregister(label: label)
+        }
+        guard let outcome else { return true }
+        switch outcome {
+        case .installed:
+            return true
+        case .requiresApproval(let message):
+            state = .requiresApproval(message)
+        case .denied(let message):
+            state = .denied(message)
+        case .failed(let message):
+            state = .failed(message)
+        }
+        return false
+    }
+
     public func reset() {
         state = .notChecked
+    }
+
+    public func openApprovalSettings() {
+        service.openApprovalSettings()
     }
 
     /// A daemon old enough to predate `version()` entirely doesn't just fail to answer — an XPC
@@ -378,12 +531,21 @@ public final class HelperInstaller: ObservableObject {
         }
     }
 
-    /// Unconditional install/reinstall — the one path both `installIfNeeded()` and any future
-    /// "Reinstall privileged helper" caller use. Guards against a double-tap firing two
-    /// concurrent `SMJobBless` calls (each would show its own OS auth prompt).
+    /// Unconditional install/reinstall — the one path shared by first run and Settings. Guards
+    /// against double-taps starting two concurrent registration/authorization transactions.
     public func install() async {
         guard state != .installing else { return }
         state = .installing
+        if let retiredHelperDetector {
+            let result = await withStaleCheckTimeout {
+                try await retiredHelperDetector.uninstallHelper()
+            }
+            if let result {
+                helperInstallerLog.notice(
+                    "retired compatibility helper cleanup: exitCode=\(result.exitCode, privacy: .public) output=\(result.output, privacy: .public)"
+                )
+            }
+        }
         let outcome = await runOffCooperativePool { [service, label, legacyLabel, quarantineStripper] in
             quarantineStripper.stripQuarantine()
             if let migration = service.migrateLegacyHelper(
@@ -397,6 +559,8 @@ public final class HelperInstaller: ObservableObject {
         switch outcome {
         case .installed:
             state = .installed
+        case .requiresApproval(let message):
+            state = .requiresApproval(message)
         case .denied(let message):
             state = .denied(message)
         case .failed(let message):
@@ -404,10 +568,12 @@ public final class HelperInstaller: ObservableObject {
         }
     }
 
-    /// `SMJobCopyDictionary`/`SMJobBless` block for an indefinite, user-driven duration (the
-    /// system auth prompt) — dispatched to a dedicated GCD queue, not `Task.detached` (which
-    /// would occupy a slot on Swift Concurrency's small, shared cooperative thread pool for
-    /// that entire indefinite wait, starving unrelated `async` work elsewhere in the process).
+    private static let modernApprovalMessage =
+        "Allow ntfsmac in System Settings > General > Login Items, then return and refresh."
+
+    /// ServiceManagement work is dispatched to a dedicated GCD queue. This is essential for the
+    /// Legacy password dialog and also keeps status/registration calls off Swift Concurrency's
+    /// small shared cooperative thread pool.
     private nonisolated func runOffCooperativePool<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {

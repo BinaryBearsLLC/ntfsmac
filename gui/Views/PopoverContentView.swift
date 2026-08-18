@@ -165,7 +165,7 @@ public struct PopoverContentView: View {
                     onBack: navigation.showMain,
                     updateChecker: updateChecker
                 )
-            // Helper install is a self-contained SMJobBless/XPC flow that doesn't touch the CLI
+            // Helper install is a self-contained ServiceManagement/XPC flow that doesn't touch the CLI
             // tree at all — gating it behind `cliInstallChecker.isInstalled` would block the
             // "Install Helper…" button while the CLI is still being staged. `CLIAutoStager`
             // stages the CLI (bundled into the .app by `build/package-app.sh`, no tap/Homebrew

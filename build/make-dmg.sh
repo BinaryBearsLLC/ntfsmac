@@ -69,7 +69,10 @@ main() {
   payload="$stage/payload"
   mkdir -p "$payload/.background"
 
-  if ! cp -R "$APP" "$payload/"; then
+  # Both distributions install the same visible product name. The Legacy distinction belongs to
+  # the DMG filename, volume label, Settings metadata, and helper lifecycle — never to a P2 label
+  # or a second application name in /Applications.
+  if ! cp -R "$APP" "$payload/ntfsmac.app"; then
     echo "make-dmg: HARD-STOP — failed to stage $APP" >&2
     exit 1
   fi

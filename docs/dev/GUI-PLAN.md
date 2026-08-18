@@ -1,8 +1,8 @@
 # ntfsmac GUI — Feature & Button Plan
 
-> BinaryBears v3 keeps the visible application name **ntfsmac**. Settings also includes a minimal
-> GitHub release check; it never downloads or installs software. The SMJobBless compatibility
-> helper may appear in System Settings by its technical label, which the setup UI names explicitly.
+> BinaryBears keeps the visible application name **ntfsmac**. Settings also includes a minimal
+> GitHub release check; it never downloads or installs software. The standard macOS 13+ build uses
+> an SMAppService helper; the explicitly labelled Legacy build retains SMJobBless compatibility.
 
 > Custom SwiftUI menu-bar app (no Dock icon). Wraps the CLI + pf security layer via an XPC helper.
 > Companion to `PLAN.md` Phase 3 — that covers engineering scaffolding; this covers what the user sees and taps.
@@ -21,7 +21,8 @@
 ## App shape
 
 Menu-bar agent → click icon or run `ntfsmac opengui` → popover. Settings is a page inside that
-same popover; the only separate system UI is the first-run helper authorization prompt. The CLI
+same popover; the only separate system UI is helper authorization/approval (including Login Items
+for the standard build). The CLI
 uses a registered URL event handled by the app's thin AppKit status-item shell, with no simulated
 mouse click or Accessibility permission.
 
@@ -52,7 +53,7 @@ This table describes the current integrated GUI, not the original aspirational p
 | Shipped | One-click mount/unmount and multiple concurrent drive rows |
 | Shipped — extended matrix incomplete | Dirty NTFS fails closed with no read/write override and concise Windows recovery guidance; Fast Startup and a genuinely hibernated removable-volume fixture remain resource-gated |
 | Shipped | Diagnose summary, inline Hide, and Command-click privacy-safe JSON export |
-| Shipped | Consent-first helper install, progress-backed CLI staging, pre-mount Full Disk Access verification, helper reinstall, and confirmed complete uninstall |
+| Integrated candidate — live v3.1.0 gate pending | Consent-first standard/Legacy helper install, explicit Login Items approval state for the standard build, progress-backed CLI staging, pre-mount Full Disk Access verification, helper repair, and complete-uninstall flows |
 | Shipped | In-popover Settings with Back, canonical version/build, Launch at login, contextual help, and adaptive menu-bar icon |
 | Shipped — matrix incomplete | Three compact SECURITY rows consume the live transaction's fixed states/reasons and provide Hide/Show. Missing, malformed, or unavailable evidence fails closed to `unknown`; the remaining packaged hardware matrix is tracked in the roadmap. |
 | Shipped | Each verified mounted-drive row exposes Open in Finder and uses that row's observed mount point |
@@ -231,4 +232,4 @@ surface remains focused on Mount, Open, and Unmount.
 
 ## Control → privilege boundary (non-negotiable)
 
-Every control that mounts, unmounts, or touches pf/route goes through the **SMJobBless XPC helper** — never a raw `sudo` shell-out from the UI. Device names are validated against `^disk[0-9]+s[0-9]+$` in *both* the UI and the helper before any shell call. (Mirrors `PLAN.md` §4.2.)
+Every control that mounts, unmounts, or touches pf/route goes through the reviewed **XPC helper** — SMAppService in the standard build, SMJobBless in Legacy, and never a raw `sudo` shell-out from the UI. Device names are validated against `^disk[0-9]+s[0-9]+$` in *both* the UI and the helper before any shell call. (Mirrors `PLAN.md` §4.2.)

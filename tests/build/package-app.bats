@@ -1,8 +1,7 @@
 #!/usr/bin/env bats
 # tests/build/package-app.bats — build/package-app.sh acceptance checks.
 #
-# Assembles dist/ntfsmac.app from the swift build release binaries + gui/Info.plist +
-# gui/Resources/AppIcon.icns + the privileged helper. Local fixtures use ad-hoc signing.
+# Assembles the standard SMAppService app or the Legacy SMJobBless app from the same source.
 
 setup() {
   REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
@@ -34,7 +33,7 @@ teardown() {
   [ -x "$SCRIPT" ]
 }
 
-@test "assembles ntfsmac.app with the expected bundle structure" {
+@test "assembles the standard app with an embedded SMAppService LaunchDaemon" {
   run "$SCRIPT"
   [ "$status" -eq 0 ]
   [ -d "$APP" ]
@@ -43,7 +42,28 @@ teardown() {
   [ -f "$APP/Contents/Resources/AppIcon.icns" ]
   [ -f "$APP/Contents/Resources/HelperIcon.png" ]
   [ -f "$APP/Contents/Resources/cli-src/cli/pf/ntfsmac.anchor.tmpl" ]
-  [ -f "$APP/Contents/Library/LaunchServices/com.binarybears.ntfsmac.helper" ]
+  [ -f "$APP/Contents/Resources/ntfsmac-helper" ]
+  [ -f "$APP/Contents/Library/LaunchDaemons/com.binarybears.ntfsmac.helper.daemon.plist" ]
+  run /usr/libexec/PlistBuddy -c "Print :BundleProgram" \
+    "$APP/Contents/Library/LaunchDaemons/com.binarybears.ntfsmac.helper.daemon.plist"
+  [ "$output" = "Contents/Resources/ntfsmac-helper" ]
+  run /usr/libexec/PlistBuddy -c "Print :NTFSMACHelperVariant" "$APP/Contents/Info.plist"
+  [ "$output" = "modern" ]
+  run /usr/libexec/PlistBuddy -c "Print :SMPrivilegedExecutables" "$APP/Contents/Info.plist"
+  [ "$status" -ne 0 ]
+}
+
+@test "assembles the Legacy app with the SMJobBless trust pairing" {
+  NTFSMAC_HELPER_VARIANT=legacy run "$SCRIPT"
+  [ "$status" -eq 0 ]
+  local legacy_app="$OUT_DIR/ntfsmac-legacy.app"
+  [ -f "$legacy_app/Contents/Library/LaunchServices/com.binarybears.ntfsmac.helper" ]
+  [ ! -d "$legacy_app/Contents/Library/LaunchDaemons" ]
+  run /usr/libexec/PlistBuddy -c "Print :NTFSMACHelperVariant" "$legacy_app/Contents/Info.plist"
+  [ "$output" = "legacy" ]
+  run /usr/libexec/PlistBuddy -c "Print :SMPrivilegedExecutables:com.binarybears.ntfsmac.helper" \
+    "$legacy_app/Contents/Info.plist"
+  [ "$status" -eq 0 ]
 }
 
 @test "Contents/Info.plist declares CFBundleExecutable matching the launcher binary" {
@@ -67,6 +87,10 @@ teardown() {
   [ "$output" = "$NTFSMAC_VERSION" ]
   run /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$REPO_ROOT/helper/Info.plist"
   [ "$output" = "$NTFSMAC_BUILD_VERSION" ]
+  run /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$REPO_ROOT/helper/Info-Modern.plist"
+  [ "$output" = "$NTFSMAC_VERSION" ]
+  run /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$REPO_ROOT/helper/Info-Modern.plist"
+  [ "$output" = "$NTFSMAC_BUILD_VERSION" ]
 }
 
 @test "package-app hard-stops before build when canonical version metadata drifts" {
@@ -82,7 +106,7 @@ teardown() {
   run "$SCRIPT"
   [ "$status" -eq 0 ]
 
-  run codesign -dv "$APP/Contents/Library/LaunchServices/com.binarybears.ntfsmac.helper"
+  run codesign -dv "$APP/Contents/Resources/ntfsmac-helper"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Signature=adhoc"* ]]
 
@@ -95,7 +119,7 @@ teardown() {
   [[ "$output" == *"Signature=adhoc"* ]]
 }
 
-@test "Package.swift embeds the helper's Info.plist/launchd.plist sections SMJobBless needs" {
+@test "Package.swift embeds variant-specific helper metadata while preserving Legacy sections" {
   # The Mach-O __info_plist/__launchd_plist sections are added at `swift build` link time
   # (Package.swift's linkerSettings on the ntfsmac-helper target), not by this script — this
   # script only copies+signs the already-linked binary. A fixture binary standing in for the
@@ -105,6 +129,16 @@ teardown() {
   [ "$status" -eq 0 ]
   run grep -c -- '__launchd_plist' "$REPO_ROOT/Package.swift"
   [ "$status" -eq 0 ]
+  run grep -F 'Info-Modern.plist' "$REPO_ROOT/Package.swift"
+  [ "$status" -eq 0 ]
+  run grep -F 'launchd-modern.plist' "$REPO_ROOT/Package.swift"
+  [ "$status" -eq 0 ]
+}
+
+@test "rejects an unknown helper variant before touching output" {
+  NTFSMAC_HELPER_VARIANT=experimental run "$SCRIPT"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"must be 'modern' or 'legacy'"* ]]
 }
 
 @test "defaults to ad-hoc signing and accepts an explicit release identity" {

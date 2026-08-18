@@ -441,7 +441,7 @@ private final class UnknownSecurityCleanupRunner: PrivilegedCommandRunning {
     #expect(runner.calls.contains { $0.executablePath == "/bin/rm" } == false)
 }
 
-@Test func uninstallHelperBootsOutLaunchdJobAndRemovesItsOwnFiles() async {
+@Test func uninstallHelperUsesTheLifecycleOwnedByTheCurrentVariant() async {
     let runner = FakeRunner()
     let service = HelperService(runner: runner, legacyArtifactsPresent: { false })
     let (data, error) = await awaitReply { reply in
@@ -449,6 +449,7 @@ private final class UnknownSecurityCleanupRunner: PrivilegedCommandRunning {
     }
     #expect(data != nil)
     #expect(error == nil)
+    #if NTFSMAC_LEGACY_HELPER
     #expect(runner.calls.count == 5)
     // rm-plist and rm-binary (and the reply, implicit above) must complete before the
     // self-destructive bootout — reversing this order is the exact race that made every
@@ -461,6 +462,11 @@ private final class UnknownSecurityCleanupRunner: PrivilegedCommandRunning {
     #expect(runner.calls[3].arguments == ["reset", "All", helperMachServiceName])
     #expect(runner.calls[4].executablePath == "/bin/launchctl")
     #expect(runner.calls[4].arguments == ["bootout", "system/\(helperMachServiceName)"])
+    #else
+    // The modern binary is embedded in the signed app. XPC prepares the service and the app calls
+    // SMAppService.unregister(); the daemon must not delete or boot out itself.
+    #expect(runner.calls.isEmpty)
+    #endif
 }
 
 @Test func uninstallHelperAlsoRemovesOrphanedLegacyArtifacts() async {
@@ -479,7 +485,15 @@ private final class UnknownSecurityCleanupRunner: PrivilegedCommandRunning {
         $0.executablePath == "/bin/rm"
             && $0.arguments == ["-f", "/Library/PrivilegedHelperTools/\(legacyHelperMachServiceName)"]
     })
+    #if NTFSMAC_LEGACY_HELPER
     #expect(runner.calls.last?.arguments == ["bootout", "system/\(helperMachServiceName)"])
+    #else
+    #expect(runner.calls.contains {
+        $0.executablePath == "/bin/rm"
+            && $0.arguments == ["-f", "/Library/LaunchDaemons/\(compatibilityHelperMachServiceName).plist"]
+    })
+    #expect(!runner.calls.contains { $0.arguments == ["bootout", "system/\(helperMachServiceName)"] })
+    #endif
 }
 
 // MARK: - resolveNtfsmacPrefix / ntfsmacPrefix injection (fixed prefix vs brew-tap fallback)
@@ -671,6 +685,12 @@ private func makeStagedInstallScript(content: String = "#!/bin/sh\nexit 0\n") th
         $0.executablePath == "/bin/rm"
             && $0.arguments == ["-f", "/Library/PrivilegedHelperTools/\(legacyHelperMachServiceName)"]
     })
+    #if !NTFSMAC_LEGACY_HELPER
+    #expect(runner.calls.contains {
+        $0.executablePath == "/bin/rm"
+            && $0.arguments == ["-f", "/Library/PrivilegedHelperTools/\(compatibilityHelperMachServiceName)"]
+    })
+    #endif
     #expect(runner.calls.last?.executablePath == scriptPath.path)
 }
 

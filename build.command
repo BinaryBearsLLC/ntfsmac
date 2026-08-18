@@ -1,6 +1,6 @@
 #!/bin/bash
 # Interactive source-build assistant for ntfsmac.
-# Double-click this file in Finder, or run it as ./build.command [cli|gui|both].
+# Double-click this file in Finder, or run it as ./build.command [cli|gui|both] [--no-legacy].
 # Missing build tools are installed only after explicit user consent.
 set -uo pipefail
 
@@ -8,6 +8,7 @@ REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 DIST_DIR="$REPO_ROOT/dist"
 INTERACTIVE=0
 TARGET=""
+LEGACY_ENABLED=1
 
 if [[ -t 1 && -n "${TERM:-}" ]] && command -v tput >/dev/null 2>&1; then
   BOLD="$(tput bold 2>/dev/null || true)"
@@ -81,19 +82,33 @@ confirm() {
 
 usage() {
   cat <<'EOF'
-Usage: ./build.command [cli|gui|both]
+Usage: ./build.command [cli|gui|both] [--no-legacy]
 
   cli   Build and verify the CLI runtime, then create
         dist/ntfsmac-cli.tar.gz
   gui   Build the shared CLI runtime, run the Swift tests, then create and
-        verify dist/ntfsmac.app and dist/ntfsmac.dmg
+        verify the standard and Legacy app/DMG distributions
   both  Create and verify both distributions in one run
+
+  --no-legacy  Build only the standard modern-helper app/DMG. By default every
+               GUI build automatically produces both standard and Legacy variants.
 
 With no argument, an interactive menu is shown. Missing command-line build
 dependencies can be installed only after an explicit confirmation. Full Xcode
 must be installed through Apple; the helper can open its App Store page.
 Nothing is installed into /usr/local by this build helper.
 EOF
+}
+
+choose_legacy_mode() {
+  [[ "$TARGET" == "gui" || "$TARGET" == "both" ]] || return
+  local answer
+  echo ""
+  read -r -p "Also build the Legacy compatibility version? [Y/n]: " answer
+  case "$answer" in
+    n | N | no | NO | No) LEGACY_ENABLED=0 ;;
+    *) LEGACY_ENABLED=1 ;;
+  esac
 }
 
 choose_target() {
@@ -388,30 +403,75 @@ package_cli() {
 }
 
 package_gui() {
-  section "Swift GUI tests"
-  swift test --package-path "$REPO_ROOT" || fail "The Swift test suite failed."
-  ok "Swift tests passed"
+  local version modern_app modern_dmg legacy_app legacy_dmg
+  version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$REPO_ROOT/gui/Info.plist")"
+  modern_app="$DIST_DIR/ntfsmac.app"
+  modern_dmg="$DIST_DIR/ntfsmac-${version}-Apple-Silicon.dmg"
+  legacy_app="$DIST_DIR/ntfsmac-legacy.app"
+  legacy_dmg="$DIST_DIR/ntfsmac-${version}-Legacy-Apple-Silicon.dmg"
 
-  section "App bundle packaging"
-  "$REPO_ROOT/build/package-app.sh" || fail "The app bundle could not be created."
+  if [[ "$LEGACY_ENABLED" -eq 0 ]]; then
+    # An explicit opt-out must not leave a prior Legacy build looking like part of this run.
+    rm -rf -- "$legacy_app"
+    rm -f -- "$legacy_dmg" "${legacy_dmg}.sha256"
+  fi
 
-  local app="$DIST_DIR/ntfsmac.app"
-  [[ -d "$app" ]] || fail "The expected app bundle is missing: $app"
-  codesign --verify --deep --strict --verbose=2 "$app" || fail "The app bundle signature verification failed."
-  file "$app/Contents/MacOS/ntfsmac-gui" | grep -q 'arm64' || fail "The GUI executable is not an arm64 Mach-O binary."
-  ok "App bundle structure, architecture, and ad-hoc signature verified"
+  section "Swift GUI tests — standard"
+  NTFSMAC_HELPER_VARIANT=modern swift test --package-path "$REPO_ROOT" \
+    --scratch-path "$REPO_ROOT/.build/ntfsmac-modern-tests" || fail "The standard Swift test suite failed."
+  ok "Standard Swift tests passed"
 
-  section "DMG packaging"
-  "$REPO_ROOT/build/make-dmg.sh" || fail "The DMG could not be created."
+  if [[ "$LEGACY_ENABLED" -eq 1 ]]; then
+    section "Swift GUI tests — Legacy"
+    NTFSMAC_HELPER_VARIANT=legacy swift test --package-path "$REPO_ROOT" \
+      --scratch-path "$REPO_ROOT/.build/ntfsmac-legacy-tests" || fail "The Legacy Swift test suite failed."
+    ok "Legacy Swift tests passed"
+  fi
 
-  local dmg="$DIST_DIR/ntfsmac.dmg"
-  [[ -f "$dmg" ]] || fail "The expected DMG is missing: $dmg"
-  hdiutil verify "$dmg" || fail "The DMG failed hdiutil verification."
-  ok "DMG created and verified"
-  shasum -a 256 "$dmg"
+  section "App bundle packaging — standard"
+  NTFSMAC_HELPER_VARIANT=modern NTFSMAC_APP_BUNDLE_OUT="$modern_app" \
+    "$REPO_ROOT/build/package-app.sh" || fail "The standard app bundle could not be created."
+  [[ -d "$modern_app" ]] || fail "The expected app bundle is missing: $modern_app"
+  [[ -f "$modern_app/Contents/Library/LaunchDaemons/com.binarybears.ntfsmac.helper.daemon.plist" ]] || \
+    fail "The standard app is missing its SMAppService LaunchDaemon plist."
+  [[ -f "$modern_app/Contents/Resources/ntfsmac-helper" ]] || \
+    fail "The standard app is missing its bundled helper."
+  codesign --verify --deep --strict --verbose=2 "$modern_app" || fail "The standard app signature verification failed."
+  file "$modern_app/Contents/MacOS/ntfsmac-gui" | grep -q 'arm64' || fail "The standard GUI executable is not arm64."
+  ok "Standard app structure, architecture, and ad-hoc signature verified"
+
+  section "DMG packaging — standard"
+  NTFSMAC_APP_BUNDLE="$modern_app" NTFSMAC_DMG_OUT="$modern_dmg" \
+    NTFSMAC_DMG_VOLUME_NAME="ntfsmac Installer" "$REPO_ROOT/build/make-dmg.sh" || \
+    fail "The standard DMG could not be created."
+  hdiutil verify "$modern_dmg" || fail "The standard DMG failed hdiutil verification."
+  ok "Standard DMG created and verified"
+  shasum -a 256 "$modern_dmg"
+
+  if [[ "$LEGACY_ENABLED" -eq 1 ]]; then
+    section "App bundle packaging — Legacy"
+    NTFSMAC_HELPER_VARIANT=legacy NTFSMAC_APP_BUNDLE_OUT="$legacy_app" \
+      "$REPO_ROOT/build/package-app.sh" || fail "The Legacy app bundle could not be created."
+    [[ -d "$legacy_app" ]] || fail "The expected Legacy app bundle is missing: $legacy_app"
+    [[ -f "$legacy_app/Contents/Library/LaunchServices/com.binarybears.ntfsmac.helper" ]] || \
+      fail "The Legacy app is missing its SMJobBless helper."
+    codesign --verify --deep --strict --verbose=2 "$legacy_app" || fail "The Legacy app signature verification failed."
+    file "$legacy_app/Contents/MacOS/ntfsmac-gui" | grep -q 'arm64' || fail "The Legacy GUI executable is not arm64."
+    ok "Legacy app structure, architecture, and ad-hoc signature verified"
+
+    section "DMG packaging — Legacy"
+    NTFSMAC_APP_BUNDLE="$legacy_app" NTFSMAC_DMG_OUT="$legacy_dmg" \
+      NTFSMAC_DMG_VOLUME_NAME="ntfsmac Legacy Installer" "$REPO_ROOT/build/make-dmg.sh" || \
+      fail "The Legacy DMG could not be created."
+    hdiutil verify "$legacy_dmg" || fail "The Legacy DMG failed hdiutil verification."
+    ok "Legacy DMG created and verified"
+    shasum -a 256 "$legacy_dmg"
+  fi
 }
 
 print_summary() {
+  local version
+  version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$REPO_ROOT/gui/Info.plist")"
   section "Build complete"
   case "$TARGET" in
     cli)
@@ -419,12 +479,20 @@ print_summary() {
       ;;
     gui)
       ok "$DIST_DIR/ntfsmac.app"
-      ok "$DIST_DIR/ntfsmac.dmg"
+      ok "$DIST_DIR/ntfsmac-${version}-Apple-Silicon.dmg"
+      if [[ "$LEGACY_ENABLED" -eq 1 ]]; then
+        ok "$DIST_DIR/ntfsmac-legacy.app"
+        ok "$DIST_DIR/ntfsmac-${version}-Legacy-Apple-Silicon.dmg"
+      fi
       ;;
     both)
       ok "$DIST_DIR/ntfsmac-cli.tar.gz"
       ok "$DIST_DIR/ntfsmac.app"
-      ok "$DIST_DIR/ntfsmac.dmg"
+      ok "$DIST_DIR/ntfsmac-${version}-Apple-Silicon.dmg"
+      if [[ "$LEGACY_ENABLED" -eq 1 ]]; then
+        ok "$DIST_DIR/ntfsmac-legacy.app"
+        ok "$DIST_DIR/ntfsmac-${version}-Legacy-Apple-Silicon.dmg"
+      fi
       ;;
   esac
   echo ""
@@ -435,10 +503,16 @@ print_summary() {
 main() {
   cd "$REPO_ROOT" || fail "Could not enter the repository directory."
 
+  if [[ "$#" -gt 2 ]]; then
+    usage >&2
+    fail "Too many arguments."
+  fi
+
   case "${1:-}" in
     "")
       INTERACTIVE=1
       choose_target
+      choose_legacy_mode
       ;;
     cli | gui | both)
       TARGET="$1"
@@ -452,6 +526,15 @@ main() {
     *)
       usage >&2
       fail "Unknown target '$1'."
+      ;;
+  esac
+
+  case "${2:-}" in
+    "") ;;
+    --no-legacy) LEGACY_ENABLED=0 ;;
+    *)
+      usage >&2
+      fail "Unknown option '${2:-}'."
       ;;
   esac
 

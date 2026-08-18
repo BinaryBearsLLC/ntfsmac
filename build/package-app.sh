@@ -1,9 +1,9 @@
 #!/bin/bash
-# build/package-app.sh — assembles dist/ntfsmac.app.
+# build/package-app.sh — assembles the standard or Legacy ntfsmac.app variant.
 #
-# Release-builds the gui + helper SPM executables, lays them into a real .app bundle
-# (Contents/MacOS, Contents/Resources, Contents/Library/LaunchServices for the raw
-# SMJobBless helper tool), then signs the helper and outer app in that order. Local builds
+# Release-builds the gui + helper SPM executables, lays them into a real .app bundle, then signs
+# the helper and outer app in that order. The standard build embeds an SMAppService LaunchDaemon;
+# the Legacy build embeds the standalone SMJobBless helper under LaunchServices. Local builds
 # default to ad-hoc; official releases supply the BinaryBears Developer ID identity and use
 # Hardened Runtime plus Apple's trusted timestamp.
 #
@@ -20,9 +20,28 @@ set -uo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 
-RELEASE_DIR="${NTFSMAC_SWIFT_RELEASE_DIR:-$REPO_ROOT/.build/release}"
+HELPER_VARIANT="${NTFSMAC_HELPER_VARIANT:-modern}"
+case "$HELPER_VARIANT" in
+  modern | legacy) ;;
+  *)
+    echo "package-app: HARD-STOP — NTFSMAC_HELPER_VARIANT must be 'modern' or 'legacy'" >&2
+    exit 1
+    ;;
+esac
+
+SWIFT_SCRATCH_DIR="${NTFSMAC_SWIFT_SCRATCH_DIR:-$REPO_ROOT/.build/ntfsmac-$HELPER_VARIANT}"
+RELEASE_DIR="${NTFSMAC_SWIFT_RELEASE_DIR:-$SWIFT_SCRATCH_DIR/release}"
 OUT_DIR="${NTFSMAC_APP_OUT_DIR:-$REPO_ROOT/dist}"
-APP="$OUT_DIR/ntfsmac.app"
+if [[ "$HELPER_VARIANT" == "legacy" ]]; then
+  DEFAULT_APP="$OUT_DIR/ntfsmac-legacy.app"
+  HELPER_INFO_PLIST="$REPO_ROOT/helper/Info.plist"
+  HELPER_LAUNCHD_PLIST="$REPO_ROOT/helper/launchd.plist"
+else
+  DEFAULT_APP="$OUT_DIR/ntfsmac.app"
+  HELPER_INFO_PLIST="$REPO_ROOT/helper/Info-Modern.plist"
+  HELPER_LAUNCHD_PLIST="$REPO_ROOT/helper/launchd-modern.plist"
+fi
+APP="${NTFSMAC_APP_BUNDLE_OUT:-$DEFAULT_APP}"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
 SIGNING_KEYCHAIN="${SIGNING_KEYCHAIN:-}"
 
@@ -43,8 +62,8 @@ validate_product_versions() {
   local canonical_release canonical_build helper_release helper_build
   canonical_release="$(plist_get "$product_info" CFBundleShortVersionString)" || return 1
   canonical_build="$(plist_get "$product_info" CFBundleVersion)" || return 1
-  helper_release="$(plist_get "$REPO_ROOT/helper/Info.plist" CFBundleShortVersionString)" || return 1
-  helper_build="$(plist_get "$REPO_ROOT/helper/Info.plist" CFBundleVersion)" || return 1
+  helper_release="$(plist_get "$HELPER_INFO_PLIST" CFBundleShortVersionString)" || return 1
+  helper_build="$(plist_get "$HELPER_INFO_PLIST" CFBundleVersion)" || return 1
   if [[ "$helper_release" != "$canonical_release" || "$helper_build" != "$canonical_build" ]]; then
     echo "package-app: HARD-STOP — helper version $helper_release ($helper_build) does not match app version $canonical_release ($canonical_build)" >&2
     return 1
@@ -52,12 +71,12 @@ validate_product_versions() {
 }
 
 swift_build_release() {
-  local -a args=(-c release --package-path "$REPO_ROOT")
+  local -a args=(-c release --package-path "$REPO_ROOT" --scratch-path "$SWIFT_SCRATCH_DIR")
   # Codex/CI may already run inside a filesystem sandbox; SwiftPM's nested sandbox cannot be
   # created there. This opt-in disables only SwiftPM's inner process sandbox, never the outer
   # runner or any repository safety gate.
   [[ "${NTFSMAC_SWIFTPM_DISABLE_SANDBOX:-}" == "1" ]] && args+=(--disable-sandbox)
-  swift build "${args[@]}"
+  NTFSMAC_HELPER_VARIANT="$HELPER_VARIANT" swift build "${args[@]}"
 }
 
 main() {
@@ -205,8 +224,8 @@ SWIFT
   # carries the real pinned hash, this is the one that actually gets signed and installed below.
 
   local helper_label
-  helper_label="$(plist_get "$REPO_ROOT/helper/Info.plist" CFBundleIdentifier)" || {
-    echo "package-app: HARD-STOP — couldn't read CFBundleIdentifier from helper/Info.plist" >&2
+  helper_label="$(plist_get "$HELPER_INFO_PLIST" CFBundleIdentifier)" || {
+    echo "package-app: HARD-STOP — couldn't read CFBundleIdentifier from $HELPER_INFO_PLIST" >&2
     exit 1
   }
   # helper_label becomes a path component below (Contents/Library/LaunchServices/$helper_label)
@@ -219,7 +238,14 @@ SWIFT
   fi
 
   rm -rf "$APP"
-  mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Library/LaunchServices"
+  mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+  if [[ "$HELPER_VARIANT" == "legacy" ]]; then
+    mkdir -p "$APP/Contents/Library/LaunchServices"
+    helper_destination="$APP/Contents/Library/LaunchServices/$helper_label"
+  else
+    mkdir -p "$APP/Contents/Library/LaunchDaemons"
+    helper_destination="$APP/Contents/Resources/$HELPER_BIN_NAME"
+  fi
 
   if ! cp "$gui_bin" "$APP/Contents/MacOS/$GUI_BIN_NAME"; then
     echo "package-app: HARD-STOP — failed to copy $gui_bin" >&2
@@ -229,6 +255,18 @@ SWIFT
     echo "package-app: HARD-STOP — failed to copy gui/Info.plist" >&2
     exit 1
   fi
+  /usr/libexec/PlistBuddy -c "Delete :NTFSMACHelperVariant" "$APP/Contents/Info.plist" >/dev/null 2>&1 || true
+  /usr/libexec/PlistBuddy -c "Add :NTFSMACHelperVariant string $HELPER_VARIANT" "$APP/Contents/Info.plist" || {
+    echo "package-app: HARD-STOP — failed to record helper variant in app Info.plist" >&2
+    exit 1
+  }
+  if [[ "$HELPER_VARIANT" == "modern" ]]; then
+    /usr/libexec/PlistBuddy -c "Delete :SMPrivilegedExecutables" "$APP/Contents/Info.plist" >/dev/null 2>&1 || true
+    if ! cp "$HELPER_LAUNCHD_PLIST" "$APP/Contents/Library/LaunchDaemons/$helper_label.plist"; then
+      echo "package-app: HARD-STOP — failed to embed the SMAppService LaunchDaemon plist" >&2
+      exit 1
+    fi
+  fi
   if ! cp "$REPO_ROOT/gui/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"; then
     echo "package-app: HARD-STOP — failed to copy gui/Resources/AppIcon.icns" >&2
     exit 1
@@ -237,7 +275,7 @@ SWIFT
     echo "package-app: HARD-STOP — failed to copy gui/Resources/HelperIcon.png" >&2
     exit 1
   fi
-  if ! cp "$helper_bin" "$APP/Contents/Library/LaunchServices/$helper_label"; then
+  if ! cp "$helper_bin" "$helper_destination"; then
     echo "package-app: HARD-STOP — failed to copy $helper_bin" >&2
     exit 1
   fi
@@ -265,7 +303,7 @@ SWIFT
   fi
 
   echo "package-app: signing helper binary with $SIGNING_IDENTITY"
-  if ! codesign "${helper_sign_args[@]}" "$APP/Contents/Library/LaunchServices/$helper_label" 2>&1; then
+  if ! codesign "${helper_sign_args[@]}" "$helper_destination" 2>&1; then
     echo "package-app: HARD-STOP — failed to sign helper binary" >&2
     exit 1
   fi

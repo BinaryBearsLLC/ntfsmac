@@ -68,7 +68,7 @@ public final class CLIAutoStager: ObservableObject {
         isStaging = false
     }
 
-    /// Bounded retry for the *connection*, not the install: right after a fresh `SMJobBless`,
+    /// Bounded retry for the *connection*, not the install: right after fresh helper registration,
     /// launchd has registered the job but the daemon process may not be listening yet, so the
     /// very first XPC call here can lose that race and throw a connection-level error (Apple's
     /// own "Couldn't communicate with a helper application.") that has nothing to do with

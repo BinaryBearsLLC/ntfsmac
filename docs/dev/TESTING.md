@@ -392,8 +392,12 @@ raw SwiftPM executable:
 ```bash
 cd <repo>
 ./build.command gui
-open dist/ntfsmac.app
 ```
+
+The builder must produce both `dist/ntfsmac.app` and `dist/ntfsmac-legacy.app`, plus the standard
+and `Legacy` versioned DMGs. Test the standard app first, remove it completely, then repeat the
+applicable matrix with the Legacy app. `./build.command gui --no-legacy` is only for a deliberate
+single-artifact developer run, not the normal release gate.
 
 Fixed: root cause identified for the build failure below — the failing build was running against
 the standalone Command Line Tools, with no Xcode.app toolchain in play. The `@State` macro
@@ -408,9 +412,12 @@ above and re-run.
 
 1. Click the menu-bar icon, then close it and run `ntfsmac opengui`; both actions must reveal the
    same popover without Accessibility permission or a simulated click. If the privileged helper
-   isn't installed yet, the app must first explain why it is needed and that macOS will request
-   an administrator password. A real `SMJobBless` prompt may appear only after the explicit
-   **Install Helper…** action. The packaged app then stages its
+   isn't installed yet, the app must first explain why it is needed. In the standard build,
+   **Install Helper…** registers the bundled service and may require approval under System
+   Settings > General > Login Items; the UI must expose **Open Login Items…** and **Refresh
+   Approval**, and must never claim success while approval is pending. In the Legacy build, a real
+   `SMJobBless` administrator prompt may appear only after the explicit action. The packaged app
+   then stages its
    bundled CLI/runtime through the helper; no separate Homebrew or manual CLI install is required
    for this GUI pass.
 2. Popover should show your drive in the list (the same filtered `anylinuxfs list` data Part A's
@@ -419,10 +426,12 @@ above and re-run.
    `NTFS3 (Experimental)…`, verify the Windows shutdown/Fast Startup/`chkdsk` preflight, and
    confirm diagnostics record `ntfs3` with no silent fallback.
    Before Mount becomes available, the setup gate performs a non-mutating one-block raw-device
-   access check. If Full Disk Access is required, macOS lists the component as
-   `com.khr898.ntfsmac.helper`; this is the technical service name of **ntfsmac Helper**, not an
-   unrelated package. Enable that exact entry and return to ntfsmac; the gate must recheck and
-   reveal the normal popover automatically, so the first Mount is not lost to authorization.
+   access check. If Full Disk Access is required, follow the friendly guidance and confirm the
+   entry corresponds to this exact packaged variant (`com.binarybears.ntfsmac.helper.daemon` for
+   the standard candidate or `com.binarybears.ntfsmac.helper` for Legacy). Record the name and icon
+   macOS actually presents rather than inferring them from plist metadata. Return to ntfsmac; the
+   gate must recheck and reveal the normal popover automatically, so the first Mount is not lost to
+   authorization.
 3. Icon should pulse blue while mounting, then turn green with the drive shown as mounted, a
    per-drive Unmount action, and measured **Private VM link**, **VPN-safe route**, and **PF policy
    enforced** rows. Their state/reason codes must match CLI diagnostics; unavailable or malformed

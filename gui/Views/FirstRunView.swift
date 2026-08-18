@@ -1,9 +1,10 @@
 import SwiftUI
 import AppKit
+import HelperShared
 
 /// First-run helper-install prompt (GUI-PLAN.md "App shape": "No windows except Preferences and
 /// the first-run helper prompt"). Performs a read-only registration check on appear, but never
-/// requests administrator authorization until the user explicitly chooses Install Helper.
+/// starts registration or administrator authorization until the user explicitly chooses Install Helper.
 /// Denial/failure renders
 /// `ui/prototype.html`'s "Error — Helper Missing" card (comp lines 636-711) — red icon-box header,
 /// message card, primary "Install Helper…" pill, and a footer so Quit/Settings stay reachable even
@@ -57,6 +58,25 @@ public struct FirstRunView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glassPrimary())
+                .focusable(true)
+            case .requiresApproval(let message):
+                approvalCard(message: message)
+                Button {
+                    installer.openApprovalSettings()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "gearshape.fill")
+                        Text("Open Login Items…")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glassPrimary())
+                .focusable(true)
+
+                Button("Refresh Approval") {
+                    Task { await installer.checkWithoutInstalling() }
+                }
+                .buttonStyle(.glassNeutral(colorScheme: colorScheme))
                 .focusable(true)
             case .installing:
                 ProgressView("Installing privileged helper…")
@@ -144,6 +164,7 @@ public struct FirstRunView: View {
 
     private var headerColor: Color {
         switch installer.state {
+        case .requiresApproval: .ntfsYellow
         case .denied, .failed: .ntfsRed
         case .installed: .ntfsGreen
         case .notChecked, .checking, .readyToInstall, .installing: .secondary
@@ -152,6 +173,7 @@ public struct FirstRunView: View {
 
     private var headerSubtitle: String {
         switch installer.state {
+        case .requiresApproval: "Approval required"
         case .denied, .failed: "Setup required"
         case .installed: "Privileged helper installed"
         case .notChecked, .checking: "Checking privileged helper…"
@@ -164,7 +186,7 @@ public struct FirstRunView: View {
         VStack(alignment: .leading, spacing: 5) {
             Text("Install the privileged helper")
                 .font(.system(size: 12.5, weight: .semibold))
-            Text("ntfsmac uses a small helper to mount and unmount drives safely. macOS will ask for an administrator password after you continue.")
+            Text(helperInstallExplanation)
                 .font(.system(size: 11.5))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -172,6 +194,29 @@ public struct FirstRunView: View {
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.secondary.opacity(0.08)))
         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.secondary.opacity(0.16)))
+    }
+
+    private var helperInstallExplanation: String {
+        switch HelperDistributionVariant.current {
+        case .modern:
+            "ntfsmac uses a bundled helper to mount and unmount drives safely. macOS will ask you to approve ntfsmac in Login Items."
+        case .legacy:
+            "ntfsmac Legacy uses a compatibility helper to mount and unmount drives safely. macOS will ask for an administrator password."
+        }
+    }
+
+    private func approvalCard(message: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("Approve ntfsmac Helper")
+                .font(.system(size: 12.5, weight: .semibold))
+            Text(message)
+                .font(.system(size: 11.5))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.ntfsYellow.opacity(0.09)))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.ntfsYellow.opacity(0.2)))
     }
 
     private func errorCard(message: String) -> some View {

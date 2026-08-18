@@ -1,17 +1,21 @@
 # BinaryBears release guide
 
 Official releases are built from `dev`, use SemVer beginning at `v3.0.0`, and are published in two
-steps: draft artifact first, human validation second.
+steps: draft artifacts first, human validation second. GUI releases produce the standard
+SMAppService DMG and the explicitly labelled Legacy SMJobBless DMG by default.
 
 ## Local release candidate
 
-1. Set the same `CFBundleShortVersionString` and `CFBundleVersion` in the app and helper plists.
-2. Run the automated suites once on the completed candidate.
-3. Build the Developer ID-signed local RC and notarize it.
-4. Verify the app/helper identifiers, arm64 architecture, nested signatures, notarization ticket,
-   Gatekeeper assessment, DMG contents, and SHA-256.
-5. Exercise clean install, old-helper migration, Full Disk Access, a known-clean mount/write/reread/
-   unmount, update-check behavior, and complete uninstall.
+1. Set the same `CFBundleShortVersionString` and `CFBundleVersion` in the app, standard-helper, and
+   Legacy-helper plists.
+2. Run the automated suites for both helper variants on the completed candidate.
+3. Build both Developer ID-signed local RCs and notarize them.
+4. Verify each app/helper identity, arm64 architecture, nested signatures, notarization ticket,
+   Gatekeeper assessment, DMG contents, visible app name, and SHA-256.
+5. On the standard artifact, exercise clean registration, Login Items approval and denial,
+   Legacy-to-standard migration, mismatch repair, Full Disk Access, a known-clean mount/write/
+   reread/unmount, update-check behavior, and complete uninstall.
+6. Repeat the applicable clean install, mount, and uninstall checks on the Legacy artifact.
 
 Do not create a release tag until this candidate passes.
 
@@ -44,11 +48,15 @@ Never commit certificate files, API keys, passwords, Keychain profiles, or encod
 
 ## Draft and publish
 
-1. Run **Release notarized DMG** manually from `dev` and enter the version without `v`.
+1. Run **Release notarized DMG** manually from `dev`, enter the version without `v`, and leave
+   **include legacy** enabled for the normal dual release. Disable it only after an explicit product
+   decision; the local builder has the equivalent `--no-legacy` control.
 2. The workflow verifies the signed tag and version, runs the release gates, imports credentials
    into a temporary Keychain, builds, signs, notarizes, staples, verifies, and creates a draft.
-3. Download `ntfsmac-X.Y.Z-Apple-Silicon.dmg` and its `.sha256` file from that draft.
-4. Confirm the checksum, install the downloaded DMG, and run the final smoke test.
+3. Download both `ntfsmac-X.Y.Z-Apple-Silicon.dmg` and
+   `ntfsmac-X.Y.Z-Legacy-Apple-Silicon.dmg`, together with both `.sha256` files, from that draft.
+4. Confirm both checksums, confirm both DMGs contain an app named exactly `ntfsmac.app`, and run
+   the final smoke matrix for both variants.
 5. Publish the existing draft in GitHub. Do not rebuild or replace its files.
 
 Any failure returns to `dev` for a new commit and tag. Never overwrite a published release tag or

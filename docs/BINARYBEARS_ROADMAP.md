@@ -6,7 +6,7 @@ and in Git history.
 
 ## Current baseline
 
-The compatibility product is software-complete for its measured P0/P1 scope:
+The published compatibility product is software-complete for its measured P0/P1 scope:
 
 - Apple Silicon, macOS 13+, menu-bar app, CLI, and SMJobBless helper.
 - `ntfs-3g` default; NTFS3 explicit and experimental.
@@ -71,20 +71,33 @@ a partial release.
 Patch releases follow SemVer (`v3.0.1`, `v3.0.2`, and so on) and use the same signed-tag and draft
 artifact process.
 
-### P2 — modern helper variant
+### v3.1.0 candidate — modern helper integration
 
-The published v3 DMG passed its post-download test, so P2 is eligible to start as separate future
-work.
+The published v3 DMG passed its post-download test. The modern lifecycle is now integrated as the
+standard `v3.1.0` candidate; P2 remains an internal roadmap name and is not written in the app or
+standard artifact name.
 
-The v3 compatibility line remains the current supported release until P2 is integrated, tested,
-and shipped. Only then does v3 become the documented **legacy** line.
+The published `v3.0.0` compatibility line remains the current supported release until the complete
+dual-distribution gate below passes and `v3.1.0` ships.
 
-- Prototype the macOS 13+ `SMAppService` lifecycle without weakening the XPC boundary.
-- Give the modern variant a separate internal identity and migration contract.
-- Validate clean install, approval, denial, upgrade, mismatch, reinstall, and complete uninstall.
-- Determine from live System Settings evidence whether a bundle-based helper can present the
-  friendly **ntfsmac Helper** name and gear icon.
-- Ship the compatibility and modern variants only when users can distinguish them clearly.
+- [x] Integrate the macOS 13+ `SMAppService` LaunchDaemon lifecycle without weakening the XPC
+  boundary.
+- [x] Give the standard helper the separate internal identity
+  `com.binarybears.ntfsmac.helper.daemon` and preserve the compatibility identity for migration.
+- [x] Build and test standard and Legacy code paths from one source tree with isolated Swift build
+  directories.
+- [x] Make GUI/release builds emit both DMGs automatically, with explicit local and workflow
+  controls to disable Legacy.
+- [x] Keep the standard user-facing name exactly **ntfsmac**; label only the compatibility output
+  and Settings metadata as **Legacy**.
+- [ ] Complete live clean install, System Settings approval/denial, compatibility upgrade,
+  mismatch, reinstall, Full Disk Access, complete uninstall, and known-clean mount/write/reread/
+  unmount on the packaged standard candidate.
+- [ ] Repeat the applicable packaged acceptance matrix on the Legacy candidate.
+- [ ] Record live System Settings evidence for the friendly service name/icon; do not infer it from
+  bundle metadata alone.
+- [ ] Publish only after both locally tested candidates are rebuilt as signed/notarized draft
+  artifacts and the downloaded DMGs pass their final smoke tests.
 
 ### Later product work
 

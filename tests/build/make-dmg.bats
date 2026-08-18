@@ -76,6 +76,23 @@ teardown() {
   [[ "$output" == *"pixelHeight: 460"* ]]
 }
 
+@test "a Legacy source bundle is still presented as ntfsmac.app inside the DMG" {
+  local legacy_app="$APP_PARENT/ntfsmac-legacy.app"
+  mv "$APP" "$legacy_app"
+  export NTFSMAC_APP_BUNDLE="$legacy_app"
+
+  run "$SCRIPT"
+  [ "$status" -eq 0 ]
+
+  MOUNT_DIR="$(mktemp -d)"
+  run hdiutil attach "$NTFSMAC_DMG_OUT" -mountpoint "$MOUNT_DIR" -nobrowse -readonly -noautoopen
+  [ "$status" -eq 0 ]
+  [ -d "$MOUNT_DIR/ntfsmac.app" ]
+  [ ! -e "$MOUNT_DIR/ntfsmac-legacy.app" ]
+  hdiutil detach "$MOUNT_DIR" -quiet
+  rm -rf "$MOUNT_DIR"
+}
+
 @test "fails clearly when the app bundle is missing" {
   rm -rf "$APP"
   run "$SCRIPT"

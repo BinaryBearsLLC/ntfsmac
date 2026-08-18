@@ -167,11 +167,57 @@ public func resolveNtfsmacPrefix(fileManager: FileManager = .default) -> String 
 }
 
 public let ntfsmacAppBundleIdentifier = "com.binarybears.ntfsmac"
-public let helperMachServiceName = "com.binarybears.ntfsmac.helper"
+
+/// The release builder compiles two deliberately separate helper distributions from the same
+/// reviewed XPC implementation. The standard build uses Apple's macOS 13+ `SMAppService`
+/// LaunchDaemon lifecycle; the compatibility build retains `SMJobBless` for older deployments.
+/// Only the compatibility artifact is labelled for users — the standard product remains simply
+/// "ntfsmac" and never exposes the internal P2 project name.
+public enum HelperDistributionVariant: String, Sendable {
+    case modern
+    case legacy
+
+    public static let current: Self = {
+        #if NTFSMAC_LEGACY_HELPER
+        .legacy
+        #else
+        .modern
+        #endif
+    }()
+
+    public var settingsLabel: String {
+        switch self {
+        case .modern: "Modern helper"
+        case .legacy: "Legacy compatibility helper"
+        }
+    }
+}
+
+/// The published v3 compatibility helper keeps its historical label so existing installations
+/// remain repairable. The modern helper must use a different identity: this prevents launchd from
+/// confusing an embedded SMAppService daemon with the standalone SMJobBless tool it replaces.
+public let compatibilityHelperMachServiceName = "com.binarybears.ntfsmac.helper"
+public let modernHelperMachServiceName = "com.binarybears.ntfsmac.helper.daemon"
+public let modernHelperLaunchDaemonPlistName = "\(modernHelperMachServiceName).plist"
+public let helperMachServiceName = HelperDistributionVariant.current == .legacy
+    ? compatibilityHelperMachServiceName
+    : modernHelperMachServiceName
 
 /// Pre-v3 helper identity. It remains only as an explicit one-way migration source and must never
 /// be used for a new install, XPC connection, diagnostic default, or packaged production identity.
 public let legacyHelperMachServiceName = "com.khr898.ntfsmac.helper"
+
+/// Helper identities this distribution may retire after its own root service is available. The
+/// standard build removes both the v3 compatibility helper and the pre-v3 helper; the Legacy
+/// build removes only the pre-v3 helper and must never remove itself.
+public let retiredHelperMachServiceNames: [String] = {
+    switch HelperDistributionVariant.current {
+    case .modern:
+        [compatibilityHelperMachServiceName, legacyHelperMachServiceName]
+    case .legacy:
+        [legacyHelperMachServiceName]
+    }
+}()
 
 /// Detects the pre-v3 helper artifacts even when launchd no longer has a registered job for
 /// their label. `SMJobCopyDictionary` cannot see that orphaned state, but leaving the root-owned
@@ -182,6 +228,13 @@ public func legacyHelperArtifactsPresent(fileManager: FileManager = .default) ->
     ) || fileManager.fileExists(
         atPath: "/Library/PrivilegedHelperTools/\(legacyHelperMachServiceName)"
     )
+}
+
+public func retiredHelperArtifactsPresent(fileManager: FileManager = .default) -> Bool {
+    retiredHelperMachServiceNames.contains { label in
+        fileManager.fileExists(atPath: "/Library/LaunchDaemons/\(label).plist")
+            || fileManager.fileExists(atPath: "/Library/PrivilegedHelperTools/\(label)")
+    }
 }
 
 public enum FsDriver: String, Codable, Sendable {
@@ -488,7 +541,7 @@ public final class HelperService: NSObject, HelperXPCProtocol {
     private let resolvePrefix: @Sendable () -> String
     private let expectedCLITreeHash: String
     private let exitSink: @Sendable () -> Void
-    private let legacyArtifactsPresent: @Sendable () -> Bool
+    private let retiredArtifactsPresent: @Sendable () -> Bool
 
     /// `ntfsmacPrefix`, when passed (tests only), pins the CLI location instead of resolving it
     /// live. Production always passes `nil` so every privileged call below re-runs
@@ -509,7 +562,7 @@ public final class HelperService: NSObject, HelperXPCProtocol {
         runner: PrivilegedCommandRunning,
         ntfsmacPrefix: String? = nil,
         expectedCLITreeHash: String = GeneratedCLIManifest.expectedTreeHashHex,
-        legacyArtifactsPresent: @Sendable @escaping () -> Bool = { legacyHelperArtifactsPresent() },
+        legacyArtifactsPresent: @Sendable @escaping () -> Bool = { retiredHelperArtifactsPresent() },
         exitSink: @Sendable @escaping () -> Void = { exit(0) }
     ) {
         self.runner = runner
@@ -519,7 +572,7 @@ public final class HelperService: NSObject, HelperXPCProtocol {
             self.resolvePrefix = { resolveNtfsmacPrefix() }
         }
         self.expectedCLITreeHash = expectedCLITreeHash
-        self.legacyArtifactsPresent = legacyArtifactsPresent
+        self.retiredArtifactsPresent = legacyArtifactsPresent
         self.exitSink = exitSink
     }
 
@@ -698,7 +751,7 @@ public final class HelperService: NSObject, HelperXPCProtocol {
         // unprivileged installer cannot see it through `SMJobCopyDictionary` and cannot delete
         // it directly. This newly blessed root helper is the first safe place to finish that
         // one-way migration. Run only after the bundled CLI tree has passed its integrity pin.
-        removeLegacyHelperArtifactsIfPresent()
+        removeRetiredHelperArtifactsIfPresent()
         // Idempotency: if the installed CLI tree already matches this helper's pinned hash, skip
         // the reinstall. Without this, a new app build re-blesses the helper but `CLIAutoStager`
         // never re-stages (it skips on "any ntfsmac installed"), so the installed `ntfsmac` stays
@@ -725,11 +778,13 @@ public final class HelperService: NSObject, HelperXPCProtocol {
     public func uninstallHelper(reply: @escaping (Data?, String?) -> Void) {
         Self.mutationLock.lock()
         defer { Self.mutationLock.unlock() }
+        // Complete uninstall means every helper retired by this distribution is gone, including
+        // orphaned standalone files that Service Management can no longer discover. Do this while
+        // a root process is still available.
+        removeRetiredHelperArtifactsIfPresent()
+
+        #if NTFSMAC_LEGACY_HELPER
         let label = helperMachServiceName
-        // Complete uninstall means the compatibility-era helper is gone too, including the
-        // orphaned-files state that `SMJobRemove` cannot discover. Do this before booting out the
-        // current helper, while a root process is still available to perform the cleanup.
-        removeLegacyHelperArtifactsIfPresent()
         _ = runner.run("/bin/rm", ["-f", "/Library/LaunchDaemons/\(label).plist"])
         // Deleting our own running binary is safe on Unix — the inode stays valid until this
         // process exits.
@@ -745,18 +800,25 @@ public final class HelperService: NSObject, HelperXPCProtocol {
         // those). Replying first, then self-terminating last, is the fix: nothing after this
         // point should assume the helper is still reachable.
         _ = runner.run("/bin/launchctl", ["bootout", "system/\(label)"])
+        #else
+        // The modern daemon lives inside the signed app bundle. It must never delete itself or a
+        // system plist: the unprivileged app calls SMAppService.unregister() immediately after
+        // this preparation reply, and macOS terminates the service atomically.
+        encode(CommandResult(output: "modern helper ready to unregister", exitCode: 0), reply: reply)
+        #endif
     }
 
-    private func removeLegacyHelperArtifactsIfPresent() {
-        guard legacyArtifactsPresent() else { return }
-        let label = legacyHelperMachServiceName
-        // `bootout` is intentionally best-effort: orphaned files are precisely the case where
-        // the job is absent. The exact file paths remain fixed to the one historical label.
-        _ = runner.run("/bin/launchctl", ["bootout", "system/\(label)"])
-        _ = runner.run("/bin/rm", ["-f", "/Library/LaunchDaemons/\(label).plist"])
-        _ = runner.run("/bin/rm", ["-f", "/Library/PrivilegedHelperTools/\(label)"])
-        _ = runner.run("/usr/bin/tccutil", ["reset", "SystemPolicyAllFiles", label])
-        _ = runner.run("/usr/bin/tccutil", ["reset", "All", label])
+    private func removeRetiredHelperArtifactsIfPresent() {
+        guard retiredArtifactsPresent() else { return }
+        for label in retiredHelperMachServiceNames {
+            // `bootout` is intentionally best-effort: orphaned files are precisely the case where
+            // the job is absent. The exact file paths are limited to reviewed historical labels.
+            _ = runner.run("/bin/launchctl", ["bootout", "system/\(label)"])
+            _ = runner.run("/bin/rm", ["-f", "/Library/LaunchDaemons/\(label).plist"])
+            _ = runner.run("/bin/rm", ["-f", "/Library/PrivilegedHelperTools/\(label)"])
+            _ = runner.run("/usr/bin/tccutil", ["reset", "SystemPolicyAllFiles", label])
+            _ = runner.run("/usr/bin/tccutil", ["reset", "All", label])
+        }
     }
 
     public func exitHelper(reply: @escaping (Data?, String?) -> Void) {

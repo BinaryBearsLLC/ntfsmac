@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import CoreServices
+import HelperShared
 import NtfsmacGUI
 import SwiftUI
 import os.log
@@ -83,7 +84,11 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
         if let installOutcome = ProcessInfo.processInfo.environment["NTFSMAC_INSTALL_DEMO"] {
             helperInstaller = DemoScaffold.helperInstaller(outcome: installOutcome)
         } else {
-            helperInstaller = HelperInstaller()
+            let retiredHelperDetector: (any StaleHelperDetecting)? =
+                HelperDistributionVariant.current == .modern
+                    ? HelperClient(machServiceName: compatibilityHelperMachServiceName)
+                    : nil
+            helperInstaller = HelperInstaller(retiredHelperDetector: retiredHelperDetector)
         }
 
         let cliInstallChecker = CLIInstallChecker()

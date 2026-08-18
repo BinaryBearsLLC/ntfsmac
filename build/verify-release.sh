@@ -7,6 +7,7 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 APP="${NTFSMAC_APP_BUNDLE:-$REPO_ROOT/dist/ntfsmac.app}"
 VERSION="${RELEASE_VERSION:-$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$REPO_ROOT/gui/Info.plist")}"
 DMG="${NTFSMAC_DMG_OUT:-$REPO_ROOT/dist/ntfsmac-${VERSION}-Apple-Silicon.dmg}"
+HELPER_VARIANT="${NTFSMAC_HELPER_VARIANT:-modern}"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
 REQUIRE_NOTARIZATION="${REQUIRE_NOTARIZATION:-0}"
 
@@ -14,6 +15,11 @@ fail() {
   echo "verify-release: FAIL — $*" >&2
   exit 1
 }
+
+case "$HELPER_VARIANT" in
+  modern | legacy) ;;
+  *) fail "unknown helper variant: $HELPER_VARIANT" ;;
+esac
 
 plist_value() {
   /usr/libexec/PlistBuddy -c "Print :$2" "$1"
@@ -34,8 +40,27 @@ verify_app() {
   [[ "$(plist_value "$APP/Contents/Info.plist" CFBundleShortVersionString)" == "$VERSION" ]] ||
     fail "app version does not match $VERSION"
 
-  local app_bin="$APP/Contents/MacOS/ntfsmac-gui"
-  local helper="$APP/Contents/Library/LaunchServices/com.binarybears.ntfsmac.helper"
+  [[ "$(plist_value "$APP/Contents/Info.plist" NTFSMACHelperVariant)" == "$HELPER_VARIANT" ]] ||
+    fail "app helper variant does not match $HELPER_VARIANT"
+
+  local app_bin="$APP/Contents/MacOS/ntfsmac-gui" helper helper_identifier
+  if [[ "$HELPER_VARIANT" == "modern" ]]; then
+    helper="$APP/Contents/Resources/ntfsmac-helper"
+    helper_identifier="com.binarybears.ntfsmac.helper.daemon"
+    local daemon_plist="$APP/Contents/Library/LaunchDaemons/${helper_identifier}.plist"
+    [[ -f "$daemon_plist" ]] || fail "SMAppService LaunchDaemon plist is missing"
+    [[ "$(plist_value "$daemon_plist" Label)" == "$helper_identifier" ]] ||
+      fail "SMAppService LaunchDaemon label is wrong"
+    [[ "$(plist_value "$daemon_plist" BundleProgram)" == "Contents/Resources/ntfsmac-helper" ]] ||
+      fail "SMAppService BundleProgram is wrong"
+    ! /usr/libexec/PlistBuddy -c 'Print :SMPrivilegedExecutables' "$APP/Contents/Info.plist" >/dev/null 2>&1 ||
+      fail "standard app still declares SMPrivilegedExecutables"
+  else
+    helper_identifier="com.binarybears.ntfsmac.helper"
+    helper="$APP/Contents/Library/LaunchServices/$helper_identifier"
+    [[ "$(plist_value "$APP/Contents/Info.plist" "SMPrivilegedExecutables:$helper_identifier")" == \
+      "identifier \"$helper_identifier\"" ]] || fail "Legacy SMJobBless trust pairing is wrong"
+  fi
   [[ -f "$helper" ]] || fail "BinaryBears helper is missing"
   require_arm64_only "$app_bin"
   require_arm64_only "$helper"
@@ -45,7 +70,7 @@ verify_app() {
   app_info="$(codesign -dvvv "$APP" 2>&1)"
   helper_info="$(codesign -dvvv "$helper" 2>&1)"
   [[ "$app_info" == *"Identifier=com.binarybears.ntfsmac"* ]] || fail "signed app identifier is wrong"
-  [[ "$helper_info" == *"Identifier=com.binarybears.ntfsmac.helper"* ]] || fail "signed helper identifier is wrong"
+  [[ "$helper_info" == *"Identifier=$helper_identifier"* ]] || fail "signed helper identifier is wrong"
 
   NTFSMAC_VENDOR_BIN_DIR="$APP/Contents/Resources/cli-src/vendor/bin" \
     SIGNING_IDENTITY="$SIGNING_IDENTITY" "$SCRIPT_DIR/verify-signature.sh" ||
@@ -81,6 +106,8 @@ verify_dmg() {
   [[ -f "$mount_dir/.VolumeIcon.icns" ]] || fail "DMG does not contain the approved volume icon"
   [[ "$(plist_value "$mount_dir/ntfsmac.app/Contents/Info.plist" CFBundleIdentifier)" == "com.binarybears.ntfsmac" ]] ||
     fail "DMG contains the wrong app bundle"
+  [[ "$(plist_value "$mount_dir/ntfsmac.app/Contents/Info.plist" NTFSMACHelperVariant)" == "$HELPER_VARIANT" ]] ||
+    fail "DMG contains the wrong helper variant"
   hdiutil detach "$mount_dir" -quiet
   rmdir "$mount_dir"
   trap - EXIT
@@ -106,4 +133,4 @@ verify_dmg() {
 
 verify_app
 verify_dmg
-echo "verify-release: OK — ntfsmac $VERSION"
+echo "verify-release: OK — ntfsmac $VERSION ($HELPER_VARIANT)"

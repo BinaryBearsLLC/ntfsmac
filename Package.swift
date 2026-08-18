@@ -10,8 +10,23 @@ import PackageDescription
 // helper/launchd.plist relative to that is the only path-independent way to feed them to the
 // linker below.
 let packageDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-let helperInfoPlistPath = packageDir.appendingPathComponent("helper/Info.plist").path
-let helperLaunchdPlistPath = packageDir.appendingPathComponent("helper/launchd.plist").path
+let helperVariant = ProcessInfo.processInfo.environment["NTFSMAC_HELPER_VARIANT"] ?? "modern"
+let legacyHelperBuild: Bool
+switch helperVariant {
+case "modern":
+    legacyHelperBuild = false
+case "legacy":
+    legacyHelperBuild = true
+default:
+    fatalError("NTFSMAC_HELPER_VARIANT must be 'modern' or 'legacy'")
+}
+let helperSwiftSettings: [SwiftSetting] = legacyHelperBuild
+    ? [.define("NTFSMAC_LEGACY_HELPER")]
+    : []
+let helperInfoPlistName = legacyHelperBuild ? "Info.plist" : "Info-Modern.plist"
+let helperLaunchdPlistName = legacyHelperBuild ? "launchd.plist" : "launchd-modern.plist"
+let helperInfoPlistPath = packageDir.appendingPathComponent("helper/\(helperInfoPlistName)").path
+let helperLaunchdPlistPath = packageDir.appendingPathComponent("helper/\(helperLaunchdPlistName)").path
 
 let package = Package(
     name: "ntfsmac-gui",
@@ -26,20 +41,22 @@ let package = Package(
         .target(
             name: "HelperShared",
             path: "helper",
-            exclude: ["main.swift", "Info.plist", "launchd.plist", "Tests"],
-            sources: ["HelperProtocol.swift", "GeneratedCLIManifest.swift"]
+            exclude: ["main.swift", "Info.plist", "Info-Modern.plist", "launchd.plist", "launchd-modern.plist", "Tests"],
+            sources: ["HelperProtocol.swift", "GeneratedCLIManifest.swift"],
+            swiftSettings: helperSwiftSettings
         ),
         .executableTarget(
             name: "ntfsmac-helper",
             dependencies: ["HelperShared"],
             path: "helper",
-            exclude: ["HelperProtocol.swift", "GeneratedCLIManifest.swift", "Info.plist", "launchd.plist", "Tests"],
+            exclude: [
+                "HelperProtocol.swift", "GeneratedCLIManifest.swift", "Info.plist", "Info-Modern.plist",
+                "launchd.plist", "launchd-modern.plist", "Tests",
+            ],
             sources: ["main.swift"],
-            // SMJobBless reads a raw (non-.app-bundled) helper tool's identity straight out of
-            // its Mach-O sections, not from a plist file sitting next to it on disk — these two
-            // sectcreate flags are what make helper/Info.plist's SMAuthorizedClients and
-            // helper/launchd.plist's Label/MachServices actually reachable once this binary is
-            // copied into ntfsmac.app/Contents/Library/LaunchServices/ (build/package-app.sh).
+            // Legacy SMJobBless reads identity and launchd metadata from these Mach-O sections.
+            // The standard build keeps equally specific modern metadata embedded while
+            // SMAppService owns registration through the app's Library/LaunchDaemons plist.
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-sectcreate",
@@ -56,7 +73,8 @@ let package = Package(
         .testTarget(
             name: "HelperTests",
             dependencies: ["HelperShared"],
-            path: "helper/Tests"
+            path: "helper/Tests",
+            swiftSettings: helperSwiftSettings
         ),
         .target(
             name: "NtfsmacGUI",
@@ -82,11 +100,12 @@ let package = Package(
                 "Style/Colors.swift", "Style/GlassTheme.swift", "Style/Icons.swift", "Style/PillButtons.swift",
                 "Style/TooltipCopy.swift",
                 "Views/PopoverContentView.swift",
-            ]
+            ],
+            swiftSettings: helperSwiftSettings
         ),
         .executableTarget(
             name: "ntfsmac-gui",
-            dependencies: ["NtfsmacGUI"],
+            dependencies: ["NtfsmacGUI", "HelperShared"],
             path: "gui",
             exclude: [
                 "Helper", "Status", "State", "Drives", "Views", "Actions", "FirstRun", "Preferences", "Updates",
@@ -97,7 +116,8 @@ let package = Package(
         .testTarget(
             name: "NtfsmacGUITests",
             dependencies: ["NtfsmacGUI", "HelperShared"],
-            path: "gui/Tests"
+            path: "gui/Tests",
+            swiftSettings: helperSwiftSettings
         ),
     ]
 )
