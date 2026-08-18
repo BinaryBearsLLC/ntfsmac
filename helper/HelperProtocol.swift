@@ -34,9 +34,10 @@ func applyInvokerIdentityEnvironment(
 /// invocation, in both the CLI (`cli/lib/validate-device.sh`) and here, independently.
 public let deviceNamePattern = "^disk[0-9]+s[0-9]+$"
 
-/// Bump whenever the XPC selector surface changes. The CLI tree hash alone cannot distinguish a
-/// newly packaged GUI from an older helper when only Swift/helper code changed.
-public let helperProtocolRevision = 2
+/// Bump whenever the XPC selector surface or required helper behavior changes. The CLI tree hash
+/// alone cannot distinguish a newly packaged GUI from an older helper when only Swift/helper
+/// code changed.
+public let helperProtocolRevision = 3
 
 public func helperBuildIdentity(cliTreeHash: String) -> String {
     "xpc\(helperProtocolRevision):\(cliTreeHash)"
@@ -171,6 +172,17 @@ public let helperMachServiceName = "com.binarybears.ntfsmac.helper"
 /// Pre-v3 helper identity. It remains only as an explicit one-way migration source and must never
 /// be used for a new install, XPC connection, diagnostic default, or packaged production identity.
 public let legacyHelperMachServiceName = "com.khr898.ntfsmac.helper"
+
+/// Detects the pre-v3 helper artifacts even when launchd no longer has a registered job for
+/// their label. `SMJobCopyDictionary` cannot see that orphaned state, but leaving the root-owned
+/// files behind would make both migration and the GUI's complete uninstall incomplete.
+public func legacyHelperArtifactsPresent(fileManager: FileManager = .default) -> Bool {
+    fileManager.fileExists(
+        atPath: "/Library/LaunchDaemons/\(legacyHelperMachServiceName).plist"
+    ) || fileManager.fileExists(
+        atPath: "/Library/PrivilegedHelperTools/\(legacyHelperMachServiceName)"
+    )
+}
 
 public enum FsDriver: String, Codable, Sendable {
     // Raw value matches `cli/commands/mount.sh`'s literal `--fs-driver` values (L1: ntfs-3g is
@@ -476,6 +488,7 @@ public final class HelperService: NSObject, HelperXPCProtocol {
     private let resolvePrefix: @Sendable () -> String
     private let expectedCLITreeHash: String
     private let exitSink: @Sendable () -> Void
+    private let legacyArtifactsPresent: @Sendable () -> Bool
 
     /// `ntfsmacPrefix`, when passed (tests only), pins the CLI location instead of resolving it
     /// live. Production always passes `nil` so every privileged call below re-runs
@@ -496,6 +509,7 @@ public final class HelperService: NSObject, HelperXPCProtocol {
         runner: PrivilegedCommandRunning,
         ntfsmacPrefix: String? = nil,
         expectedCLITreeHash: String = GeneratedCLIManifest.expectedTreeHashHex,
+        legacyArtifactsPresent: @Sendable @escaping () -> Bool = { legacyHelperArtifactsPresent() },
         exitSink: @Sendable @escaping () -> Void = { exit(0) }
     ) {
         self.runner = runner
@@ -505,6 +519,7 @@ public final class HelperService: NSObject, HelperXPCProtocol {
             self.resolvePrefix = { resolveNtfsmacPrefix() }
         }
         self.expectedCLITreeHash = expectedCLITreeHash
+        self.legacyArtifactsPresent = legacyArtifactsPresent
         self.exitSink = exitSink
     }
 
@@ -678,6 +693,12 @@ public final class HelperService: NSObject, HelperXPCProtocol {
             reply(nil, "rejected: cli-src content does not match the hash pinned into this helper at build time — refusing (possible tampering)")
             return
         }
+        // A pre-v3 job normally goes through `SMJobRemove` before this helper is blessed. If
+        // launchd has already forgotten that job but its root-owned files remain, the
+        // unprivileged installer cannot see it through `SMJobCopyDictionary` and cannot delete
+        // it directly. This newly blessed root helper is the first safe place to finish that
+        // one-way migration. Run only after the bundled CLI tree has passed its integrity pin.
+        removeLegacyHelperArtifactsIfPresent()
         // Idempotency: if the installed CLI tree already matches this helper's pinned hash, skip
         // the reinstall. Without this, a new app build re-blesses the helper but `CLIAutoStager`
         // never re-stages (it skips on "any ntfsmac installed"), so the installed `ntfsmac` stays
@@ -705,6 +726,10 @@ public final class HelperService: NSObject, HelperXPCProtocol {
         Self.mutationLock.lock()
         defer { Self.mutationLock.unlock() }
         let label = helperMachServiceName
+        // Complete uninstall means the compatibility-era helper is gone too, including the
+        // orphaned-files state that `SMJobRemove` cannot discover. Do this before booting out the
+        // current helper, while a root process is still available to perform the cleanup.
+        removeLegacyHelperArtifactsIfPresent()
         _ = runner.run("/bin/rm", ["-f", "/Library/LaunchDaemons/\(label).plist"])
         // Deleting our own running binary is safe on Unix — the inode stays valid until this
         // process exits.
@@ -720,6 +745,18 @@ public final class HelperService: NSObject, HelperXPCProtocol {
         // those). Replying first, then self-terminating last, is the fix: nothing after this
         // point should assume the helper is still reachable.
         _ = runner.run("/bin/launchctl", ["bootout", "system/\(label)"])
+    }
+
+    private func removeLegacyHelperArtifactsIfPresent() {
+        guard legacyArtifactsPresent() else { return }
+        let label = legacyHelperMachServiceName
+        // `bootout` is intentionally best-effort: orphaned files are precisely the case where
+        // the job is absent. The exact file paths remain fixed to the one historical label.
+        _ = runner.run("/bin/launchctl", ["bootout", "system/\(label)"])
+        _ = runner.run("/bin/rm", ["-f", "/Library/LaunchDaemons/\(label).plist"])
+        _ = runner.run("/bin/rm", ["-f", "/Library/PrivilegedHelperTools/\(label)"])
+        _ = runner.run("/usr/bin/tccutil", ["reset", "SystemPolicyAllFiles", label])
+        _ = runner.run("/usr/bin/tccutil", ["reset", "All", label])
     }
 
     public func exitHelper(reply: @escaping (Data?, String?) -> Void) {

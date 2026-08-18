@@ -443,7 +443,7 @@ private final class UnknownSecurityCleanupRunner: PrivilegedCommandRunning {
 
 @Test func uninstallHelperBootsOutLaunchdJobAndRemovesItsOwnFiles() async {
     let runner = FakeRunner()
-    let service = HelperService(runner: runner)
+    let service = HelperService(runner: runner, legacyArtifactsPresent: { false })
     let (data, error) = await awaitReply { reply in
         service.uninstallHelper(reply: reply)
     }
@@ -461,6 +461,25 @@ private final class UnknownSecurityCleanupRunner: PrivilegedCommandRunning {
     #expect(runner.calls[3].arguments == ["reset", "All", helperMachServiceName])
     #expect(runner.calls[4].executablePath == "/bin/launchctl")
     #expect(runner.calls[4].arguments == ["bootout", "system/\(helperMachServiceName)"])
+}
+
+@Test func uninstallHelperAlsoRemovesOrphanedLegacyArtifacts() async {
+    let runner = FakeRunner()
+    let service = HelperService(runner: runner, legacyArtifactsPresent: { true })
+    let (data, error) = await awaitReply { reply in
+        service.uninstallHelper(reply: reply)
+    }
+    #expect(data != nil)
+    #expect(error == nil)
+    #expect(runner.calls.contains {
+        $0.executablePath == "/bin/rm"
+            && $0.arguments == ["-f", "/Library/LaunchDaemons/\(legacyHelperMachServiceName).plist"]
+    })
+    #expect(runner.calls.contains {
+        $0.executablePath == "/bin/rm"
+            && $0.arguments == ["-f", "/Library/PrivilegedHelperTools/\(legacyHelperMachServiceName)"]
+    })
+    #expect(runner.calls.last?.arguments == ["bootout", "system/\(helperMachServiceName)"])
 }
 
 // MARK: - resolveNtfsmacPrefix / ntfsmacPrefix injection (fixed prefix vs brew-tap fallback)
@@ -614,7 +633,11 @@ private func makeStagedInstallScript(content: String = "#!/bin/sh\nexit 0\n") th
     defer { try? FileManager.default.removeItem(at: scriptPath.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()) }
 
     let runner = FakeRunner()
-    let service = HelperService(runner: runner, expectedCLITreeHash: treeHash)
+    let service = HelperService(
+        runner: runner,
+        expectedCLITreeHash: treeHash,
+        legacyArtifactsPresent: { false }
+    )
     let (data, error) = await awaitReply { reply in
         service.stageCLI(installScriptPath: scriptPath.path, reply: reply)
     }
@@ -623,6 +646,32 @@ private func makeStagedInstallScript(content: String = "#!/bin/sh\nexit 0\n") th
     #expect(runner.calls.count == 1)
     #expect(runner.calls[0].executablePath == scriptPath.path)
     #expect(runner.calls[0].arguments == ["--no-path-link"])
+}
+
+@Test func stageCLIRemovesOrphanedLegacyArtifactsAfterIntegrityValidation() async throws {
+    let (scriptPath, treeHash) = try makeStagedInstallScript()
+    defer { try? FileManager.default.removeItem(at: scriptPath.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()) }
+
+    let runner = FakeRunner()
+    let service = HelperService(
+        runner: runner,
+        expectedCLITreeHash: treeHash,
+        legacyArtifactsPresent: { true }
+    )
+    let (data, error) = await awaitReply { reply in
+        service.stageCLI(installScriptPath: scriptPath.path, reply: reply)
+    }
+    #expect(data != nil)
+    #expect(error == nil)
+    #expect(runner.calls.contains {
+        $0.executablePath == "/bin/rm"
+            && $0.arguments == ["-f", "/Library/LaunchDaemons/\(legacyHelperMachServiceName).plist"]
+    })
+    #expect(runner.calls.contains {
+        $0.executablePath == "/bin/rm"
+            && $0.arguments == ["-f", "/Library/PrivilegedHelperTools/\(legacyHelperMachServiceName)"]
+    })
+    #expect(runner.calls.last?.executablePath == scriptPath.path)
 }
 
 @Test func stageCLIRejectsWhenContentHashDoesNotMatchPinnedValue() async throws {

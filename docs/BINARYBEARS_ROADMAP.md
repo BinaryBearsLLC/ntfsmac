@@ -39,7 +39,8 @@ hardware or controlled playback environment is available.
 
 ### Migration and update behavior
 
-- [x] Detect and remove the old `com.khr898.ntfsmac.helper` before blessing the v3 helper.
+- [x] Remove a registered `com.khr898.ntfsmac.helper` before blessing; remove orphaned legacy
+  files during the first integrity-checked v3 staging and during complete uninstall.
 - [x] Migrate only safe preferences: notification opt-in and confirmed launch-at-login intent.
 - [x] Re-probe Full Disk Access for the new helper and never inherit stale permission state.
 - [x] Add a manual update check plus an automatic check limited to once every 24 hours.
@@ -52,7 +53,7 @@ hardware or controlled playback environment is available.
 - [x] Prepare Developer ID signing and notarization for official BinaryBears releases.
 - [ ] Produce `ntfsmac-3.0.0-Apple-Silicon.dmg` and its SHA-256 file from a signed v3 tag.
 - [ ] Create a draft GitHub Release, test that exact downloaded DMG, then publish without rebuilding.
-- [ ] Publish the static, analytics-free GitHub Pages site.
+- [x] Publish the static, analytics-free GitHub Pages site.
 - [x] Complete the tracked-tree privacy audit and enable concise issue templates.
 
 ### v3 release gate
@@ -73,6 +74,9 @@ artifact process.
 ### P2 — modern helper variant
 
 P2 starts only after the published v3 DMG passes its post-download test.
+
+The v3 compatibility line remains the current supported release until P2 is integrated, tested,
+and shipped. Only then does v3 become the documented **legacy** line.
 
 - Prototype the macOS 13+ `SMAppService` lifecycle without weakening the XPC boundary.
 - Give the modern variant a separate internal identity and migration contract.
