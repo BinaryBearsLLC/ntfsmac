@@ -17,7 +17,7 @@ fetch("https://api.github.com/repos/BinaryBearsLLC/ntfsmac/releases/latest", {
     releaseStatus.textContent = `Latest published release: ${release.tag_name}`;
   })
   .catch(() => {
-    // The Releases link and pre-release message are already useful offline or under API limits.
+    // The static latest-release link and status remain useful offline or under API limits.
   });
 
 if (!reducedMotion.matches && "IntersectionObserver" in window) {

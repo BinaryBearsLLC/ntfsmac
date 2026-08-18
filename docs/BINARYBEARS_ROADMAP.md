@@ -22,7 +22,7 @@ hardware or controlled playback environment is available.
 
 ## v3.0.0 — production BinaryBears release
 
-`v3.0.0` is the next release and a hard gate before any P2 implementation.
+`v3.0.0` was published on 2026-08-18 and completed the hard release gate before P2.
 
 ### Repository and product identity
 
@@ -51,8 +51,8 @@ hardware or controlled playback environment is available.
 
 - [x] Keep local contributor builds ad-hoc and credential-free.
 - [x] Prepare Developer ID signing and notarization for official BinaryBears releases.
-- [ ] Produce `ntfsmac-3.0.0-Apple-Silicon.dmg` and its SHA-256 file from a signed v3 tag.
-- [ ] Create a draft GitHub Release, test that exact downloaded DMG, then publish without rebuilding.
+- [x] Produce `ntfsmac-3.0.0-Apple-Silicon.dmg` and its SHA-256 file from a signed v3 tag.
+- [x] Create a draft GitHub Release, test that exact downloaded DMG, then publish without rebuilding.
 - [x] Publish the static, analytics-free GitHub Pages site.
 - [x] Complete the tracked-tree privacy audit and enable concise issue templates.
 
@@ -73,7 +73,8 @@ artifact process.
 
 ### P2 — modern helper variant
 
-P2 starts only after the published v3 DMG passes its post-download test.
+The published v3 DMG passed its post-download test, so P2 is eligible to start as separate future
+work.
 
 The v3 compatibility line remains the current supported release until P2 is integrated, tested,
 and shipped. Only then does v3 become the documented **legacy** line.

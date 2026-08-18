@@ -5,9 +5,8 @@
 Native Apple Silicon NTFS read/write for macOS, without kernel extensions or disabling SIP.
 
 > [!NOTE]
-> BinaryBears `v3.0.0` is being prepared on `dev`. Until a public v3 release appears on
-> [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases), builds from this branch
-> are development candidates rather than published BinaryBears releases.
+> BinaryBears `v3.0.0` is the current published release. Download the signed Apple Silicon DMG
+> from [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases/latest).
 
 ntfsmac runs the filesystem driver inside a small Linux microVM and exposes the mounted volume to
 macOS over a private NFS link. `ntfs-3g` is the compatibility-first default; NTFS3 is an explicit
@@ -37,10 +36,8 @@ Intel Macs are not supported.
 
 ### Official BinaryBears release
 
-When `v3.0.0` is published:
-
 1. Download `ntfsmac-3.0.0-Apple-Silicon.dmg` from
-   [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases).
+   [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases/latest).
 2. Open the DMG and drag `ntfsmac.app` to Applications.
 3. Launch **ntfsmac** and approve the guided helper setup.
 4. In Full Disk Access, enable the entry identified in the app's instructions.
@@ -127,8 +124,9 @@ offers to open that release in the browser. Automatic network failures remain si
 
 The current fork baseline completed its measured P0/P1 acceptance ledger with no remaining measured
 failure. Two resource-dependent extended cells remain explicitly blocked, not silently counted as
-passes. `v3.0.0` is the production rebrand and release gate; P2 helper modernization starts only
-after that release is published and its downloaded DMG is revalidated.
+passes. `v3.0.0` was published on 2026-08-18 after the downloaded GitHub DMG passed checksum,
+Gatekeeper, install, mount, write/reread, and unmount validation. It remains the current supported
+line until a future P2 implementation is integrated, tested, and released.
 
 - [Roadmap](docs/BINARYBEARS_ROADMAP.md)
 - [Validation ledger](docs/testing/BINARYBEARS_VALIDATION_RESULTS_2026-08-12.md)
