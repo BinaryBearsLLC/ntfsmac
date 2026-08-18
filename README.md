@@ -99,6 +99,24 @@ read at that time; it cannot guarantee against later media failure.
 Reports omit usernames, volume labels, device identifiers, serial numbers, mount paths, IP
 addresses, DNS servers, route tables, and VPN provider details.
 
+### Planned v3.1.0 interaction changes
+
+These behaviors are planned for `v3.1.0`; they are not implemented by this documentation update
+and are not claims about the current published `v3.0.0` release:
+
+- Diagnose will present only a few plain-language categories. Connection protection will be part
+  of that result rather than a separate SECURITY section; implementation details remain in the CLI
+  and Command-click JSON export for support.
+- If Quit confirmation has been suppressed with `Don't show again`, Command-click **Quit** will
+  clear that saved choice and restore the confirmation when a drive is mounted. There will be no
+  reset control in Settings.
+- The Settings header will keep Back, the centred Settings title/version, and the icon-only update
+  action aligned as one balanced row.
+- Button focus will appear only after deliberate keyboard navigation, with no random autofocus or
+  thick stacked outline.
+- Both v3.1.0 DMGs will receive official BinaryBears artwork supplied by the maintainer before
+  release; no placeholder branding will ship.
+
 ## How it works
 
 ```mermaid

@@ -88,6 +88,36 @@ been through every state at least once:
 
 ---
 
+## v3.1.0 planned acceptance additions — not yet implemented
+
+These cases are specifications for the next implementation pass, not claims about the current
+build. Add automated coverage first where state can be injected; then execute the packaged manual
+cases locally on both standard and Legacy artifacts before any push.
+
+| ID | Acceptance case | Required result |
+| --- | --- | --- |
+| V31-DMG-01 | Build and open both DMGs after the maintainer supplies official BinaryBears artwork | Both use only approved assets, preserve `ntfsmac`, label only the compatibility image Legacy, pass visual inspection, `hdiutil verify`, and packaging checks |
+| V31-MIG-01 | Launch the standard build with a registered/running Legacy helper | Standard approval and XPC health are confirmed before Legacy removal; Legacy job, process, and files are absent afterward |
+| V31-MIG-02 | Deny or fail standard-helper approval while Legacy is healthy | Legacy remains usable, no partial removal occurs, and recovery copy is clear |
+| V31-MIG-03 | Launch the standard build with orphaned Legacy files but no job | Orphans are removed only after standard health; complete uninstall leaves neither identity |
+| V31-LEG-01 | Install and run the explicitly labelled Legacy build | It does not remove its own helper and still passes mount/unmount/uninstall acceptance |
+| V31-QUIT-01 | Select Quit with one and multiple mounted drives | Confirmation stays in the popover; `Cancel` is a no-op; the other choices meet their documented postconditions |
+| V31-QUIT-02 | Persist `Don't show again`, relaunch, then Command-click Quit with and without a mounted drive | Only `Unmount and Quit` is persisted; no Settings reset exists; Command-click clears it and restores the prompt when mounted |
+| V31-QUIT-03 | Proposed extension: try Quit during Verified Copy and during mount/unmount | No silent interruption, teardown, data-loss claim, or stale green state |
+| V31-DIAG-01 | Run healthy, idle, degraded, failed, and malformed diagnostic fixtures | User-facing macro categories use the correct text/symbol/semantic colour; missing evidence never passes and no internal terminology appears |
+| V31-DIAG-02 | Compare GUI summary, Command-click export, and CLI JSON | GUI aggregation is faithful; CLI and JSON schema/output remain unchanged |
+| V31-DIAG-03 | Open, Diagnose, Hide, and Diagnose again | No standalone SECURITY UI exists; Connection protection appears only inside Diagnose, Hide removes the complete panel, and a fresh run restores it |
+| V31-UPD-01 | Exercise every update state from Settings | Back, centred Settings title/version, and update icon remain aligned; the icon is reachable, labelled, stable in size, debounced, and opens only the verified release page |
+| V31-UI-01 | Capture open/reopen, pointer, hover, pressed, asynchronous refresh, and Full Keyboard Access states in light/dark mode | No random/autofocus or stacked rectangles occur; only deliberate keyboard traversal shows a maximum 1.5-point focus outline with no layout movement |
+| V31-PERF-01 | Run the resource matrix before changes and on the final candidates | Per-process and total CPU/RAM/wakeups are comparable; no sustained idle CPU or monotonic memory growth is unexplained |
+
+For resource measurements, record the exact commit, artifact variant, macOS build, hardware, power
+mode, connected media, sample interval/duration, and measurement tool. Run each scenario three
+times and retain raw local evidence plus a concise privacy-safe summary. Set numeric budgets from
+the baseline before coding so the final result cannot redefine success after the fact.
+
+---
+
 ## End-to-end: connect a real NTFS drive (CLI, then GUI)
 
 Fixed: `cli/lib/nfs-mount.sh`'s `run_anylinuxfs_mount()` now auto-ejects the target partition

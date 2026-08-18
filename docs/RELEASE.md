@@ -4,6 +4,18 @@ Official releases are built from `dev`, use SemVer beginning at `v3.0.0`, and ar
 steps: draft artifacts first, human validation second. GUI releases produce the standard
 SMAppService DMG and the explicitly labelled Legacy SMJobBless DMG by default.
 
+## v3.1.0 DMG branding prerequisite
+
+The v3.1.0 standard and Legacy DMGs must use the official BinaryBears logo assets supplied by the
+maintainer. This is an asset-blocked release gate: do not substitute generated, traced, redrawn,
+placeholder, or otherwise unapproved marks. Both installers share the approved brand system; the
+visible app remains `ntfsmac`, and only the compatibility artifact is labelled `Legacy`.
+
+After the assets are integrated, inspect both mounted DMGs at their actual Finder size and confirm
+logo clarity, spacing, drag direction, app/Applications alignment, and naming before continuing to
+the local release candidate. Automated image/layout/signature checks supplement but do not replace
+that visual approval.
+
 ## Local release candidate
 
 1. Set the same `CFBundleShortVersionString` and `CFBundleVersion` in the app, standard-helper, and

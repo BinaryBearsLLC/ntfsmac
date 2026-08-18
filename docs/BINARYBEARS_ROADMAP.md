@@ -99,6 +99,54 @@ dual-distribution gate below passes and `v3.1.0` ships.
 - [ ] Publish only after both locally tested candidates are rebuilt as signed/notarized draft
   artifacts and the downloaded DMGs pass their final smoke tests.
 
+#### Planned v3.1.0 completion sequence — documentation only
+
+The items below combine the requested product scope with explicitly identified professional
+acceptance proposals. They are **not implemented by this planning update**. They are intentionally
+ordered so resource regressions have a before/after baseline, safety and data-integrity behavior
+lands before presentation work, and the final measurements cover the actual release candidate
+rather than an incomplete intermediate build.
+
+- **0.1 — Rebrand both DMGs with official BinaryBears artwork.** This gate is blocked until the
+  maintainer supplies the approved logo assets. Use those originals in the standard and Legacy
+  installer presentation; do not invent, redraw, trace, or ship placeholder branding. Preserve the
+  visible app name **ntfsmac**, keep only the compatibility DMG explicitly labelled **Legacy**, and
+  visually validate the final mounted-window composition before either artifact can ship.
+1. **Capture a pre-change resource and visual baseline.** Record app, helper, and runtime CPU,
+   resident memory, wakeups, and memory growth separately for idle, popover-open polling, Refresh,
+   Diagnose, one mounted drive, and a 30-minute soak. Record both standard and Legacy builds on the
+   same Mac/OS/power conditions.
+2. **Make standard-helper migration transactional.** The standard build detects registered,
+   running, and orphaned Legacy helper state. It first obtains approval for and verifies a healthy
+   standard helper/XPC connection, then uninstalls the Legacy helper and proves its job, process,
+   and files are absent. A denied or failed standard installation must retain the working Legacy
+   helper and show a recoverable state. The explicitly labelled Legacy build never removes the
+   helper it requires.
+3. **Protect Quit while storage is active.** With any verified mount, present `Unmount and Quit`
+   as the safe default, `Quit Anyway`, and `Cancel`. `Don't show again` may persist only the safe
+   `Unmount and Quit` action. It has no Settings control: Command-clicking Quit clears the saved
+   choice and restores the confirmation. Proposed safety extension: treat an active Verified Copy
+   or an in-flight mount/unmount as a stronger non-suppressible state.
+4. **Replace the GUI diagnostic row dump with a semantic summary.** Keep the CLI and privacy-safe
+   JSON schema unchanged. Aggregate the same evidence into a few textual macro categories with an
+   explicit status, short explanation, and next action. Hide implementation details from the
+   normal user; retain them only in the CLI and developer JSON export. Never rely on colour alone
+   and never map missing evidence to green.
+5. **Integrate protection status into Diagnose.** Remove the standalone SECURITY presentation.
+   Diagnose includes one plain-language `Connection protection` macro category; `Hide` dismisses
+   the complete Diagnose presentation, including that category. Running Diagnose again reveals a
+   fresh result. The normal GUI never exposes PF, routes, vmnet, XPC, or similarly internal terms.
+6. **Refine the Settings header, update action, and button focus.** Use one balanced header row:
+   Back on the left, `Settings` optically centred, and the icon-only update action on the right,
+   all aligned to the same baseline and stable hit-target geometry. Remove stacked decorative
+   button rectangles. Do not autofocus an action when the popover opens or transfer focus because
+   of a pointer click; show a thin focus treatment only after deliberate keyboard navigation, with
+   no stale halo, excessive thickness, or layout movement.
+7. **Repeat resource qualification and the complete local release gate.** Compare the final
+   candidate with step 1, investigate sustained CPU or monotonic memory growth, then run both
+   packaged variants through automated, visual/accessibility, migration, mount, quit, uninstall,
+   signing, and downloaded-DMG acceptance before any push or publication.
+
 ### Later product work
 
 - Complete the two resource-blocked extended qualification cells when their prerequisites exist.

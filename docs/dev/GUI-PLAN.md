@@ -66,6 +66,154 @@ This table describes the current integrated GUI, not the original aspirational p
 
 ---
 
+## Planned v3.1.0 refinement contract — not implemented
+
+This section records the next UI behavior without changing the current-state tables below. No GUI,
+CLI, helper, or release behavior is changed merely by this document update. Implementation follows
+the ordered sequence in the product roadmap and must remain locally tested before any push. Text
+labelled `Recommended` or `proposed` is additional professional guidance awaiting a product
+decision, not silently approved scope.
+
+### 0.1 DMG rebrand asset gate
+
+The standard and Legacy DMGs receive a new installer presentation based only on official
+BinaryBears logo assets supplied by the maintainer. Until those source assets arrive this item is
+blocked, not approximated: no generated substitute, traced logo, temporary mark, or modified
+unapproved artwork may enter the candidate. Both DMGs use the same official brand system while
+only the compatibility artifact says `Legacy`. The visible app remains `ntfsmac`.
+
+Before release, visually inspect the mounted DMG at its real 720×460 size and verify logo clarity,
+spacing, drag direction, app/Applications alignment, legibility, hidden-window chrome, and both
+standard and Legacy naming. Automated packaging checks continue to verify the app, Applications
+symlink, background reference, architecture, signatures, and image integrity.
+
+### Button chrome and keyboard focus
+
+The current controls can show two superimposed rectangles:
+
+- the subtle rounded fill/stroke belongs to the custom button style and is visible in the normal
+  pointer state;
+- the thicker blue outline is the native macOS keyboard-focus indicator produced for explicitly
+  focusable controls when Full Keyboard Access moves focus to that button.
+
+The v3.1.0 visual pass removes the stacked-frame appearance, not keyboard accessibility. A control
+may have at most one deliberate default-state container. Icon-only secondary controls are
+borderless at rest and gain background treatment on hover/press; primary row actions may retain a
+single restrained affordance.
+
+Opening/reopening the popover does not autofocus an action. Pointer hover, pointer activation,
+state refresh, and asynchronous view updates must not move focus or leave a blue ring behind.
+Focus becomes visible only after deliberate keyboard navigation such as Tab/Shift-Tab while Full
+Keyboard Access is active. Its custom visual treatment is a subtle, high-contrast outline no more
+than 1.5 points thick, does not stack with a second decorative stroke, and never changes layout.
+Reverse traversal, returning from Settings, Diagnose completion, and list insertion/removal must
+preserve predictable order without jumping to an unrelated control.
+
+### Settings update control
+
+The text `Software update` row is replaced by an icon in the Settings header. The header is one
+balanced three-column layout: Back is leading, `Settings` remains optically centred over the full
+popover, and the update icon is trailing. Back and update occupy matched side geometry and share
+the title's vertical alignment so loading/badging never shifts `Settings`. The version/build label
+remains centred directly below the title. The update icon keeps a stable hit target and has all of
+the following states without adding a second text row:
+
+| State | Presentation and behavior |
+| --- | --- |
+| Idle | Update/check symbol, native tooltip, `Check for updates` VoiceOver label |
+| Checking | Non-blocking compact progress state; repeated activation disabled |
+| Up to date | Brief success acknowledgement, then return to idle |
+| Update available | Distinct badge/accent; activation opens the verified GitHub Release page |
+| Unavailable/error | Neutral warning state and concise help; no false `up to date` result |
+
+The existing once-per-24-hours automatic check and manual-only navigation/download policy do not
+change.
+
+### GUI Diagnose information architecture
+
+The CLI output and privacy-safe JSON remain unchanged. The GUI derives a separate presentation
+model from that same report and shows user-facing macro categories rather than a long flat list:
+
+| Macro category | User-facing scope |
+| --- | --- |
+| App readiness | `Ready`, `Setup needed`, or `Repair needed`, with one direct next action |
+| Drive status | Drive detected/mounted, safe read/write state, or required recovery action |
+| Connection protection | Plain-language protected/attention/unavailable result; no internal network terms |
+| Permissions | Whether macOS permission is ready and exactly where the user must act |
+
+Every category displays a status word, symbol, one-sentence explanation, and—only when useful—a
+specific next action. The normal GUI has no technical disclosure and does not mention helper
+identifiers, XPC, runtime pins, VM state, PF, routes, digests, or raw diagnostic keys. Those details
+remain available to support/developers through the unchanged CLI and existing Command-click JSON
+export.
+
+| Semantic state | Colour role | Meaning |
+| --- | --- | --- |
+| Idle | Secondary neutral | Not currently required, for example no active mount |
+| Checking | Blue accent | A fresh read-only diagnostic is running |
+| OK | Green | All evidence required for this category is positively confirmed |
+| Attention | Amber | Usable or recoverable, but the user should review an action |
+| Failed | Red | A required condition is confirmed broken |
+| Unavailable | Neutral with explicit text | Evidence is missing/malformed; never green |
+
+Colour is always paired with text and a symbol. Category aggregation is fail-closed: confirmed
+failure outranks attention, attention outranks OK, and missing required evidence becomes
+Unavailable rather than passing. `Idle` is reserved for evidence that is genuinely not expected
+in the current state; it is not an alias for unknown.
+
+### Protection status integrated into Diagnose
+
+There is no standalone SECURITY section, row group, placeholder, or collapsed `Show` header in the
+v3.1.0 GUI. Running Diagnose reveals the freshly measured `Connection protection` macro category
+inside the same user-friendly diagnostic presentation. Selecting `Hide` dismisses the complete
+Diagnose presentation, including protection status, without changing helper, mount, or network
+state. Running Diagnose again reveals a fresh complete result. This replaces the current
+always-mounted SECURITY `Hide`/`Show` presentation only after implementation and tests land.
+
+### Quit with mounted drives
+
+Quit remains immediate when no drive is mounted and no storage operation is active. With one or
+more verified mounts, an in-popover confirmation must stay visible and offer:
+
+1. `Unmount and Quit` — safe default; attempts every mounted drive, reports failures, and quits
+   only after the defined teardown postcondition is reached.
+2. `Quit Anyway` — exits without requesting unmount only if the architecture can keep the mounted
+   filesystem and its required services valid; otherwise the implementation must not offer a
+   misleading option.
+3. `Cancel` — consumes no action and preserves all state.
+
+`Don't show again` is available only with `Unmount and Quit` and persists only that safe action.
+There is no Settings toggle or reset row. Command-clicking Quit clears the saved choice; when a
+drive is mounted it immediately restores and shows the confirmation. This shortcut is documented
+in the README and repository UI contract. With no mounted drive, Command-click still clears the
+saved choice and then follows the normal immediate-Quit path.
+
+Verified Copy and in-flight mount/unmount remain the proposed additional safety case: if approved,
+they are never covered by the saved preference, require an explicit decision, and are not
+interrupted silently.
+
+### Resource-impact acceptance
+
+Measurements are local-only and add no analytics or telemetry. Capture three comparable runs and
+report the median plus worst observed value for the app, privileged helper, VM/runtime processes,
+and their combined total. Use the same hardware, OS, power mode, drives, polling interval, and
+sample duration before and after the work.
+
+| Scenario | Required evidence |
+| --- | --- |
+| App idle, popover closed | Average/peak CPU, resident memory, wakeups over 10 minutes |
+| Popover open, no drive | Same metrics while normal five-second reconciliation runs |
+| Refresh and Diagnose | Ten cycles; transient peak and time to return to baseline |
+| One clean mounted drive | Separate app/helper/runtime totals over 30 minutes without I/O |
+| Repeated mount/unmount | Ten safe cycles; final memory versus initial memory |
+| Standard versus Legacy | Same scenario matrix and explained differences |
+
+Before implementation, freeze numeric pass budgets from the pre-change measurements. At minimum,
+the release gate rejects unexplained sustained idle CPU, monotonic memory growth, failure to return
+near baseline after Diagnose, or a material regression between the pre-change and final candidate.
+
+---
+
 ## Button & control plan
 
 ### Popover — idle (no mount)
