@@ -417,14 +417,14 @@ package_gui() {
   fi
 
   section "Swift GUI tests — standard"
-  NTFSMAC_HELPER_VARIANT=modern swift test --package-path "$REPO_ROOT" \
-    --scratch-path "$REPO_ROOT/.build/ntfsmac-modern-tests" || fail "The standard Swift test suite failed."
+  "$REPO_ROOT/build/run-swift-tests.sh" modern \
+    "$REPO_ROOT/.build/ntfsmac-modern-tests" || fail "The standard Swift test suite failed."
   ok "Standard Swift tests passed"
 
   if [[ "$LEGACY_ENABLED" -eq 1 ]]; then
     section "Swift GUI tests — Legacy"
-    NTFSMAC_HELPER_VARIANT=legacy swift test --package-path "$REPO_ROOT" \
-      --scratch-path "$REPO_ROOT/.build/ntfsmac-legacy-tests" || fail "The Legacy Swift test suite failed."
+    "$REPO_ROOT/build/run-swift-tests.sh" legacy \
+      "$REPO_ROOT/.build/ntfsmac-legacy-tests" || fail "The Legacy Swift test suite failed."
     ok "Legacy Swift tests passed"
   fi
 

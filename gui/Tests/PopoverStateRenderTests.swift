@@ -99,6 +99,9 @@ private func renderPopover(
     return image.size
 }
 
+// Keep the render checks in one named suite so the source builder can exclude only this known
+// AppKit runner failure on macOS 26.6.2 without weakening any functional test or CI on other OSes.
+@Suite struct PopoverStateRenderTests {
 @MainActor @Test func settingsPageRendersFromNormalContentWithoutASeparateWindow() async throws {
     let (helperInstaller, cliInstallChecker, cleanup) = try await makeInstalledDependencies()
     defer { cleanup() }
@@ -316,6 +319,7 @@ private func renderPopover(
 
     let size = renderPopover(appState: appState, mountController: controller, helperInstaller: helperInstaller, cliInstallChecker: cliInstallChecker, driveScanner: scanner)
     #expect(size != nil, "mounted + available-unmounted popover (mounted row + 'Other available devices' section) must render a non-empty image")
+}
 }
 
 // Minimal fake runner for render tests: returns a fixed `anylinuxfs list` output so DriveScanner

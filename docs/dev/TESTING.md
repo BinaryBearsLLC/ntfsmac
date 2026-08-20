@@ -516,6 +516,13 @@ swift test --build-path /tmp/ntfsmac-build
 Require the complete Swift test run to pass. The exact case count is printed by Swift Testing and
 changes when focused regression coverage is added; do not use a stale hard-coded count as a gate.
 
+On macOS 26.6.2, Apple's SwiftPM AppKit helper can stop in the CoreFoundation main executor when
+the off-screen `PopoverStateRenderTests` begin. `build.command gui` detects that exact OS release,
+prints a warning, compiles but skips only that named 13-test render suite, and runs every remaining
+Swift test serially before packaging. Other macOS releases and CI still execute the render suite.
+The builder also enforces a bounded timeout and rejects failures, empty runs, and missing terminal
+test summaries; a stalled process can no longer leave a double-click build waiting indefinitely.
+
 ```bash
 tests/run-all.sh   # full bats suite: lock/preflight/submodule/audit/fetch-prebuilt/gvproxy/
                     # rootfs/build-all/verify-vendor/pf-rules/route-guard/teardown/
