@@ -380,7 +380,7 @@ package_cli() {
   mkdir -p "$DIST_DIR" || fail "Could not create $DIST_DIR."
   tar -czf "$DIST_DIR/ntfsmac-cli.tar.gz" \
     -C "$REPO_ROOT" \
-    install.sh vendor cli build/sources.lock build/lib/lock.sh || \
+    install.sh vendor cli gui/Info.plist build/sources.lock build/lib/lock.sh || \
     fail "The CLI archive could not be created."
   tar -tzf "$DIST_DIR/ntfsmac-cli.tar.gz" >/dev/null || fail "The CLI archive failed its integrity check."
   ok "CLI archive created and readable"

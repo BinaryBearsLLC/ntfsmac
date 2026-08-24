@@ -451,7 +451,47 @@ nas.example:/share on /Volumes/Share (nfs, nodev, nosuid)"
   [[ "$output" == *"vendor binaries missing: 0"* ]]
 }
 
+@test "kernel pin and alpine runtime resolve correctly in a non-standard or Homebrew install prefix" {
+  unset NTFSMAC_SOURCES_LOCK NTFSMAC_VENDOR_KERNEL_DIR
+  local custom_prefix="$FIXTURE_DIR/custom-opt"
+  mkdir -p "$custom_prefix/libexec/ntfsmac/commands" \
+           "$custom_prefix/libexec/ntfsmac/lib" \
+           "$custom_prefix/lib" \
+           "$custom_prefix/bin"
+
+  # Copy diagnose script into custom commands dir
+  cp "$SCRIPT" "$custom_prefix/libexec/ntfsmac/commands/diagnose.sh"
+  chmod +x "$custom_prefix/libexec/ntfsmac/commands/diagnose.sh"
+
+  # Copy lock.sh, sources.lock, runtime-alpine.sh, version.sh, product-info.plist into custom lib
+  cp "$REPO_ROOT/build/lib/lock.sh" "$custom_prefix/libexec/ntfsmac/lib/lock.sh"
+  cp "$FIXTURE_DIR/sources.lock" "$custom_prefix/libexec/ntfsmac/sources.lock"
+  cp "$REPO_ROOT/cli/lib/runtime-alpine.sh" "$custom_prefix/libexec/ntfsmac/lib/runtime-alpine.sh"
+  cp "$REPO_ROOT/cli/lib/version.sh" "$custom_prefix/libexec/ntfsmac/lib/version.sh"
+  cp "$REPO_ROOT/gui/Info.plist" "$custom_prefix/libexec/ntfsmac/lib/product-info.plist"
+  chmod +x "$custom_prefix/libexec/ntfsmac/lib/lock.sh"
+
+  # Copy modules.squashfs into $custom_prefix/lib
+  cp "$FIXTURE_DIR/kernel/modules.squashfs" "$custom_prefix/lib/modules.squashfs"
+
+  # binaries
+  cp "$FIXTURE_DIR/anylinuxfs" "$custom_prefix/bin/anylinuxfs"
+  cp "$FIXTURE_DIR/gvproxy" "$custom_prefix/libexec/gvproxy"
+  cp "$FIXTURE_DIR/vmnet-helper" "$custom_prefix/libexec/vmnet-helper"
+  cp "$FIXTURE_DIR/vmproxy" "$custom_prefix/libexec/vmproxy"
+
+  export NTFSMAC_PREFIX="$custom_prefix"
+  export PATH="$custom_prefix/bin:/usr/bin:/bin"
+
+  run "$custom_prefix/libexec/ntfsmac/commands/diagnose.sh" --json
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"kernel_pin":"match"'* ]]
+  [[ "$output" == *'"alpine_runtime_tag":"3.23.5"'* ]]
+  [[ "$output" == *'"healthy":true'* ]]
+}
+
 @test "never performs a mount/unmount/pf/route operation (read-only)" {
   run grep -E '\bmount\(|anylinuxfs" (mount|unmount)|pfctl|route add|route delete' "$SCRIPT"
   [ "$status" -ne 0 ]
 }
+

@@ -265,17 +265,16 @@ version_status() {
 }
 
 check_kernel_pin() {
-  local lock_sh="$REPO_ROOT/build/lib/lock.sh"
-  if [[ ! -x "$lock_sh" ]]; then
+  local lock_sh=""
+  if [[ -r "$SCRIPT_DIR/../lib/lock.sh" ]]; then
+    lock_sh="$SCRIPT_DIR/../lib/lock.sh"
+  elif [[ -r "$REPO_ROOT/build/lib/lock.sh" ]]; then
+    lock_sh="$REPO_ROOT/build/lib/lock.sh"
+  elif [[ -r "$PREFIX/libexec/ntfsmac/lib/lock.sh" ]]; then
     lock_sh="$PREFIX/libexec/ntfsmac/lib/lock.sh"
-  fi
-
-  local kernel_dir="${NTFSMAC_VENDOR_KERNEL_DIR:-$REPO_ROOT/vendor/kernel}"
-  if [[ ! -d "$kernel_dir" ]]; then
-    kernel_dir="$PREFIX/lib"
-  fi
-
-  if [[ ! -x "$lock_sh" ]]; then
+  elif [[ -r "$HOMEBREW_OPT_PREFIX/libexec/ntfsmac/lib/lock.sh" ]]; then
+    lock_sh="$HOMEBREW_OPT_PREFIX/libexec/ntfsmac/lib/lock.sh"
+  else
     echo "unknown"
     return
   fi
@@ -286,12 +285,22 @@ check_kernel_pin() {
   local expected actual
   expected="$(lock_get LIBKRUNFW_MODULES_SHA256 2>/dev/null)" || { echo "unknown"; return; }
 
-  local squashfs_file="$kernel_dir/modules.squashfs"
-  if [[ ! -f "$squashfs_file" && -f "$PREFIX/lib/modules.squashfs" ]]; then
-    squashfs_file="$PREFIX/lib/modules.squashfs"
-  fi
+  local squashfs_file="" candidate
+  local candidates=(
+    "${NTFSMAC_VENDOR_KERNEL_DIR:-}/modules.squashfs"
+    "$REPO_ROOT/vendor/kernel/modules.squashfs"
+    "$PREFIX/lib/modules.squashfs"
+    "$HOMEBREW_OPT_PREFIX/lib/modules.squashfs"
+    "$SCRIPT_DIR/../../../lib/modules.squashfs"
+  )
+  for candidate in "${candidates[@]}"; do
+    if [[ -n "$candidate" && -f "$candidate" ]]; then
+      squashfs_file="$candidate"
+      break
+    fi
+  done
 
-  [[ -f "$squashfs_file" ]] || { echo "missing"; return; }
+  [[ -n "$squashfs_file" ]] || { echo "missing"; return; }
   actual="$(shasum -a 256 "$squashfs_file" | awk '{print $1}')"
   [[ "$actual" == "$expected" ]] && echo "match" || echo "mismatch"
 }

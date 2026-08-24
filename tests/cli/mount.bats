@@ -409,3 +409,27 @@ STUB
   [[ "$output" == *"disk2s1"* ]]
   [ ! -f "$CALL_LOG" ]
 }
+
+@test "mount fails with clear fatal error when Alpine runtime metadata is missing" {
+  local isolated_cli="$STUB_DIR/isolated-cli"
+  mkdir -p "$isolated_cli/commands" "$isolated_cli/lib"
+  cp "$REPO_ROOT/cli/commands/mount.sh" "$isolated_cli/commands/"
+  cp "$REPO_ROOT/cli/lib/validate-device.sh" "$isolated_cli/lib/"
+  cp "$REPO_ROOT/cli/lib/nfs-mount.sh" "$isolated_cli/lib/"
+  cp "$REPO_ROOT/cli/lib/run-with-progress.sh" "$isolated_cli/lib/"
+  cp "$REPO_ROOT/cli/lib/resolve-vendor-bin.sh" "$isolated_cli/lib/"
+  cp "$REPO_ROOT/cli/lib/list-drives.sh" "$isolated_cli/lib/"
+  cp "$REPO_ROOT/cli/lib/interactive-select.sh" "$isolated_cli/lib/"
+  cp "$REPO_ROOT/cli/lib/security-transaction.sh" "$isolated_cli/lib/"
+  cp "$REPO_ROOT/cli/lib/pf-teardown.sh" "$isolated_cli/lib/"
+  cp "$REPO_ROOT/cli/lib/runtime-alpine.sh" "$isolated_cli/lib/"
+  # Deliberately do NOT copy lock.sh or sources.lock
+  chmod +x "$isolated_cli/commands/mount.sh"
+
+  run "$isolated_cli/commands/mount.sh" disk2s1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"FATAL"* ]]
+  [[ "$output" == *"pinned Alpine runtime metadata is missing"* ]]
+  [[ "$output" == *"lock.sh"* ]]
+}
+

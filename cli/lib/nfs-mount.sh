@@ -23,14 +23,17 @@ source "$NFS_MOUNT_LIB_DIR/run-with-progress.sh"
 source "$NFS_MOUNT_LIB_DIR/resolve-vendor-bin.sh"
 
 load_runtime_alpine_contract() {
-  local lock_lib
+  local lock_lib=""
   if [[ -r "$NFS_MOUNT_LIB_DIR/lock.sh" ]]; then
     lock_lib="$NFS_MOUNT_LIB_DIR/lock.sh"
-  else
+  elif [[ -r "$NFS_MOUNT_LIB_DIR/../../build/lib/lock.sh" ]]; then
     lock_lib="$NFS_MOUNT_LIB_DIR/../../build/lib/lock.sh"
   fi
-  if [[ ! -r "$lock_lib" || ! -r "$NFS_MOUNT_LIB_DIR/runtime-alpine.sh" ]]; then
-    echo "mount: FATAL — pinned Alpine runtime metadata is missing; reinstall ntfsmac" >&2
+  if [[ -z "$lock_lib" || ! -r "$NFS_MOUNT_LIB_DIR/runtime-alpine.sh" ]]; then
+    local missing=()
+    [[ -z "$lock_lib" ]] && missing+=("lock.sh")
+    [[ ! -r "$NFS_MOUNT_LIB_DIR/runtime-alpine.sh" ]] && missing+=("runtime-alpine.sh")
+    echo "mount: FATAL — pinned Alpine runtime metadata is missing (${missing[*]}); reinstall ntfsmac" >&2
     return 1
   fi
   # Runtime and source-tree layouts resolve lock.sh from different locations.
