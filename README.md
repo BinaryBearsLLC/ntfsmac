@@ -56,8 +56,10 @@ cd ntfsmac
 GUI builds automatically create the standard `ntfsmac-X.Y.Z-Apple-Silicon.dmg` and the
 `ntfsmac-X.Y.Z-Legacy-Apple-Silicon.dmg` compatibility alternative. The standard product never
 uses the internal P2 project name. Pass `--no-legacy` after `gui` or `both` only when the Legacy
-artifact is deliberately not needed. Local builds use ad-hoc signing by default and require no
-Apple credentials. See
+artifact is deliberately not needed. When the exact BinaryBears Developer ID Application identity
+is installed, the builder selects it automatically and produces a locally installable P2 helper;
+otherwise it clearly marks the result as an ad-hoc UI/structure build whose P2 helper macOS cannot
+register. `SIGNING_IDENTITY=-` deliberately forces that credential-free fallback. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow.
 
 ## Use
@@ -99,21 +101,25 @@ read at that time; it cannot guarantee against later media failure.
 Reports omit usernames, volume labels, device identifiers, serial numbers, mount paths, IP
 addresses, DNS servers, route tables, and VPN provider details.
 
-### Planned v3.1.0 interaction changes
+### v3.1.0 candidate interaction changes
 
-These behaviors are planned for `v3.1.0`; they are not implemented by this documentation update
-and are not claims about the current published `v3.0.0` release:
+The source candidate integrates these behaviors; they remain subject to the complete local and
+packaged release gates and are not claims about the current published `v3.0.0` release:
 
-- Diagnose will present only a few plain-language categories. Connection protection will be part
-  of that result rather than a separate SECURITY section; implementation details remain in the CLI
-  and Command-click JSON export for support.
-- If Quit confirmation has been suppressed with `Don't show again`, Command-click **Quit** will
-  clear that saved choice and restore the confirmation when a drive is mounted. There will be no
-  reset control in Settings.
-- The Settings header will keep Back, the centred Settings title/version, and the icon-only update
+- Diagnose presents four plain-language categories. Connection protection is part of that result
+  rather than a separate SECURITY section; implementation details remain in the CLI and
+  Command-click JSON export for support.
+- Quit is immediate with no mounted drive. With a mounted drive it offers **Unmount and Quit**,
+  **Quit Anyway**, and **Cancel**. `Don't show again` can remember only the safe unmount action.
+  Command-click **Quit** clears that choice and restores the confirmation; there is no Settings
+  reset. Quit is disabled during Verified Copy and mount/unmount operations.
+- The Settings header keeps Back, the centred Settings title/version, and the icon-only update
   action aligned as one balanced row.
-- Button focus will appear only after deliberate keyboard navigation, with no random autofocus or
-  thick stacked outline.
+- Pointer focus no longer leaves the thick stacked blue halo. A thin focus outline appears only
+  after deliberate keyboard traversal on macOS 14+, while macOS 13 retains its native accessible
+  focus behavior.
+- The standard helper is health-checked before the candidate removes any installed Legacy helper.
+  Approval denial or a failed replacement leaves Legacy intact and exposes a repairable state.
 - Both v3.1.0 DMGs will receive official BinaryBears artwork supplied by the maintainer before
   release; no placeholder branding will ship.
 
@@ -135,8 +141,9 @@ call after hot-unplug or guest failure.
 
 ## Security and updates
 
-The three SECURITY rows use measured, reason-coded state and fail closed to `unknown` when evidence
-is missing. See [SECURITY.md](SECURITY.md) for the reporting boundary.
+The v3.1.0 candidate summarizes measured protection evidence inside Diagnose and fails closed to an
+explicit unavailable/attention state when evidence is missing. The CLI retains its reason-coded
+detail. See [SECURITY.md](SECURITY.md) for the reporting boundary.
 
 The optional update check contacts only GitHub's public latest-release endpoint, at most once every
 24 hours. It never downloads or installs anything: if a newer stable SemVer release exists, the app

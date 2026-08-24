@@ -37,3 +37,27 @@ setup() {
   run grep -F 'helperSwiftSettings' "$REPO_ROOT/Package.swift"
   [ "$status" -eq 0 ]
 }
+
+@test "builder persists verified checksum sidecars for local artifacts" {
+  run grep -F 'write-sha256.sh" "$modern_dmg"' "$SCRIPT"
+  [ "$status" -eq 0 ]
+  run grep -F 'write-sha256.sh" "$legacy_dmg"' "$SCRIPT"
+  [ "$status" -eq 0 ]
+  run grep -F 'ntfsmac-${version}-Apple-Silicon.dmg.sha256' "$SCRIPT"
+  [ "$status" -eq 0 ]
+  run grep -F 'ntfsmac-${version}-Legacy-Apple-Silicon.dmg.sha256' "$SCRIPT"
+  [ "$status" -eq 0 ]
+}
+
+@test "builder auto-selects only the official BinaryBears identity for a usable local P2 DMG" {
+  run grep -F 'Developer ID Application: BinaryBears LLC (SQY8T23X8N)' "$SCRIPT"
+  [ "$status" -eq 0 ]
+  run grep -F 'security find-identity -v -p codesigning' "$SCRIPT"
+  [ "$status" -eq 0 ]
+  run grep -F 'macOS will not register the P2 helper from this DMG' "$SCRIPT"
+  [ "$status" -eq 0 ]
+  run "$SCRIPT" --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"use it automatically"* ]]
+  [[ "$output" == *"SIGNING_IDENTITY=-"* ]]
+}

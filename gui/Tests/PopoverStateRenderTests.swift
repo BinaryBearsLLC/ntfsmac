@@ -76,6 +76,7 @@ private func renderPopover(
     helperInstaller: HelperInstaller,
     cliInstallChecker: CLIInstallChecker,
     driveScanner: DriveScanner = DriveScanner(),
+    fullDiskAccessController: FullDiskAccessController = FullDiskAccessController(initialState: .granted),
     navigation: PopoverNavigation = PopoverNavigation()
 ) -> CGSize? {
     let view = PopoverContentView(
@@ -88,7 +89,7 @@ private func renderPopover(
         helperUninstaller: HelperUninstaller(),
         cliInstallChecker: cliInstallChecker,
         cliAutoStager: CLIAutoStager(checker: cliInstallChecker),
-        fullDiskAccessController: FullDiskAccessController(initialState: .granted),
+        fullDiskAccessController: fullDiskAccessController,
         settings: Settings(defaults: UserDefaults(suiteName: UUID().uuidString)!),
         finderOpener: FinderOpener(),
         helperClient: HelperClient(),
@@ -276,11 +277,17 @@ private func renderPopover(
     defer { cleanup() }
     let appState = AppState()
     let controller = MountController(helper: FakeHelper(), appState: appState)
-    controller.errorMessage = "FDA_REQUIRED"
-    #expect(controller.errorMessage == "FDA_REQUIRED")
+    let fullDiskAccessController = FullDiskAccessController(initialState: .waitingForDrive)
+    #expect(!fullDiskAccessController.isGranted)
 
-    let size = renderPopover(appState: appState, mountController: controller, helperInstaller: helperInstaller, cliInstallChecker: cliInstallChecker)
-    #expect(size != nil)
+    let size = renderPopover(
+        appState: appState,
+        mountController: controller,
+        helperInstaller: helperInstaller,
+        cliInstallChecker: cliInstallChecker,
+        fullDiskAccessController: fullDiskAccessController
+    )
+    #expect(size != nil, "Full Disk Access setup (including Settings and Quit) must render without trapping the user")
 }
 
 // "Other available" section split: idle-with-drives renders the detected drives as the primary

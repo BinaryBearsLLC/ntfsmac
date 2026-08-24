@@ -10,6 +10,11 @@ source "$REPO_ROOT/cli/lib/run-with-progress.sh"
 
 variant="${1:-}"
 scratch_path="${2:-}"
+if [[ $# -ge 2 ]]; then
+  shift 2
+else
+  set --
+fi
 timeout_secs="${NTFSMAC_SWIFT_TEST_TIMEOUT:-600}"
 summary_grace_secs="${NTFSMAC_SWIFT_TEST_SUMMARY_GRACE:-3}"
 heartbeat_secs="${NTFSMAC_SWIFT_TEST_HEARTBEAT:-15}"
@@ -18,13 +23,13 @@ swift_test_executable="${NTFSMAC_SWIFT_TEST_EXECUTABLE:-swift}"
 case "$variant" in
   modern | legacy) ;;
   *)
-    echo "usage: $0 <modern|legacy> <scratch-path>" >&2
+    echo "usage: $0 <modern|legacy> <scratch-path> [swift-test-args...]" >&2
     exit 2
     ;;
 esac
 
 if [[ -z "$scratch_path" ]]; then
-  echo "usage: $0 <modern|legacy> <scratch-path>" >&2
+  echo "usage: $0 <modern|legacy> <scratch-path> [swift-test-args...]" >&2
   exit 2
 fi
 
@@ -64,6 +69,9 @@ swift_test_args=(
   --package-path "$REPO_ROOT"
   --scratch-path "$scratch_path"
 )
+if [[ $# -gt 0 ]]; then
+  swift_test_args+=("$@")
+fi
 
 # macOS 26.6.2 can wedge its CoreFoundation main executor when SwiftPM starts an
 # ImageRenderer-based AppKit test. Keep compiling those tests, but skip only their named suite
@@ -86,7 +94,7 @@ runner_pid=$!
 start=$SECONDS
 next_heartbeat=$heartbeat_secs
 summary_seen_at=-1
-success_pattern='Test run with [1-9][0-9]* tests .* passed after'
+success_pattern='Test run with [1-9][0-9]* tests? .* passed after'
 
 while kill -0 "$runner_pid" 2>/dev/null; do
   sleep 0.2

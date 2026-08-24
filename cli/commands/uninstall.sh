@@ -7,10 +7,10 @@
 # itself creates outside PREFIX (confirmed by reading vendor/.../anylinuxfs/src/main.rs, not
 # guessed): ~/.anylinuxfs (rootfs cache + config.toml) and ~/Library/Logs/anylinuxfs*.log —
 # glob-scoped to that exact prefix, never the whole Library/Logs dir (shared with every other
-# app on the system). Run with sudo to also remove the GUI's privileged helper (root-owned
-# files under /Library/{LaunchDaemons,PrivilegedHelperTools} — a non-root process cannot
-# touch them, and per L5 this script never re-authenticates itself to gain that access; the
-# GUI's own Preferences "Uninstall" control uses the already-authorized XPC helper instead).
+# app on the system). Run with sudo to also remove standalone SMJobBless helpers (root-owned
+# files under /Library/{LaunchDaemons,PrivilegedHelperTools}). The standard SMAppService daemon
+# is app-managed by macOS and must be unregistered through Settings > Uninstall; this script
+# refuses before deleting anything when that registered service is present.
 set -u
 
 PREFIX="${NTFSMAC_PREFIX:-/usr/local/ntfsmac}"
@@ -28,6 +28,16 @@ refuse_if_mounted() {
   [[ -n "$force" ]] && return 0
   if mount -t nfs 2>/dev/null | grep -q .; then
     echo "uninstall: an NFS mount is currently active — unmount it first (ntfsmac unmount <device>) or pass --force" >&2
+    return 1
+  fi
+  return 0
+}
+
+refuse_if_modern_helper_registered() {
+  local label="${NTFSMAC_MODERN_HELPER_LABEL:-com.binarybears.ntfsmac.helper.daemon}"
+  if launchctl print "system/$label" >/dev/null 2>&1; then
+    echo "uninstall: the standard app helper is registered by macOS." >&2
+    echo "uninstall: use ntfsmac Settings > Uninstall so SMAppService can remove it safely; no files were changed." >&2
     return 1
   fi
   return 0
@@ -142,8 +152,8 @@ remove_privileged_helper_if_root() {
   fi
 
   if [[ "$(id -u)" -ne 0 ]]; then
-    echo "uninstall: not running as root — the GUI's privileged helper (if installed) was left in place."
-    echo "uninstall: re-run with 'sudo' to remove it too, or use the GUI's own Uninstall control in Preferences."
+    echo "uninstall: not running as root — standalone compatibility helpers (if installed) were left in place."
+    echo "uninstall: re-run with 'sudo' to remove them, or use the GUI's own Uninstall control in Settings."
     return 0
   fi
   if launchctl print "system/$label" >/dev/null 2>&1; then
@@ -163,14 +173,14 @@ remove_privileged_helper_if_root() {
     tccutil reset SystemPolicyAllFiles "$legacy_label" >/dev/null 2>&1 || true
     tccutil reset All "$legacy_label" >/dev/null 2>&1 || true
   fi
-  echo "uninstall: removed current and legacy privileged helpers (ran as root)"
+  echo "uninstall: removed standalone compatibility and pre-v3 privileged helpers (ran as root)"
 }
 
 cmd_uninstall() {
-  # Self-elevate so a single `ntfsmac uninstall` actually finishes the whole job — the GUI's
-  # privileged helper (/Library/LaunchDaemons, /Library/PrivilegedHelperTools) can only be
-  # removed as root, and previously this just printed "re-run with sudo" and left it in
-  # place. Same pattern as mount.sh's self-elevation; resolve_invoker_home() above is what
+  # Self-elevate so a single `ntfsmac uninstall` can remove standalone compatibility helpers
+  # under /Library. The app-managed standard helper is rejected below before any mutation because
+  # only the containing app can unregister its SMAppService lifecycle safely. Same elevation
+  # pattern as mount.sh; resolve_invoker_home() below is what
   # keeps ~/.anylinuxfs/logs removal pointed at the real user's home once this re-execs as
   # root, not root's own.
   if [[ $EUID -ne 0 && "${NTFSMAC_SKIP_ROOT_CHECK:-}" != "1" ]]; then
@@ -200,6 +210,7 @@ cmd_uninstall() {
     esac
   done
 
+  refuse_if_modern_helper_registered || return 1
   refuse_if_mounted "$force" || return 1
   teardown_pf_if_present "$force" || return 1
   remove_path_symlink

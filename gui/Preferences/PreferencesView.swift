@@ -22,8 +22,101 @@ public struct UninstallConfirmationPresentation: Equatable, Sendable {
     }
 }
 
+public struct SettingsUpdatePresentation: Equatable, Sendable {
+    public let symbolName: String
+    public let accessibilityLabel: String
+    public let help: String
+    public let usesAccent: Bool
+    public let isChecking: Bool
+
+    public static func resolve(_ state: UpdateCheckState) -> Self {
+        switch state {
+        case .idle:
+            .init(
+                symbolName: "arrow.clockwise",
+                accessibilityLabel: "Check for updates",
+                help: "Check for updates",
+                usesAccent: false,
+                isChecking: false
+            )
+        case .checking:
+            .init(
+                symbolName: "arrow.clockwise",
+                accessibilityLabel: "Checking for updates",
+                help: "Checking GitHub Releases…",
+                usesAccent: true,
+                isChecking: true
+            )
+        case .upToDate:
+            .init(
+                symbolName: "checkmark.circle.fill",
+                accessibilityLabel: "ntfsmac is up to date",
+                help: "ntfsmac is up to date",
+                usesAccent: false,
+                isChecking: false
+            )
+        case .updateAvailable(let release):
+            .init(
+                symbolName: "arrow.down.circle.fill",
+                accessibilityLabel: "Update available",
+                help: "Version \(release.version) is available on GitHub",
+                usesAccent: true,
+                isChecking: false
+            )
+        case .failed(let message):
+            .init(
+                symbolName: "exclamationmark.triangle",
+                accessibilityLabel: "Update check unavailable",
+                help: message,
+                usesAccent: false,
+                isChecking: false
+            )
+        }
+    }
+}
+
+public struct HelperRepairPresentation: Equatable, Sendable {
+    public let subtitle: String
+    public let primaryButtonLabel: String
+    public let showsApprovalButton: Bool
+
+    public static func resolve(
+        _ state: HelperInstallState,
+        variant: HelperDistributionVariant = .current
+    ) -> Self {
+        switch state {
+        case .requiresApproval(let message):
+            return .init(
+                subtitle: message,
+                primaryButtonLabel: "Refresh",
+                showsApprovalButton: true
+            )
+        case .installing:
+            return .init(
+                subtitle: "Repairing app access…",
+                primaryButtonLabel: "Repair…",
+                showsApprovalButton: false
+            )
+        case .denied(let message), .failed(let message):
+            return .init(
+                subtitle: "Repair failed: \(message)",
+                primaryButtonLabel: "Repair…",
+                showsApprovalButton: false
+            )
+        case .notChecked, .checking, .readyToInstall, .installed:
+            return .init(
+                subtitle: variant == .modern
+                    ? "Repair the component ntfsmac uses for drive access"
+                    : "Repair the Legacy compatibility component",
+                primaryButtonLabel: "Repair…",
+                showsApprovalButton: false
+            )
+        }
+    }
+}
+
 /// GUI-PLAN.md "Settings page" table, using the same controls and application-owned state as the
-/// former Preferences window. "Reinstall privileged helper" reuses `HelperInstaller.install()`
+/// former Preferences window. "Repair app access" reuses `HelperInstaller.install()`
 /// directly — the same path `3-first-run-install` built for first-run, per that unit's Do clause.
 public struct PreferencesView: View {
     @ObservedObject public var settings: Settings
@@ -100,9 +193,6 @@ public struct PreferencesView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             if let onBack {
-                // ZStack so "Settings" centers over the full popover width — an HStack with two
-                // Spacers would center it in the *remaining* space after the Back button, sitting
-                // right-of-true-center. The title is the visual anchor; Back is overlaid leading.
                 ZStack {
                     VStack(spacing: 1) {
                         Text("Settings")
@@ -111,9 +201,11 @@ public struct PreferencesView: View {
                             .font(.system(size: 9, weight: .regular))
                             .foregroundStyle(.secondary.opacity(0.72))
                             .accessibilityLabel("ntfsmac \(productVersion.settingsText)")
-                        Text(HelperDistributionVariant.current.settingsLabel)
-                            .font(.system(size: 9, weight: .regular))
-                            .foregroundStyle(.secondary.opacity(0.72))
+                        if HelperDistributionVariant.current == .legacy {
+                            Text("Legacy")
+                                .font(.system(size: 9, weight: .regular))
+                                .foregroundStyle(.secondary.opacity(0.72))
+                        }
                     }
                     HStack {
                         Button {
@@ -125,10 +217,13 @@ public struct PreferencesView: View {
                             }
                         }
                         .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                        .focusable(true)
+                        .ntfsmacKeyboardFocus()
                         .accessibilityLabel("Back")
                         .help(TooltipCopy.text(for: .back))
+                        .frame(width: 82, alignment: .leading)
                         Spacer()
+                        updateButton
+                            .frame(width: 82, alignment: .trailing)
                     }
                 }
                 Divider()
@@ -148,7 +243,7 @@ public struct PreferencesView: View {
                     )
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .focusable(true)
+                    .ntfsmacKeyboardFocus()
                     .disabled(settings.isUpdatingLaunchAtLogin)
                     .accessibilityLabel("Launch at login")
                 }
@@ -168,59 +263,33 @@ public struct PreferencesView: View {
                     )
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .focusable(true)
+                    .ntfsmacKeyboardFocus()
                     .disabled(settings.isUpdatingNotifications)
                     .accessibilityLabel("Mount notifications")
                 }
             }
 
-            row("Software update", updateSubtitle) {
-                if case .updateAvailable = updateChecker.state {
-                    Button("View on GitHub") {
-                        updateChecker.openAvailableRelease()
-                    }
-                    .focusable(true)
-                } else {
-                    HStack(spacing: 6) {
-                        if updateChecker.state == .checking {
-                            ProgressView().controlSize(.small)
-                        }
-                        Button("Check…") {
-                            Task {
-                                await updateChecker.checkManually(
-                                    currentVersion: productVersion.release
-                                )
-                            }
-                        }
-                        .focusable(true)
-                        .disabled(updateChecker.state == .checking)
-                    }
-                }
-            }
-
-            Divider()
-
-            row("Reinstall privileged helper", helperRepairSubtitle) {
+            row("Repair app access", helperRepairSubtitle) {
                 HStack(spacing: 6) {
                     if installer.state == .installing {
                         ProgressView().controlSize(.small)
                     }
-                    if case .requiresApproval = installer.state {
+                    if helperRepairPresentation.showsApprovalButton {
                         Button("Approve…") {
                             installer.openApprovalSettings()
                         }
-                        .focusable(true)
+                        .ntfsmacKeyboardFocus()
                     }
-                    Button(helperRequiresApproval ? "Refresh" : "Reinstall…") {
+                    Button(helperRepairPresentation.primaryButtonLabel) {
                         Task {
-                            if helperRequiresApproval {
+                            if helperRepairPresentation.showsApprovalButton {
                                 await installer.installAfterConsent()
                             } else {
                                 await installer.reinstallAfterConsent()
                             }
                         }
                     }
-                    .focusable(true)
+                    .ntfsmacKeyboardFocus()
                 }
             }
 
@@ -232,7 +301,7 @@ public struct PreferencesView: View {
                     Button("Uninstall…", role: .destructive) {
                         uninstallConfirmation.request()
                     }
-                    .focusable(true)
+                    .ntfsmacKeyboardFocus()
                     .disabled(
                         uninstaller.state == .removingDependencies
                             || uninstaller.state == .removingHelper
@@ -278,32 +347,39 @@ public struct PreferencesView: View {
     }
 
     private var helperRepairSubtitle: String {
-        switch HelperDistributionVariant.current {
-        case .modern:
-            return "Repair the bundled modern XPC helper"
-        case .legacy:
-            return "Repair the Legacy SMJobBless XPC helper"
-        }
+        helperRepairPresentation.subtitle
     }
 
-    private var helperRequiresApproval: Bool {
-        if case .requiresApproval = installer.state { return true }
-        return false
+    private var helperRepairPresentation: HelperRepairPresentation {
+        HelperRepairPresentation.resolve(installer.state)
     }
 
-    private var updateSubtitle: String {
-        switch updateChecker.state {
-        case .idle:
-            return "Checks published GitHub Releases only"
-        case .checking:
-            return "Checking GitHub Releases…"
-        case .upToDate:
-            return "Version \(productVersion.release) is up to date"
-        case .updateAvailable(let release):
-            return "Version \(release.version) is available"
-        case .failed(let message):
-            return message
+    private var updateButton: some View {
+        let presentation = SettingsUpdatePresentation.resolve(updateChecker.state)
+        return Button {
+            if case .updateAvailable = updateChecker.state {
+                updateChecker.openAvailableRelease()
+            } else {
+                Task {
+                    await updateChecker.checkManually(currentVersion: productVersion.release)
+                }
+            }
+        } label: {
+            ZStack {
+                if presentation.isChecking {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: presentation.symbolName)
+                        .foregroundStyle(presentation.usesAccent ? Color.ntfsBlue : Color.secondary)
+                }
+            }
+            .frame(width: 30, height: 28)
         }
+        .buttonStyle(.glassIcon(colorScheme: colorScheme))
+        .ntfsmacKeyboardFocus(cornerRadius: 7)
+        .disabled(presentation.isChecking)
+        .accessibilityLabel(presentation.accessibilityLabel)
+        .help(presentation.help)
     }
 
     /// Inline (in-popover) two-step confirmation — a native `confirmationDialog` would dismiss
@@ -324,14 +400,14 @@ public struct PreferencesView: View {
                     uninstallConfirmation.cancel()
                 }
                 .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                .focusable(true)
+                .ntfsmacKeyboardFocus()
 
                 Button("Uninstall Everything", role: .destructive) {
                     guard uninstallConfirmation.confirm() else { return }
                     Task { await uninstaller.uninstallEverything() }
                 }
                 .buttonStyle(.glassDestructive(colorScheme: colorScheme))
-                .focusable(true)
+                .ntfsmacKeyboardFocus()
             }
         }
         .glassCard()

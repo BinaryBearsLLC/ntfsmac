@@ -1,5 +1,6 @@
 import Foundation
 import Darwin
+import ServiceManagement
 import Testing
 import HelperShared
 @testable import NtfsmacGUI
@@ -8,6 +9,17 @@ import HelperShared
 // branches.
 
 private let testExpectedVersion = "test-build-hash"
+
+private final class InstallEventRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedEvents: [String] = []
+
+    var events: [String] { lock.withLock { storedEvents } }
+
+    func append(_ event: String) {
+        lock.withLock { storedEvents.append(event) }
+    }
+}
 
 private func setTestQuarantine(_ path: String) throws {
     let bytes = Array("0083;00000000;Safari;".utf8)
@@ -58,10 +70,11 @@ private final class StaleModernInstallService: HelperInstallService, @unchecked 
     private let lock = NSLock()
     private(set) var unregisterCallCount = 0
     private(set) var blessCallCount = 0
+    let requiresPostInstallHealthCheck = true
 
     func isInstalled(label: String) -> Bool { true }
 
-    func unregister(label: String) -> HelperInstallOutcome? {
+    func unregister(label: String) async -> HelperInstallOutcome? {
         lock.withLock { unregisterCallCount += 1 }
         return .installed
     }
@@ -133,26 +146,91 @@ private final class FakeQuarantineStripper: QuarantineStripping, @unchecked Send
 @MainActor
 private final class FakeStaleDetector: StaleHelperDetecting, Sendable {
     var versionResult: Result<String, Error> = .success(testExpectedVersion)
+    let versionAfterFirstRead: Result<String, Error>?
+    let versionAfterUninstall: Result<String, Error>?
     private(set) var uninstallCallCount = 0
+    private(set) var cleanupCallCount = 0
+    var cleanupResult = CommandResult(output: "removed", exitCode: 0)
+    let events: InstallEventRecorder?
     // Simulates a helper old/wedged enough to never resolve `version()` at all — the exact case
     // `withStaleCheckTimeout` exists for. `Task.sleep` here vastly outlasts any test's injected
     // timeout, so it proves the bound actually fires rather than the call happening to finish fast.
     var hangsOnVersion = false
 
-    init(versionResult: Result<String, Error> = .success(testExpectedVersion)) {
+    init(
+        versionResult: Result<String, Error> = .success(testExpectedVersion),
+        versionAfterFirstRead: Result<String, Error>? = nil,
+        versionAfterUninstall: Result<String, Error>? = nil,
+        events: InstallEventRecorder? = nil
+    ) {
         self.versionResult = versionResult
+        self.versionAfterFirstRead = versionAfterFirstRead
+        self.versionAfterUninstall = versionAfterUninstall
+        self.events = events
     }
 
     func version() async throws -> String {
+        events?.append("version")
         if hangsOnVersion {
             try await Task.sleep(nanoseconds: 60_000_000_000)
         }
-        return try versionResult.get()
+        let result = versionResult
+        if let versionAfterFirstRead {
+            versionResult = versionAfterFirstRead
+        }
+        return try result.get()
     }
 
     func uninstallHelper() async throws -> CommandResult {
+        events?.append("uninstall-current")
         uninstallCallCount += 1
+        if let versionAfterUninstall {
+            versionResult = versionAfterUninstall
+        }
         return CommandResult(output: "uninstalled", exitCode: 0)
+    }
+
+    func cleanupRetiredHelpers() async throws -> CommandResult {
+        events?.append("cleanup-retired")
+        cleanupCallCount += 1
+        return cleanupResult
+    }
+}
+
+private final class TransactionalModernInstallService: HelperInstallService, @unchecked Sendable {
+    let requiresPostInstallHealthCheck = true
+    let outcome: HelperInstallOutcome
+    let events: InstallEventRecorder
+
+    init(outcome: HelperInstallOutcome, events: InstallEventRecorder) {
+        self.outcome = outcome
+        self.events = events
+    }
+
+    func isInstalled(label: String) -> Bool { false }
+
+    func bless(label: String) -> HelperInstallOutcome {
+        events.append("register-modern")
+        return outcome
+    }
+
+    func unregister(label: String) async -> HelperInstallOutcome? {
+        events.append("unregister-modern-start")
+        try? await Task.sleep(for: .milliseconds(20))
+        events.append("unregister-modern-finished")
+        return .installed
+    }
+}
+
+@MainActor
+private final class NonCooperativeStaleDetector: StaleHelperDetecting, Sendable {
+    func version() async throws -> String {
+        await withUnsafeContinuation { (_: UnsafeContinuation<Void, Never>) in }
+        return testExpectedVersion
+    }
+
+    func uninstallHelper() async throws -> CommandResult {
+        CommandResult(output: "uninstalled", exitCode: 0)
     }
 }
 
@@ -281,6 +359,31 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
     #expect(service.blessCallCount == 1)
 }
 
+@Test func modernRegistrationPermissionErrorsRouteToLoginItemsRecoveryOnly() {
+    let directPermissionError = NSError(
+        domain: "SMAppServiceErrorDomain",
+        code: Int(POSIXErrorCode.EPERM.rawValue)
+    )
+    let wrappedLaunchDenial = NSError(
+        domain: NSCocoaErrorDomain,
+        code: CocoaError.fileReadUnknown.rawValue,
+        userInfo: [
+            NSUnderlyingErrorKey: NSError(
+                domain: NSOSStatusErrorDomain,
+                code: Int(kSMErrorLaunchDeniedByUser)
+            )
+        ]
+    )
+    let invalidSignature = NSError(
+        domain: NSOSStatusErrorDomain,
+        code: Int(kSMErrorInvalidSignature)
+    )
+
+    #expect(ModernRegistrationErrorPolicy.requiresLoginItemsRecovery(directPermissionError))
+    #expect(ModernRegistrationErrorPolicy.requiresLoginItemsRecovery(wrappedLaunchDenial))
+    #expect(!ModernRegistrationErrorPolicy.requiresLoginItemsRecovery(invalidSignature))
+}
+
 @MainActor
 @Test func explicitConsentInstallsAfterPassiveCheck() async {
     let service = CountingInstallService(alreadyInstalled: false, outcome: .installed)
@@ -312,7 +415,10 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
 @MainActor
 @Test func staleModernRegistrationIsUnregisteredBeforeReplacement() async {
     let service = StaleModernInstallService()
-    let staleDetector = FakeStaleDetector(versionResult: .success("old-build-hash"))
+    let staleDetector = FakeStaleDetector(
+        versionResult: .success("old-build-hash"),
+        versionAfterFirstRead: .success(testExpectedVersion)
+    )
     let installer = HelperInstaller(
         service: service,
         staleDetector: staleDetector,
@@ -321,16 +427,20 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
 
     await installer.installAfterConsent()
 
-    #expect(staleDetector.uninstallCallCount == 1)
+    #expect(staleDetector.uninstallCallCount == 0)
     #expect(service.unregisterCallCount == 1)
     #expect(service.blessCallCount == 1)
+    #expect(staleDetector.cleanupCallCount == 1)
     #expect(installer.state == .installed)
 }
 
 @MainActor
 @Test func settingsRepairReplacesEvenACurrentRegisteredHelper() async {
     let service = StaleModernInstallService()
-    let currentDetector = FakeStaleDetector(versionResult: .success(testExpectedVersion))
+    let currentDetector = FakeStaleDetector(
+        versionResult: .success(testExpectedVersion),
+        versionAfterUninstall: .success(testExpectedVersion)
+    )
     let installer = HelperInstaller(
         service: service,
         staleDetector: currentDetector,
@@ -339,27 +449,103 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
 
     await installer.reinstallAfterConsent()
 
-    #expect(currentDetector.uninstallCallCount == 1)
+    #expect(currentDetector.uninstallCallCount == 0)
     #expect(service.unregisterCallCount == 1)
     #expect(service.blessCallCount == 1)
+    #expect(currentDetector.cleanupCallCount == 1)
     #expect(installer.state == .installed)
 }
 
 @MainActor
-@Test func standardInstallAsksRetiredCompatibilityHelperToRemoveItself() async {
-    let service = CountingInstallService(alreadyInstalled: false, outcome: .installed)
-    let retiredDetector = FakeStaleDetector()
+@Test func standardInstallRemovesLegacyOnlyAfterModernXPCIsHealthy() async {
+    let events = InstallEventRecorder()
+    let service = TransactionalModernInstallService(outcome: .installed, events: events)
+    let detector = FakeStaleDetector(events: events)
     let installer = HelperInstaller(
         service: service,
-        retiredHelperDetector: retiredDetector,
+        staleDetector: detector,
+        expectedVersion: testExpectedVersion,
         staleCheckTimeoutNanoseconds: 50_000_000
     )
 
     await installer.install()
 
-    #expect(retiredDetector.uninstallCallCount == 1)
-    #expect(service.blessCallCount == 1)
+    #expect(events.events == ["register-modern", "version", "cleanup-retired"])
+    #expect(detector.cleanupCallCount == 1)
     #expect(installer.state == .installed)
+}
+
+@MainActor
+@Test func deniedModernInstallLeavesLegacyUntouched() async {
+    let events = InstallEventRecorder()
+    let service = TransactionalModernInstallService(
+        outcome: .requiresApproval("Approval required."),
+        events: events
+    )
+    let detector = FakeStaleDetector(events: events)
+    let installer = HelperInstaller(service: service, staleDetector: detector)
+
+    await installer.install()
+
+    #expect(events.events == ["register-modern"])
+    #expect(detector.cleanupCallCount == 0)
+    #expect(installer.state == .requiresApproval("Approval required."))
+}
+
+@MainActor
+@Test func transientModernStartupFailureWaitsWithoutDestroyingApproval() async {
+    let events = InstallEventRecorder()
+    let service = TransactionalModernInstallService(outcome: .installed, events: events)
+    let detector = FakeStaleDetector(
+        versionResult: .success("wrong-version"),
+        versionAfterFirstRead: .success(testExpectedVersion),
+        events: events
+    )
+    let installer = HelperInstaller(
+        service: service,
+        staleDetector: detector,
+        expectedVersion: testExpectedVersion,
+        postRegistrationHealthCheckAttempts: 2,
+        postRegistrationHealthCheckDelayNanoseconds: 1_000_000
+    )
+
+    await installer.install()
+
+    #expect(events.events == [
+        "register-modern", "version", "version", "cleanup-retired",
+    ])
+    #expect(detector.cleanupCallCount == 1)
+    #expect(installer.state == .installed)
+}
+
+@MainActor
+@Test func persistentModernHealthFailureStopsAfterOneRepairAndLeavesLegacyUntouched() async {
+    let events = InstallEventRecorder()
+    let service = TransactionalModernInstallService(outcome: .installed, events: events)
+    let detector = FakeStaleDetector(
+        versionResult: .success("wrong-version"),
+        events: events
+    )
+    let installer = HelperInstaller(
+        service: service,
+        staleDetector: detector,
+        expectedVersion: testExpectedVersion,
+        postRegistrationHealthCheckAttempts: 2,
+        postRegistrationHealthCheckDelayNanoseconds: 1_000_000
+    )
+
+    await installer.install()
+
+    #expect(events.events == [
+        "register-modern", "version", "version", "unregister-modern-start",
+        "unregister-modern-finished", "register-modern", "version", "version",
+    ])
+    #expect(detector.cleanupCallCount == 0)
+    guard case .failed(let message) = installer.state else {
+        Issue.record("A broken modern helper must fail without touching Legacy")
+        return
+    }
+    #expect(message.contains("after an automatic repair"))
 }
 
 @MainActor
@@ -400,6 +586,23 @@ private final class BlockingInstallService: HelperInstallService, @unchecked Sen
     #expect(staleDetector.uninstallCallCount == 1)
     #expect(service.blessCallCount == 1)
     #expect(installer.state == .installed)
+}
+
+@MainActor
+@Test func timeoutReturnsWhenTheXPCOperationIgnoresCancellation() async {
+    let service = CountingInstallService(alreadyInstalled: true, outcome: .installed)
+    let installer = HelperInstaller(
+        service: service,
+        staleDetector: NonCooperativeStaleDetector(),
+        expectedVersion: testExpectedVersion,
+        staleCheckTimeoutNanoseconds: 50_000_000
+    )
+    let started = ContinuousClock.now
+
+    await installer.checkWithoutInstalling()
+
+    #expect(ContinuousClock.now - started < .seconds(1))
+    #expect(installer.state == .readyToInstall)
 }
 
 @MainActor

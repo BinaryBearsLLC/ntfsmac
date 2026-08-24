@@ -1,12 +1,12 @@
 import Testing
+import HelperShared
 @testable import NtfsmacGUI
 
 @Suite struct FDAPromptCopyTests {
-    @Test func explainsTheTechnicalServiceNameInFriendlyTerms() {
+    @Test func explainsThePackagedServiceNameInFriendlyTerms() {
         #expect(FDAPromptCopy.instructions.contains("ntfsmac Helper"))
         #expect(FDAPromptCopy.instructions.contains(FDAPromptCopy.helperServiceName))
-        #expect(FDAPromptCopy.instructions.contains("technical service name"))
-        #expect(FDAPromptCopy.instructions.contains("generic executable icon"))
-        #expect(FDAPromptCopy.instructions.contains("standalone privileged tool"))
+        #expect(FDAPromptCopy.helperServiceName == helperMachServiceName)
+        #expect(FDAPromptCopy.instructions.contains("Full Disk Access"))
     }
 }

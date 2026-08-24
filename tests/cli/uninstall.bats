@@ -102,6 +102,25 @@ STUB
   [ -d "$NTFSMAC_PREFIX" ]
 }
 
+@test "refuses before mutation when the standard SMAppService helper is registered" {
+  cat > "$STUB_DIR/launchctl" <<'STUB'
+#!/bin/bash
+if [[ "$*" == "print system/com.binarybears.ntfsmac.helper.daemon" ]]; then
+  exit 0
+fi
+exit 1
+STUB
+  chmod +x "$STUB_DIR/launchctl"
+
+  run "$SCRIPT"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Settings > Uninstall"* ]]
+  [[ "$output" == *"no files were changed"* ]]
+  [ -d "$NTFSMAC_PREFIX" ]
+  [ -d "$HOME/.anylinuxfs" ]
+}
+
 @test "--force skips the active-mount check" {
   cat > "$STUB_DIR/mount" <<'STUB'
 #!/bin/bash

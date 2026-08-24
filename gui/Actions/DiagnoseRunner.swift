@@ -335,7 +335,7 @@ public final class DiagnoseRunner: ObservableObject {
         // failure; surfacing the raw Cocoa error was the actual defect, not the missing file
         // itself (staging still being in progress right after a fresh install is expected).
         guard fileExists(ntfsmacPath) else {
-            errorMessage = "ntfsmac isn't installed yet. If you just installed the helper, this can take a few seconds — try again, or use Preferences ▸ Reinstall privileged helper."
+            errorMessage = "ntfsmac setup is still finishing. Wait a few seconds and try again, or open Settings and choose Repair app access."
             return nil
         }
 

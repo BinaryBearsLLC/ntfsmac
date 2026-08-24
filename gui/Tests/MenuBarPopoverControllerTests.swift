@@ -1,8 +1,10 @@
+import AppKit
 import Foundation
 import Testing
 @testable import NtfsmacGUI
 
 @Test func openGUIRequestAcceptsOnlyTheExactForkURL() {
+    #expect(OpenGUIRequest.notificationName == "com.binarybears.ntfsmac.open-gui")
     #expect(OpenGUIRequest.matches(URL(string: "binarybears-ntfsmac://opengui")!))
     #expect(OpenGUIRequest.matches(URL(string: "binarybears-ntfsmac://opengui/")!))
     #expect(!OpenGUIRequest.matches(URL(string: "binarybears-ntfsmac://settings")!))
@@ -53,4 +55,28 @@ import Testing
         anchorFrameOnScreen: menuBarAnchor,
         screenFrame: screen
     ))
+}
+
+@Test func popoverVisibilityRejectsAnOrderedOutTransientWindow() {
+    #expect(PopoverVisibility.isVisible(isShown: true, windowIsVisible: true))
+    #expect(!PopoverVisibility.isVisible(isShown: true, windowIsVisible: false))
+    #expect(!PopoverVisibility.isVisible(isShown: false, windowIsVisible: true))
+    #expect(!PopoverVisibility.isVisible(isShown: false, windowIsVisible: false))
+}
+
+@MainActor
+@Test func popoverWindowInteractivityRestoresPhysicalMouseDelivery() {
+    let window = NSWindow(
+        contentRect: CGRect(x: 0, y: 0, width: 200, height: 120),
+        styleMask: [.borderless],
+        backing: .buffered,
+        defer: false
+    )
+    window.ignoresMouseEvents = true
+    window.acceptsMouseMovedEvents = false
+
+    PopoverWindowInteractivity.restore(window)
+
+    #expect(!window.ignoresMouseEvents)
+    #expect(window.acceptsMouseMovedEvents)
 }

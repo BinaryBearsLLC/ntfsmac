@@ -33,6 +33,8 @@ setup() {
   [ "$status" -eq 0 ]
   run grep -F 'com.binarybears.ntfsmac.helper' "$VERIFY_SCRIPT"
   [ "$status" -eq 0 ]
+  run grep -F 'write-sha256.sh' "$VERIFY_SCRIPT"
+  [ "$status" -eq 0 ]
 }
 
 @test "all three product plists carry the same candidate version" {

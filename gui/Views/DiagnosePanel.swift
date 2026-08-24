@@ -38,6 +38,269 @@ public enum DiagnoseStatus: String, Equatable, Sendable {
     case unavailable
 }
 
+/// GUI-only semantic states. The CLI and exported JSON keep their detailed schema unchanged;
+/// these values deliberately describe only what a person needs to decide next.
+public enum DiagnoseMacroState: String, Equatable, Sendable {
+    case idle
+    case checking
+    case ok
+    case attention
+    case failed
+    case unavailable
+
+    public var label: String {
+        switch self {
+        case .idle: "Idle"
+        case .checking: "Checking"
+        case .ok: "OK"
+        case .attention: "Attention"
+        case .failed: "Failed"
+        case .unavailable: "Unavailable"
+        }
+    }
+
+    public var symbolName: String {
+        switch self {
+        case .idle: "pause.circle"
+        case .checking: "arrow.triangle.2.circlepath"
+        case .ok: "checkmark.circle.fill"
+        case .attention: "exclamationmark.triangle.fill"
+        case .failed: "xmark.octagon.fill"
+        case .unavailable: "questionmark.circle"
+        }
+    }
+}
+
+public struct DiagnoseMacroRow: Equatable, Sendable, Identifiable {
+    public let id: String
+    public let title: String
+    public let state: DiagnoseMacroState
+    public let summary: String
+    public let explanation: String
+    public let nextAction: String?
+
+    public var userFacingText: String {
+        [title, state.label, summary, explanation, nextAction].compactMap { $0 }.joined(separator: " ")
+    }
+}
+
+/// Fail-closed presentation model for the normal GUI. It intentionally contains no service
+/// identifiers, implementation names, raw reason codes, paths, versions, or network internals.
+/// Those remain available through `ntfsmac diagnose` and Command-click Diagnose export.
+public enum DiagnoseMacroSummary {
+    public static let categoryTitles = [
+        "App readiness", "Drive status", "Connection protection", "Permissions",
+    ]
+
+    public static var checkingRows: [DiagnoseMacroRow] {
+        zip(["app", "drive", "protection", "permissions"], categoryTitles).map { id, title in
+            .init(
+                id: id,
+                title: title,
+                state: .checking,
+                summary: "Checking…",
+                explanation: "Reading the latest local status without changing your drives.",
+                nextAction: nil
+            )
+        }
+    }
+
+    public static func rows(
+        for report: DiagnoseReport,
+        mountState: MountState?,
+        detectedDriveCount: Int?,
+        fullDiskAccessGranted: Bool?
+    ) -> [DiagnoseMacroRow] {
+        [
+            appReadiness(report),
+            driveStatus(report, mountState: mountState, detectedDriveCount: detectedDriveCount),
+            connectionProtection(report, mountState: mountState),
+            permissions(report, fullDiskAccessGranted: fullDiskAccessGranted),
+        ]
+    }
+
+    public static func failureRow(_ message: String) -> DiagnoseMacroRow {
+        .init(
+            id: "diagnostic",
+            title: "Diagnostic check",
+            state: .failed,
+            summary: "Could not complete",
+            explanation: message,
+            nextAction: "Try Diagnose again. If it still fails, reinstall ntfsmac from a verified DMG."
+        )
+    }
+
+    private static func appReadiness(_ report: DiagnoseReport) -> DiagnoseMacroRow {
+        let unavailable = DiagnoseMacroRow(
+            id: "app",
+            title: "App readiness",
+            state: .unavailable,
+            summary: "Could not confirm",
+            explanation: "ntfsmac could not confirm every app check required for drive access.",
+            nextAction: "Run Diagnose again. If this persists, reinstall ntfsmac from a verified DMG."
+        )
+
+        guard report.missingBinaries >= 0, report.quarantinedBinaries >= 0 else { return unavailable }
+
+        let confirmedRepair = report.missingBinaries > 0
+            || report.quarantinedBinaries > 0
+            || ["mismatch", "missing"].contains(report.kernelPin)
+            || report.architecture.map { $0 != "arm64" } == true
+            || unsupportedMacOS(report.macosVersion)
+            || [report.anylinuxfsVersionStatus, report.gvproxyVersionStatus, report.vmnetHelperVersionStatus]
+                .contains { status in
+                    guard let status else { return false }
+                    return status != "match"
+                }
+            || report.alpineRuntimeState.map {
+                !["initialized", "not_initialized", "migration_available"].contains($0)
+            } == true
+
+        if confirmedRepair {
+            return .init(
+                id: "app",
+                title: "App readiness",
+                state: .failed,
+                summary: "Repair needed",
+                explanation: "Some files ntfsmac needs are missing, blocked, or incompatible.",
+                nextAction: "Reinstall ntfsmac from a verified DMG, then run Diagnose again."
+            )
+        }
+
+        if report.helperInstalled == false {
+            return .init(
+                id: "app",
+                title: "App readiness",
+                state: .attention,
+                summary: "Setup needed",
+                explanation: "ntfsmac still needs a macOS approval before it can manage drives.",
+                nextAction: "Open Settings and choose Repair app access."
+            )
+        }
+
+        guard report.diagnosticSchema.map({ $0 >= 6 }) == true,
+              report.helperInstalled == true,
+              report.architecture == "arm64",
+              supportedMacOS(report.macosVersion),
+              report.kernelPin == "match",
+              report.anylinuxfsVersionStatus == "match",
+              report.gvproxyVersionStatus == "match",
+              report.vmnetHelperVersionStatus == "match",
+              let appState = report.alpineRuntimeState,
+              ["initialized", "not_initialized", "migration_available"].contains(appState)
+        else { return unavailable }
+
+        return .init(
+            id: "app",
+            title: "App readiness",
+            state: .ok,
+            summary: "Ready",
+            explanation: "Everything ntfsmac needs is present and compatible.",
+            nextAction: nil
+        )
+    }
+
+    private static func driveStatus(
+        _ report: DiagnoseReport,
+        mountState: MountState?,
+        detectedDriveCount: Int?
+    ) -> DiagnoseMacroRow {
+        switch mountState {
+        case .mounting:
+            return .init(id: "drive", title: "Drive status", state: .checking, summary: "Mounting…", explanation: "ntfsmac is waiting for macOS to confirm the mounted drive.", nextAction: nil)
+        case .mountedReadWrite:
+            return .init(id: "drive", title: "Drive status", state: .ok, summary: "Mounted read/write", explanation: "The drive is mounted and ready for normal use.", nextAction: nil)
+        case .mountedReadOnly:
+            return .init(id: "drive", title: "Drive status", state: .attention, summary: "Mounted read-only", explanation: "The drive is available, but changes are currently disabled.", nextAction: "Unmount it safely before checking or repairing it on the system that created it.")
+        case .mountedReadOnlyDirty:
+            return .init(id: "drive", title: "Drive status", state: .attention, summary: "Windows recovery needed", explanation: "The drive is protected in read-only mode because Windows did not leave it in a safe state.", nextAction: "Unmount it, fully shut down Windows, run its disk check, then reconnect it.")
+        case .mountedUnknown:
+            return .init(id: "drive", title: "Drive status", state: .unavailable, summary: "Mount needs verification", explanation: "ntfsmac cannot yet confirm the drive's current access mode.", nextAction: "Use Refresh. If this persists, unmount the drive before reconnecting it.")
+        case .error:
+            let unsafeWindowsState = report.mountFailureCategory == "unsafe_windows_state"
+            return .init(
+                id: "drive",
+                title: "Drive status",
+                state: unsafeWindowsState ? .attention : .failed,
+                summary: unsafeWindowsState ? "Windows recovery needed" : "Mount failed",
+                explanation: unsafeWindowsState
+                    ? "ntfsmac refused a write operation to protect the drive."
+                    : "ntfsmac could not complete the last drive operation.",
+                nextAction: unsafeWindowsState
+                    ? "Fully shut down Windows, run its disk check, then reconnect the drive."
+                    : "Use Refresh and try once more. Keep the drive connected while recovery completes."
+            )
+        case .idle:
+            guard let detectedDriveCount, detectedDriveCount >= 0 else {
+                return .init(id: "drive", title: "Drive status", state: .unavailable, summary: "Could not confirm", explanation: "The current drive inventory is unavailable.", nextAction: "Use Refresh and run Diagnose again.")
+            }
+            if detectedDriveCount == 0 {
+                return .init(id: "drive", title: "Drive status", state: .idle, summary: "No compatible drive", explanation: "Connect an NTFS or ext drive when you are ready.", nextAction: nil)
+            }
+            return .init(id: "drive", title: "Drive status", state: .idle, summary: "Ready to mount", explanation: detectedDriveCount == 1 ? "One compatible drive is detected." : "\(detectedDriveCount) compatible drives are detected.", nextAction: nil)
+        case .none:
+            return .init(id: "drive", title: "Drive status", state: .unavailable, summary: "Could not confirm", explanation: "The current drive state is unavailable.", nextAction: "Use Refresh and run Diagnose again.")
+        }
+    }
+
+    private static func connectionProtection(
+        _ report: DiagnoseReport,
+        mountState: MountState?
+    ) -> DiagnoseMacroRow {
+        switch mountState {
+        case .idle:
+            return .init(id: "protection", title: "Connection protection", state: .idle, summary: "Not currently needed", explanation: "Protection activates automatically when ntfsmac mounts a drive.", nextAction: nil)
+        case .mounting:
+            return .init(id: "protection", title: "Connection protection", state: .checking, summary: "Starting…", explanation: "ntfsmac is confirming protection for the new mount.", nextAction: nil)
+        case .mountedUnknown, .none:
+            return .init(id: "protection", title: "Connection protection", state: .unavailable, summary: "Could not confirm", explanation: "The protection state is not available, so ntfsmac will not report it as safe.", nextAction: "Run Diagnose again before relying on this mount.")
+        case .error where (report.securityActiveSessions ?? 0) == 0:
+            return .init(id: "protection", title: "Connection protection", state: .unavailable, summary: "Could not confirm", explanation: "The last drive operation ended before protection could be verified.", nextAction: "Resolve the drive error, then run Diagnose again.")
+        case .mountedReadWrite, .mountedReadOnly, .mountedReadOnlyDirty, .error:
+            guard let activeSessions = report.securityActiveSessions else {
+                return .init(id: "protection", title: "Connection protection", state: .unavailable, summary: "Could not confirm", explanation: "The protection evidence is incomplete, so ntfsmac will not report it as safe.", nextAction: "Run Diagnose again. If this persists, unmount the drive safely.")
+            }
+            guard activeSessions > 0 else {
+                return .init(id: "protection", title: "Connection protection", state: .failed, summary: "Protection missing", explanation: "A mounted drive is active, but its required protection was not confirmed.", nextAction: "Unmount the drive safely and run Diagnose again before remounting it.")
+            }
+            switch report.securityOverall {
+            case "enforced":
+                return .init(id: "protection", title: "Connection protection", state: .ok, summary: "Protected", explanation: "The active drive connection is using ntfsmac's required safeguards.", nextAction: nil)
+            case "notEnforced":
+                return .init(id: "protection", title: "Connection protection", state: .failed, summary: "Protection incomplete", explanation: "One or more safeguards required for the active mount are not in place.", nextAction: "Unmount the drive safely, then run Diagnose again before remounting it.")
+            default:
+                return .init(id: "protection", title: "Connection protection", state: .unavailable, summary: "Could not confirm", explanation: "The protection evidence is incomplete, so ntfsmac will not report it as safe.", nextAction: "Run Diagnose again. If this persists, unmount the drive safely.")
+            }
+        }
+    }
+
+    private static func permissions(
+        _ report: DiagnoseReport,
+        fullDiskAccessGranted: Bool?
+    ) -> DiagnoseMacroRow {
+        if fullDiskAccessGranted == false {
+            return .init(id: "permissions", title: "Permissions", state: .attention, summary: "Full Disk Access needed", explanation: "macOS has not yet allowed ntfsmac to read supported drives.", nextAction: "Open System Settings > Privacy & Security > Full Disk Access and enable ntfsmac.")
+        }
+        if report.helperInstalled == false {
+            return .init(id: "permissions", title: "Permissions", state: .attention, summary: "Approval needed", explanation: "macOS has not yet approved ntfsmac's drive-access component.", nextAction: "Open System Settings > General > Login Items and allow ntfsmac.")
+        }
+        guard fullDiskAccessGranted == true, report.helperInstalled == true else {
+            return .init(id: "permissions", title: "Permissions", state: .unavailable, summary: "Could not confirm", explanation: "ntfsmac could not confirm every macOS permission it needs.", nextAction: "Review ntfsmac in System Settings, then run Diagnose again.")
+        }
+        return .init(id: "permissions", title: "Permissions", state: .ok, summary: "Ready", explanation: "macOS permissions required for drive access are enabled.", nextAction: nil)
+    }
+
+    private static func supportedMacOS(_ value: String?) -> Bool {
+        guard let value, let major = Int(value.split(separator: ".").first ?? "") else { return false }
+        return major >= 13
+    }
+
+    private static func unsupportedMacOS(_ value: String?) -> Bool {
+        guard let value, let major = Int(value.split(separator: ".").first ?? "") else { return false }
+        return major < 13
+    }
+}
+
 /// Plain-language summary row (this unit's Do clause: "render a plain-language summary" — not
 /// a raw JSON/log dump).
 public struct DiagnoseSummaryRow: Equatable, Sendable, Identifiable {
@@ -508,23 +771,37 @@ public enum DiagnoseSummary {
 public struct DiagnosePanel: View {
     @ObservedObject public var runner: DiagnoseRunner
     public let mountState: MountState?
+    public let detectedDriveCount: Int?
+    public let fullDiskAccessGranted: Bool?
     public let onHide: (() -> Void)?
 
     public init(runner: DiagnoseRunner) {
         self.runner = runner
         self.mountState = nil
+        self.detectedDriveCount = nil
+        self.fullDiskAccessGranted = nil
         self.onHide = nil
     }
 
     public init(runner: DiagnoseRunner, onHide: @escaping () -> Void) {
         self.runner = runner
         self.mountState = nil
+        self.detectedDriveCount = nil
+        self.fullDiskAccessGranted = nil
         self.onHide = onHide
     }
 
-    public init(runner: DiagnoseRunner, mountState: MountState?, onHide: (() -> Void)? = nil) {
+    public init(
+        runner: DiagnoseRunner,
+        mountState: MountState?,
+        detectedDriveCount: Int? = nil,
+        fullDiskAccessGranted: Bool? = nil,
+        onHide: (() -> Void)? = nil
+    ) {
         self.runner = runner
         self.mountState = mountState
+        self.detectedDriveCount = detectedDriveCount
+        self.fullDiskAccessGranted = fullDiskAccessGranted
         self.onHide = onHide
     }
 
@@ -537,7 +814,7 @@ public struct DiagnosePanel: View {
                     Spacer()
                     Button("Hide", action: onHide)
                         .buttonStyle(.plain)
-                        .focusable(true)
+                        .ntfsmacKeyboardFocus()
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .accessibilityLabel("Hide diagnostics")
@@ -546,22 +823,17 @@ public struct DiagnosePanel: View {
             }
 
             Group {
-                if let report = runner.report {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(DiagnoseSummary.rows(for: report, mountState: mountState)) { row in
-                            Label("\(row.label): \(row.value)", systemImage: iconName(for: row.status))
-                                .foregroundStyle(color(for: row.status))
-                                .font(.caption)
-                                .help(row.explanation)
-                                .accessibilityHint(row.explanation)
-                        }
-                    }
+                if runner.isRunning {
+                    macroRows(DiagnoseMacroSummary.checkingRows)
+                } else if let report = runner.report {
+                    macroRows(DiagnoseMacroSummary.rows(
+                        for: report,
+                        mountState: mountState,
+                        detectedDriveCount: detectedDriveCount,
+                        fullDiskAccessGranted: fullDiskAccessGranted
+                    ))
                 } else if let errorMessage = runner.errorMessage {
-                    Text(errorMessage)
-                        .font(.caption)
-                        .foregroundStyle(Color.ntfsRed.opacity(0.95))
-                } else if runner.isRunning {
-                    ProgressView().frame(maxWidth: .infinity)
+                    macroRows([DiagnoseMacroSummary.failureRow(errorMessage)])
                 }
             }
         }
@@ -580,21 +852,60 @@ public struct DiagnosePanel: View {
         runner.errorMessage == nil ? Color.secondary.opacity(0.12) : Color.ntfsRed.opacity(0.2)
     }
 
-    private func iconName(for status: DiagnoseStatus) -> String {
-        switch status {
-        case .healthy: "checkmark.circle"
-        case .informational: "info.circle"
-        case .warning: "exclamationmark.circle"
-        case .unavailable: "questionmark.circle"
+    private func macroRows(_ rows: [DiagnoseMacroRow]) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            ForEach(rows) { row in
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: row.state.symbolName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(color(for: row.state))
+                        .frame(width: 16, height: 17)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(alignment: .firstTextBaseline, spacing: 5) {
+                            Text(row.title)
+                                .font(.system(size: 11.5, weight: .semibold))
+                            Spacer(minLength: 5)
+                            Text(row.state.label.uppercased())
+                                .font(.system(size: 8.5, weight: .bold))
+                                .tracking(0.5)
+                                .foregroundStyle(color(for: row.state))
+                        }
+                        Text(row.summary)
+                            .font(.system(size: 11, weight: .medium))
+                        Text(row.explanation)
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let nextAction = row.nextAction {
+                            Text(nextAction)
+                                .font(.system(size: 10.5, weight: .medium))
+                                .foregroundStyle(color(for: row.state))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .padding(7)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(color(for: row.state).opacity(row.state == .idle || row.state == .unavailable ? 0.04 : 0.07))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .strokeBorder(color(for: row.state).opacity(0.12), lineWidth: 1)
+                )
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(row.userFacingText)
+            }
         }
     }
 
-    private func color(for status: DiagnoseStatus) -> Color {
-        switch status {
-        case .healthy: .primary
-        case .informational: .ntfsBlue
-        case .warning: .orange
-        case .unavailable: .secondary
+    private func color(for state: DiagnoseMacroState) -> Color {
+        switch state {
+        case .idle, .unavailable: .secondary
+        case .checking: .ntfsBlue
+        case .ok: .ntfsGreen
+        case .attention: .ntfsYellow
+        case .failed: .ntfsRed
         }
     }
 }

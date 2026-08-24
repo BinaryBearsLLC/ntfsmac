@@ -37,6 +37,79 @@ private final class FakeRunner: PrivilegedCommandRunning {
     }
 }
 
+@Test func guiDiagnosticsCollapseTechnicalEvidenceIntoFourMacroCategories() throws {
+    let report = try JSONDecoder().decode(DiagnoseReport.self, from: Data(expandedJSON.utf8))
+    let rows = DiagnoseMacroSummary.rows(
+        for: report,
+        mountState: .mountedReadWrite,
+        detectedDriveCount: 1,
+        fullDiskAccessGranted: true
+    )
+
+    #expect(rows.map(\.title) == DiagnoseMacroSummary.categoryTitles)
+    #expect(rows.map(\.state) == [.ok, .ok, .ok, .ok])
+    #expect(rows.first { $0.id == "drive" }?.summary == "Mounted read/write")
+    #expect(rows.first { $0.id == "protection" }?.summary == "Protected")
+}
+
+@Test func guiDiagnosticCopyDoesNotExposeImplementationDetails() throws {
+    let report = try JSONDecoder().decode(DiagnoseReport.self, from: Data(expandedJSON.utf8))
+    let visible = DiagnoseMacroSummary.rows(
+        for: report,
+        mountState: .mountedReadWrite,
+        detectedDriveCount: 1,
+        fullDiskAccessGranted: true
+    ).map(\.userFacingText).joined(separator: " ").lowercased()
+
+    for forbidden in ["helper", "xpc", "runtime", "kernel", "vmnet", "virtual machine", "pf", "route", "digest", "sha256", "diagnostic_schema"] {
+        #expect(!visible.contains(forbidden), "Normal GUI copy must not expose \(forbidden)")
+    }
+}
+
+@Test func guiProtectionFailsClosedWhenActiveEvidenceIsMissingOrBroken() throws {
+    let missingEvidence = try JSONDecoder().decode(DiagnoseReport.self, from: Data(healthyJSON.utf8))
+    let unavailable = DiagnoseMacroSummary.rows(
+        for: missingEvidence,
+        mountState: .mountedReadWrite,
+        detectedDriveCount: 1,
+        fullDiskAccessGranted: true
+    )
+    #expect(unavailable.first { $0.id == "protection" }?.state == .unavailable)
+
+    let brokenJSON = expandedJSON.replacingOccurrences(
+        of: #""security_overall":"enforced""#,
+        with: #""security_overall":"notEnforced""#
+    )
+    let brokenReport = try JSONDecoder().decode(DiagnoseReport.self, from: Data(brokenJSON.utf8))
+    let broken = DiagnoseMacroSummary.rows(
+        for: brokenReport,
+        mountState: .mountedReadWrite,
+        detectedDriveCount: 1,
+        fullDiskAccessGranted: true
+    )
+    #expect(broken.first { $0.id == "protection" }?.state == .failed)
+}
+
+@Test func guiDriveAndPermissionStatesGiveOnlyRelevantActions() throws {
+    let report = try JSONDecoder().decode(DiagnoseReport.self, from: Data(expandedJSON.utf8))
+    let rows = DiagnoseMacroSummary.rows(
+        for: report,
+        mountState: .mountedReadOnlyDirty,
+        detectedDriveCount: 1,
+        fullDiskAccessGranted: false
+    )
+
+    #expect(rows.first { $0.id == "drive" }?.state == .attention)
+    #expect(rows.first { $0.id == "drive" }?.nextAction?.contains("Windows") == true)
+    #expect(rows.first { $0.id == "permissions" }?.state == .attention)
+    #expect(rows.first { $0.id == "permissions" }?.nextAction?.contains("Full Disk Access") == true)
+}
+
+@Test func guiDiagnosticsShowEveryCategoryWhileChecking() {
+    #expect(DiagnoseMacroSummary.checkingRows.map(\.title) == DiagnoseMacroSummary.categoryTitles)
+    #expect(DiagnoseMacroSummary.checkingRows.allSatisfy { $0.state == .checking })
+}
+
 @Test func healthyReportProducesAllHealthyRows() {
     let report = try! JSONDecoder().decode(DiagnoseReport.self, from: Data(healthyJSON.utf8))
     let rows = DiagnoseSummary.rows(for: report)
@@ -240,7 +313,7 @@ func bridgeDownUsesMountContext(argument: (MountState, DiagnoseStatus, String)) 
     #expect(fake.calls.isEmpty, "must never shell out to a binary confirmed missing")
     #expect(runner.report == nil)
     #expect(runner.errorMessage?.contains("NSCocoaErrorDomain") == false)
-    #expect(runner.errorMessage == "ntfsmac isn't installed yet. If you just installed the helper, this can take a few seconds — try again, or use Preferences ▸ Reinstall privileged helper.")
+    #expect(runner.errorMessage == "ntfsmac setup is still finishing. Wait a few seconds and try again, or open Settings and choose Repair app access.")
 }
 
 @Test func diagnosticPresentationCoversHiddenRunningResultAndErrorPhases() {

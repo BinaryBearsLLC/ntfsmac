@@ -37,7 +37,7 @@ public let deviceNamePattern = "^disk[0-9]+s[0-9]+$"
 /// Bump whenever the XPC selector surface or required helper behavior changes. The CLI tree hash
 /// alone cannot distinguish a newly packaged GUI from an older helper when only Swift/helper
 /// code changed.
-public let helperProtocolRevision = 3
+public let helperProtocolRevision = 4
 
 public func helperBuildIdentity(cliTreeHash: String) -> String {
     "xpc\(helperProtocolRevision):\(cliTreeHash)"
@@ -306,6 +306,12 @@ public struct CommandResult: Codable, Sendable {
     /// gone once this returns. Combined with `removeDependencies`, this is what lets "drag the
     /// app to Trash" leave zero leftovers.
     func uninstallHelper(reply: @escaping (Data?, String?) -> Void)
+
+    /// Removes helper identities retired by the current distribution without unregistering the
+    /// current helper. The standard SMAppService daemon uses this only after its own XPC version
+    /// handshake succeeds, making Legacy-to-standard migration transactional: a denied or broken
+    /// standard registration can never destroy the still-working compatibility helper.
+    func cleanupRetiredHelpers(reply: @escaping (Data?, String?) -> Void)
 
     /// Runs the bundled `install.sh` (staged read-only inside the calling app's own
     /// `Contents/Resources/cli-src/`, `build/package-app.sh`) as this already-root helper
@@ -751,7 +757,11 @@ public final class HelperService: NSObject, HelperXPCProtocol {
         // unprivileged installer cannot see it through `SMJobCopyDictionary` and cannot delete
         // it directly. This newly blessed root helper is the first safe place to finish that
         // one-way migration. Run only after the bundled CLI tree has passed its integrity pin.
-        removeRetiredHelperArtifactsIfPresent()
+        let cleanup = removeRetiredHelperArtifacts()
+        guard cleanup.exitCode == 0 else {
+            encode(cleanup, reply: reply)
+            return
+        }
         // Idempotency: if the installed CLI tree already matches this helper's pinned hash, skip
         // the reinstall. Without this, a new app build re-blesses the helper but `CLIAutoStager`
         // never re-stages (it skips on "any ntfsmac installed"), so the installed `ntfsmac` stays
@@ -778,12 +788,16 @@ public final class HelperService: NSObject, HelperXPCProtocol {
     public func uninstallHelper(reply: @escaping (Data?, String?) -> Void) {
         Self.mutationLock.lock()
         defer { Self.mutationLock.unlock() }
-        // Complete uninstall means every helper retired by this distribution is gone, including
-        // orphaned standalone files that Service Management can no longer discover. Do this while
-        // a root process is still available.
-        removeRetiredHelperArtifactsIfPresent()
 
         #if NTFSMAC_LEGACY_HELPER
+        // A Legacy complete uninstall owns both its current standalone helper and any pre-v3
+        // orphan. Unlike the standard replacement path below, there is no separate embedded
+        // generation whose health must be proved before this cleanup.
+        let cleanup = removeRetiredHelperArtifacts()
+        guard cleanup.exitCode == 0 else {
+            encode(cleanup, reply: reply)
+            return
+        }
         let label = helperMachServiceName
         _ = runner.run("/bin/rm", ["-f", "/Library/LaunchDaemons/\(label).plist"])
         // Deleting our own running binary is safe on Unix — the inode stays valid until this
@@ -802,31 +816,63 @@ public final class HelperService: NSObject, HelperXPCProtocol {
         _ = runner.run("/bin/launchctl", ["bootout", "system/\(label)"])
         #else
         // The modern daemon lives inside the signed app bundle. It must never delete itself or a
-        // system plist: the unprivileged app calls SMAppService.unregister() immediately after
-        // this preparation reply, and macOS terminates the service atomically.
+        // system plist. It also deliberately leaves Legacy untouched here: HelperInstaller uses
+        // this selector while replacing a stale modern generation, before the replacement has
+        // proved healthy. The explicit post-health cleanup selector and the GUI's complete
+        // uninstall adapter own retired-helper removal at their safe transaction boundaries.
+        // The unprivileged app calls SMAppService.unregister() immediately after this preparation
+        // reply, and macOS terminates the embedded service atomically.
         encode(CommandResult(output: "modern helper ready to unregister", exitCode: 0), reply: reply)
         #endif
     }
 
-    private func removeRetiredHelperArtifactsIfPresent() {
-        guard retiredArtifactsPresent() else { return }
+    public func cleanupRetiredHelpers(reply: @escaping (Data?, String?) -> Void) {
+        Self.mutationLock.lock()
+        defer { Self.mutationLock.unlock() }
+        encode(removeRetiredHelperArtifacts(), reply: reply)
+    }
+
+    /// Best-effort removal is followed by explicit postcondition checks. `rm -f` alone is not
+    /// evidence that launchd released a job or that a previously running standalone helper died.
+    /// The labels and paths below are compile-time constants, never caller-controlled input.
+    private func removeRetiredHelperArtifacts() -> CommandResult {
+        guard retiredArtifactsPresent() else {
+            return CommandResult(output: "No previous ntfsmac Helper found.", exitCode: 0)
+        }
+        var failures: [String] = []
         for label in retiredHelperMachServiceNames {
-            // `bootout` is intentionally best-effort: orphaned files are precisely the case where
-            // the job is absent. The exact file paths are limited to reviewed historical labels.
+            let plistPath = "/Library/LaunchDaemons/\(label).plist"
+            let executablePath = "/Library/PrivilegedHelperTools/\(label)"
+
+            // `bootout` is intentionally best-effort: an orphaned-file migration has no job.
             _ = runner.run("/bin/launchctl", ["bootout", "system/\(label)"])
-            _ = runner.run("/bin/rm", ["-f", "/Library/LaunchDaemons/\(label).plist"])
-            _ = runner.run("/bin/rm", ["-f", "/Library/PrivilegedHelperTools/\(label)"])
+            let removePlist = runner.run("/bin/rm", ["-f", plistPath])
+            let removeExecutable = runner.run("/bin/rm", ["-f", executablePath])
             _ = runner.run("/usr/bin/tccutil", ["reset", "SystemPolicyAllFiles", label])
             _ = runner.run("/usr/bin/tccutil", ["reset", "All", label])
+
+            let registeredJob = runner.run("/bin/launchctl", ["print", "system/\(label)"])
+            let runningProcess = runner.run("/usr/bin/pgrep", ["-f", "-x", executablePath])
+            if removePlist.exitCode != 0 || removeExecutable.exitCode != 0
+                || registeredJob.exitCode == 0 || runningProcess.exitCode == 0 {
+                failures.append(label)
+            }
         }
+        guard failures.isEmpty else {
+            return CommandResult(
+                output: "The previous ntfsmac Helper could not be removed completely. Retry from Settings.",
+                exitCode: 1
+            )
+        }
+        return CommandResult(output: "Previous ntfsmac Helper removed.", exitCode: 0)
     }
 
     public func exitHelper(reply: @escaping (Data?, String?) -> Void) {
-        // Reply first, then self-terminate — same ordering as `uninstallHelper`: a reply queued
-        // after `exit(0)` never reaches the client and the GUI's `await` hangs. `exitSink`
-        // defaults to `exit(0)` in production; tests inject a capturing closure so they can
-        // assert the call happened without terminating the test process.
-        reply(Data(), nil)
+        // Reply with the same decodable CommandResult envelope as every other Data-returning XPC
+        // method, then self-terminate. An empty Data payload made HelperClient correctly throw a
+        // decode error even though the helper had acknowledged the call, preventing a strict Quit
+        // postcondition from distinguishing success from a dropped connection.
+        encode(CommandResult(output: "ntfsmac Helper stopped.", exitCode: 0), reply: reply)
         exitSink()
     }
 

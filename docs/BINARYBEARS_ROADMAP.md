@@ -12,7 +12,7 @@ The published compatibility product is software-complete for its measured P0/P1 
 - `ntfs-3g` default; NTFS3 explicit and experimental.
 - Private vmnet/NFS transport with per-session PF and route ownership.
 - Authoritative GUI/CLI/host mount reconciliation.
-- Fail-closed, reason-coded SECURITY rows and privacy-safe diagnostics.
+- Fail-closed, reason-coded protection evidence and privacy-safe diagnostics.
 - Verified Copy and Verify with flush, reread, and SHA-256 manifests.
 - Multi-drive lifecycle, notifications, Finder opening, Eject All, and professional DMG layout.
 
@@ -49,7 +49,8 @@ hardware or controlled playback environment is available.
 
 ### Release and public project
 
-- [x] Keep local contributor builds ad-hoc and credential-free.
+- [x] Keep a clearly labelled ad-hoc, credential-free contributor fallback while automatically
+  using the exact BinaryBears Developer ID identity when present for real local helper validation.
 - [x] Prepare Developer ID signing and notarization for official BinaryBears releases.
 - [x] Produce `ntfsmac-3.0.0-Apple-Silicon.dmg` and its SHA-256 file from a signed v3 tag.
 - [x] Create a draft GitHub Release, test that exact downloaded DMG, then publish without rebuilding.
@@ -99,53 +100,53 @@ dual-distribution gate below passes and `v3.1.0` ships.
 - [ ] Publish only after both locally tested candidates are rebuilt as signed/notarized draft
   artifacts and the downloaded DMGs pass their final smoke tests.
 
-#### Planned v3.1.0 completion sequence — documentation only
+#### v3.1.0 completion sequence — implementation status
 
-The items below combine the requested product scope with explicitly identified professional
-acceptance proposals. They are **not implemented by this planning update**. They are intentionally
-ordered so resource regressions have a before/after baseline, safety and data-integrity behavior
-lands before presentation work, and the final measurements cover the actual release candidate
-rather than an incomplete intermediate build.
+Items 2–6 are integrated in the `upgrade/v3.1.0` candidate and covered by focused regressions.
+They are not release claims: the complete local Standard/Legacy gate, packaged live acceptance,
+official artwork, signing/notarization, and downloaded-draft smoke tests remain mandatory.
 
-- **0.1 — Rebrand both DMGs with official BinaryBears artwork.** This gate is blocked until the
+- [ ] **0.1 — Rebrand both DMGs with official BinaryBears artwork.** This gate is blocked until the
   maintainer supplies the approved logo assets. Use those originals in the standard and Legacy
   installer presentation; do not invent, redraw, trace, or ship placeholder branding. Preserve the
   visible app name **ntfsmac**, keep only the compatibility DMG explicitly labelled **Legacy**, and
   visually validate the final mounted-window composition before either artifact can ship.
-1. **Capture a pre-change resource and visual baseline.** Record app, helper, and runtime CPU,
+- [ ] **1 — Complete the resource and visual baseline.** Record app, helper, and runtime CPU,
    resident memory, wakeups, and memory growth separately for idle, popover-open polling, Refresh,
    Diagnose, one mounted drive, and a 30-minute soak. Record both standard and Legacy builds on the
-   same Mac/OS/power conditions.
-2. **Make standard-helper migration transactional.** The standard build detects registered,
+   same Mac/OS/power conditions. Short idle sampling is useful development evidence, but does not
+   replace the full candidate matrix.
+- [x] **2 — Make standard-helper migration transactional.** The standard build detects registered,
    running, and orphaned Legacy helper state. It first obtains approval for and verifies a healthy
    standard helper/XPC connection, then uninstalls the Legacy helper and proves its job, process,
    and files are absent. A denied or failed standard installation must retain the working Legacy
    helper and show a recoverable state. The explicitly labelled Legacy build never removes the
    helper it requires.
-3. **Protect Quit while storage is active.** With any verified mount, present `Unmount and Quit`
+- [x] **3 — Protect Quit while storage is active.** With any verified mount, present `Unmount and Quit`
    as the safe default, `Quit Anyway`, and `Cancel`. `Don't show again` may persist only the safe
    `Unmount and Quit` action. It has no Settings control: Command-clicking Quit clears the saved
-   choice and restores the confirmation. Proposed safety extension: treat an active Verified Copy
-   or an in-flight mount/unmount as a stronger non-suppressible state.
-4. **Replace the GUI diagnostic row dump with a semantic summary.** Keep the CLI and privacy-safe
+   choice and restores the confirmation. An active Verified Copy or in-flight mount/unmount disables
+   Quit so an operation is never interrupted or covered by a saved preference.
+- [x] **4 — Replace the GUI diagnostic row dump with a semantic summary.** Keep the CLI and privacy-safe
    JSON schema unchanged. Aggregate the same evidence into a few textual macro categories with an
    explicit status, short explanation, and next action. Hide implementation details from the
    normal user; retain them only in the CLI and developer JSON export. Never rely on colour alone
    and never map missing evidence to green.
-5. **Integrate protection status into Diagnose.** Remove the standalone SECURITY presentation.
+- [x] **5 — Integrate protection status into Diagnose.** Remove the standalone SECURITY presentation.
    Diagnose includes one plain-language `Connection protection` macro category; `Hide` dismisses
    the complete Diagnose presentation, including that category. Running Diagnose again reveals a
    fresh result. The normal GUI never exposes PF, routes, vmnet, XPC, or similarly internal terms.
-6. **Refine the Settings header, update action, and button focus.** Use one balanced header row:
+- [x] **6 — Refine the Settings header, update action, and button focus.** Use one balanced header row:
    Back on the left, `Settings` optically centred, and the icon-only update action on the right,
    all aligned to the same baseline and stable hit-target geometry. Remove stacked decorative
    button rectangles. Do not autofocus an action when the popover opens or transfer focus because
    of a pointer click; show a thin focus treatment only after deliberate keyboard navigation, with
    no stale halo, excessive thickness, or layout movement.
-7. **Repeat resource qualification and the complete local release gate.** Compare the final
+- [ ] **7 — Repeat resource qualification and the complete release gate.** Compare the final
    candidate with step 1, investigate sustained CPU or monotonic memory growth, then run both
    packaged variants through automated, visual/accessibility, migration, mount, quit, uninstall,
-   signing, and downloaded-DMG acceptance before any push or publication.
+   signing, and downloaded-DMG acceptance. Local validation must finish before any push; the final
+   signed/notarized draft and downloaded-DMG checks follow only after the official artwork lands.
 
 ### Later product work
 

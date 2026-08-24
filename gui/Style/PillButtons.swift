@@ -91,11 +91,35 @@ public struct GlassIconButtonStyle: ButtonStyle {
     public var border: Color
 
     public func makeBody(configuration: Configuration) -> some View {
-        configuration.label
+        GlassIconButtonBody(
+            label: configuration.label,
+            fill: fill,
+            border: border,
+            isPressed: configuration.isPressed
+        )
+    }
+}
+
+private struct GlassIconButtonBody<Label: View>: View {
+    let label: Label
+    let fill: Color
+    let border: Color
+    let isPressed: Bool
+    @State private var isHovered = false
+
+    var body: some View {
+        label
             .frame(width: 30, height: 28)
-            .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(fill))
-            .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(border))
-            .opacity(configuration.isPressed ? 0.7 : 1.0)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(fill.opacity(isHovered || isPressed ? 1 : 0))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .strokeBorder(border.opacity(isHovered || isPressed ? 1 : 0))
+            )
+            .opacity(isPressed ? 0.7 : 1.0)
+            .onHover { isHovered = $0 }
     }
 }
 

@@ -112,17 +112,21 @@ public final class UpdateChecker: ObservableObject {
     private let defaults: UserDefaults
     private let now: @Sendable () -> Date
     private let openURL: (URL) -> Bool
+    private let successAcknowledgementDuration: Duration
+    private var transientResetTask: Task<Void, Never>?
 
     public init(
         client: any LatestReleaseFetching = GitHubLatestReleaseClient(),
         defaults: UserDefaults = .standard,
         now: @escaping @Sendable () -> Date = Date.init,
-        openURL: @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) }
+        openURL: @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) },
+        successAcknowledgementDuration: Duration = .seconds(2)
     ) {
         self.client = client
         self.defaults = defaults
         self.now = now
         self.openURL = openURL
+        self.successAcknowledgementDuration = successAcknowledgementDuration
     }
 
     public func checkAutomaticallyIfNeeded(currentVersion: String) async {
@@ -146,6 +150,8 @@ public final class UpdateChecker: ObservableObject {
 
     private func check(currentVersion: String, manual: Bool, at date: Date) async {
         guard state != .checking else { return }
+        transientResetTask?.cancel()
+        transientResetTask = nil
         guard let installed = SemanticVersion(tag: currentVersion) else {
             if manual { state = .failed("The installed version could not be read.") }
             return
@@ -159,6 +165,15 @@ public final class UpdateChecker: ObservableObject {
                 state = .updateAvailable(latest)
             } else {
                 state = manual ? .upToDate : .idle
+                if manual {
+                    transientResetTask = Task { @MainActor [weak self] in
+                        guard let self else { return }
+                        try? await Task.sleep(for: self.successAcknowledgementDuration)
+                        guard !Task.isCancelled, self.state == .upToDate else { return }
+                        self.state = .idle
+                        self.transientResetTask = nil
+                    }
+                }
             }
         } catch {
             state = manual ? .failed("Could not check GitHub Releases.") : .idle

@@ -84,3 +84,21 @@ private func updateDefaults() -> UserDefaults {
     await checker.checkManually(currentVersion: "3.0.0")
     #expect(checker.state == .failed("Could not check GitHub Releases."))
 }
+
+@MainActor
+@Test func manualUpToDateAcknowledgementReturnsToIdleWithoutLayoutChange() async {
+    let release = PublishedRelease(
+        version: SemanticVersion(tag: "3.1.0")!,
+        pageURL: URL(string: "https://github.com/BinaryBearsLLC/ntfsmac/releases/tag/v3.1.0")!
+    )
+    let checker = UpdateChecker(
+        client: CountingReleaseClient(.success(release)),
+        defaults: updateDefaults(),
+        successAcknowledgementDuration: .milliseconds(10)
+    )
+
+    await checker.checkManually(currentVersion: "3.1.0")
+    #expect(checker.state == .upToDate)
+    try? await Task.sleep(for: .milliseconds(30))
+    #expect(checker.state == .idle)
+}

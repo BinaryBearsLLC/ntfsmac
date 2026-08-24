@@ -58,7 +58,7 @@ public struct FirstRunView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glassPrimary())
-                .focusable(true)
+                .ntfsmacKeyboardFocus()
             case .requiresApproval(let message):
                 approvalCard(message: message)
                 Button {
@@ -71,13 +71,13 @@ public struct FirstRunView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glassPrimary())
-                .focusable(true)
+                .ntfsmacKeyboardFocus()
 
                 Button("Refresh Approval") {
                     Task { await installer.checkWithoutInstalling() }
                 }
                 .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                .focusable(true)
+                .ntfsmacKeyboardFocus()
             case .installing:
                 ProgressView("Installing privileged helper…")
                     .frame(maxWidth: .infinity)
@@ -96,7 +96,7 @@ public struct FirstRunView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glassPrimary())
-                .focusable(true)
+                .ntfsmacKeyboardFocus()
 
                 Button {
                     let mode = DiagnoseActionMode.resolve(
@@ -121,7 +121,7 @@ public struct FirstRunView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                .focusable(true)
+                .ntfsmacKeyboardFocus()
                 .disabled(diagnoseRunner.isRunning)
                 .help(TooltipCopy.text(for: .diagnose))
             }
@@ -241,7 +241,7 @@ public struct FirstRunView: View {
                 SettingsGearGlyph(color: .secondary)
             }
             .buttonStyle(.glassIcon(colorScheme: colorScheme))
-            .focusable(true)
+            .ntfsmacKeyboardFocus()
             .accessibilityLabel("Open Settings")
             .help(TooltipCopy.text(for: .settings))
             Spacer()
@@ -249,7 +249,7 @@ public struct FirstRunView: View {
                 Text("Quit").frame(height: 28)
             }
             .buttonStyle(.glassFooter(colorScheme: colorScheme))
-            .focusable(true)
+            .ntfsmacKeyboardFocus()
             .help(TooltipCopy.text(for: .quit))
         }
     }

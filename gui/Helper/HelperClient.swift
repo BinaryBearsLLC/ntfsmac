@@ -90,6 +90,16 @@ public final class HelperClient: Sendable {
         return newConnection
     }
 
+    /// Breaks an XPC request that stopped producing either a reply or an error callback. This is
+    /// used by the installer watchdog before unregistering a stale SMAppService generation.
+    public nonisolated func invalidateConnection() {
+        connectionLock.lock()
+        let staleConnection = connection
+        connection = nil
+        connectionLock.unlock()
+        staleConnection?.invalidate()
+    }
+
     // `nonisolated`: NSXPCConnection invokes both this and the error handler below from its own
     // internal XPC dispatch queue, never the main actor — a plain method on this `@MainActor`
     // class would otherwise be implicitly main-actor-isolated, and Swift's runtime actor check
@@ -161,6 +171,10 @@ public final class HelperClient: Sendable {
 
     public func uninstallHelper() async throws -> CommandResult {
         try await call { proxy, reply in proxy.uninstallHelper(reply: reply) }
+    }
+
+    public func cleanupRetiredHelpers() async throws -> CommandResult {
+        try await call { proxy, reply in proxy.cleanupRetiredHelpers(reply: reply) }
     }
 
     /// GUI Quit's final call after `unmount`/`teardown`: asks the privileged launchd helper to

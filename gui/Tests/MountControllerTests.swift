@@ -48,6 +48,30 @@ private final class FakeHelper: HelperMounting, MountSnapshotProviding {
     }
 }
 
+@MainActor
+private final class BlockingStorageHelper: HelperMounting, MountSnapshotProviding {
+    private var mountContinuation: CheckedContinuation<CommandResult, Never>?
+
+    func mount(device: String, driver: FsDriver, mountPoint: String?, readOnly: Bool) async throws -> CommandResult {
+        await withCheckedContinuation { continuation in
+            mountContinuation = continuation
+        }
+    }
+
+    func unmount(target: String) async throws -> CommandResult {
+        CommandResult(output: "unmounted", exitCode: 0)
+    }
+
+    func snapshot() async -> MountSnapshot {
+        MountSnapshot(mounts: [])
+    }
+
+    func finishMount() {
+        mountContinuation?.resume(returning: CommandResult(output: "mount failed", exitCode: 1))
+        mountContinuation = nil
+    }
+}
+
 private struct FakeReadOnlyChecker: MountReadOnlyChecking {
     let isReadOnly: Bool
     func isAnyNfsMountReadOnly() async -> Bool { isReadOnly }
@@ -79,7 +103,26 @@ private final class RecordingMountNotifier: MountEventNotifying {
     #expect(appState.state == .mountedReadWrite)
     #expect(controller.mountedDrive == sampleDrive)
     #expect(controller.errorMessage == nil)
+    #expect(!controller.hasStorageOperationInFlight)
     #expect(notifier.events == [.mounted(volumeName: "My Drive", readOnly: false)])
+}
+
+@MainActor
+@Test func storageOperationFlagCoversTheWholeAsynchronousMount() async {
+    let helper = BlockingStorageHelper()
+    let controller = MountController(helper: helper, appState: AppState())
+
+    let operation = Task { await controller.mount(sampleDrive) }
+    await Task.yield()
+
+    #expect(controller.hasStorageOperationInFlight)
+    #expect(controller.activeStorageOperations == 1)
+
+    helper.finishMount()
+    await operation.value
+
+    #expect(!controller.hasStorageOperationInFlight)
+    #expect(controller.activeStorageOperations == 0)
 }
 
 @MainActor
@@ -163,6 +206,7 @@ private final class RecordingMountNotifier: MountEventNotifying {
     #expect(fake.unmountCalls == ["disk4s2"])
     #expect(appState.state == .idle)
     #expect(controller.mountedDrive == nil)
+    #expect(!controller.hasStorageOperationInFlight)
 }
 
 @MainActor
@@ -335,6 +379,7 @@ private final class RecordingMountNotifier: MountEventNotifying {
 
     #expect(controller.mountedDriveIDs.isEmpty)
     #expect(appState.state == .idle)
+    #expect(!controller.hasStorageOperationInFlight)
 }
 
 @MainActor

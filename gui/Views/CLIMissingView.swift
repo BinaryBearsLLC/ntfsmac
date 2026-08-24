@@ -92,7 +92,7 @@ public struct CLIMissingView: View {
                         Text("Retry").frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                    .focusable(true)
+                    .ntfsmacKeyboardFocus()
                 }
                 .padding(10)
             }
@@ -106,12 +106,12 @@ public struct CLIMissingView: View {
                     SettingsGearGlyph(color: colorScheme == .dark ? .white.opacity(0.52) : .black.opacity(0.45))
                 }
                 .buttonStyle(.glassIcon(colorScheme: colorScheme))
-                .focusable(true)
+                .ntfsmacKeyboardFocus()
                 .accessibilityLabel("Open Settings")
                 Spacer()
                 Button("Quit", action: onQuit)
                     .buttonStyle(.glassFooter(colorScheme: colorScheme, foregroundOpacity: 0.42))
-                    .focusable(true)
+                    .ntfsmacKeyboardFocus()
                     .accessibilityLabel("Quit ntfsmac")
             }
             .padding(.horizontal, 10)

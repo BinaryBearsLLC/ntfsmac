@@ -5,6 +5,31 @@ import os.log
 
 private let helperInstallerLog = Logger(subsystem: "com.binarybears.ntfsmac", category: "HelperInstaller")
 
+/// `SMAppService.register()` can report a denied/revoked background-item decision as a generic
+/// EPERM even while `status` still reads `.notRegistered` (notably after replacing a development
+/// build under the same bundle identifier). Treat only Apple's two documented denial shapes as
+/// recoverable Login Items approval; signature, plist, and all unrelated failures stay failures.
+enum ModernRegistrationErrorPolicy {
+    private static let appServiceDomain = "SMAppServiceErrorDomain"
+
+    static func requiresLoginItemsRecovery(_ error: NSError) -> Bool {
+        var candidate: NSError? = error
+        for _ in 0..<4 {
+            guard let current = candidate else { return false }
+            if current.domain == appServiceDomain,
+               current.code == Int(POSIXErrorCode.EPERM.rawValue) {
+                return true
+            }
+            if current.domain == NSOSStatusErrorDomain,
+               current.code == Int(kSMErrorLaunchDeniedByUser) {
+                return true
+            }
+            candidate = current.userInfo[NSUnderlyingErrorKey] as? NSError
+        }
+        return false
+    }
+}
+
 /// Outcome shared by the modern SMAppService registration and the Legacy SMJobBless path.
 public enum HelperInstallOutcome: Equatable, Sendable {
     case installed
@@ -17,18 +42,20 @@ public enum HelperInstallOutcome: Equatable, Sendable {
 /// for an administrator prompt; the standard registration can instead transition to a separate
 /// System Settings approval state. `Sendable` keeps both paths off the menu-bar main actor.
 public protocol HelperInstallService: Sendable {
+    var requiresPostInstallHealthCheck: Bool { get }
     func isInstalled(label: String) -> Bool
     func requiresApproval(label: String) -> Bool
     func bless(label: String) -> HelperInstallOutcome
     func migrateLegacyHelper(legacyLabel: String, newLabel: String) -> HelperInstallOutcome?
-    func unregister(label: String) -> HelperInstallOutcome?
+    func unregister(label: String) async -> HelperInstallOutcome?
     func openApprovalSettings()
 }
 
 public extension HelperInstallService {
+    var requiresPostInstallHealthCheck: Bool { false }
     func requiresApproval(label: String) -> Bool { false }
     func migrateLegacyHelper(legacyLabel: String, newLabel: String) -> HelperInstallOutcome? { nil }
-    func unregister(label: String) -> HelperInstallOutcome? { nil }
+    func unregister(label: String) async -> HelperInstallOutcome? { nil }
     func openApprovalSettings() {}
 }
 
@@ -76,6 +103,14 @@ public struct RealQuarantineStripper: QuarantineStripping {
 public struct RealHelperInstallService: HelperInstallService {
     public init() {}
 
+    public var requiresPostInstallHealthCheck: Bool {
+        #if NTFSMAC_LEGACY_HELPER
+        false
+        #else
+        true
+        #endif
+    }
+
     /// A registration probe is only lifecycle state, not an identity proof. The subsequent XPC
     /// version exchange, helper-side caller validation, and release signatures remain the
     /// authorization boundary in both distributions.
@@ -105,12 +140,19 @@ public struct RealHelperInstallService: HelperInstallService {
         do {
             try modernService.register()
         } catch {
+            let registrationError = error as NSError
+            helperInstallerLog.error(
+                "SMAppService register failed: domain=\(registrationError.domain, privacy: .public) code=\(registrationError.code, privacy: .public)"
+            )
             switch modernService.status {
             case .enabled:
                 return .installed
             case .requiresApproval:
                 return .requiresApproval(Self.modernApprovalMessage)
             case .notRegistered, .notFound:
+                if ModernRegistrationErrorPolicy.requiresLoginItemsRecovery(registrationError) {
+                    return .requiresApproval(Self.modernApprovalResetMessage)
+                }
                 return .failed("Could not register ntfsmac Helper: \(error.localizedDescription)")
             @unknown default:
                 return .failed("Could not determine the ntfsmac Helper approval state.")
@@ -154,14 +196,16 @@ public struct RealHelperInstallService: HelperInstallService {
         }
         return bless(label: newLabel, authorization: authRef)
         #else
-        // A working v3 compatibility helper is asked to remove itself over its reviewed XPC
-        // surface by HelperInstaller. Any orphaned standalone files are removed later by the
-        // newly approved root daemon, never by this unprivileged app process.
+        // The standard build keeps the compatibility helper intact until the newly registered
+        // daemon has answered the current XPC version check. That daemon then removes every
+        // retired standalone job from its privileged cleanup surface. This ordering is
+        // transactional: denied approval or an unhealthy modern daemon never destroys the
+        // user's last working helper.
         return nil
         #endif
     }
 
-    public func unregister(label: String) -> HelperInstallOutcome? {
+    public func unregister(label: String) async -> HelperInstallOutcome? {
         #if NTFSMAC_LEGACY_HELPER
         return nil
         #else
@@ -169,12 +213,41 @@ public struct RealHelperInstallService: HelperInstallService {
         case .notRegistered, .notFound:
             return .installed
         case .enabled, .requiresApproval:
-            do {
-                try modernService.unregister()
-                return .installed
-            } catch {
-                return .failed("Could not unregister ntfsmac Helper: \(error.localizedDescription)")
+            let service = modernService
+            let gate = HelperTimeoutGate<HelperInstallOutcome>()
+            let outcome = await withCheckedContinuation { continuation in
+                gate.install(continuation)
+                // The synchronous API returns before launchd has reaped a running daemon. Apple's
+                // completion-handler contract is the point at which re-registration is safe; an
+                // immediate register otherwise fails with SMAppServiceErrorDomain/EPERM and sends
+                // the user into an unnecessary Login Items recovery flow.
+                service.unregister { error in
+                    if let error {
+                        gate.resolve(
+                            .failed(
+                                "Could not unregister ntfsmac Helper: \(error.localizedDescription)"
+                            )
+                        )
+                    } else {
+                        gate.resolve(.installed)
+                    }
+                }
+                Task.detached {
+                    try? await Task.sleep(for: .seconds(10))
+                    gate.resolve(
+                        .failed("Timed out while waiting for ntfsmac Helper to stop safely.")
+                    )
+                }
             }
+            if outcome == .installed {
+                // macOS 26.6.2 can finish the documented asynchronous unregister callback while
+                // its Background Task Management record is still settling. A register in the
+                // same run-loop slice then returns EPERM even though the user never denied it;
+                // the same call succeeds moments later. Keep this one-time upgrade/repair path
+                // bounded and give the system record a short grace period.
+                try? await Task.sleep(for: .seconds(1))
+            }
+            return outcome
         @unknown default:
             return .failed("Could not determine the ntfsmac Helper registration state.")
         }
@@ -194,6 +267,9 @@ public struct RealHelperInstallService: HelperInstallService {
 
     private static let modernApprovalMessage =
         "Allow ntfsmac in System Settings > General > Login Items, then return and refresh."
+
+    private static let modernApprovalResetMessage =
+        "In System Settings > General > Login Items, turn ntfsmac off and back on. Then reopen ntfsmac from Applications and choose Refresh."
 
     private func outcomeForModernStatus() -> HelperInstallOutcome {
         switch modernService.status {
@@ -271,9 +347,45 @@ public struct RealHelperInstallService: HelperInstallService {
 public protocol StaleHelperDetecting: Sendable {
     func version() async throws -> String
     func uninstallHelper() async throws -> CommandResult
+    func cleanupRetiredHelpers() async throws -> CommandResult
+    nonisolated func invalidateConnection()
 }
 
 extension HelperClient: StaleHelperDetecting {}
+
+public extension StaleHelperDetecting {
+    func cleanupRetiredHelpers() async throws -> CommandResult {
+        CommandResult(output: "No retired helper cleanup required.", exitCode: 0)
+    }
+
+    nonisolated func invalidateConnection() {}
+}
+
+/// A task group waits for all children before leaving scope, including an XPC continuation that
+/// ignores cancellation. This single-resume gate lets the installer return at the deadline while
+/// the timed-out connection is invalidated separately.
+private final class HelperTimeoutGate<Value: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Value?, Never>?
+    private var resolved = false
+
+    func install(_ continuation: CheckedContinuation<Value?, Never>) {
+        lock.withLock { self.continuation = continuation }
+    }
+
+    @discardableResult
+    func resolve(_ value: Value?) -> Bool {
+        let pending: CheckedContinuation<Value?, Never>? = lock.withLock {
+            guard !resolved else { return nil }
+            resolved = true
+            defer { continuation = nil }
+            return continuation
+        }
+        guard let pending else { return false }
+        pending.resume(returning: value)
+        return true
+    }
+}
 
 public enum HelperInstallState: Equatable, Sendable {
     case notChecked
@@ -304,31 +416,35 @@ public final class HelperInstaller: ObservableObject {
 
     private let service: any HelperInstallService
     private let staleDetector: any StaleHelperDetecting
-    private let retiredHelperDetector: (any StaleHelperDetecting)?
     private let quarantineStripper: any QuarantineStripping
     private let label: String
     private let legacyLabel: String
     private let expectedVersion: String
     private let staleCheckTimeoutNanoseconds: UInt64
+    private let postRegistrationHealthCheckAttempts: Int
+    private let postRegistrationHealthCheckDelayNanoseconds: UInt64
 
     public init(
         service: any HelperInstallService = RealHelperInstallService(),
         staleDetector: any StaleHelperDetecting = HelperClient(),
-        retiredHelperDetector: (any StaleHelperDetecting)? = nil,
         quarantineStripper: any QuarantineStripping = RealQuarantineStripper(),
         label: String = helperMachServiceName,
         legacyLabel: String = legacyHelperMachServiceName,
         expectedVersion: String = helperBuildIdentity(cliTreeHash: GeneratedCLIManifest.expectedTreeHashHex),
-        staleCheckTimeoutNanoseconds: UInt64 = 5_000_000_000
+        staleCheckTimeoutNanoseconds: UInt64 = 5_000_000_000,
+        postRegistrationHealthCheckAttempts: Int = 12,
+        postRegistrationHealthCheckDelayNanoseconds: UInt64 = 250_000_000
     ) {
         self.service = service
         self.staleDetector = staleDetector
-        self.retiredHelperDetector = retiredHelperDetector
         self.quarantineStripper = quarantineStripper
         self.label = label
         self.legacyLabel = legacyLabel
         self.expectedVersion = expectedVersion
         self.staleCheckTimeoutNanoseconds = staleCheckTimeoutNanoseconds
+        self.postRegistrationHealthCheckAttempts = max(1, postRegistrationHealthCheckAttempts)
+        self.postRegistrationHealthCheckDelayNanoseconds =
+            postRegistrationHealthCheckDelayNanoseconds
     }
 
     /// First-launch inspection is read-only and cannot display an authorization prompt or create
@@ -378,8 +494,7 @@ public final class HelperInstaller: ObservableObject {
                 state = .installed
                 return
             }
-            await uninstallStaleHelper()
-            guard await unregisterStaleModernHelperIfNeeded() else { return }
+            guard await prepareStaleHelperForReplacement() else { return }
         }
         await install()
     }
@@ -401,13 +516,13 @@ public final class HelperInstaller: ObservableObject {
             service.isInstalled(label: label)
         }
         if alreadyInstalled {
-            await uninstallStaleHelper()
-            guard await unregisterStaleModernHelperIfNeeded() else { return }
+            guard await prepareStaleHelperForReplacement() else { return }
         }
         await install()
     }
 
-    /// First-run entry point: detect already-installed and skip (Do clause) — never re-prompts
+    /// Compatibility entry point retained for existing callers: detect already-installed and skip
+    /// — never re-prompts
     /// for an install that's already live. Guards against a stray re-trigger (e.g. SwiftUI
     /// `.task` re-running) while a check/install is already in flight, and — critically — against
     /// re-running after a `.denied`/`.failed` outcome: `MenuBarExtra(.window)` recreates
@@ -424,11 +539,10 @@ public final class HelperInstaller: ObservableObject {
     /// exactly the failure mode behind both a permanently-stuck "Setup incomplete" (`stageCLI`
     /// rejects on the hash it was actually built with) and "couldn't connect with helper"
     /// (`removeDependencies`/`uninstallHelper` calls hitting a daemon that doesn't match). So a
-    /// registered helper only counts as installed if it reports the same build hash this GUI was
-    /// built with; otherwise it's cleared out (best-effort, via its own still-live
-    /// `uninstallHelper` — works for any helper new enough to have that method, i.e. everything
-    /// from this point forward) and a fresh `bless()` runs, same single-auth-prompt path a
-    /// first-time install takes.
+    /// registered helper only counts as installed if it reports the same build identity this GUI
+    /// was built with. Standard then replaces it through `SMAppService.unregister()`; Legacy uses
+    /// its bounded XPC self-uninstall before a fresh bless. Both converge on the same explicit
+    /// install path used on first run.
     public func installIfNeeded() async {
         switch state {
         case .checking, .readyToInstall, .requiresApproval, .installing, .denied, .failed:
@@ -453,18 +567,16 @@ public final class HelperInstaller: ObservableObject {
             state = .installed
             return
         }
-        // Bounded, same reason `isRegisteredHelperCurrent` below is: a helper old enough to
-        // predate `uninstallHelper` itself (or one that's simply wedged) must not be able to
-        // hang this indefinitely — worst case, `bless()` still runs next and SMJobBless's own
-        // install path takes over from whatever state the stale daemon was left in.
+        // The lifecycle-specific replacement is bounded where it uses XPC: an old Legacy helper
+        // that predates `uninstallHelper` (or is simply wedged) cannot hang this indefinitely.
+        // Standard does not call the stale generation at all and lets SMAppService replace it.
         // Silent-failure-hunter finding (2026-07-13, MEDIUM): this result was fully discarded
         // with no logging — a real failure clearing the stale daemon (e.g. a permission error
         // deleting its plist, not just a timeout) then surfaced only as a generic `bless()`
         // failure next, with no trail pointing back at the actual root cause. Best-effort
-        // discard-and-continue is still correct (SMJobBless's own install path recovers
-        // regardless), but it should leave a diagnostic trail.
-        await uninstallStaleHelper()
-        guard await unregisterStaleModernHelperIfNeeded() else { return }
+        // discard-and-continue is still correct because registration/re-blessing performs the
+        // actual replacement, but it should leave a diagnostic trail.
+        guard await prepareStaleHelperForReplacement() else { return }
         await install()
     }
 
@@ -477,11 +589,17 @@ public final class HelperInstaller: ObservableObject {
         }
     }
 
-    private func unregisterStaleModernHelperIfNeeded() async -> Bool {
-        let outcome = await runOffCooperativePool { [service, label] in
-            service.unregister(label: label)
+    /// Standard/P2 replacement is owned entirely by `SMAppService.unregister()`: calling an old
+    /// embedded generation's XPC uninstall selector first is both unnecessary and unsafe because
+    /// a pre-fix generation may remove the still-working Legacy helper before P2 proves healthy.
+    /// Legacy has no SMAppService registration, so its `nil` outcome deliberately falls back to
+    /// the bounded XPC self-uninstall path before re-blessing.
+    private func prepareStaleHelperForReplacement() async -> Bool {
+        let outcome = await service.unregister(label: label)
+        guard let outcome else {
+            await uninstallStaleHelper()
+            return true
         }
-        guard let outcome else { return true }
         switch outcome {
         case .installed:
             return true
@@ -517,17 +635,18 @@ public final class HelperInstaller: ObservableObject {
 
     private func withStaleCheckTimeout<T: Sendable>(_ work: @escaping @Sendable () async throws -> T) async -> T? {
         let timeoutNanoseconds = staleCheckTimeoutNanoseconds
-        return await withTaskGroup(of: T?.self) { group in
-            group.addTask {
-                try? await work()
+        let gate = HelperTimeoutGate<T>()
+        return await withCheckedContinuation { continuation in
+            gate.install(continuation)
+            let operation = Task {
+                gate.resolve(try? await work())
             }
-            group.addTask {
+            Task { [staleDetector] in
                 try? await Task.sleep(nanoseconds: timeoutNanoseconds)
-                return nil
+                guard gate.resolve(nil) else { return }
+                staleDetector.invalidateConnection()
+                operation.cancel()
             }
-            let first = await group.next() ?? nil
-            group.cancelAll()
-            return first
         }
     }
 
@@ -536,19 +655,14 @@ public final class HelperInstaller: ObservableObject {
     public func install() async {
         guard state != .installing else { return }
         state = .installing
-        if let retiredHelperDetector {
-            let result = await withStaleCheckTimeout {
-                try await retiredHelperDetector.uninstallHelper()
-            }
-            if let result {
-                helperInstallerLog.notice(
-                    "retired compatibility helper cleanup: exitCode=\(result.exitCode, privacy: .public) output=\(result.output, privacy: .public)"
-                )
-            }
-        }
-        let outcome = await runOffCooperativePool { [service, label, legacyLabel, quarantineStripper] in
+        let outcome = await registrationAttempt(allowLegacyMigration: true)
+        await finishInstall(outcome, allowAutomaticHealthRepair: true)
+    }
+
+    private func registrationAttempt(allowLegacyMigration: Bool) async -> HelperInstallOutcome {
+        await runOffCooperativePool { [service, label, legacyLabel, quarantineStripper] in
             quarantineStripper.stripQuarantine()
-            if let migration = service.migrateLegacyHelper(
+            if allowLegacyMigration, let migration = service.migrateLegacyHelper(
                 legacyLabel: legacyLabel,
                 newLabel: label
             ) {
@@ -556,8 +670,51 @@ public final class HelperInstaller: ObservableObject {
             }
             return service.bless(label: label)
         }
+    }
+
+    /// A freshly re-registered SMAppService daemon can transiently remain submitted but
+    /// uninitialized after a complete uninstall (observed live on macOS 26.6.2: `runs = 0`, valid
+    /// LWCR, no XPC endpoint). The same explicit Repair action already fixes that state by
+    /// unregistering and registering once more. Perform that exact recovery automatically inside
+    /// the user's original Install action, bounded to one retry; approval/denial outcomes still
+    /// surface immediately and Legacy cleanup still waits for a healthy current XPC handshake.
+    private func finishInstall(
+        _ outcome: HelperInstallOutcome,
+        allowAutomaticHealthRepair: Bool
+    ) async {
         switch outcome {
         case .installed:
+            guard service.requiresPostInstallHealthCheck else {
+                state = .installed
+                return
+            }
+            guard await waitForRegisteredHelperCurrent() else {
+                if allowAutomaticHealthRepair {
+                    helperInstallerLog.notice(
+                        "registered modern helper did not become healthy; attempting one bounded registration reset"
+                    )
+                    guard await prepareStaleHelperForReplacement() else { return }
+                    state = .installing
+                    let retryOutcome = await registrationAttempt(allowLegacyMigration: false)
+                    await finishInstall(retryOutcome, allowAutomaticHealthRepair: false)
+                    return
+                }
+                state = .failed(
+                    "macOS registered ntfsmac Helper, but it still could not start after an automatic repair. In Login Items, turn ntfsmac off and back on, reopen the app, then choose Refresh."
+                )
+                return
+            }
+            guard let cleanup = await withStaleCheckTimeout({ [staleDetector] in
+                try await staleDetector.cleanupRetiredHelpers()
+            }), cleanup.exitCode == 0 else {
+                state = .failed(
+                    "ntfsmac Helper is ready, but the previous helper could not be removed completely. Retry from Settings."
+                )
+                return
+            }
+            helperInstallerLog.notice(
+                "retired compatibility helper cleanup completed after modern XPC health verification"
+            )
             state = .installed
         case .requiresApproval(let message):
             state = .requiresApproval(message)
@@ -566,6 +723,22 @@ public final class HelperInstaller: ObservableObject {
         case .failed(let message):
             state = .failed(message)
         }
+    }
+
+    /// Registration status becomes enabled before launchd necessarily exposes the new daemon's
+    /// XPC endpoint. A single immediate version call therefore creates a false "broken helper"
+    /// result and needlessly unregisters a healthy approval. Retry only this post-registration
+    /// health check; passive startup inspection remains a single bounded read.
+    private func waitForRegisteredHelperCurrent() async -> Bool {
+        for attempt in 0..<postRegistrationHealthCheckAttempts {
+            if await isRegisteredHelperCurrent() {
+                return true
+            }
+            staleDetector.invalidateConnection()
+            guard attempt + 1 < postRegistrationHealthCheckAttempts else { break }
+            try? await Task.sleep(nanoseconds: postRegistrationHealthCheckDelayNanoseconds)
+        }
+        return false
     }
 
     private static let modernApprovalMessage =

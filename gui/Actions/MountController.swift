@@ -121,6 +121,7 @@ public final class MountController: ObservableObject {
     @Published public private(set) var physicallyMissingDriveIDs: Set<String> = []
     @Published public private(set) var isEjectingAll = false
     @Published public private(set) var lastEjectAllReport: EjectAllReport?
+    @Published public private(set) var activeStorageOperations = 0
 
     private let helper: any HelperMounting
     private let readOnlyChecker: any MountReadOnlyChecking
@@ -181,6 +182,7 @@ public final class MountController: ObservableObject {
     public var mountedMountPoint: String? { mountedDrives.first?.mountPoint }
     /// Identifiers of every currently mounted drive — used by `DriveListView` to mark rows.
     public var mountedDriveIDs: Set<String> { Set(mountedDrives.map(\.id)) }
+    public var hasStorageOperationInFlight: Bool { activeStorageOperations > 0 }
 
     /// Reconcile on launch and every bounded polling interval. The closure is evaluated on the
     /// main actor so the scanner's latest `@Published` drive metadata can be reused safely.
@@ -313,9 +315,11 @@ public final class MountController: ObservableObject {
         reconciliationWarning = nil
         lastEjectAllReport = nil
         mountOperationsInFlight += 1
+        activeStorageOperations += 1
         appState.state = .mounting
         defer {
             mountOperationsInFlight -= 1
+            activeStorageOperations -= 1
             if appState.state == .mounting {
                 recomputeAggregateState()
             }
@@ -410,6 +414,8 @@ public final class MountController: ObservableObject {
             targets = mountedDrives.map(\.id)
         }
         guard !targets.isEmpty else { return }
+        activeStorageOperations += 1
+        defer { activeStorageOperations -= 1 }
         let notificationNames = Dictionary(uniqueKeysWithValues: mountedDrives.map {
             ($0.id, notificationName(for: $0.drive))
         })
@@ -461,10 +467,14 @@ public final class MountController: ObservableObject {
         guard !targets.isEmpty else { return }
 
         isEjectingAll = true
+        activeStorageOperations += 1
         lastEjectAllReport = nil
         errorMessage = nil
         reconciliationWarning = nil
-        defer { isEjectingAll = false }
+        defer {
+            isEjectingAll = false
+            activeStorageOperations -= 1
+        }
 
         var helperFailures: Set<String> = []
         for target in targets {

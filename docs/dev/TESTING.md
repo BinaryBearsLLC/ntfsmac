@@ -385,20 +385,11 @@ If any step fails, capture the exact stdout/stderr and bring it back rather than
 blindly — this is genuinely the first time this path has run against real hardware outside the
 sandbox.
 
-```
-$ NTFSMAC_PREFIX/bin/ntfsmac uninstall
-security_teardown=notRequired reason=NO_SESSION_STATE
-uninstall: removed <tmp-prefix>
-uninstall: removed ~/.anylinuxfs (rootfs cache + config.toml)
-uninstall: not running as root — the GUI's privileged helper (if installed) was left in place.
-uninstall: re-run with 'sudo' to remove it too, or use the GUI's own Uninstall control in Preferences.
-uninstall: done
-$ NTFSMAC_PREFIX/bin/ntfsmac diagnose
-zsh: no such file or directory: <tmp-prefix>/bin/ntfsmac
-```
-
-Fixed: not a bug — expected. `uninstall` removed the prefix, so `ntfsmac` (which lived under it)
-is legitimately gone; `diagnose` erroring with "no such file" afterward is the correct outcome.
+For a CLI-only or Legacy installation, `ntfsmac uninstall` self-elevates, removes the runtime and
+standalone helper state, and the command legitimately disappears with its prefix. If the standard
+`SMAppService` daemon is registered, the same command must instead refuse before mutation and direct
+the user to Settings > Uninstall; treating raw `launchctl`/file deletion as equivalent would leave
+macOS's service registration state stale.
 
 
 
@@ -425,7 +416,8 @@ cd <repo>
 ```
 
 The builder must produce both `dist/ntfsmac.app` and `dist/ntfsmac-legacy.app`, plus the standard
-and `Legacy` versioned DMGs. Test the standard app first, remove it completely, then repeat the
+and `Legacy` versioned DMGs and a verified, portable `.sha256` sidecar for each DMG. Test the
+standard app first, remove it completely, then repeat the
 applicable matrix with the Legacy app. `./build.command gui --no-legacy` is only for a deliberate
 single-artifact developer run, not the normal release gate.
 
@@ -450,6 +442,20 @@ above and re-run.
    then stages its
    bundled CLI/runtime through the helper; no separate Homebrew or manual CLI install is required
    for this GUI pass.
+
+   `./build.command gui` automatically uses the exact BinaryBears Developer ID Application
+   identity when it is installed, so that local DMG is suitable for a real standard-helper launch.
+   If the identity is unavailable (or `SIGNING_IDENTITY=-` is explicit), the builder must warn that
+   it produced an ad-hoc UI/structure artifact whose SMAppService helper macOS cannot register; that
+   fallback must never be reported as a P2 runtime pass. The release candidate must additionally be
+   notarized and stapled. When replacing an older/ad-hoc build under the same
+   bundle identifier, macOS can retain its previous background-item launch requirement. If the UI
+   requests recovery, turn only **ntfsmac** off and back on in Login Items, reopen ntfsmac from
+   Applications, refresh, and retry. The reopen also gives the app one bounded chance to rebuild a
+   status-item anchor invalidated by that reset; it never starts a permanent retry loop.
+   Success requires `launchctl print system/com.binarybears.ntfsmac.helper.daemon` to report a
+   running job with `has LWCR` and without `needs LWCR update`, followed by the current XPC version
+   handshake and CLI staging; registration alone is not a pass.
 2. Popover should show your drive in the list (the same filtered `anylinuxfs list` data Part A's
    `list` command showed, including MBR `Windows_NTFS`). Click `[Mount]` and confirm the default
    is still `ntfs-3g`. In a separate disposable-data run, open the adjacent compact menu, select
@@ -462,28 +468,45 @@ above and re-run.
    macOS actually presents rather than inferring them from plist metadata. Return to ntfsmac; the
    gate must recheck and reveal the normal popover automatically, so the first Mount is not lost to
    authorization.
-3. Icon should pulse blue while mounting, then turn green with the drive shown as mounted, a
-   per-drive Unmount action, and measured **Private VM link**, **VPN-safe route**, and **PF policy
-   enforced** rows. Their state/reason codes must match CLI diagnostics; unavailable or malformed
-   evidence must stay unknown/non-green. Confirm `Open` reveals this exact drive's observed mount
-   point in Finder. No speed row should appear.
-4. Click `Diagnose` in the footer — the panel should match Part A's `diagnose --json` output in
-   plain language. Hide and reopen it to confirm a fresh run still works.
+3. Icon should pulse blue while mounting, then turn green with the drive shown as mounted and a
+   per-drive Unmount action. Confirm `Open` reveals this exact drive's observed mount point in
+   Finder. No speed row or standalone SECURITY section should appear.
+4. Click `Diagnose` in the footer. The GUI must derive four plain-language categories from Part A's
+   unchanged `diagnose --json` report: **App readiness**, **Drive status**, **Connection
+   protection**, and **Permissions**. Each card pairs a status word, symbol, semantic colour,
+   concise explanation, and useful next action. Missing evidence must be explicitly non-green; the
+   normal GUI must not expose helper identifiers, XPC, VM, PF, route, digest, or raw-key details.
+   Hide the complete result and run Diagnose again to confirm it performs a fresh check and does
+   not leave a collapsed Security placeholder.
 5. Hold Command (⌘) and click `Diagnose`. The same diagnostic summary should run, followed by a
    native save panel proposing `ntfsmac-diagnose-<timestamp>.json`. Save it to a temporary
    location, confirm it is valid privacy-safe JSON, then remove only that test export. Canceling
    the save panel must create no file and no network upload should occur.
-6. Click `Unmount` — icon returns to its system-adaptive idle state and the drive drops off the
+6. With the drive still mounted, click `Quit`. Confirm the in-popover prompt offers **Unmount and
+   Quit**, **Quit Anyway**, and **Cancel**, and that Cancel changes nothing. In separate disposable
+   cycles, verify Quit Anyway exits without dismantling the still-valid mounted filesystem, while
+   Unmount and Quit attempts every drive and exits only after cleanup is confirmed. `Don't show
+   again` may remember only Unmount and Quit; after saving it, Command-click Quit must clear the
+   choice and restore the prompt. During Verified Copy or an in-flight mount/unmount, Quit must be
+   disabled and must not interrupt the operation.
+7. Click `Unmount` — icon returns to its system-adaptive idle state and the drive drops off the
    mounted row.
-7. Click the gear icon — Settings replaces the popover content. Confirm the current app
-   release/build appears directly below `Settings`. Confirm Notifications defaults off; permission
-   is requested only when explicitly enabled. Exercise Launch at login if appropriate, use Back,
-   and reopen Settings.
-8. As the final cleanup check, click `Uninstall…` in Settings. Confirm the destructive prompt stays
+8. Click the gear icon — Settings replaces the popover content. Confirm Back, the optically centred
+   Settings title/version, and the icon-only update action share one stable header row. Exercise
+   idle, checking, up-to-date, available, and unavailable update states without a separate text row.
+   Confirm the standard build has no visible `P2`/`Modern` label and only the compatibility build
+   says `Legacy`. Confirm Notifications defaults off; permission is requested only when explicitly
+   enabled. Exercise Launch at login if appropriate, use Back, and reopen Settings. Pointer-click
+   and reopen the popover repeatedly: no action may acquire a thick external blue halo. Then use
+   Tab/Shift-Tab and confirm deliberate keyboard traversal has a predictable order and one subtle
+   focus treatment without layout movement.
+9. As the final cleanup check, click `Uninstall…` in Settings. Confirm the destructive prompt stays
    inside the popover; cancel once, reopen it, then confirm. A freshly installed helper must uninstall
    on the first confirmed attempt, the UI must reach `Uninstalled`, and the uninstall action must
-   remain disabled afterward.
-9. Click `Quit` — app should exit; `mount | grep nfs` back in Terminal should show nothing
+   remain disabled afterward. Reinstall immediately from that state: if macOS submits the fresh
+   SMAppService job without starting it, the original Install action must perform at most one
+   automatic unregister/register repair and reach the next setup gate without a second click.
+10. Click `Quit` — app should exit; `mount | grep nfs` back in Terminal should show nothing
    ntfsmac-related left mounted.
 
 ### Force a dirty-journal refusal test, optional and disposable-media only
@@ -501,7 +524,8 @@ then repeat the normal clean mount. This is optional and drive-specific; Part A/
 
 ```bash
 cd <repo>
-swift test
+./build/run-swift-tests.sh modern .build/ntfsmac-modern-tests
+./build/run-swift-tests.sh legacy .build/ntfsmac-legacy-tests
 ```
 
 If you hit `error: input file '...runner.swift' was modified during the build` — real,
@@ -513,8 +537,11 @@ around it with a local build cache:
 swift test --build-path /tmp/ntfsmac-build
 ```
 
-Require the complete Swift test run to pass. The exact case count is printed by Swift Testing and
-changes when focused regression coverage is added; do not use a stale hard-coded count as a gate.
+These monitored, serial commands are the local gate for both compile-time helper variants. Raw
+`swift test` remains useful for development, but it exercises only the default variant and does not
+provide the bounded post-summary watchdog used by the builder. The exact case count is printed by
+Swift Testing and changes when focused regression coverage is added; do not use a stale hard-coded
+count as a gate.
 
 On macOS 26.6.2, Apple's SwiftPM AppKit helper can stop in the CoreFoundation main executor when
 the off-screen `PopoverStateRenderTests` begin. `build.command gui` detects that exact OS release,
@@ -539,27 +566,26 @@ you want something real to uninstall, not an empty install.
 
 ### CLI
 
-Fixed: `ntfsmac uninstall` now self-elevates via `sudo` automatically (same pattern as
-`mount`'s self-elevation) — one command, one password prompt, and it's fully done, including
-the GUI's privileged helper. It used to leave the helper in place and tell you to re-run with
-`sudo` yourself; `resolve_invoker_home()` (`cli/commands/uninstall.sh`) makes sure `~/.anylinuxfs`
-and `~/Library/Logs` still resolve to *your* home once elevated, not root's. Regression tests:
-`tests/cli/uninstall.bats` — "self-elevates via sudo" and "resolve_invoker_home ... not root's
-own HOME".
+`ntfsmac uninstall` self-elevates via `sudo` for CLI-only and Legacy installations, removes the
+runtime tree/cache/logs, and cleans standalone compatibility/pre-v3 helper files. The standard
+daemon is owned by `SMAppService`, not by raw `/Library` file deletion. If that service is
+registered, CLI uninstall refuses **before changing anything** and directs the user to Settings >
+Uninstall; the containing app must ask macOS to unregister it. `resolve_invoker_home()` keeps
+`~/.anylinuxfs` and `~/Library/Logs` pointed at the invoking user after elevation.
 
 ```bash
 NTFSMAC_PREFIX=/usr/local/ntfsmac   # or wherever you installed to
 export NTFSMAC_PREFIX
-ntfsmac uninstall                   # unmounts nothing itself — refuses if a drive is still
-                                     # mounted; run `ntfsmac unmount <device>` first. Prompts
-                                     # for your password once, removes everything including
-                                     # the GUI's privileged helper.
+ntfsmac uninstall                   # refuses if a drive is mounted; run `ntfsmac unmount
+                                     # <device>` first. For Standard, use Settings > Uninstall
+                                     # while the app-managed service is registered.
 ls "$NTFSMAC_PREFIX"                # expect: No such file or directory
 ls ~/.anylinuxfs                    # expect: No such file or directory (rootfs cache + config)
 ls ~/Library/Logs/anylinuxfs*.log 2>&1   # expect: No such file or directory
-sudo launchctl print system/com.khr898.ntfsmac.helper   # expect: Could not find service
-ls /Library/LaunchDaemons/com.khr898.ntfsmac.helper.plist        # expect: No such file
-ls /Library/PrivilegedHelperTools/com.khr898.ntfsmac.helper      # expect: No such file
+sudo launchctl print system/com.binarybears.ntfsmac.helper       # Legacy: not found
+sudo launchctl print system/com.khr898.ntfsmac.helper            # pre-v3: not found
+ls /Library/LaunchDaemons/com.binarybears.ntfsmac.helper.plist   # Legacy: no such file
+ls /Library/PrivilegedHelperTools/com.binarybears.ntfsmac.helper # Legacy: no such file
 ```
 
 `ntfsmac help` lists every command, including `uninstall` — run it if anything above is
@@ -567,15 +593,13 @@ unfamiliar.
 
 ### GUI
 
-Preferences → "Uninstall ntfsmac" → confirm the dialog. This routes through the *already*
-privileged helper (no new auth prompt — it's already running with the trust the first-run
-install granted it) to remove `$installPrefix` + your real `~/.anylinuxfs`/logs, then un-bless
-itself (`launchctl bootout` + delete its own launchd plist/binary). Verify the same way as the
-CLI `sudo` path above (`launchctl print`, `ls` on both `/Library` paths). Once that's done,
-dragging `ntfsmac.app` to the Trash should leave nothing else on disk — check `~/Library/
-Preferences/com.khr898.ntfsmac.settings.plist` too if you want to confirm even the stored
-Preferences are gone (the uninstall flow doesn't currently clear `UserDefaults` — a real,
-minor, non-blocking gap: run `defaults delete com.khr898.ntfsmac` manually if you want that too).
+Settings → "Uninstall ntfsmac" → confirm the dialog. This routes dependency cleanup through the
+already privileged helper. Standard then calls `SMAppService.unregister()` from the containing app;
+Legacy removes its standalone launchd job/files through the authorized helper. Verify the relevant
+service is absent with `launchctl print`, retired standalone files are gone, and the runtime prefix,
+cache, and logs are absent before dragging `ntfsmac.app` to the Trash. Stored UI preferences are
+separate non-privileged app data; remove them explicitly with
+`defaults delete com.binarybears.ntfsmac` only when a completely fresh preference state is desired.
 
 **Real safety property to spot-check:** if you have a drive mounted, "Uninstall ntfsmac" should
 refuse (same active-mount check the CLI makes) rather than silently ripping the helper out from

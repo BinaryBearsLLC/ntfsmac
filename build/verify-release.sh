@@ -124,11 +124,7 @@ verify_dmg() {
       fail "Gatekeeper rejected the DMG"
   fi
 
-  (
-    cd "$(dirname "$DMG")"
-    shasum -a 256 "$(basename "$DMG")" > "$(basename "$DMG").sha256"
-    shasum -a 256 -c "$(basename "$DMG").sha256" >/dev/null
-  ) || fail "checksum verification failed"
+  "$SCRIPT_DIR/write-sha256.sh" "$DMG" || fail "checksum verification failed"
 }
 
 verify_app

@@ -12,8 +12,9 @@ public protocol HelperUninstalling {
 }
 
 /// Production adapter. The Legacy helper removes its standalone launchd files and boots itself
-/// out over XPC. The modern helper only prepares root-owned retired artifacts; the app then asks
-/// SMAppService to unregister the embedded daemon so macOS owns the lifecycle atomically.
+/// out over XPC. For a complete standard uninstall, the still-healthy root daemon first removes
+/// retired standalone helpers; it then prepares itself and the app asks SMAppService to unregister
+/// the embedded daemon so macOS owns that lifecycle atomically.
 @MainActor
 public final class RealHelperUninstallService: HelperUninstalling {
     private let client: HelperClient
@@ -27,6 +28,11 @@ public final class RealHelperUninstallService: HelperUninstalling {
     }
 
     public func uninstallHelper() async throws -> CommandResult {
+        #if !NTFSMAC_LEGACY_HELPER
+        let cleanup = try await client.cleanupRetiredHelpers()
+        guard cleanup.exitCode == 0 else { return cleanup }
+        #endif
+
         let result = try await client.uninstallHelper()
         guard result.exitCode == 0 else { return result }
 

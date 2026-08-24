@@ -6,8 +6,12 @@ setup() {
   FIXTURE_DIR="$(mktemp -d)"
   export NTFSMAC_OPEN_BIN="$FIXTURE_DIR/open"
   export NTFSMAC_OPEN_CALLS="$FIXTURE_DIR/open.calls"
+  export NTFSMAC_NOTIFY_BIN="$FIXTURE_DIR/notifyutil"
+  export NTFSMAC_NOTIFY_CALLS="$FIXTURE_DIR/notify.calls"
   printf '#!/bin/bash\nprintf "%%s\\n" "$*" >> "$NTFSMAC_OPEN_CALLS"\nexit "${NTFSMAC_OPEN_EXIT:-0}"\n' > "$NTFSMAC_OPEN_BIN"
+  printf '#!/bin/bash\nprintf "%%s\\n" "$*" >> "$NTFSMAC_NOTIFY_CALLS"\n' > "$NTFSMAC_NOTIFY_BIN"
   chmod +x "$NTFSMAC_OPEN_BIN"
+  chmod +x "$NTFSMAC_NOTIFY_BIN"
 }
 
 teardown() {
@@ -19,6 +23,7 @@ teardown() {
 
   [ "$status" -eq 0 ]
   [ "$(cat "$NTFSMAC_OPEN_CALLS")" = $'-b com.binarybears.ntfsmac binarybears-ntfsmac://opengui\n-b com.binarybears.ntfsmac binarybears-ntfsmac://opengui\n-b com.binarybears.ntfsmac binarybears-ntfsmac://opengui' ]
+  [ "$(cat "$NTFSMAC_NOTIFY_CALLS")" = $'-q -p com.binarybears.ntfsmac.open-gui\n-q -p com.binarybears.ntfsmac.open-gui\n-q -p com.binarybears.ntfsmac.open-gui' ]
   [[ "$output" == *"popover requested"* ]]
 }
 
@@ -30,6 +35,17 @@ teardown() {
 
   [ "$status" -eq 0 ]
   [ "$(cat "$NTFSMAC_OPEN_CALLS")" = $'-a '"$NTFSMAC_GUI_APP_PATH"$' binarybears-ntfsmac://opengui\n-a '"$NTFSMAC_GUI_APP_PATH"$' binarybears-ntfsmac://opengui\n-a '"$NTFSMAC_GUI_APP_PATH"$' binarybears-ntfsmac://opengui' ]
+}
+
+@test "keeps the Launch Services path when notifyutil is unavailable" {
+  export NTFSMAC_NOTIFY_BIN="$FIXTURE_DIR/missing-notifyutil"
+
+  run "$SCRIPT"
+
+  [ "$status" -eq 0 ]
+  [ "$(wc -l < "$NTFSMAC_OPEN_CALLS" | tr -d ' ')" -eq 3 ]
+  [ ! -e "$NTFSMAC_NOTIFY_CALLS" ]
+  [[ "$output" == *"popover requested"* ]]
 }
 
 @test "fails clearly when Launch Services cannot find the app" {

@@ -41,6 +41,80 @@ enum OtherAvailableSection {
     static func rowsRender(availableCount: Int) -> Bool { availableCount > 0 }
 }
 
+public enum QuitRequestDecision: Equatable, Sendable {
+    case quitNow
+    case showConfirmation
+    case unmountAndQuit
+}
+
+public enum QuitRequestPolicy {
+    public static func resolve(
+        hasMountedDrives: Bool,
+        commandPressed: Bool,
+        remembersSafeAction: Bool
+    ) -> QuitRequestDecision {
+        guard hasMountedDrives else { return .quitNow }
+        if commandPressed { return .showConfirmation }
+        return remembersSafeAction ? .unmountAndQuit : .showConfirmation
+    }
+}
+
+/// The only persisted Quit choice is the safe one. Command-click clears this key; there is no
+/// Settings row or alternate persisted "Quit Anyway" state.
+public struct QuitPreferenceStore {
+    private static let safeActionKey = "com.binarybears.ntfsmac.quit.unmountWithoutAsking"
+    private let defaults: UserDefaults
+
+    public init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    public var remembersSafeAction: Bool { defaults.bool(forKey: Self.safeActionKey) }
+    public func rememberSafeAction() { defaults.set(true, forKey: Self.safeActionKey) }
+    public func clear() { defaults.removeObject(forKey: Self.safeActionKey) }
+}
+
+public struct QuitConfirmationPresentation: Equatable, Sendable {
+    public private(set) var isVisible = false
+    public private(set) var remembersSafeAction = false
+    public private(set) var isWorking = false
+    public private(set) var errorMessage: String?
+
+    public init() {}
+
+    public mutating func show(errorMessage: String? = nil) {
+        isVisible = true
+        isWorking = false
+        remembersSafeAction = false
+        self.errorMessage = errorMessage
+    }
+
+    public mutating func setRememberSafeAction(_ value: Bool) {
+        guard !isWorking else { return }
+        remembersSafeAction = value
+    }
+
+    public mutating func beginSafeShutdown() -> Bool {
+        guard isVisible, !isWorking else { return false }
+        isWorking = true
+        errorMessage = nil
+        return true
+    }
+
+    public mutating func fail(_ message: String) {
+        isVisible = true
+        isWorking = false
+        errorMessage = message
+    }
+
+    public mutating func cancel() {
+        guard !isWorking else { return }
+        isVisible = false
+        remembersSafeAction = false
+        errorMessage = nil
+    }
+}
+
 private struct HeaderStatusDot: View {
     let color: Color
     let isPulsing: Bool
@@ -78,8 +152,9 @@ public struct PopoverContentView: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var diagnosePresentation = DiagnosePanelPresentation()
-    @State private var securityPresentation = SecurityIndicatorsPresentation()
+    @State private var quitPresentation = QuitConfirmationPresentation()
     @State private var finderErrorMessage: String?
+    private let quitPreferenceStore = QuitPreferenceStore()
 
     public init(
         appState: AppState,
@@ -177,20 +252,21 @@ public struct PopoverContentView: View {
                     installer: helperInstaller,
                     diagnoseRunner: diagnoseRunner,
                     onOpenSettings: navigation.showSettings,
-                    onQuit: quit
+                    onQuit: { requestQuit(commandPressed: false) }
                 )
             } else if !cliInstallChecker.isInstalled {
                 CLIMissingView(
                     checker: cliInstallChecker,
                     stager: cliAutoStager,
                     onOpenSettings: navigation.showSettings,
-                    onQuit: quit
+                    onQuit: { requestQuit(commandPressed: false) }
                 )
             } else if !fullDiskAccessController.isGranted {
                 FullDiskAccessSetupView(
                     controller: fullDiskAccessController,
                     deviceID: driveScanner.drives.first?.identifier,
-                    onQuit: quit
+                    onOpenSettings: navigation.showSettings,
+                    onQuit: { requestQuit(commandPressed: false) }
                 )
             } else {
                 mainContent
@@ -249,7 +325,7 @@ public struct PopoverContentView: View {
                             }
                         }
                         .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                        .focusable(true)
+                        .ntfsmacKeyboardFocus()
                         .disabled(driveActionsDisabled)
                         .help(TooltipCopy.text(for: .ejectAll))
                     }
@@ -302,7 +378,7 @@ public struct PopoverContentView: View {
                         }
                     }
                     .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                    .focusable(true)
+                    .ntfsmacKeyboardFocus()
                     .accessibilityLabel("Refresh drives")
                 }
                 ForEach(visibleDrives) { drive in
@@ -317,7 +393,7 @@ public struct PopoverContentView: View {
             }
 
             // Mounted: the "Other available devices" header + small Refresh button render below the
-            // mounted list, above SecurityIndicators — and STAY rendered even when no unmounted
+            // mounted list — and STAY rendered even when no unmounted
             // drive is currently listed, so the Refresh button stays available to re-scan for newly
             // connected drives. The per-drive rows render only when an unmounted drive is detected.
             if OtherAvailableSection.shouldRender(isMounted: !mountController.mountedDrives.isEmpty) {
@@ -333,7 +409,7 @@ public struct PopoverContentView: View {
                         RefreshGlyph()
                     }
                     .buttonStyle(.glassIcon(colorScheme: colorScheme))
-                    .focusable(true)
+                    .ntfsmacKeyboardFocus()
                     .disabled(driveActionsDisabled)
                     .accessibilityLabel("Refresh drives")
                 }
@@ -354,23 +430,8 @@ public struct PopoverContentView: View {
                 emptyState
             }
 
-            if !mountController.mountedDrives.isEmpty {
-                Divider()
-                if securityPresentation.isVisible {
-                    SecurityIndicatorsView(
-                        isolatedNetwork: securityStatusReader.snapshot.privateLink.status,
-                        vpnBypass: securityStatusReader.snapshot.vpnRoute.status,
-                        pfRulesLoaded: securityStatusReader.snapshot.pfPolicy.status,
-                        privateReason: securityStatusReader.snapshot.privateLink.reason,
-                        vpnReason: securityStatusReader.snapshot.vpnRoute.reason,
-                        pfReason: securityStatusReader.snapshot.pfPolicy.reason,
-                        onHide: { securityPresentation.hide() }
-                    )
-                } else {
-                    HiddenSecurityIndicatorsView {
-                        securityPresentation.show()
-                    }
-                }
+            if quitPresentation.isVisible {
+                quitConfirmation
             }
 
             if let errorMessage = mountController.errorMessage ?? remountController.errorMessage, errorMessage != "FDA_REQUIRED" {
@@ -386,9 +447,13 @@ public struct PopoverContentView: View {
             }
 
             if diagnosePresentation.isVisible {
-                DiagnosePanel(runner: diagnoseRunner, mountState: appState.state) {
-                    diagnosePresentation.hide()
-                }
+                DiagnosePanel(
+                    runner: diagnoseRunner,
+                    mountState: appState.state,
+                    detectedDriveCount: visibleDrives.count,
+                    fullDiskAccessGranted: fullDiskAccessController.isGranted,
+                    onHide: { diagnosePresentation.hide() }
+                )
             }
 
             Divider()
@@ -437,7 +502,7 @@ public struct PopoverContentView: View {
     }
 
     private var driveActionsDisabled: Bool {
-        mountController.isEjectingAll || verifiedCopyController.isActive
+        mountController.hasStorageOperationInFlight || verifiedCopyController.isActive || quitPresentation.isWorking
     }
 
     /// Mount an unmounted drive r/w at its default mount point. Shared by the idle primary list
@@ -488,7 +553,6 @@ public struct PopoverContentView: View {
     private func refreshAll() async {
         await driveScanner.refresh()
         await mountController.reconcile(knownDrives: driveScanner.drives)
-        securityStatusReader.refresh()
     }
 
     private var headerSubtitle: String {
@@ -534,7 +598,7 @@ public struct PopoverContentView: View {
                 }
             }
             .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-            .focusable(true)
+            .ntfsmacKeyboardFocus()
             .accessibilityLabel("Refresh drives")
             .help(TooltipCopy.text(for: .refresh))
         }
@@ -555,7 +619,7 @@ public struct PopoverContentView: View {
                 SettingsGearGlyph(color: .secondary)
             }
             .buttonStyle(.glassIcon(colorScheme: colorScheme))
-            .focusable(true)
+            .ntfsmacKeyboardFocus()
             .disabled(verifiedCopyController.isActive)
             .accessibilityLabel("Open Settings")
             .help(TooltipCopy.text(for: .settings))
@@ -584,38 +648,147 @@ public struct PopoverContentView: View {
                 .frame(height: 28)
             }
             .buttonStyle(.glassFooter(colorScheme: colorScheme))
-            .focusable(true)
+            .ntfsmacKeyboardFocus()
             .disabled(diagnoseRunner.isRunning || verifiedCopyController.isActive)
             .accessibilityLabel("Diagnose")
             .help(TooltipCopy.text(for: .diagnose))
 
             Button {
-                quit()
+                requestQuit(commandPressed: NSEvent.modifierFlags.contains(.command))
             } label: {
                 Text("Quit").frame(height: 28)
             }
             .buttonStyle(.glassFooter(colorScheme: colorScheme))
-            .focusable(true)
+            .ntfsmacKeyboardFocus()
             .disabled(driveActionsDisabled)
             .accessibilityLabel("Quit ntfsmac")
             .help(TooltipCopy.text(for: .quit))
         }
     }
 
-    /// GUI-PLAN.md "Popover — idle": "Quit | Exit app, tear down network state". Clean shutdown
-    /// per the maintainer's decision: unmount every active drive → teardown pf/route → ask the
-    /// privileged helper to `exit(0)` itself (it's a root launchd on-demand Mach service that
-    /// Activity Monitor can't kill without sudo, so it must exit via XPC) → terminate the app.
-    /// Best-effort throughout — every step is `try?` so a slow/failed unmount or a helper that's
-    /// already gone never blocks quitting. The mount does NOT survive a GUI restart by design.
-    private func quit() {
-        guard !verifiedCopyController.isActive else { return }
-        Task {
-            await mountController.unmount()
-            _ = try? await helperClient.teardown()
-            _ = try? await helperClient.exitHelper()
-            NSApp.terminate(nil)
+    private func requestQuit(commandPressed: Bool) {
+        guard !verifiedCopyController.isActive, !mountController.hasStorageOperationInFlight else { return }
+        if commandPressed {
+            quitPreferenceStore.clear()
         }
+        switch QuitRequestPolicy.resolve(
+            hasMountedDrives: !mountController.mountedDrives.isEmpty,
+            commandPressed: commandPressed,
+            remembersSafeAction: quitPreferenceStore.remembersSafeAction
+        ) {
+        case .quitNow:
+            // With no observed mount there is no filesystem service to preserve or dismantle.
+            // Invalidating the lazy XPC connection keeps this path genuinely immediate even if a
+            // stale ServiceManagement registration is currently wedged.
+            helperClient.invalidateConnection()
+            NSApp.terminate(nil)
+        case .showConfirmation:
+            diagnosePresentation.hide()
+            quitPresentation.show()
+        case .unmountAndQuit:
+            quitPresentation.show()
+            beginSafeQuit()
+        }
+    }
+
+    private func beginSafeQuit() {
+        let rememberAfterSuccess = quitPresentation.remembersSafeAction
+        guard quitPresentation.beginSafeShutdown() else { return }
+        Task {
+            await mountController.ejectAll()
+            guard mountController.mountedDrives.isEmpty else {
+                quitPresentation.fail(
+                    "One or more drives could not be unmounted. They remain available and ntfsmac stayed open."
+                )
+                return
+            }
+
+            do {
+                let teardown = try await helperClient.teardown()
+                guard teardown.exitCode == 0 else {
+                    quitPresentation.fail(
+                        "The drives were unmounted, but cleanup could not be confirmed. ntfsmac stayed open."
+                    )
+                    return
+                }
+                let stopped = try await helperClient.exitHelper()
+                guard stopped.exitCode == 0 else {
+                    quitPresentation.fail(
+                        "The drives were unmounted, but ntfsmac could not finish shutting down safely."
+                    )
+                    return
+                }
+                if rememberAfterSuccess {
+                    quitPreferenceStore.rememberSafeAction()
+                }
+                NSApp.terminate(nil)
+            } catch {
+                quitPresentation.fail(
+                    "The drives were unmounted, but ntfsmac could not confirm final cleanup. Try Quit again."
+                )
+            }
+        }
+    }
+
+    private var quitConfirmation: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 7) {
+                Image(systemName: "externaldrive.badge.questionmark")
+                    .foregroundStyle(Color.ntfsYellow)
+                Text("Quit with mounted drives?")
+                    .font(.system(size: 12.5, weight: .semibold))
+            }
+            Text("Unmount and Quit is the safe choice. Quit Anyway leaves the mounted filesystems and their required services running.")
+                .font(.system(size: 10.5))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Toggle(
+                "Don't show again (always Unmount and Quit)",
+                isOn: Binding(
+                    get: { quitPresentation.remembersSafeAction },
+                    set: { quitPresentation.setRememberSafeAction($0) }
+                )
+            )
+            .toggleStyle(.checkbox)
+            .font(.system(size: 10.5))
+            .ntfsmacKeyboardFocus(cornerRadius: 5)
+            .disabled(quitPresentation.isWorking)
+
+            if let errorMessage = quitPresentation.errorMessage {
+                Text(errorMessage)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(Color.ntfsRed)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if quitPresentation.isWorking {
+                HStack(spacing: 7) {
+                    ProgressView().controlSize(.small)
+                    Text("Unmounting every drive safely…")
+                        .font(.system(size: 10.5, weight: .medium))
+                }
+            } else {
+                HStack(spacing: 6) {
+                    Button("Cancel") { quitPresentation.cancel() }
+                        .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                        .ntfsmacKeyboardFocus()
+                    Spacer(minLength: 0)
+                    Button("Quit Anyway") {
+                        helperClient.invalidateConnection()
+                        NSApp.terminate(nil)
+                    }
+                    .buttonStyle(.glassWarning())
+                    .ntfsmacKeyboardFocus()
+                    Button("Unmount and Quit") { beginSafeQuit() }
+                        .buttonStyle(.glassPrimary())
+                        .ntfsmacKeyboardFocus()
+                }
+            }
+        }
+        .glassCard()
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Confirm quitting ntfsmac with mounted drives")
     }
 }
 
@@ -634,7 +807,7 @@ private struct EjectAllReportView: View {
                         .font(.system(size: 9, weight: .semibold))
                 }
                 .buttonStyle(.plain)
-                .focusable(true)
+                .ntfsmacKeyboardFocus()
                 .accessibilityLabel("Dismiss Eject All results")
             }
 

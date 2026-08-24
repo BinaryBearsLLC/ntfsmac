@@ -15,6 +15,12 @@ final class FakeRunner: PrivilegedCommandRunning {
 
     func run(_ executablePath: String, _ arguments: [String]) -> CommandResult {
         calls.append(Call(executablePath: executablePath, arguments: arguments))
+        if executablePath == "/bin/launchctl", arguments.first == "print" {
+            return CommandResult(output: "service not found", exitCode: 113)
+        }
+        if executablePath == "/usr/bin/pgrep" {
+            return CommandResult(output: "", exitCode: 1)
+        }
         return stubbedResult
     }
 
@@ -469,7 +475,7 @@ private final class UnknownSecurityCleanupRunner: PrivilegedCommandRunning {
     #endif
 }
 
-@Test func uninstallHelperAlsoRemovesOrphanedLegacyArtifacts() async {
+@Test func uninstallHelperRetiredCleanupMatchesTheVariantLifecycle() async {
     let runner = FakeRunner()
     let service = HelperService(runner: runner, legacyArtifactsPresent: { true })
     let (data, error) = await awaitReply { reply in
@@ -477,6 +483,7 @@ private final class UnknownSecurityCleanupRunner: PrivilegedCommandRunning {
     }
     #expect(data != nil)
     #expect(error == nil)
+    #if NTFSMAC_LEGACY_HELPER
     #expect(runner.calls.contains {
         $0.executablePath == "/bin/rm"
             && $0.arguments == ["-f", "/Library/LaunchDaemons/\(legacyHelperMachServiceName).plist"]
@@ -485,15 +492,63 @@ private final class UnknownSecurityCleanupRunner: PrivilegedCommandRunning {
         $0.executablePath == "/bin/rm"
             && $0.arguments == ["-f", "/Library/PrivilegedHelperTools/\(legacyHelperMachServiceName)"]
     })
-    #if NTFSMAC_LEGACY_HELPER
     #expect(runner.calls.last?.arguments == ["bootout", "system/\(helperMachServiceName)"])
     #else
+    // This selector is also the stale-modern replacement preparation. Removing Legacy here would
+    // violate the transaction if the subsequent registration or health check failed.
+    #expect(runner.calls.isEmpty)
+    #endif
+}
+
+@Test func explicitRetiredHelperCleanupRemovesOrphanedStandaloneArtifacts() async {
+    let runner = FakeRunner()
+    let service = HelperService(runner: runner, legacyArtifactsPresent: { true })
+    let (data, error) = await awaitReply { reply in
+        service.cleanupRetiredHelpers(reply: reply)
+    }
+    let result = data.flatMap { try? JSONDecoder().decode(CommandResult.self, from: $0) }
+
+    #expect(error == nil)
+    #expect(result?.exitCode == 0)
+    #expect(runner.calls.contains {
+        $0.executablePath == "/bin/rm"
+            && $0.arguments == ["-f", "/Library/LaunchDaemons/\(legacyHelperMachServiceName).plist"]
+    })
+    #if !NTFSMAC_LEGACY_HELPER
     #expect(runner.calls.contains {
         $0.executablePath == "/bin/rm"
             && $0.arguments == ["-f", "/Library/LaunchDaemons/\(compatibilityHelperMachServiceName).plist"]
     })
-    #expect(!runner.calls.contains { $0.arguments == ["bootout", "system/\(helperMachServiceName)"] })
     #endif
+}
+
+@Test func retiredHelperCleanupRequiresLaunchdAndProcessPostconditions() async {
+    final class StillRegisteredRunner: PrivilegedCommandRunning {
+        func run(_ executablePath: String, _ arguments: [String]) -> CommandResult {
+            if executablePath == "/bin/launchctl", arguments.first == "print" {
+                return CommandResult(output: "still registered", exitCode: 0)
+            }
+            if executablePath == "/usr/bin/pgrep" {
+                return CommandResult(output: "", exitCode: 1)
+            }
+            return CommandResult(output: "", exitCode: 0)
+        }
+
+        func runPipingStdin(_ input: String, to executablePath: String, _ arguments: [String]) -> CommandResult {
+            CommandResult(output: "", exitCode: 0)
+        }
+    }
+
+    let service = HelperService(
+        runner: StillRegisteredRunner(),
+        legacyArtifactsPresent: { true }
+    )
+    let (data, error) = await awaitReply { service.cleanupRetiredHelpers(reply: $0) }
+    let result = data.flatMap { try? JSONDecoder().decode(CommandResult.self, from: $0) }
+
+    #expect(error == nil)
+    #expect(result?.exitCode == 1)
+    #expect(result?.output.contains("could not be removed completely") == true)
 }
 
 // MARK: - resolveNtfsmacPrefix / ntfsmacPrefix injection (fixed prefix vs brew-tap fallback)
@@ -792,7 +847,8 @@ private final class ExitSinkProbe: @unchecked Sendable {
     let (data, error) = await awaitReply { service.exitHelper(reply: $0) }
 
     #expect(error == nil, "exitHelper must acknowledge cleanly so the GUI's await returns before the process dies")
-    #expect(data != nil, "exitHelper must send a reply payload so HelperClient.call decodes it instead of throwing on an empty response")
+    let result = data.flatMap { try? JSONDecoder().decode(CommandResult.self, from: $0) }
+    #expect(result?.exitCode == 0, "exitHelper must send a decodable success payload before terminating")
     #expect(probe.invoked, "exitHelper must invoke the exit sink (exit(0) in production) so the launchd on-demand helper actually stops")
 }
 

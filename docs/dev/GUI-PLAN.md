@@ -52,10 +52,10 @@ This table describes the current integrated GUI, not the original aspirational p
 | Shipped | Auto-detect NTFS, MBR `Windows_NTFS`, ext2, ext3, and ext4 partitions |
 | Shipped | One-click mount/unmount and multiple concurrent drive rows |
 | Shipped — extended matrix incomplete | Dirty NTFS fails closed with no read/write override and concise Windows recovery guidance; Fast Startup and a genuinely hibernated removable-volume fixture remain resource-gated |
-| Shipped | Diagnose summary, inline Hide, and Command-click privacy-safe JSON export |
+| Integrated candidate — live v3.1.0 gate pending | Diagnose renders four plain-language, fail-closed macro categories with semantic text/symbol/colour, inline Hide, and Command-click privacy-safe JSON export; the CLI schema remains unchanged |
 | Integrated candidate — live v3.1.0 gate pending | Consent-first standard/Legacy helper install, explicit Login Items approval state for the standard build, progress-backed CLI staging, pre-mount Full Disk Access verification, helper repair, and complete-uninstall flows |
-| Shipped | In-popover Settings with Back, canonical version/build, Launch at login, contextual help, and adaptive menu-bar icon |
-| Shipped — matrix incomplete | Three compact SECURITY rows consume the live transaction's fixed states/reasons and provide Hide/Show. Missing, malformed, or unavailable evidence fails closed to `unknown`; the remaining packaged hardware matrix is tracked in the roadmap. |
+| Integrated candidate — live v3.1.0 gate pending | In-popover Settings with a balanced Back/title/update-icon header, canonical version/build, Launch at login, contextual help, and adaptive menu-bar icon |
+| Integrated candidate — live v3.1.0 gate pending | Connection protection appears only inside a freshly run Diagnose result. There is no standalone SECURITY row group or collapsed Show placeholder; missing evidence remains non-green. |
 | Shipped | Each verified mounted-drive row exposes Open in Finder and uses that row's observed mount point |
 | Resolved | Global transfer telemetry was removed because bridge-wide counters cannot truthfully attribute concurrent traffic per drive; the minimal UI shows no speed row |
 | Shipped — extended matrix incomplete | NTFS3 has an explicit one-mount menu choice, Experimental warning/preflight, no silent fallback, privacy-safe driver/result diagnostics, and a passing dirty-refusal/repair/clean-write/Windows-reread cycle; broader devices and OS versions remain resource-gated. |
@@ -63,16 +63,16 @@ This table describes the current integrated GUI, not the original aspirational p
 | Shipped — extended media check blocked | Verified Copy is a per-drive overflow action for verified read/write mounts. It validates the exact destination volume, invokes the unprivileged CLI with literal argv, shows compact progress/result state, and cancels the whole process group; cross-OS hash proof passes, while controlled TV playback remains resource-gated. |
 | Shipped | Default-off local mount/unmount/error notifications, persisted only after macOS grants permission |
 | Shipped | Eject All attempts every drive, reports per-drive results, and retains recovery controls for failures |
+| Integrated candidate — live v3.1.0 gate pending | Mounted-drive Quit confirmation with safe `Unmount and Quit`, `Quit Anyway`, Cancel, safe-only persistence, and Command-click reset; active copy/mount/unmount disables Quit |
+| Integrated candidate — visual gate pending | Pointer input suppresses stale focus presentation; deliberate keyboard traversal uses one in-bounds one-point outline on macOS 14+ and preserves the native accessible focus behavior on macOS 13 |
 
 ---
 
-## Planned v3.1.0 refinement contract — not implemented
+## v3.1.0 refinement contract — integrated candidate
 
-This section records the next UI behavior without changing the current-state tables below. No GUI,
-CLI, helper, or release behavior is changed merely by this document update. Implementation follows
-the ordered sequence in the product roadmap and must remain locally tested before any push. Text
-labelled `Recommended` or `proposed` is additional professional guidance awaiting a product
-decision, not silently approved scope.
+The behavior below is implemented in the `upgrade/v3.1.0` candidate. It remains subject to the
+complete local Standard/Legacy and packaged visual/live gates, and is not a claim about the current
+published `v3.0.0` release. Official DMG branding is still asset-blocked.
 
 ### 0.1 DMG rebrand asset gate
 
@@ -89,14 +89,14 @@ symlink, background reference, architecture, signatures, and image integrity.
 
 ### Button chrome and keyboard focus
 
-The current controls can show two superimposed rectangles:
+The v3.0 controls could show two superimposed rectangles:
 
 - the subtle rounded fill/stroke belongs to the custom button style and is visible in the normal
   pointer state;
 - the thicker blue outline is the native macOS keyboard-focus indicator produced for explicitly
   focusable controls when Full Keyboard Access moves focus to that button.
 
-The v3.1.0 visual pass removes the stacked-frame appearance, not keyboard accessibility. A control
+The v3.1.0 candidate removes the stacked-frame appearance, not keyboard accessibility. A control
 may have at most one deliberate default-state container. Icon-only secondary controls are
 borderless at rest and gain background treatment on hover/press; primary row actions may retain a
 single restrained affordance.
@@ -107,7 +107,9 @@ Focus becomes visible only after deliberate keyboard navigation such as Tab/Shif
 Keyboard Access is active. Its custom visual treatment is a subtle, high-contrast outline no more
 than 1.5 points thick, does not stack with a second decorative stroke, and never changes layout.
 Reverse traversal, returning from Settings, Diagnose completion, and list insertion/removal must
-preserve predictable order without jumping to an unrelated control.
+preserve predictable order without jumping to an unrelated control. macOS 13 retains the system's
+native accessible focus effect because the public focus-effect suppression API starts on macOS 14;
+no private AppKit hook is used.
 
 ### Settings update control
 
@@ -167,8 +169,8 @@ There is no standalone SECURITY section, row group, placeholder, or collapsed `S
 v3.1.0 GUI. Running Diagnose reveals the freshly measured `Connection protection` macro category
 inside the same user-friendly diagnostic presentation. Selecting `Hide` dismisses the complete
 Diagnose presentation, including protection status, without changing helper, mount, or network
-state. Running Diagnose again reveals a fresh complete result. This replaces the current
-always-mounted SECURITY `Hide`/`Show` presentation only after implementation and tests land.
+state. Running Diagnose again reveals a fresh complete result. This replaces the published v3.0
+always-mounted SECURITY `Hide`/`Show` presentation in the v3.1.0 candidate.
 
 ### Quit with mounted drives
 
@@ -188,8 +190,8 @@ drive is mounted it immediately restores and shows the confirmation. This shortc
 in the README and repository UI contract. With no mounted drive, Command-click still clears the
 saved choice and then follows the normal immediate-Quit path.
 
-Verified Copy and in-flight mount/unmount remain the proposed additional safety case: if approved,
-they are never covered by the saved preference, require an explicit decision, and are not
+Verified Copy and in-flight mount/unmount are stronger safety states in the candidate: Quit is
+disabled while they run, they are never covered by the saved preference, and they are not
 interrupted silently.
 
 ### Resource-impact acceptance
@@ -226,7 +228,8 @@ near baseline after Diagnose, or a material regression between the pre-change an
 | `Diagnose` | Run CLI diagnostic, show summary | Always |
 | `⌘`-click `Diagnose` | Run the same read-only diagnostic and save its JSON for developer support | Always |
 | ⚙ (gear) | Navigate to Settings in the popover | Always |
-| `Quit` | Exit app, tear down network state | Always |
+| `Quit` | Exit immediately when no drive is mounted | No storage operation or Verified Copy is active |
+| `⌘`-click `Quit` | Clear the saved safe action, then follow normal Quit policy | No storage operation or Verified Copy is active |
 
 ### Popover — mounted
 
@@ -239,16 +242,17 @@ near baseline after Diagnose, or a material regression between the pre-change an
 | `Eject All` | Try every mounted drive and show each result without hiding failed rows | Two or more drives are mounted |
 | Other-device `Mount` | Mount another compatible partition | Another compatible drive is detected |
 | Refresh (↻) | Re-scan drives and reconcile mounted rows against host truth | Always |
-| SECURITY rows | Display measured private-link, VPN-route, and PF-policy states/reasons; fail closed to `unknown` | One or more drives mounted |
-| SECURITY `Hide` / `Show` | Collapse or restore only the SECURITY presentation | One or more drives mounted |
-| ⚙ / `Quit` | As above | Always |
+| `Diagnose` | Reveal the four freshly measured macro categories, including Connection protection | No Diagnose or Verified Copy is active |
+| `Hide` | Dismiss the complete Diagnose result, leaving no collapsed placeholder | A Diagnose presentation is visible |
+| `Quit` | Show the mounted-drive confirmation or execute the remembered safe unmount action | No storage operation or Verified Copy is active |
+| ⚙ | Navigate to Settings | No Verified Copy is active |
 
 The mounted row intentionally stops at two primary actions: Open and Unmount. Verified Copy is the
 single secondary item in its small overflow menu, and its card exists only while a job/result
 exists. Eject All appears only when it is useful for multiple drives. No transfer-speed row is
 shown: the removed sampler observed bridge-wide traffic and could not provide honest per-drive
 telemetry for concurrent mounts. Mount lifecycle, Settings, and Quit controls remain disabled
-while Verified Copy owns a write.
+while Verified Copy owns a write; Quit also stays disabled during mount/unmount/eject operations.
 
 ### Mount-state truth contract
 
@@ -339,10 +343,11 @@ focus is active; it is accessibility state, not a permanent decorative border.
 ### Settings page
 
 The gear replaces the main popover content with Settings. A keyboard-reachable `Back` action
-returns to the previous application content. Normal, first-run, and CLI-repair screens all use the
-same route and the same long-lived Settings/helper objects; navigation does not open an `NSWindow`
-or recreate in-flight state. The title includes the app release/build directly underneath in
-small secondary text; it is informative and never competes visually with the `Settings` heading.
+returns to the previous application content. Normal, helper-install, CLI-repair, and Full Disk
+Access setup screens all keep that gear reachable and use the same route plus the same long-lived
+Settings/helper objects; navigation does not open an `NSWindow` or recreate in-flight state. The
+title includes the app release/build directly underneath in small secondary text; it is
+informative and never competes visually with the `Settings` heading.
 
 | Control | Type | Default |
 |---------|------|---------|

@@ -24,13 +24,17 @@ unredacted local logs.
   never shells out to `sudo`.
 - Every active mount owns its security state. Teardown must not flush global PF state, remove a
   default route, or release another mount's resources.
-- SECURITY rows consume measured reason-coded evidence and become `unknown` when evidence is
-  unavailable or untrusted.
+- The CLI and privacy-safe JSON retain measured reason-coded protection evidence. The v3.1.0 GUI
+  aggregates it into Diagnose and reports missing or untrusted evidence as non-green
+  `Unavailable`/`Attention`, never as protected.
 - Diagnostics are local, opt-in exports and omit identifying disk/network/user details.
 
-The v3 compatibility helper uses SMJobBless. macOS may display its technical service label
-`com.binarybears.ntfsmac.helper` and a generic executable icon in Full Disk Access; the app names
-that exact entry rather than implying it can control System Settings presentation.
+The standard macOS 13+ candidate uses `SMAppService` with the internal service identity
+`com.binarybears.ntfsmac.helper.daemon`; the explicitly labelled Legacy candidate retains
+`SMJobBless` and `com.binarybears.ntfsmac.helper`. The standard migration verifies its own XPC
+health before removing a Legacy helper, and keeps Legacy intact after denial or failed health.
+macOS ultimately controls names/icons shown in Login Items and Full Disk Access; the app gives
+variant-aware guidance without claiming it can control that presentation.
 
 ## Signing and releases
 

@@ -70,8 +70,16 @@ public final class FullDiskAccessController: ObservableObject {
 }
 
 enum FDAPromptCopy {
-    static let helperServiceName = "com.binarybears.ntfsmac.helper"
-    static let instructions = "macOS lists ntfsmac Helper under its technical service name, \(helperServiceName), and may show a generic executable icon because the helper is a standalone privileged tool. Enable that exact entry in Full Disk Access."
+    static var helperServiceName: String { helperMachServiceName }
+
+    static var instructions: String {
+        switch HelperDistributionVariant.current {
+        case .modern:
+            "In Full Disk Access, enable ntfsmac. If macOS shows its drive-access component separately, enable ntfsmac Helper (\(helperServiceName)) too."
+        case .legacy:
+            "In Full Disk Access, enable ntfsmac Helper (\(helperServiceName)). macOS may show a generic executable icon for this Legacy component."
+        }
+    }
 }
 
 /// Minimal setup step shown after helper/CLI preparation and before the normal popover. The
@@ -80,6 +88,7 @@ enum FDAPromptCopy {
 public struct FullDiskAccessSetupView: View {
     @ObservedObject public var controller: FullDiskAccessController
     public let deviceID: String?
+    public let onOpenSettings: () -> Void
     public let onQuit: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
@@ -87,10 +96,12 @@ public struct FullDiskAccessSetupView: View {
     public init(
         controller: FullDiskAccessController,
         deviceID: String?,
+        onOpenSettings: @escaping () -> Void,
         onQuit: @escaping () -> Void
     ) {
         self.controller = controller
         self.deviceID = deviceID
+        self.onOpenSettings = onOpenSettings
         self.onQuit = onQuit
     }
 
@@ -100,10 +111,19 @@ public struct FullDiskAccessSetupView: View {
             content
             Divider()
             HStack {
+                Button {
+                    onOpenSettings()
+                } label: {
+                    SettingsGearGlyph(color: .secondary)
+                }
+                .buttonStyle(.glassIcon(colorScheme: colorScheme))
+                .ntfsmacKeyboardFocus()
+                .accessibilityLabel("Open Settings")
+                .help(TooltipCopy.text(for: .settings))
                 Spacer()
                 Button("Quit", action: onQuit)
                     .buttonStyle(.glassFooter(colorScheme: colorScheme))
-                    .focusable(true)
+                    .ntfsmacKeyboardFocus()
                     .accessibilityLabel("Quit ntfsmac")
             }
         }
@@ -169,7 +189,7 @@ public struct FullDiskAccessSetupView: View {
                 Task { await controller.check(deviceID: deviceID) }
             }
             .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-            .focusable(true)
+            .ntfsmacKeyboardFocus()
         }
     }
 
@@ -216,7 +236,7 @@ public struct FullDiskAccessSetupView: View {
                 }
             }
             .buttonStyle(.glassPrimary())
-            .focusable(true)
+            .ntfsmacKeyboardFocus()
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.ntfsYellow.opacity(0.09)))

@@ -494,6 +494,26 @@ nas.example:/share on /Volumes/Share (nfs, nodev, nosuid)"
   [[ "$output" == *'"helper_installed":true'* ]]
 }
 
+@test "standard SMAppService registration is reported without a standalone helper file" {
+  unset NTFSMAC_HELPER_PATH_OVERRIDE
+  export NTFSMAC_MODERN_HELPER_REGISTERED_OVERRIDE=1
+
+  run "$SCRIPT" --json
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"helper_installed":true'* ]]
+}
+
+@test "an absent standard and Legacy helper remains a valid CLI-only installation" {
+  unset NTFSMAC_HELPER_PATH_OVERRIDE
+  export NTFSMAC_MODERN_HELPER_REGISTERED_OVERRIDE=0
+
+  run "$SCRIPT" --json
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"helper_installed":false'* ]]
+}
+
 @test "degraded: macOS older than 13.0 is unsupported" {
   export NTFSMAC_MACOS_VERSION_OVERRIDE="12.6"
   run "$SCRIPT"

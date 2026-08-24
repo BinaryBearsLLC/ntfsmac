@@ -94,7 +94,7 @@ public struct DriveRow: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                    .focusable(true)
+                    .ntfsmacKeyboardFocus()
                     .disabled(onOpenInFinder == nil || actionsDisabled)
                     .accessibilityLabel("Open in Finder")
                     .help(TooltipCopy.text(for: .openInFinder))
@@ -109,7 +109,7 @@ public struct DriveRow: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.glassDestructive(colorScheme: colorScheme))
-                    .focusable(true)
+                    .ntfsmacKeyboardFocus()
                     .disabled(actionsDisabled)
                     .help(TooltipCopy.text(for: .unmount))
 
@@ -122,7 +122,7 @@ public struct DriveRow: View {
                         }
                         .menuStyle(.borderlessButton)
                         .fixedSize()
-                        .focusable(true)
+                        .ntfsmacKeyboardFocus()
                         .disabled(actionsDisabled)
                         .accessibilityLabel("More drive actions")
                         .help(TooltipCopy.text(for: .verifiedCopy))
@@ -140,7 +140,7 @@ public struct DriveRow: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.glassWarning())
-                    .focusable(true)
+                    .ntfsmacKeyboardFocus()
                     .disabled(actionsDisabled)
                     .help(TooltipCopy.text(for: .mountReadWriteAnyway))
                 }
@@ -157,13 +157,13 @@ public struct DriveRow: View {
                         HStack(spacing: 6) {
                             Button("Cancel") { showsNTFS3Preflight = false }
                                 .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                                .focusable(true)
+                                .ntfsmacKeyboardFocus()
                             Button("Mount with NTFS3") {
                                 showsNTFS3Preflight = false
                                 onMountExperimental()
                             }
                             .buttonStyle(.glassWarning())
-                            .focusable(true)
+                            .ntfsmacKeyboardFocus()
                         }
                         .disabled(actionsDisabled)
                     }
@@ -176,7 +176,7 @@ public struct DriveRow: View {
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                        .focusable(true)
+                        .ntfsmacKeyboardFocus()
                         .disabled(actionsDisabled)
                         .accessibilityLabel("Mount \(drive.label.isEmpty ? drive.identifier : drive.label)")
                         .help("Mount with ntfs-3g, the compatibility-first default")
@@ -192,7 +192,7 @@ public struct DriveRow: View {
                             }
                             .menuStyle(.borderlessButton)
                             .fixedSize()
-                            .focusable(true)
+                            .ntfsmacKeyboardFocus()
                             .disabled(actionsDisabled)
                             .accessibilityLabel("More drive actions")
                             .help("Choose the experimental NTFS3 driver for this mount only")

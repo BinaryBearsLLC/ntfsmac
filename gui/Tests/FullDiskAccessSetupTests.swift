@@ -64,3 +64,9 @@ private final class FakeDiskAccessChecker: FullDiskAccessChecking, Sendable {
     #expect(!controller.isGranted)
     #expect(controller.authorizationAttempt == 0)
 }
+
+@Test func fullDiskAccessInstructionsUseThePackagedHelperIdentity() {
+    #expect(FDAPromptCopy.helperServiceName == helperMachServiceName)
+    #expect(FDAPromptCopy.instructions.contains(helperMachServiceName))
+    #expect(FDAPromptCopy.instructions.contains("Full Disk Access"))
+}

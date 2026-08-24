@@ -105,7 +105,7 @@ public struct SecurityIndicatorsView: View {
                 if let onHide {
                     Button("Hide") { onHide() }
                         .buttonStyle(.plain)
-                        .focusable(true)
+                        .ntfsmacKeyboardFocus()
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.secondary)
                         .accessibilityLabel("Hide Security")
@@ -162,7 +162,7 @@ public struct HiddenSecurityIndicatorsView: View {
             Spacer()
             Button("Show") { onShow() }
                 .buttonStyle(.plain)
-                .focusable(true)
+                .ntfsmacKeyboardFocus()
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
                 .accessibilityLabel("Show Security")

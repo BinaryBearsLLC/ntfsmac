@@ -6,6 +6,7 @@ set -uo pipefail
 
 REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 DIST_DIR="$REPO_ROOT/dist"
+BINARYBEARS_SIGNING_IDENTITY="Developer ID Application: BinaryBears LLC (SQY8T23X8N)"
 INTERACTIVE=0
 TARGET=""
 LEGACY_ENABLED=1
@@ -96,6 +97,10 @@ Usage: ./build.command [cli|gui|both] [--no-legacy]
 With no argument, an interactive menu is shown. Missing command-line build
 dependencies can be installed only after an explicit confirmation. Full Xcode
 must be installed through Apple; the helper can open its App Store page.
+If the official BinaryBears Developer ID identity is installed, GUI builds use it
+automatically so the local P2 helper can be exercised. Otherwise the builder emits
+an explicit warning and creates an ad-hoc inspection build; SIGNING_IDENTITY=- also
+forces that fallback deliberately.
 Nothing is installed into /usr/local by this build helper.
 EOF
 }
@@ -380,6 +385,30 @@ prepare_toolchain() {
   ok "Project preflight passed"
 }
 
+configure_gui_signing() {
+  [[ "$TARGET" == "gui" || "$TARGET" == "both" ]] || return
+
+  section "GUI signing mode"
+  if [[ -n "${SIGNING_IDENTITY:-}" ]]; then
+    if [[ "$SIGNING_IDENTITY" == "-" ]]; then
+      warn "Ad-hoc signing was explicitly requested. The DMG can be inspected, but its P2 helper cannot be registered by macOS."
+    else
+      info "Using the explicitly configured signing identity: $SIGNING_IDENTITY"
+    fi
+    return
+  fi
+
+  if security find-identity -v -p codesigning 2>/dev/null | grep -Fq -- "\"$BINARYBEARS_SIGNING_IDENTITY\""; then
+    export SIGNING_IDENTITY="$BINARYBEARS_SIGNING_IDENTITY"
+    ok "BinaryBears Developer ID found; app, helper, and DMG will be signed for a real local P2 install"
+    return
+  fi
+
+  export SIGNING_IDENTITY="-"
+  warn "BinaryBears Developer ID not found; falling back to an ad-hoc inspection build."
+  warn "macOS will not register the P2 helper from this DMG. Use an official signed/notarized release for an installation test."
+}
+
 build_runtime() {
   section "Shared CLI runtime build"
   info "Initializing the pinned anylinuxfs submodule and building the vendored runtime"
@@ -399,16 +428,20 @@ package_cli() {
     fail "The CLI archive could not be created."
   tar -tzf "$DIST_DIR/ntfsmac-cli.tar.gz" >/dev/null || fail "The CLI archive failed its integrity check."
   ok "CLI archive created and readable"
-  shasum -a 256 "$DIST_DIR/ntfsmac-cli.tar.gz"
+  "$REPO_ROOT/build/write-sha256.sh" "$DIST_DIR/ntfsmac-cli.tar.gz" || \
+    fail "The CLI archive checksum could not be written and verified."
+  ok "CLI SHA-256 sidecar created and verified"
 }
 
 package_gui() {
-  local version modern_app modern_dmg legacy_app legacy_dmg
+  local version modern_app modern_dmg legacy_app legacy_dmg signature_description
   version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$REPO_ROOT/gui/Info.plist")"
   modern_app="$DIST_DIR/ntfsmac.app"
   modern_dmg="$DIST_DIR/ntfsmac-${version}-Apple-Silicon.dmg"
   legacy_app="$DIST_DIR/ntfsmac-legacy.app"
   legacy_dmg="$DIST_DIR/ntfsmac-${version}-Legacy-Apple-Silicon.dmg"
+  signature_description="ad-hoc"
+  [[ "${SIGNING_IDENTITY:--}" != "-" ]] && signature_description="Developer ID"
 
   if [[ "$LEGACY_ENABLED" -eq 0 ]]; then
     # An explicit opt-out must not leave a prior Legacy build looking like part of this run.
@@ -438,7 +471,7 @@ package_gui() {
     fail "The standard app is missing its bundled helper."
   codesign --verify --deep --strict --verbose=2 "$modern_app" || fail "The standard app signature verification failed."
   file "$modern_app/Contents/MacOS/ntfsmac-gui" | grep -q 'arm64' || fail "The standard GUI executable is not arm64."
-  ok "Standard app structure, architecture, and ad-hoc signature verified"
+  ok "Standard app structure, architecture, and $signature_description signature verified"
 
   section "DMG packaging — standard"
   NTFSMAC_APP_BUNDLE="$modern_app" NTFSMAC_DMG_OUT="$modern_dmg" \
@@ -446,7 +479,9 @@ package_gui() {
     fail "The standard DMG could not be created."
   hdiutil verify "$modern_dmg" || fail "The standard DMG failed hdiutil verification."
   ok "Standard DMG created and verified"
-  shasum -a 256 "$modern_dmg"
+  "$REPO_ROOT/build/write-sha256.sh" "$modern_dmg" || \
+    fail "The standard DMG checksum could not be written and verified."
+  ok "Standard DMG SHA-256 sidecar created and verified"
 
   if [[ "$LEGACY_ENABLED" -eq 1 ]]; then
     section "App bundle packaging — Legacy"
@@ -457,7 +492,7 @@ package_gui() {
       fail "The Legacy app is missing its SMJobBless helper."
     codesign --verify --deep --strict --verbose=2 "$legacy_app" || fail "The Legacy app signature verification failed."
     file "$legacy_app/Contents/MacOS/ntfsmac-gui" | grep -q 'arm64' || fail "The Legacy GUI executable is not arm64."
-    ok "Legacy app structure, architecture, and ad-hoc signature verified"
+    ok "Legacy app structure, architecture, and $signature_description signature verified"
 
     section "DMG packaging — Legacy"
     NTFSMAC_APP_BUNDLE="$legacy_app" NTFSMAC_DMG_OUT="$legacy_dmg" \
@@ -465,7 +500,9 @@ package_gui() {
       fail "The Legacy DMG could not be created."
     hdiutil verify "$legacy_dmg" || fail "The Legacy DMG failed hdiutil verification."
     ok "Legacy DMG created and verified"
-    shasum -a 256 "$legacy_dmg"
+    "$REPO_ROOT/build/write-sha256.sh" "$legacy_dmg" || \
+      fail "The Legacy DMG checksum could not be written and verified."
+    ok "Legacy DMG SHA-256 sidecar created and verified"
   fi
 }
 
@@ -476,22 +513,28 @@ print_summary() {
   case "$TARGET" in
     cli)
       ok "$DIST_DIR/ntfsmac-cli.tar.gz"
+      ok "$DIST_DIR/ntfsmac-cli.tar.gz.sha256"
       ;;
     gui)
       ok "$DIST_DIR/ntfsmac.app"
       ok "$DIST_DIR/ntfsmac-${version}-Apple-Silicon.dmg"
+      ok "$DIST_DIR/ntfsmac-${version}-Apple-Silicon.dmg.sha256"
       if [[ "$LEGACY_ENABLED" -eq 1 ]]; then
         ok "$DIST_DIR/ntfsmac-legacy.app"
         ok "$DIST_DIR/ntfsmac-${version}-Legacy-Apple-Silicon.dmg"
+        ok "$DIST_DIR/ntfsmac-${version}-Legacy-Apple-Silicon.dmg.sha256"
       fi
       ;;
     both)
       ok "$DIST_DIR/ntfsmac-cli.tar.gz"
+      ok "$DIST_DIR/ntfsmac-cli.tar.gz.sha256"
       ok "$DIST_DIR/ntfsmac.app"
       ok "$DIST_DIR/ntfsmac-${version}-Apple-Silicon.dmg"
+      ok "$DIST_DIR/ntfsmac-${version}-Apple-Silicon.dmg.sha256"
       if [[ "$LEGACY_ENABLED" -eq 1 ]]; then
         ok "$DIST_DIR/ntfsmac-legacy.app"
         ok "$DIST_DIR/ntfsmac-${version}-Legacy-Apple-Silicon.dmg"
+        ok "$DIST_DIR/ntfsmac-${version}-Legacy-Apple-Silicon.dmg.sha256"
       fi
       ;;
   esac
@@ -540,6 +583,7 @@ main() {
 
   check_platform
   prepare_toolchain
+  configure_gui_signing
   build_runtime
 
   case "$TARGET" in

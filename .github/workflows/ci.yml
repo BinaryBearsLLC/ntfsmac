@@ -54,9 +54,18 @@ jobs:
         run: ./vendor/src/anylinuxfs/run-rust-tests.sh
 
   swift-build:
-    name: swift build (GUI)
+    name: Swift GUI tests (standard + Legacy)
     runs-on: macos-26
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - run: swift build
-      - run: swift test
+      - name: Test standard SMAppService distribution
+        run: >-
+          ./build/run-swift-tests.sh modern
+          "$RUNNER_TEMP/ntfsmac-modern-tests"
+          --disable-sandbox
+      - name: Test Legacy SMJobBless distribution
+        run: >-
+          ./build/run-swift-tests.sh legacy
+          "$RUNNER_TEMP/ntfsmac-legacy-tests"
+          --disable-sandbox

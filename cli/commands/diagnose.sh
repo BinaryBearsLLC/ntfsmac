@@ -555,12 +555,32 @@ check_architecture() {
 }
 
 check_helper_installed() {
-  local helper_path
-  helper_path="${NTFSMAC_HELPER_PATH_OVERRIDE-/Library/PrivilegedHelperTools/com.binarybears.ntfsmac.helper}"
-  # The SMJobBless artifact is normally root:wheel 0544. An unprivileged caller therefore cannot
-  # use `-x` to infer whether launchd/root can execute it; presence as a regular file is the honest
-  # installation signal available to this read-only command.
-  [[ -n "$helper_path" && -f "$helper_path" ]]
+  local helper_path modern_label
+
+  # An explicit path override is a complete test/support override. In particular, an explicitly
+  # empty value must stay false instead of falling through to the host's real ServiceManagement
+  # state and contaminating a fixture run.
+  if [[ -n "${NTFSMAC_HELPER_PATH_OVERRIDE+x}" ]]; then
+    helper_path="$NTFSMAC_HELPER_PATH_OVERRIDE"
+    [[ -n "$helper_path" && -f "$helper_path" ]]
+    return
+  fi
+
+  helper_path="/Library/PrivilegedHelperTools/com.binarybears.ntfsmac.helper"
+  # The Legacy SMJobBless artifact is normally root:wheel 0544. An unprivileged caller therefore
+  # cannot use `-x` to infer whether launchd/root can execute it; presence as a regular file is the
+  # honest installation signal available to this read-only command.
+  [[ -f "$helper_path" ]] && return 0
+
+  # The standard SMAppService daemon remains inside ntfsmac.app, so there is deliberately no file
+  # under /Library/PrivilegedHelperTools. Query only whether launchd has the fixed modern label;
+  # runtime health remains the GUI's bounded XPC-version check and is not fabricated here.
+  if [[ -n "${NTFSMAC_MODERN_HELPER_REGISTERED_OVERRIDE+x}" ]]; then
+    [[ "$NTFSMAC_MODERN_HELPER_REGISTERED_OVERRIDE" == "1" ]]
+    return
+  fi
+  modern_label="${NTFSMAC_MODERN_HELPER_LABEL_OVERRIDE-com.binarybears.ntfsmac.helper.daemon}"
+  /bin/launchctl print "system/$modern_label" >/dev/null 2>&1
 }
 
 # Reports only whether the default route is carried by a tunnel. It deliberately omits the

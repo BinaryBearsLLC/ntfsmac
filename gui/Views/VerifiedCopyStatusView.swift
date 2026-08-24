@@ -26,7 +26,7 @@ public struct VerifiedCopyStatusView: View {
                 if controller.isActive {
                     Button("Cancel") { controller.cancel() }
                         .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                        .focusable(true)
+                        .ntfsmacKeyboardFocus()
                         .disabled(controller.phase == .cancelling)
                 } else {
                     Button { controller.dismiss() } label: {
@@ -34,7 +34,7 @@ public struct VerifiedCopyStatusView: View {
                             .font(.system(size: 9, weight: .semibold))
                     }
                     .buttonStyle(.plain)
-                    .focusable(true)
+                    .ntfsmacKeyboardFocus()
                     .accessibilityLabel("Dismiss Verified Copy result")
                 }
             }

@@ -43,6 +43,22 @@ STUB
   ! grep -Fxq -- 'PopoverStateRenderTests' "${STUB}.args"
 }
 
+@test "forwards additional Swift test arguments for CI sandbox configuration" {
+  cat > "$STUB" <<'STUB'
+#!/bin/bash
+printf '%s\n' "$@" > "${0}.args"
+echo 'Test run with 291 tests in 3 suites passed after 0.5 seconds.'
+STUB
+
+  run env NTFSMAC_SWIFT_TEST_EXECUTABLE="$STUB" NTFSMAC_TEST_MACOS_VERSION=26.6.1 \
+    "$RUNNER" modern "$SCRATCH" --disable-sandbox --filter DiagnoseRunnerTests
+
+  [ "$status" -eq 0 ]
+  grep -Fxq -- '--disable-sandbox' "${STUB}.args"
+  grep -Fxq -- '--filter' "${STUB}.args"
+  grep -Fxq -- 'DiagnoseRunnerTests' "${STUB}.args"
+}
+
 @test "accepts a normally completed non-empty Swift test run" {
   cat > "$STUB" <<'STUB'
 #!/bin/bash
@@ -50,6 +66,18 @@ echo 'Test run with 291 tests in 3 suites passed after 0.5 seconds.'
 STUB
 
   run env NTFSMAC_SWIFT_TEST_EXECUTABLE="$STUB" "$RUNNER" modern "$SCRATCH"
+
+  [ "$status" -eq 0 ]
+}
+
+@test "accepts Swift Testing's singular summary for one filtered test" {
+  cat > "$STUB" <<'STUB'
+#!/bin/bash
+echo 'Test run with 1 test in 0 suites passed after 0.001 seconds.'
+STUB
+
+  run env NTFSMAC_SWIFT_TEST_EXECUTABLE="$STUB" "$RUNNER" modern "$SCRATCH" \
+    --filter oneFocusedTest
 
   [ "$status" -eq 0 ]
 }

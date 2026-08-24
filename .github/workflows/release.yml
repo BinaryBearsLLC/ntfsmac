@@ -136,10 +136,10 @@ jobs:
           ./build/sync-brand-assets.sh
           git diff --exit-code -- gui/Resources/AppIcon-source.png gui/Resources/AppIcon.icns gui/Resources/HelperIcon.png
           ./tests/run-all.sh
-          NTFSMAC_HELPER_VARIANT=modern swift test --disable-sandbox \
-            --scratch-path .build/ntfsmac-modern-tests
-          NTFSMAC_HELPER_VARIANT=legacy swift test --disable-sandbox \
-            --scratch-path .build/ntfsmac-legacy-tests
+          ./build/run-swift-tests.sh modern \
+            "$RUNNER_TEMP/ntfsmac-modern-tests" --disable-sandbox
+          ./build/run-swift-tests.sh legacy \
+            "$RUNNER_TEMP/ntfsmac-legacy-tests" --disable-sandbox
 
       - name: Import the Developer ID certificate
         shell: bash
