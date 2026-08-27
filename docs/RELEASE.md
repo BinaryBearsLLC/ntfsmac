@@ -4,17 +4,20 @@ Official releases are built from `dev`, use SemVer beginning at `v3.0.0`, and ar
 steps: draft artifacts first, human validation second. GUI releases produce the standard
 SMAppService DMG and the explicitly labelled Legacy SMJobBless DMG by default.
 
-## v3.1.0 DMG branding prerequisite
+## v3.1.0 DMG branding
 
-The v3.1.0 standard and Legacy DMGs must use the official BinaryBears logo assets supplied by the
-maintainer. This is an asset-blocked release gate: do not substitute generated, traced, redrawn,
-placeholder, or otherwise unapproved marks. Both installers share the approved brand system; the
-visible app remains `ntfsmac`, and only the compatibility artifact is labelled `Legacy`.
+The v3.1.0 standard and Legacy DMGs use the official BinaryBears logo assets supplied by the
+maintainer. Do not substitute generated, traced, redrawn, placeholder, or otherwise unapproved
+marks. Both installers share the approved brand system; the visible app remains `ntfsmac`, and
+only the compatibility artifact is labelled `Legacy`.
 
 After the assets are integrated, inspect both mounted DMGs at their actual Finder size and confirm
 logo clarity, spacing, drag direction, app/Applications alignment, and naming before continuing to
 the local release candidate. Automated image/layout/signature checks supplement but do not replace
 that visual approval.
+
+Only release-required installer artwork belongs in `build/dmg-assets/`. Design experiments and
+local DMG-interface testers stay outside the tracked tree.
 
 ## Local release candidate
 
@@ -26,7 +29,10 @@ that visual approval.
    Gatekeeper assessment, DMG contents, visible app name, and SHA-256.
 5. On the standard artifact, exercise clean registration, Login Items approval and denial,
    Legacy-to-standard migration, mismatch repair, Full Disk Access, a known-clean mount/write/
-   reread/unmount, update-check behavior, and complete uninstall.
+   reread/unmount, update-check behavior, and complete uninstall. For the positive update path,
+   install a temporary locally re-signed copy whose displayed version is lower than the current
+   public stable release; verify that Settings opens that exact release, then remove the fixture.
+   Never commit or upload the synthetic old build.
 6. Repeat the applicable clean install, mount, and uninstall checks on the Legacy artifact.
 
 Do not create a release tag until this candidate passes.
@@ -36,9 +42,9 @@ Do not create a release tag until this candidate passes.
 Create an SSH-signed tag whose version exactly matches the plist:
 
 ```sh
-git tag -s v3.0.0 -m "ntfsmac 3.0.0"
-git verify-tag v3.0.0
-git push origin v3.0.0
+git tag -s v3.1.0 -m "ntfsmac 3.1.0"
+git verify-tag v3.1.0
+git push origin v3.1.0
 ```
 
 The tag must be reachable from `origin/dev`. Pushing it does not publish a release.

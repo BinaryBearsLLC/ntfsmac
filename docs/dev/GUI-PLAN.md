@@ -52,35 +52,35 @@ This table describes the current integrated GUI, not the original aspirational p
 | Shipped | Auto-detect NTFS, MBR `Windows_NTFS`, ext2, ext3, and ext4 partitions |
 | Shipped | One-click mount/unmount and multiple concurrent drive rows |
 | Shipped — extended matrix incomplete | Dirty NTFS fails closed with no read/write override and concise Windows recovery guidance; Fast Startup and a genuinely hibernated removable-volume fixture remain resource-gated |
-| Integrated candidate — live v3.1.0 gate pending | Diagnose renders four plain-language, fail-closed macro categories with semantic text/symbol/colour, inline Hide, and Command-click privacy-safe JSON export; the CLI schema remains unchanged |
-| Integrated candidate — live v3.1.0 gate pending | Consent-first standard/Legacy helper install, explicit Login Items approval state for the standard build, progress-backed CLI staging, pre-mount Full Disk Access verification, helper repair, and complete-uninstall flows |
-| Integrated candidate — live v3.1.0 gate pending | In-popover Settings with a balanced Back/title/update-icon header, canonical version/build, Launch at login, contextual help, and adaptive menu-bar icon |
-| Integrated candidate — live v3.1.0 gate pending | Connection protection appears only inside a freshly run Diagnose result. There is no standalone SECURITY row group or collapsed Show placeholder; missing evidence remains non-green. |
+| Integrated candidate — local v3.1.0 gate passed | Diagnose renders four plain-language, fail-closed macro categories with semantic text/symbol/colour, inline Hide, and Command-click privacy-safe JSON export; the CLI schema remains unchanged |
+| Integrated candidate — local v3.1.0 gate passed | Consent-first standard/Legacy helper install, explicit Login Items approval state for the standard build, progress-backed CLI staging, pre-mount Full Disk Access verification, helper repair, and complete-uninstall flows |
+| Integrated candidate — local v3.1.0 gate passed | In-popover Settings with a balanced Back/title/update-icon header, canonical version/build, Launch at login, contextual help, and adaptive menu-bar icon |
+| Integrated candidate — local v3.1.0 gate passed | Connection protection appears only inside a freshly run Diagnose result. There is no standalone SECURITY row group or collapsed Show placeholder; missing evidence remains non-green. |
 | Shipped | Each verified mounted-drive row exposes Open in Finder and uses that row's observed mount point |
 | Resolved | Global transfer telemetry was removed because bridge-wide counters cannot truthfully attribute concurrent traffic per drive; the minimal UI shows no speed row |
 | Shipped — extended matrix incomplete | NTFS3 has an explicit one-mount menu choice, Experimental warning/preflight, no silent fallback, privacy-safe driver/result diagnostics, and a passing dirty-refusal/repair/clean-write/Windows-reread cycle; broader devices and OS versions remain resource-gated. |
-| Shipped — extended matrix incomplete | Live mount-state reconciliation pairs physical inventory, host NFS truth, and bounded runtime probes, polls every five seconds, refreshes on lifecycle actions, and fails closed to yellow/unknown on disagreement. GUI/CLI unmount, external NFS/Finder disconnect, restart, concurrent devices, and selective physical hot-unplug pass on the installed package; broader hardware remains resource-gated. |
+| Shipped — extended matrix incomplete | Live mount-state reconciliation pairs physical inventory, host NFS truth, and bounded runtime probes. With the popover visible it scans drives every 15 seconds and reconciles mounts every five seconds; while hidden it slows to 60/30 seconds, with an immediate refresh whenever the cadence changes. Lifecycle actions still refresh directly, and disagreement fails closed to yellow/unknown. GUI/CLI unmount, external NFS/Finder disconnect, restart, concurrent devices, and selective physical hot-unplug pass on the installed package; broader hardware remains resource-gated. |
 | Shipped — extended media check blocked | Verified Copy is a per-drive overflow action for verified read/write mounts. It validates the exact destination volume, invokes the unprivileged CLI with literal argv, shows compact progress/result state, and cancels the whole process group; cross-OS hash proof passes, while controlled TV playback remains resource-gated. |
 | Shipped | Default-off local mount/unmount/error notifications, persisted only after macOS grants permission |
 | Shipped | Eject All attempts every drive, reports per-drive results, and retains recovery controls for failures |
-| Integrated candidate — live v3.1.0 gate pending | Mounted-drive Quit confirmation with safe `Unmount and Quit`, `Quit Anyway`, Cancel, safe-only persistence, and Command-click reset; active copy/mount/unmount disables Quit |
-| Integrated candidate — visual gate pending | Pointer input suppresses stale focus presentation; deliberate keyboard traversal uses one in-bounds one-point outline on macOS 14+ and preserves the native accessible focus behavior on macOS 13 |
+| Integrated candidate — local v3.1.0 gate passed | Mounted-drive Quit confirmation with safe `Unmount and Quit`, `Quit Anyway`, Cancel, safe-only persistence, and Command-click reset; active copy/mount/unmount disables Quit |
+| Integrated candidate — local visual gate passed | Pointer input suppresses stale focus presentation; deliberate keyboard traversal uses one in-bounds one-point outline on macOS 14+ and preserves the native accessible focus behavior on macOS 13 |
 
 ---
 
 ## v3.1.0 refinement contract — integrated candidate
 
-The behavior below is implemented in the `upgrade/v3.1.0` candidate. It remains subject to the
-complete local Standard/Legacy and packaged visual/live gates, and is not a claim about the current
-published `v3.0.0` release. Official DMG branding is still asset-blocked.
+The behavior below is implemented in the `upgrade/v3.1.0` candidate and passed the complete local
+Standard/Legacy and packaged visual/live gates. It is not a claim about the current published
+`v3.0.0` release. Official DMG branding is integrated; the remaining remote release gates are
+tracked in the canonical roadmap.
 
 ### 0.1 DMG rebrand asset gate
 
-The standard and Legacy DMGs receive a new installer presentation based only on official
-BinaryBears logo assets supplied by the maintainer. Until those source assets arrive this item is
-blocked, not approximated: no generated substitute, traced logo, temporary mark, or modified
-unapproved artwork may enter the candidate. Both DMGs use the same official brand system while
-only the compatibility artifact says `Legacy`. The visible app remains `ntfsmac`.
+The standard and Legacy DMGs use a new installer presentation based only on official BinaryBears
+logo assets supplied by the maintainer. No generated substitute, traced logo, temporary mark, or
+modified unapproved artwork may enter the candidate. Both DMGs use the same official brand system
+while only the compatibility artifact says `Legacy`. The visible app remains `ntfsmac`.
 
 Before release, visually inspect the mounted DMG at its real 720×460 size and verify logo clarity,
 spacing, drag direction, app/Applications alignment, legibility, hidden-window chrome, and both
@@ -196,23 +196,27 @@ interrupted silently.
 
 ### Resource-impact acceptance
 
-Measurements are local-only and add no analytics or telemetry. Capture three comparable runs and
-report the median plus worst observed value for the app, privileged helper, VM/runtime processes,
-and their combined total. Use the same hardware, OS, power mode, drives, polling interval, and
-sample duration before and after the work.
+Measurements are local-only and add no analytics or telemetry. Capture one uninterrupted
+full-duration final run for each scenario, plus a repeat or control whenever a value is unexpected.
+Report average, worst observation, and start-to-end change for the app, privileged helper,
+VM/runtime processes, and their combined total. Use the same hardware, OS, power mode, drives,
+polling interval, and sample duration before and after the work.
 
 | Scenario | Required evidence |
 | --- | --- |
 | App idle, popover closed | Average/peak CPU, resident memory, wakeups over 10 minutes |
-| Popover open, no drive | Same metrics while normal five-second reconciliation runs |
+| Popover open, no drive | Same metrics while interactive 15-second drive scans and five-second mount reconciliation run |
 | Refresh and Diagnose | Ten cycles; transient peak and time to return to baseline |
 | One clean mounted drive | Separate app/helper/runtime totals over 30 minutes without I/O |
-| Repeated mount/unmount | Ten safe cycles; final memory versus initial memory |
-| Standard versus Legacy | Same scenario matrix and explained differences |
+| Repeated mount/unmount | Ten safe cycles with independent host-mount truth; measure memory in a separate untouched sampler run |
+| Standard versus Legacy | Same mounted/no-I/O soak, including each helper, and explained differences; app-only scenarios use the shared GUI path |
 
-Before implementation, freeze numeric pass budgets from the pre-change measurements. At minimum,
-the release gate rejects unexplained sustained idle CPU, monotonic memory growth, failure to return
-near baseline after Diagnose, or a material regression between the pre-change and final candidate.
+Compare the final measurements with the retained pre-fix evidence. Accessibility/UI-tree reads are
+instrumentation, not a passive memory probe: if they materially change the footprint in a no-action
+control, use them only for functional cycle counts and keep resource claims on the untouched sampler.
+At minimum, the release gate rejects unexplained sustained idle CPU, monotonic memory growth,
+failure to return near baseline after Diagnose, or a material regression between the pre-change
+and final candidate.
 
 ---
 
@@ -265,7 +269,8 @@ continued to show a green `Mounted read/write` row and `Unmount` button. Refresh
 it, while the GUI's own Diagnose panel reported an inactive bridge and zero NFS mounts.
 
 The P0 remediation implements this contract in source: helper success is provisional, the app
-reconciles at launch/popover open/every five seconds/Refresh/after helper completion, and an
+reconciles at launch, popover open, the current visibility-aware polling cadence, Refresh, and
+after helper completion, and an
 incomplete or inconsistent snapshot preserves recovery controls in yellow `unknown` rather than
 publishing green. On 2026-08-11 one packaged device passed GUI unmount, Finder network-share
 disconnect, and an external NFS unmount with complete VM/PF/route reconciliation. The later

@@ -147,6 +147,10 @@ screen inspection without touching a real service, and inject one per-drive Ejec
 the current manual gate remains in
 [`../testing/BINARYBEARS_MANUAL_ACCEPTANCE_2026-08-12.md`](../testing/BINARYBEARS_MANUAL_ACCEPTANCE_2026-08-12.md).
 
+The demo also supplies a granted Full Disk Access state and suppresses production CLI-staging
+resets, so screenshots never probe a synthetic disk identifier or mutate a real helper setup.
+These seams are active only when `NTFSMAC_UI_DEMO` is explicitly set.
+
 ## Live GUI audit session (2026-07-12, this pass)
 
 Full live walkthrough using `DemoScaffold` (`NTFSMAC_UI_DEMO`/`NTFSMAC_INSTALL_DEMO` env seams,

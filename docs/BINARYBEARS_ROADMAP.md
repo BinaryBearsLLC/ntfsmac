@@ -102,20 +102,21 @@ dual-distribution gate below passes and `v3.1.0` ships.
 
 #### v3.1.0 completion sequence — implementation status
 
-Items 2–6 are integrated in the `upgrade/v3.1.0` candidate and covered by focused regressions.
+Items 0.1 and 2–6 are integrated in the `upgrade/v3.1.0` candidate and covered by focused regressions.
 They are not release claims: the complete local Standard/Legacy gate, packaged live acceptance,
-official artwork, signing/notarization, and downloaded-draft smoke tests remain mandatory.
+signing/notarization, and downloaded-draft smoke tests remain mandatory.
 
-- [ ] **0.1 — Rebrand both DMGs with official BinaryBears artwork.** This gate is blocked until the
-  maintainer supplies the approved logo assets. Use those originals in the standard and Legacy
-  installer presentation; do not invent, redraw, trace, or ship placeholder branding. Preserve the
-  visible app name **ntfsmac**, keep only the compatibility DMG explicitly labelled **Legacy**, and
-  visually validate the final mounted-window composition before either artifact can ship.
-- [ ] **1 — Complete the resource and visual baseline.** Record app, helper, and runtime CPU,
+- [x] **0.1 — Rebrand both DMGs with official BinaryBears artwork.** The standard and Legacy
+  installer presentations use the maintainer-supplied originals from the dedicated release-asset
+  directory, with pinned hashes and packaging regressions. The visible app remains **ntfsmac**,
+  only the compatibility DMG is explicitly labelled **Legacy**, and both mounted DMGs were
+  visually validated at their real 720×460 Finder size.
+- [x] **1 — Complete the resource and visual baseline.** Record app, helper, and runtime CPU,
    resident memory, wakeups, and memory growth separately for idle, popover-open polling, Refresh,
-   Diagnose, one mounted drive, and a 30-minute soak. Record both standard and Legacy builds on the
-   same Mac/OS/power conditions. Short idle sampling is useful development evidence, but does not
-   replace the full candidate matrix.
+   Diagnose, one mounted drive, and a 30-minute soak. The shared GUI path has complete Standard
+   app-only coverage; Standard and Legacy have matching 30-minute mounted/no-I/O runs on the same
+   Mac/OS/power conditions, including separate helpers and runtimes. Accessibility-cycle memory is
+   excluded after a no-action control proved that the instrumentation itself changes footprint.
 - [x] **2 — Make standard-helper migration transactional.** The standard build detects registered,
    running, and orphaned Legacy helper state. It first obtains approval for and verifies a healthy
    standard helper/XPC connection, then uninstalls the Legacy helper and proves its job, process,
@@ -146,7 +147,20 @@ official artwork, signing/notarization, and downloaded-draft smoke tests remain 
    candidate with step 1, investigate sustained CPU or monotonic memory growth, then run both
    packaged variants through automated, visual/accessibility, migration, mount, quit, uninstall,
    signing, and downloaded-DMG acceptance. Local validation must finish before any push; the final
-   signed/notarized draft and downloaded-DMG checks follow only after the official artwork lands.
+   signed/notarized draft and downloaded-DMG checks follow only after that local gate passes.
+
+On 2026-08-27 the final local source candidate passed 335 shell/Bats checks, 306 Standard Swift
+tests, 306 Legacy Swift tests, the 8/41/9 Rust suites, and a full automatic Developer ID build of
+both apps and DMGs. Both installers, nested signatures, arm64 structure, approved artwork, website
+link, container integrity, and SHA-256 sidecars passed. The live Standard/Legacy mount, write,
+reread, cycle, Quit, updater, migration, focus, and resource evidence is recorded in
+[`testing/BINARYBEARS_V3_1_LOCAL_RC_2026-08-27.md`](testing/BINARYBEARS_V3_1_LOCAL_RC_2026-08-27.md).
+Final macOS approval for the exact rebuilt Standard app passed. The app registered its 3.1.0
+service, completed a fresh 64 MiB mount/write/unmount/remount/reread proof with matching SHA-256,
+showed the user-facing Diagnose categories as healthy, and left no mount, security session, Legacy
+helper, or removable-media test file behind. The local release-candidate gate is complete;
+notarization/stapling and downloaded-draft checks necessarily follow only after publication of a
+signed tag and draft.
 
 ### Later product work
 

@@ -3,6 +3,87 @@ const releaseStatus = document.querySelector("#release-status");
 const root = document.documentElement;
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
+const impactLab = document.querySelector("[data-impact-lab]");
+const impactScenarios = {
+  idle: {
+    kicker: "At rest",
+    title: "Barely there.",
+    copy: "The menu stays ready while ntfsmac settles into a slower background rhythm.",
+    cpu: "<0.002%",
+    memory: "~30 MB",
+    memoryShare: "0.12%",
+    battery: "Near-zero",
+    ariaLabel: "At rest: less than 0.002 percent CPU and about 30 megabytes of memory",
+    cpuLevel: "12%",
+    memoryLevel: "12%",
+    speed: "8s",
+    verdict: "Quiet by design.",
+    verdictCopy: "Enough headroom that ordinary use stays comfortably below one percent of a CPU core and system memory."
+  },
+  open: {
+    kicker: "Menu open",
+    title: "Responsive, still tiny.",
+    copy: "Fresh drive information and live controls arrive without turning the menu into a heavyweight app.",
+    cpu: "<0.006%",
+    memory: "~34 MB",
+    memoryShare: "0.14%",
+    battery: "Near-zero",
+    ariaLabel: "Menu open: less than 0.006 percent CPU and about 34 megabytes of memory",
+    cpuLevel: "59%",
+    memoryLevel: "14%",
+    speed: "5.5s",
+    verdict: "Fast when visible.",
+    verdictCopy: "Opening the menu increases responsiveness, not resource pressure."
+  },
+  mounted: {
+    kicker: "Drive mounted",
+    title: "More capability. Less than 1% memory.",
+    copy: "The private filesystem runtime joins in only while your drive is mounted, then leaves when you unmount.",
+    cpu: "<0.004%",
+    memory: "~200 MB",
+    memoryShare: "0.82%",
+    battery: "Very low",
+    ariaLabel: "Drive mounted: less than 0.004 percent CPU and about 200 megabytes of memory",
+    cpuLevel: "34%",
+    memoryLevel: "82%",
+    speed: "4.2s",
+    verdict: "Headroom to spare.",
+    verdictCopy: "Even the complete mounted stack remains below one percent of the test Mac's memory."
+  }
+};
+
+const updateImpactScenario = (scenarioName) => {
+  if (!impactLab || !impactScenarios[scenarioName]) return;
+  const scenario = impactScenarios[scenarioName];
+  impactLab.dataset.impactScenario = scenarioName;
+  impactLab.style.setProperty("--impact-cpu", scenario.cpuLevel);
+  impactLab.style.setProperty("--impact-memory", scenario.memoryLevel);
+  impactLab.style.setProperty("--impact-speed", scenario.speed);
+  impactLab.querySelector("[data-impact-kicker]").textContent = scenario.kicker;
+  impactLab.querySelector("[data-impact-title]").textContent = scenario.title;
+  impactLab.querySelector("[data-impact-copy]").textContent = scenario.copy;
+  impactLab.querySelector("[data-impact-cpu]").textContent = scenario.cpu;
+  impactLab.querySelector("[data-impact-memory]").textContent = scenario.memory;
+  impactLab.querySelector("[data-impact-battery]").textContent = scenario.battery;
+  impactLab.querySelector("[data-impact-cpu-label]").textContent = scenario.cpu;
+  impactLab.querySelector("[data-impact-memory-label]").textContent = scenario.memoryShare;
+  impactLab.querySelector("[data-impact-verdict]").textContent = scenario.verdict;
+  impactLab.querySelector("[data-impact-verdict-copy]").textContent = scenario.verdictCopy;
+  impactLab.querySelector("[data-impact-chart]").setAttribute("aria-label", scenario.ariaLabel);
+  impactLab.querySelectorAll("[data-impact-button]").forEach((button) => {
+    const isActive = button.dataset.impactButton === scenarioName;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+};
+
+if (impactLab) {
+  impactLab.querySelectorAll("[data-impact-button]").forEach((button) => {
+    button.addEventListener("click", () => updateImpactScenario(button.dataset.impactButton));
+  });
+  updateImpactScenario(impactLab.dataset.impactScenario || "idle");
+}
+
 fetch("https://api.github.com/repos/BinaryBearsLLC/ntfsmac/releases/latest", {
   headers: { Accept: "application/vnd.github+json" }
 })
@@ -30,6 +111,10 @@ if (!reducedMotion.matches && "IntersectionObserver" in window) {
   });
 
   document.querySelectorAll(".steps [data-reveal]").forEach((card, index) => {
+    card.style.setProperty("--reveal-delay", `${index * 90}ms`);
+  });
+
+  document.querySelectorAll(".showcase-grid [data-reveal]").forEach((card, index) => {
     card.style.setProperty("--reveal-delay", `${index * 90}ms`);
   });
 

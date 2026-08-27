@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="ntfsmac by BinaryBears — read and write NTFS drives on Apple Silicon Macs.">
+    <meta name="description" content="ntfsmac 3.1 by BinaryBears — native, private NTFS read/write for Apple Silicon Macs.">
     <meta name="theme-color" content="#067ce7">
     <title>ntfsmac by BinaryBears</title>
     <link rel="icon" href="assets/ntfsmac-icon.png">
@@ -25,8 +25,9 @@
       </a>
       <nav aria-label="Primary navigation">
         <a href="#features">Features</a>
+        <a href="#impact">Impact</a>
+        <a href="#interface">Interface</a>
         <a href="#install">Install</a>
-        <a href="#privacy">Privacy</a>
         <a href="https://github.com/BinaryBearsLLC/ntfsmac">GitHub</a>
       </nav>
     </header>
@@ -34,15 +35,15 @@
     <main id="top">
       <section class="hero">
         <div class="hero-copy" data-reveal-group>
-          <p class="eyebrow">Open source · macOS · Apple Silicon</p>
+          <p class="eyebrow">Version 3.1 · Open source · Apple Silicon</p>
           <h1>ntfsmac <span>by BinaryBears</span></h1>
           <p class="lede">Mount NTFS drives read/write from a focused native menu-bar app, with
-            isolated networking and diagnostics you can actually inspect.</p>
+            a modern macOS helper, isolated networking and diagnostics written for people.</p>
           <div class="actions">
-            <a class="button primary" id="release-link" href="https://github.com/BinaryBearsLLC/ntfsmac/releases/latest">Get v3.0.0</a>
+            <a class="button primary" id="release-link" href="https://github.com/BinaryBearsLLC/ntfsmac/releases/latest">Get latest release</a>
             <a class="button secondary" href="https://github.com/BinaryBearsLLC/ntfsmac">Source code</a>
           </div>
-          <p class="release-status" id="release-status">Latest published release: v3.0.0</p>
+          <p class="release-status" id="release-status">Latest published release on GitHub</p>
         </div>
         <div class="hero-art" data-parallax aria-hidden="true">
           <div class="glow"></div>
@@ -59,7 +60,89 @@
       <section class="requirements" data-reveal aria-label="System requirements">
         <div><strong>Apple Silicon</strong><span>M-series Mac</span></div>
         <div><strong>macOS 13+</strong><span>Ventura or newer</span></div>
-        <div><strong>Local control</strong><span>No account or telemetry</span></div>
+        <div><strong>Two installers</strong><span>Standard and Legacy</span></div>
+      </section>
+
+      <section class="section impact" id="impact">
+        <div class="section-heading" data-reveal>
+          <div>
+            <p class="eyebrow">A lighter footprint</p>
+            <h2>So light, it practically disappears.</h2>
+          </div>
+          <p>ntfsmac slows its background work when the menu is closed and wakes only when you need
+            it. Explore the measured footprint in three everyday moments.</p>
+        </div>
+
+        <div class="impact-lab" data-impact-lab data-impact-scenario="idle" data-reveal>
+          <div class="impact-toolbar" aria-label="Choose an activity scenario">
+            <span>See ntfsmac while…</span>
+            <div class="impact-tabs">
+              <button class="impact-tab is-active" type="button" data-impact-button="idle" aria-pressed="true">At rest</button>
+              <button class="impact-tab" type="button" data-impact-button="open" aria-pressed="false">Menu open</button>
+              <button class="impact-tab" type="button" data-impact-button="mounted" aria-pressed="false">Drive mounted</button>
+            </div>
+          </div>
+
+          <div class="impact-stage">
+            <div class="impact-orb" aria-hidden="true">
+              <span class="impact-orbit impact-orbit-one"></span>
+              <span class="impact-orbit impact-orbit-two"></span>
+              <span class="impact-signal"></span>
+              <div class="impact-orb-core">
+                <img src="assets/ntfsmac-icon.png" alt="" width="112" height="112">
+              </div>
+            </div>
+
+            <div class="impact-story" aria-live="polite">
+              <p class="impact-kicker" data-impact-kicker>At rest</p>
+              <h3 data-impact-title>Barely there.</h3>
+              <p data-impact-copy>The menu stays ready while ntfsmac settles into a slower background rhythm.</p>
+              <div class="impact-metrics">
+                <div>
+                  <span>CPU</span>
+                  <strong data-impact-cpu>&lt;0.002%</strong>
+                  <small>measured average</small>
+                </div>
+                <div>
+                  <span>Memory</span>
+                  <strong data-impact-memory>~30 MB</strong>
+                  <small>physical footprint</small>
+                </div>
+                <div>
+                  <span>Battery</span>
+                  <strong data-impact-battery>Near-zero</strong>
+                  <small>estimated impact</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="impact-chart" data-impact-chart role="img" aria-label="At rest: less than 0.002 percent CPU and about 30 megabytes of memory">
+            <div class="impact-chart-row">
+              <div class="impact-chart-label"><span>CPU activity</span><strong data-impact-cpu-label>&lt;0.002%</strong></div>
+              <div class="impact-track impact-track-cpu"><span data-impact-cpu-bar></span><i></i></div>
+              <div class="impact-axis"><span>0</span><span>0.01%</span></div>
+            </div>
+            <div class="impact-chart-row">
+              <div class="impact-chart-label"><span>Share of test Mac memory</span><strong data-impact-memory-label>0.12%</strong></div>
+              <div class="impact-track impact-track-memory"><span data-impact-memory-bar></span><i></i></div>
+              <div class="impact-axis"><span>0</span><span>1%</span></div>
+            </div>
+          </div>
+
+          <div class="impact-verdict">
+            <span class="impact-verdict-dot" aria-hidden="true"></span>
+            <p><strong data-impact-verdict>Quiet by design.</strong> <span data-impact-verdict-copy>Enough headroom that ordinary use stays comfortably below one percent of a CPU core and system memory.</span></p>
+          </div>
+
+          <details class="impact-method">
+            <summary>How we measured</summary>
+            <p>Local 10- and 30-minute samples on a 24 GB Apple Silicon Mac. CPU is a time-based
+              process average; mounted memory includes ntfsmac and its private filesystem runtime.
+              Battery wording is an estimate based on measured CPU activity and wakeups, not a
+              battery-life guarantee. Values are rounded up for a clear, conservative summary.</p>
+          </details>
+        </div>
       </section>
 
       <section class="section split" id="features">
@@ -70,28 +153,65 @@
             result locally to macOS. The interface keeps mount state, safety checks and recovery
             close at hand.</p>
           <ul class="checklist">
-            <li>NTFS read/write with explicit mount and unmount controls</li>
-            <li>Per-mount network isolation and firewall status</li>
-            <li>Built-in diagnostics and complete uninstall</li>
-            <li>Simple release check that always sends you to GitHub</li>
+            <li>Modern macOS helper in the standard installer</li>
+            <li>Legacy compatibility installer released alongside it</li>
+            <li>Plain-language diagnostics with clear OK, idle and attention states</li>
+            <li>Safe Quit confirmation whenever a drive is still mounted</li>
+            <li>Per-mount isolation, verified copy and complete uninstall</li>
           </ul>
         </div>
         <figure class="app-shot" data-reveal>
-          <img src="assets/ntfsmac-mounted.png" alt="ntfsmac menu showing a mounted NTFS drive and security status">
-          <figcaption>Native controls with visible security state.</figcaption>
+          <img src="assets/gui-mounted-v3.1.png" alt="ntfsmac 3.1 showing a demo NTFS drive mounted read/write">
+          <figcaption>A mounted drive, one safe action away from unmount.</figcaption>
         </figure>
       </section>
 
+      <section class="section" id="interface">
+        <div class="section-heading" data-reveal>
+          <div>
+            <p class="eyebrow">The 3.1 interface</p>
+            <h2>Useful detail, without the internals.</h2>
+          </div>
+          <p>Diagnose groups the real checks into four readable outcomes. Settings keeps navigation,
+            version and update check on one line. When storage is active, Quit makes the safe choice
+            explicit instead of silently leaving services behind.</p>
+        </div>
+        <div class="showcase-grid">
+          <figure class="showcase-card showcase-wide" data-reveal>
+            <div class="showcase-image tall"><img src="assets/gui-diagnose-v3.1.png" alt="ntfsmac Diagnose panel with App readiness, Drive status, Connection protection and Permissions categories"></div>
+            <figcaption><strong>Diagnose you can act on.</strong><span>Four macro-categories, clear status language and no implementation dump.</span></figcaption>
+          </figure>
+          <figure class="showcase-card" data-reveal>
+            <div class="showcase-image"><img src="assets/gui-settings-v3.1.png" alt="ntfsmac Settings with aligned Back, title and update controls"></div>
+            <figcaption><strong>Calmer Settings.</strong><span>Back, title and update check share one balanced header.</span></figcaption>
+          </figure>
+          <figure class="showcase-card" data-reveal>
+            <div class="showcase-image"><img src="assets/gui-quit-confirm-v3.1.png" alt="ntfsmac asking how to quit while a demo drive is mounted"></div>
+            <figcaption><strong>Quit without surprises.</strong><span>Unmount and Quit is the safe default; Cancel always keeps the drive available.</span></figcaption>
+          </figure>
+        </div>
+      </section>
+
       <section class="section" id="install">
-        <p class="eyebrow" data-reveal>Installation</p>
-        <h2 data-reveal>Three deliberate steps.</h2>
+        <div class="section-heading" data-reveal>
+          <div>
+            <p class="eyebrow">Installation</p>
+            <h2>Three deliberate steps.</h2>
+          </div>
+          <p>Choose the standard DMG for current macOS releases. The separately labelled Legacy DMG
+            remains available for compatibility and installs the same visible <strong>ntfsmac</strong> app.</p>
+        </div>
+        <figure class="installer-shot" data-reveal>
+          <img src="assets/installer-v3.1.png" alt="Branded ntfsmac installer window showing the app dragged to Applications">
+          <figcaption>Open the DMG, then drag ntfsmac to Applications. The BinaryBears icon links to the official website.</figcaption>
+        </figure>
         <div class="steps">
           <article data-reveal><span>1</span><h3>Download</h3><p>Get the latest signed Apple Silicon DMG from GitHub Releases.</p></article>
           <article data-reveal><span>2</span><h3>Move</h3><p>Drag <strong>ntfsmac</strong> to Applications and open it.</p></article>
-          <article data-reveal><span>3</span><h3>Authorize</h3><p>Approve ntfsmac Helper and Full Disk Access when macOS asks.</p></article>
+          <article data-reveal><span>3</span><h3>Authorize</h3><p>Allow ntfsmac in Login Items and grant Full Disk Access when macOS asks.</p></article>
         </div>
-        <p class="note" data-reveal>Upgrading from an older build replaces the previous helper. macOS may ask
-          you to approve Full Disk Access again.</p>
+        <p class="note" data-reveal>Upgrading to the standard 3.1 build verifies its modern helper first,
+          then removes the retired Legacy helper. macOS may ask you to approve access again.</p>
       </section>
 
       <section class="section privacy" id="privacy">

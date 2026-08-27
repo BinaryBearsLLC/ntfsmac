@@ -88,11 +88,11 @@ been through every state at least once:
 
 ---
 
-## v3.1.0 planned acceptance additions — not yet implemented
+## v3.1.0 candidate acceptance additions
 
-These cases are specifications for the next implementation pass, not claims about the current
-build. Add automated coverage first where state can be injected; then execute the packaged manual
-cases locally on both standard and Legacy artifacts before any push.
+These cases define the candidate gate. Automated coverage is used where state can be injected;
+packaged manual results and remaining boundaries are recorded in the dated local-RC evidence before
+any push.
 
 | ID | Acceptance case | Required result |
 | --- | --- | --- |
@@ -108,13 +108,21 @@ cases locally on both standard and Legacy artifacts before any push.
 | V31-DIAG-02 | Compare GUI summary, Command-click export, and CLI JSON | GUI aggregation is faithful; CLI and JSON schema/output remain unchanged |
 | V31-DIAG-03 | Open, Diagnose, Hide, and Diagnose again | No standalone SECURITY UI exists; Connection protection appears only inside Diagnose, Hide removes the complete panel, and a fresh run restores it |
 | V31-UPD-01 | Exercise every update state from Settings | Back, centred Settings title/version, and update icon remain aligned; the icon is reachable, labelled, stable in size, debounced, and opens only the verified release page |
+| V31-UPD-02 | Install a locally version-injected app older than the latest public GitHub release, then use the Settings update icon | The app detects the newer stable release, presents the update state without changing layout, and opens that exact GitHub Release; the synthetic old build and its artifacts remain local and are never committed or uploaded |
 | V31-UI-01 | Capture open/reopen, pointer, hover, pressed, asynchronous refresh, and Full Keyboard Access states in light/dark mode | No random/autofocus or stacked rectangles occur; only deliberate keyboard traversal shows a maximum 1.5-point focus outline with no layout movement |
 | V31-PERF-01 | Run the resource matrix before changes and on the final candidates | Per-process and total CPU/RAM/wakeups are comparable; no sustained idle CPU or monotonic memory growth is unexplained |
 
-For resource measurements, record the exact commit, artifact variant, macOS build, hardware, power
-mode, connected media, sample interval/duration, and measurement tool. Run each scenario three
-times and retain raw local evidence plus a concise privacy-safe summary. Set numeric budgets from
-the baseline before coding so the final result cannot redefine success after the fact.
+For resource measurements, record the exact source state, artifact variant, macOS build, hardware,
+power mode, connected media, sample interval/duration, and measurement tool. Retain raw local
+evidence plus a concise privacy-safe summary. Use uninterrupted passive sampler runs for CPU/RAM;
+Accessibility-driven UI cycles prove behavior but must not be treated as memory measurements unless
+a no-action control proves that instrumentation has no material effect.
+
+The V31-UPD-02 fixture is made from the already-validated local app by changing only its displayed
+bundle version to a lower synthetic SemVer and re-signing that temporary copy. It must be installed
+and launched from `/Applications` for the manual check, must not register or replace a production
+helper, and must be removed after the result is recorded. The test compares against GitHub's actual
+latest stable release; it never creates, edits, downloads, or publishes a release.
 
 ---
 

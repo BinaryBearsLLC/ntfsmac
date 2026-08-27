@@ -5,8 +5,8 @@
 Native Apple Silicon NTFS read/write for macOS, without kernel extensions or disabling SIP.
 
 > [!NOTE]
-> BinaryBears `v3.0.0` is the current published release. Download the signed Apple Silicon DMG
-> from [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases/latest).
+> Download the latest signed Apple Silicon DMG from
+> [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases/latest).
 
 ntfsmac runs the filesystem driver inside a small Linux microVM and exposes the mounted volume to
 macOS over a private NFS link. `ntfs-3g` is the compatibility-first default; NTFS3 is an explicit
@@ -36,7 +36,7 @@ Intel Macs are not supported.
 
 ### Official BinaryBears release
 
-1. Download `ntfsmac-3.0.0-Apple-Silicon.dmg` from
+1. Download the standard `ntfsmac-X.Y.Z-Apple-Silicon.dmg` from
    [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases/latest).
 2. Open the DMG and drag `ntfsmac.app` to Applications.
 3. Launch **ntfsmac** and approve the guided helper setup.
@@ -54,12 +54,12 @@ cd ntfsmac
 ```
 
 GUI builds automatically create the standard `ntfsmac-X.Y.Z-Apple-Silicon.dmg` and the
-`ntfsmac-X.Y.Z-Legacy-Apple-Silicon.dmg` compatibility alternative. The standard product never
-uses the internal P2 project name. Pass `--no-legacy` after `gui` or `both` only when the Legacy
-artifact is deliberately not needed. When the exact BinaryBears Developer ID Application identity
-is installed, the builder selects it automatically and produces a locally installable P2 helper;
-otherwise it clearly marks the result as an ad-hoc UI/structure build whose P2 helper macOS cannot
-register. `SIGNING_IDENTITY=-` deliberately forces that credential-free fallback. See
+`ntfsmac-X.Y.Z-Legacy-Apple-Silicon.dmg` compatibility alternative. Pass `--no-legacy` after
+`gui` or `both` only when the Legacy artifact is deliberately not needed. When the exact
+BinaryBears Developer ID Application identity is installed, the builder selects it automatically
+and produces a locally installable standard helper; otherwise it clearly marks the result as an
+ad-hoc UI/structure build whose helper macOS cannot register. `SIGNING_IDENTITY=-` deliberately
+forces that credential-free fallback. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow.
 
 ## Use
@@ -101,10 +101,10 @@ read at that time; it cannot guarantee against later media failure.
 Reports omit usernames, volume labels, device identifiers, serial numbers, mount paths, IP
 addresses, DNS servers, route tables, and VPN provider details.
 
-### v3.1.0 candidate interaction changes
+### v3.1.0 interaction changes
 
-The source candidate integrates these behaviors; they remain subject to the complete local and
-packaged release gates and are not claims about the current published `v3.0.0` release:
+The v3.1.0 source line integrates these behaviors. GitHub Releases remains authoritative for the
+currently published version and its signed artifacts:
 
 - Diagnose presents four plain-language categories. Connection protection is part of that result
   rather than a separate SECURITY section; implementation details remain in the CLI and
@@ -120,8 +120,8 @@ packaged release gates and are not claims about the current published `v3.0.0` r
   focus behavior.
 - The standard helper is health-checked before the candidate removes any installed Legacy helper.
   Approval denial or a failed replacement leaves Legacy intact and exposes a repairable state.
-- Both v3.1.0 DMGs will receive official BinaryBears artwork supplied by the maintainer before
-  release; no placeholder branding will ship.
+- Both v3.1.0 DMGs use the official BinaryBears artwork supplied by the maintainer; no placeholder
+  branding is included.
 
 ## How it works
 
@@ -141,7 +141,7 @@ call after hot-unplug or guest failure.
 
 ## Security and updates
 
-The v3.1.0 candidate summarizes measured protection evidence inside Diagnose and fails closed to an
+v3.1.0 summarizes measured protection evidence inside Diagnose and fails closed to an
 explicit unavailable/attention state when evidence is missing. The CLI retains its reason-coded
 detail. See [SECURITY.md](SECURITY.md) for the reporting boundary.
 
@@ -154,9 +154,9 @@ offers to open that release in the browser. Automatic network failures remain si
 The current fork baseline completed its measured P0/P1 acceptance ledger with no remaining measured
 failure. Two resource-dependent extended cells remain explicitly blocked, not silently counted as
 passes. `v3.0.0` was published on 2026-08-18 after the downloaded GitHub DMG passed checksum,
-Gatekeeper, install, mount, write/reread, and unmount validation. It remains the current supported
-release. The source tree contains the `v3.1.0` dual-distribution candidate, but that candidate is
-not a published release until both artifacts complete their local and downloaded-DMG acceptance
+Gatekeeper, install, mount, write/reread, and unmount validation. The `dev` source line contains the
+`v3.1.0` dual-distribution work; the Releases page, not the branch README, is the source of truth
+for whether that version has completed its signed/notarized draft and downloaded-DMG acceptance
 gates.
 
 - [Roadmap](docs/BINARYBEARS_ROADMAP.md)
