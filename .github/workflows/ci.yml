@@ -20,7 +20,9 @@ jobs:
         run: |
           # *.command (build.command, PR #14's interactive release builder) is bash too —
           # security-relevant (codesign, xattr), so lint it alongside the .sh scripts.
-          find . \( -name '*.sh' -o -name '*.command' \) -not -path './vendor/src/*' -print0 \
+          # Ask Git for the inputs so local-only testers and generated caches can never alter
+          # this gate or accidentally become part of the release surface.
+          git ls-files -z -- '*.sh' '*.command' ':(exclude)vendor/src/**' \
             | xargs -0 shellcheck -S warning
       - name: Install build dependencies
         run: |

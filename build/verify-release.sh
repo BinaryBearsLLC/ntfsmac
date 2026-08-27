@@ -10,6 +10,7 @@ DMG="${NTFSMAC_DMG_OUT:-$REPO_ROOT/dist/ntfsmac-${VERSION}-Apple-Silicon.dmg}"
 HELPER_VARIANT="${NTFSMAC_HELPER_VARIANT:-modern}"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
 REQUIRE_NOTARIZATION="${REQUIRE_NOTARIZATION:-0}"
+LAYOUT_CONFIG="${NTFSMAC_DMG_LAYOUT:-$REPO_ROOT/build/dmg-assets/layout.json}"
 
 fail() {
   echo "verify-release: FAIL — $*" >&2
@@ -103,6 +104,25 @@ verify_dmg() {
   [[ -d "$mount_dir/ntfsmac.app" ]] || fail "DMG does not contain ntfsmac.app"
   [[ -L "$mount_dir/Applications" && "$(readlink "$mount_dir/Applications")" == "/Applications" ]] ||
     fail "DMG Applications link is missing or invalid"
+  local website_filename
+  website_filename="$(/usr/bin/plutil -extract website.filename raw "$LAYOUT_CONFIG" 2>/dev/null)" ||
+    fail "DMG layout configuration is unreadable"
+  [[ -f "$mount_dir/$website_filename" ]] ||
+    fail "DMG does not contain the BinaryBears website link"
+  [[ "$(/usr/bin/plutil -extract URL raw "$mount_dir/$website_filename" 2>/dev/null)" == \
+    "https://binarybears.com/" ]] || fail "DMG website link has the wrong destination"
+  xattr -p com.apple.ResourceFork "$mount_dir/$website_filename" >/dev/null 2>&1 ||
+    fail "DMG website link has no custom BinaryBears icon"
+  [[ -f "$mount_dir/.DS_Store" ]] || fail "DMG Finder layout is missing"
+  [[ -f "$mount_dir/.background/ntfsmac-dmg-background.png" ]] ||
+    fail "DMG branded background is missing"
+  local background_info
+  background_info="$(sips -g pixelWidth -g pixelHeight \
+    "$mount_dir/.background/ntfsmac-dmg-background.png" 2>/dev/null)" ||
+    fail "DMG branded background is unreadable"
+  [[ "$background_info" == *"pixelWidth: 720"* && \
+    "$background_info" == *"pixelHeight: 460"* ]] ||
+    fail "DMG branded background has the wrong canvas size"
   [[ -f "$mount_dir/.VolumeIcon.icns" ]] || fail "DMG does not contain the approved volume icon"
   [[ "$(plist_value "$mount_dir/ntfsmac.app/Contents/Info.plist" CFBundleIdentifier)" == "com.binarybears.ntfsmac" ]] ||
     fail "DMG contains the wrong app bundle"

@@ -49,12 +49,12 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
-@test "builder auto-selects only the official BinaryBears identity for a usable local P2 DMG" {
+@test "builder auto-selects only the official BinaryBears identity for a usable local standard DMG" {
   run grep -F 'Developer ID Application: BinaryBears LLC (SQY8T23X8N)' "$SCRIPT"
   [ "$status" -eq 0 ]
   run grep -F 'security find-identity -v -p codesigning' "$SCRIPT"
   [ "$status" -eq 0 ]
-  run grep -F 'macOS will not register the P2 helper from this DMG' "$SCRIPT"
+  run grep -F 'macOS will not register the standard helper from this DMG' "$SCRIPT"
   [ "$status" -eq 0 ]
   run "$SCRIPT" --help
   [ "$status" -eq 0 ]

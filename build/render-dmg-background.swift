@@ -2,57 +2,187 @@
 import AppKit
 import Foundation
 
-private let canvas = NSSize(width: 720, height: 460)
+struct Layout: Decodable {
+  struct Canvas: Decodable { let width: CGFloat; let height: CGFloat }
+  struct Card: Decodable {
+    let x: CGFloat; let y: CGFloat; let width: CGFloat; let height: CGFloat
+    let radius: CGFloat; let opacity: CGFloat
+  }
+  struct Watermark: Decodable {
+    let centerX: CGFloat; let centerY: CGFloat; let size: CGFloat; let opacity: CGFloat
+  }
+  struct TextElement: Decodable {
+    let text: String; let centerX: CGFloat; let centerY: CGFloat
+    let fontSize: CGFloat; let boxHeight: CGFloat
+  }
+  struct Arrow: Decodable {
+    let centerX: CGFloat; let centerY: CGFloat; let width: CGFloat
+    let rotationDegrees: CGFloat; let opacity: CGFloat; let removeWhite: Bool
+    let whiteThreshold: CGFloat; let edgeSoftness: CGFloat
+  }
+
+  let schemaVersion: Int
+  let canvas: Canvas
+  let card: Card
+  let watermark: Watermark
+  let title: TextElement
+  let subtitle: TextElement
+  let arrow: Arrow
+}
+
+private func fail(_ message: String) -> Never {
+  FileHandle.standardError.write(Data("render-dmg-background: \(message)\n".utf8))
+  exit(1)
+}
 
 private func drawText(
-  _ text: String,
-  y: CGFloat,
-  font: NSFont,
-  color: NSColor,
-  height: CGFloat
+  _ element: Layout.TextElement,
+  canvas: NSSize,
+  weight: NSFont.Weight,
+  color: NSColor
 ) {
   let style = NSMutableParagraphStyle()
   style.alignment = .center
-
   let attributes: [NSAttributedString.Key: Any] = [
-    .font: font,
+    .font: NSFont.systemFont(ofSize: element.fontSize, weight: weight),
     .foregroundColor: color,
     .paragraphStyle: style,
   ]
-
-  text.draw(
-    in: NSRect(x: 40, y: y, width: canvas.width - 80, height: height),
-    withAttributes: attributes
+  let rect = NSRect(
+    x: 0,
+    y: canvas.height - element.centerY - element.boxHeight / 2,
+    width: canvas.width,
+    height: element.boxHeight
   )
+  element.text.draw(in: rect, withAttributes: attributes)
 }
 
-private func drawArrow() {
-  let accent = NSColor(calibratedRed: 0.16, green: 0.72, blue: 0.38, alpha: 0.82)
-  let line = NSBezierPath()
-  line.move(to: NSPoint(x: 292, y: 226))
-  line.line(to: NSPoint(x: 428, y: 226))
-  line.lineWidth = 4
-  line.lineCapStyle = .round
-  accent.setStroke()
-  line.stroke()
+private func preparedArrow(from url: URL, settings: Layout.Arrow) -> NSImage {
+  guard let source = NSImage(contentsOf: url) else {
+    fail("failed to load arrow artwork: \(url.path)")
+  }
+  var proposed = NSRect(origin: .zero, size: source.size)
+  guard let sourceCG = source.cgImage(forProposedRect: &proposed, context: nil, hints: nil) else {
+    fail("failed to decode arrow artwork: \(url.path)")
+  }
 
-  let head = NSBezierPath()
-  head.move(to: NSPoint(x: 414, y: 238))
-  head.line(to: NSPoint(x: 430, y: 226))
-  head.line(to: NSPoint(x: 414, y: 214))
-  head.lineWidth = 4
-  head.lineCapStyle = .round
-  head.lineJoinStyle = .round
-  accent.setStroke()
-  head.stroke()
+  let width = sourceCG.width
+  let height = sourceCG.height
+  let bytesPerRow = width * 4
+  var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
+  let colorSpace = CGColorSpaceCreateDeviceRGB()
+  let bitmapInfo = CGBitmapInfo.byteOrder32Big.rawValue |
+    CGImageAlphaInfo.premultipliedLast.rawValue
+  guard let context = CGContext(
+    data: &pixels,
+    width: width,
+    height: height,
+    bitsPerComponent: 8,
+    bytesPerRow: bytesPerRow,
+    space: colorSpace,
+    bitmapInfo: bitmapInfo
+  ) else {
+    fail("failed to allocate arrow bitmap")
+  }
+  context.translateBy(x: 0, y: CGFloat(height))
+  context.scaleBy(x: 1, y: -1)
+  context.draw(sourceCG, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+  var minX = width
+  var minY = height
+  var maxX = -1
+  var maxY = -1
+  let thresholdFloor = 255.0 - settings.whiteThreshold
+  let softness = max(1.0, settings.edgeSoftness)
+
+  for y in 0..<height {
+    for x in 0..<width {
+      let index = y * bytesPerRow + x * 4
+      let originalAlpha = CGFloat(pixels[index + 3])
+      if settings.removeWhite {
+        let minimumChannel = CGFloat(min(pixels[index], min(pixels[index + 1], pixels[index + 2])))
+        let darkness = 255.0 - minimumChannel
+        let normalized = max(0.0, min(1.0, (darkness - thresholdFloor) / softness))
+        let newAlpha = min(originalAlpha, normalized * 255.0)
+        let alphaScale = originalAlpha > 0 ? newAlpha / originalAlpha : 0
+        pixels[index] = UInt8((CGFloat(pixels[index]) * alphaScale).rounded())
+        pixels[index + 1] = UInt8((CGFloat(pixels[index + 1]) * alphaScale).rounded())
+        pixels[index + 2] = UInt8((CGFloat(pixels[index + 2]) * alphaScale).rounded())
+        pixels[index + 3] = UInt8(newAlpha.rounded())
+      }
+      if pixels[index + 3] > 3 {
+        minX = min(minX, x)
+        minY = min(minY, y)
+        maxX = max(maxX, x)
+        maxY = max(maxY, y)
+      }
+    }
+  }
+  guard maxX >= minX, maxY >= minY else {
+    fail("arrow processing removed every visible pixel")
+  }
+
+  let padding = 4
+  let cropX = max(0, minX - padding)
+  let cropY = max(0, minY - padding)
+  let cropMaxX = min(width - 1, maxX + padding)
+  let cropMaxY = min(height - 1, maxY + padding)
+  let cropWidth = cropMaxX - cropX + 1
+  let cropHeight = cropMaxY - cropY + 1
+  let cropBytesPerRow = cropWidth * 4
+  var croppedPixels = [UInt8](repeating: 0, count: cropHeight * cropBytesPerRow)
+  for y in 0..<cropHeight {
+    let sourceStart = (cropY + y) * bytesPerRow + cropX * 4
+    let destinationStart = y * cropBytesPerRow
+    croppedPixels[destinationStart..<(destinationStart + cropBytesPerRow)] =
+      pixels[sourceStart..<(sourceStart + cropBytesPerRow)]
+  }
+
+  guard let provider = CGDataProvider(data: Data(croppedPixels) as CFData),
+    let croppedCG = CGImage(
+      width: cropWidth,
+      height: cropHeight,
+      bitsPerComponent: 8,
+      bitsPerPixel: 32,
+      bytesPerRow: cropBytesPerRow,
+      space: colorSpace,
+      bitmapInfo: CGBitmapInfo(rawValue: bitmapInfo),
+      provider: provider,
+      decode: nil,
+      shouldInterpolate: true,
+      intent: .defaultIntent
+    )
+  else {
+    fail("failed to create processed arrow image")
+  }
+  return NSImage(cgImage: croppedCG, size: NSSize(width: cropWidth, height: cropHeight))
 }
 
-guard CommandLine.arguments.count == 2 else {
-  FileHandle.standardError.write(Data("usage: render-dmg-background.swift OUTPUT.png\n".utf8))
+guard CommandLine.arguments.count == 5 else {
+  FileHandle.standardError.write(
+    Data("usage: render-dmg-background.swift OUTPUT.png BRAND_BACKGROUND.png ARROW_IMAGE LAYOUT.json\n".utf8)
+  )
   exit(2)
 }
 
 let output = URL(fileURLWithPath: CommandLine.arguments[1])
+let brandBackgroundURL = URL(fileURLWithPath: CommandLine.arguments[2])
+let arrowURL = URL(fileURLWithPath: CommandLine.arguments[3])
+let layoutURL = URL(fileURLWithPath: CommandLine.arguments[4])
+guard let brandBackground = NSImage(contentsOf: brandBackgroundURL) else {
+  fail("failed to load approved brand background: \(brandBackgroundURL.path)")
+}
+let layout: Layout
+do {
+  layout = try JSONDecoder().decode(Layout.self, from: Data(contentsOf: layoutURL))
+} catch {
+  fail("invalid layout configuration: \(error)")
+}
+guard layout.schemaVersion == 1 else {
+  fail("unsupported layout schema: \(layout.schemaVersion)")
+}
+
+let canvas = NSSize(width: layout.canvas.width, height: layout.canvas.height)
 guard
   let bitmap = NSBitmapImageRep(
     bitmapDataPlanes: nil,
@@ -67,8 +197,7 @@ guard
     bitsPerPixel: 0
   )
 else {
-  FileHandle.standardError.write(Data("render-dmg-background: failed to create canvas\n".utf8))
-  exit(1)
+  fail("failed to create canvas")
 }
 bitmap.size = canvas
 
@@ -80,47 +209,81 @@ let top = NSColor(calibratedWhite: 0.985, alpha: 1)
 let bottom = NSColor(calibratedRed: 0.91, green: 0.95, blue: 0.93, alpha: 1)
 NSGradient(starting: top, ending: bottom)?.draw(in: bounds, angle: -90)
 
-let halo = NSBezierPath(
-  roundedRect: NSRect(x: 48, y: 86, width: 624, height: 258), xRadius: 28, yRadius: 28)
-NSColor(calibratedWhite: 1, alpha: 0.55).setFill()
+let cardRect = NSRect(
+  x: layout.card.x,
+  y: canvas.height - layout.card.y - layout.card.height,
+  width: layout.card.width,
+  height: layout.card.height
+)
+let halo = NSBezierPath(roundedRect: cardRect, xRadius: layout.card.radius, yRadius: layout.card.radius)
+NSColor(calibratedWhite: 1, alpha: layout.card.opacity).setFill()
 halo.fill()
 
+let watermarkRect = NSRect(
+  x: layout.watermark.centerX - layout.watermark.size / 2,
+  y: canvas.height - layout.watermark.centerY - layout.watermark.size / 2,
+  width: layout.watermark.size,
+  height: layout.watermark.size
+)
+brandBackground.draw(
+  in: watermarkRect,
+  from: .zero,
+  operation: .sourceOver,
+  fraction: layout.watermark.opacity,
+  respectFlipped: false,
+  hints: [.interpolation: NSImageInterpolation.high]
+)
+
 let border = NSBezierPath(
-  roundedRect: NSRect(x: 48.5, y: 86.5, width: 623, height: 257), xRadius: 28, yRadius: 28)
+  roundedRect: cardRect.insetBy(dx: 0.5, dy: 0.5),
+  xRadius: layout.card.radius,
+  yRadius: layout.card.radius
+)
 border.lineWidth = 1
 NSColor(calibratedWhite: 0.62, alpha: 0.18).setStroke()
 border.stroke()
 
 drawText(
-  "Install ntfsmac",
-  y: 381,
-  font: .systemFont(ofSize: 28, weight: .semibold),
-  color: NSColor(calibratedWhite: 0.16, alpha: 1),
-  height: 40
+  layout.title,
+  canvas: canvas,
+  weight: .semibold,
+  color: NSColor(calibratedWhite: 0.16, alpha: 1)
 )
 drawText(
-  "Drag ntfsmac to Applications",
-  y: 351,
-  font: .systemFont(ofSize: 15, weight: .regular),
-  color: NSColor(calibratedWhite: 0.34, alpha: 1),
-  height: 24
+  layout.subtitle,
+  canvas: canvas,
+  weight: .regular,
+  color: NSColor(calibratedWhite: 0.34, alpha: 1)
 )
-drawText(
-  "DRAG TO INSTALL",
-  y: 111,
-  font: .systemFont(ofSize: 11, weight: .semibold),
-  color: NSColor(calibratedWhite: 0.42, alpha: 0.78),
-  height: 18
-)
-drawArrow()
 
+let arrow = preparedArrow(from: arrowURL, settings: layout.arrow)
+let arrowHeight = layout.arrow.width * arrow.size.height / arrow.size.width
+NSGraphicsContext.saveGraphicsState()
+let transform = NSAffineTransform()
+transform.translateX(by: layout.arrow.centerX, yBy: canvas.height - layout.arrow.centerY)
+transform.rotate(byDegrees: -layout.arrow.rotationDegrees)
+// The processed raster rows use top-left image order; flip once for AppKit's bottom-left canvas.
+transform.scaleX(by: 1, yBy: -1)
+transform.concat()
+arrow.draw(
+  in: NSRect(
+    x: -layout.arrow.width / 2,
+    y: -arrowHeight / 2,
+    width: layout.arrow.width,
+    height: arrowHeight
+  ),
+  from: .zero,
+  operation: .sourceOver,
+  fraction: layout.arrow.opacity,
+  respectFlipped: false,
+  hints: [.interpolation: NSImageInterpolation.high]
+)
+NSGraphicsContext.restoreGraphicsState()
 NSGraphicsContext.restoreGraphicsState()
 
 guard let png = bitmap.representation(using: .png, properties: [:]) else {
-  FileHandle.standardError.write(Data("render-dmg-background: failed to encode PNG\n".utf8))
-  exit(1)
+  fail("failed to encode PNG")
 }
-
 do {
   try FileManager.default.createDirectory(
     at: output.deletingLastPathComponent(),
@@ -128,6 +291,5 @@ do {
   )
   try png.write(to: output, options: .atomic)
 } catch {
-  FileHandle.standardError.write(Data("render-dmg-background: \(error)\n".utf8))
-  exit(1)
+  fail("failed to write output: \(error)")
 }

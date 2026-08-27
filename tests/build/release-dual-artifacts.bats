@@ -33,6 +33,12 @@ setup() {
   [ "$status" -eq 0 ]
   run grep -F 'com.binarybears.ntfsmac.helper' "$VERIFY_SCRIPT"
   [ "$status" -eq 0 ]
+  run grep -F 'website.filename' "$VERIFY_SCRIPT"
+  [ "$status" -eq 0 ]
+  run grep -F 'com.apple.ResourceFork' "$VERIFY_SCRIPT"
+  [ "$status" -eq 0 ]
+  run grep -F '.background/ntfsmac-dmg-background.png' "$VERIFY_SCRIPT"
+  [ "$status" -eq 0 ]
   run grep -F 'write-sha256.sh' "$VERIFY_SCRIPT"
   [ "$status" -eq 0 ]
 }

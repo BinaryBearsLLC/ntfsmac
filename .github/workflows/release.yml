@@ -131,7 +131,7 @@ jobs:
 
       - name: Run release source gates
         run: |
-          find . \( -name '*.sh' -o -name '*.command' \) -not -path './vendor/src/*' -print0 |
+          git ls-files -z -- '*.sh' '*.command' ':(exclude)vendor/src/**' |
             xargs -0 shellcheck -S warning
           ./build/sync-brand-assets.sh
           git diff --exit-code -- gui/Resources/AppIcon-source.png gui/Resources/AppIcon.icns gui/Resources/HelperIcon.png

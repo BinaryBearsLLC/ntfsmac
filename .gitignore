@@ -20,6 +20,8 @@ Cargo.lock.bak
 
 # Swift
 .build/
+.build-modern/
+.build-legacy/
 *.xcodeproj/xcuserdata/
 DerivedData/
 

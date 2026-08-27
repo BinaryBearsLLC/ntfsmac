@@ -1,6 +1,7 @@
 #!/bin/bash
 # Interactive source-build assistant for ntfsmac.
 # Double-click this file in Finder, or run it as ./build.command [cli|gui|both] [--no-legacy].
+# GUI targets always use the versioned BinaryBears installer assets from build/dmg-assets/.
 # Missing build tools are installed only after explicit user consent.
 set -uo pipefail
 
@@ -88,7 +89,7 @@ Usage: ./build.command [cli|gui|both] [--no-legacy]
   cli   Build and verify the CLI runtime, then create
         dist/ntfsmac-cli.tar.gz
   gui   Build the shared CLI runtime, run the Swift tests, then create and
-        verify the standard and Legacy app/DMG distributions
+        verify the branded standard and Legacy app/DMG distributions
   both  Create and verify both distributions in one run
 
   --no-legacy  Build only the standard modern-helper app/DMG. By default every
@@ -98,7 +99,7 @@ With no argument, an interactive menu is shown. Missing command-line build
 dependencies can be installed only after an explicit confirmation. Full Xcode
 must be installed through Apple; the helper can open its App Store page.
 If the official BinaryBears Developer ID identity is installed, GUI builds use it
-automatically so the local P2 helper can be exercised. Otherwise the builder emits
+automatically so the local standard helper can be exercised. Otherwise the builder emits
 an explicit warning and creates an ad-hoc inspection build; SIGNING_IDENTITY=- also
 forces that fallback deliberately.
 Nothing is installed into /usr/local by this build helper.
@@ -391,7 +392,7 @@ configure_gui_signing() {
   section "GUI signing mode"
   if [[ -n "${SIGNING_IDENTITY:-}" ]]; then
     if [[ "$SIGNING_IDENTITY" == "-" ]]; then
-      warn "Ad-hoc signing was explicitly requested. The DMG can be inspected, but its P2 helper cannot be registered by macOS."
+      warn "Ad-hoc signing was explicitly requested. The DMG can be inspected, but its standard helper cannot be registered by macOS."
     else
       info "Using the explicitly configured signing identity: $SIGNING_IDENTITY"
     fi
@@ -400,13 +401,13 @@ configure_gui_signing() {
 
   if security find-identity -v -p codesigning 2>/dev/null | grep -Fq -- "\"$BINARYBEARS_SIGNING_IDENTITY\""; then
     export SIGNING_IDENTITY="$BINARYBEARS_SIGNING_IDENTITY"
-    ok "BinaryBears Developer ID found; app, helper, and DMG will be signed for a real local P2 install"
+    ok "BinaryBears Developer ID found; app, helper, and DMG will be signed for a real local standard-helper install"
     return
   fi
 
   export SIGNING_IDENTITY="-"
   warn "BinaryBears Developer ID not found; falling back to an ad-hoc inspection build."
-  warn "macOS will not register the P2 helper from this DMG. Use an official signed/notarized release for an installation test."
+  warn "macOS will not register the standard helper from this DMG. Use an official signed/notarized release for an installation test."
 }
 
 build_runtime() {

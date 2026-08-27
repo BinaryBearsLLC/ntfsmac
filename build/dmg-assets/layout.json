@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "canvas": {
+    "width": 720,
+    "height": 460
+  },
+  "card": {
+    "x": 48,
+    "y": 116,
+    "width": 624,
+    "height": 258,
+    "radius": 28,
+    "opacity": 0.55
+  },
+  "watermark": {
+    "centerX": 360,
+    "centerY": 270,
+    "size": 440,
+    "opacity": 0.07
+  },
+  "title": {
+    "text": "Install ntfsmac",
+    "centerX": 360,
+    "centerY": 59,
+    "fontSize": 28,
+    "boxHeight": 40
+  },
+  "subtitle": {
+    "text": "Drag ntfsmac to Applications",
+    "centerX": 360,
+    "centerY": 94,
+    "fontSize": 15,
+    "boxHeight": 24
+  },
+  "arrow": {
+    "centerX": 360,
+    "centerY": 193,
+    "width": 256,
+    "rotationDegrees": 8,
+    "opacity": 0.81,
+    "removeWhite": true,
+    "whiteThreshold": 200,
+    "edgeSoftness": 80
+  },
+  "finder": {
+    "windowBounds": [180, 120, 900, 580],
+    "iconSize": 104,
+    "textSize": 14,
+    "items": {
+      "application": [180, 236],
+      "applicationsFolder": [540, 236],
+      "website": [635, 338]
+    }
+  },
+  "website": {
+    "filename": "⁣.webloc",
+    "visibleIconSize": 70,
+    "labelVisible": false,
+    "url": "https://binarybears.com/"
+  }
+}
