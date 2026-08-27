@@ -55,6 +55,28 @@ enum PopoverVisibility {
     }
 }
 
+/// Keep hardware truth fresh without paying the VM-backed scan cost every five seconds while the
+/// menu is not on screen. Opening the popover always switches to the interactive cadence and the
+/// polling tasks run an immediate first refresh, so the user never sees data that waited for the
+/// slower background interval.
+public struct PopoverPollingCadence: Equatable, Sendable {
+    public let driveScanInterval: Duration
+    public let mountReconcileInterval: Duration
+
+    public static let background = PopoverPollingCadence(
+        driveScanInterval: .seconds(60),
+        mountReconcileInterval: .seconds(30)
+    )
+    public static let interactive = PopoverPollingCadence(
+        driveScanInterval: .seconds(15),
+        mountReconcileInterval: .seconds(5)
+    )
+
+    public static func resolve(isPopoverVisible: Bool) -> Self {
+        isPopoverVisible ? .interactive : .background
+    }
+}
+
 @MainActor
 enum PopoverWindowInteractivity {
     static func restore(_ window: NSWindow) {
@@ -77,16 +99,23 @@ public final class MenuBarPopoverController: NSObject, NSPopoverDelegate {
     private var pendingShowTask: Task<Void, Never>?
     private var displayedState: MountState = .idle
     private var hasPresentedPopover = false
+    private var reportedVisibility = false
+    private let onVisibilityChange: @MainActor (Bool) -> Void
 
     private static let showRetryCount = 40
     private static let showRetryDelay = Duration.milliseconds(50)
 
-    public init<Content: View>(content: Content, initialState: MountState = .idle) {
+    public init<Content: View>(
+        content: Content,
+        initialState: MountState = .idle,
+        onVisibilityChange: @escaping @MainActor (Bool) -> Void = { _ in }
+    ) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         let hostingController = NSHostingController(rootView: content)
         hostingController.sizingOptions = [.preferredContentSize]
         popoverContentViewController = hostingController
         popover = NSPopover()
+        self.onVisibilityChange = onVisibilityChange
         super.init()
 
         configurePopover(popover)
@@ -112,6 +141,7 @@ public final class MenuBarPopoverController: NSObject, NSPopoverDelegate {
         pendingShowTask = nil
         pulseTimer?.invalidate()
         pulseTimer = nil
+        reportVisibility(false)
         popover.close()
         NSStatusBar.system.removeStatusItem(statusItem)
     }
@@ -160,6 +190,7 @@ public final class MenuBarPopoverController: NSObject, NSPopoverDelegate {
     public func closePopover() {
         pendingShowTask?.cancel()
         pendingShowTask = nil
+        reportVisibility(false)
         popover.performClose(nil)
     }
 
@@ -168,6 +199,7 @@ public final class MenuBarPopoverController: NSObject, NSPopoverDelegate {
         // consumes the status-item mouse-down to dismiss itself. Reapply the action to the same
         // bounded AppKit button so the very next physical click reopens it.
         configureStatusItemButton()
+        reportVisibility(false)
         menuBarPopoverLog.notice("Restored the status-item action after transient close")
     }
 
@@ -203,8 +235,15 @@ public final class MenuBarPopoverController: NSObject, NSPopoverDelegate {
         )
         if popover.isShown {
             hasPresentedPopover = true
+            reportVisibility(true)
         }
         return popover.isShown
+    }
+
+    private func reportVisibility(_ isVisible: Bool) {
+        guard reportedVisibility != isVisible else { return }
+        reportedVisibility = isVisible
+        onVisibilityChange(isVisible)
     }
 
     private func configurePopover(_ popover: NSPopover) {

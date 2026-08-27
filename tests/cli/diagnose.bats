@@ -496,6 +496,7 @@ nas.example:/share on /Volumes/Share (nfs, nodev, nosuid)"
 
 @test "standard SMAppService registration is reported without a standalone helper file" {
   unset NTFSMAC_HELPER_PATH_OVERRIDE
+  export NTFSMAC_LEGACY_HELPER_PATH_OVERRIDE="$FIXTURE_DIR/missing-legacy-helper"
   export NTFSMAC_MODERN_HELPER_REGISTERED_OVERRIDE=1
 
   run "$SCRIPT" --json
@@ -506,6 +507,7 @@ nas.example:/share on /Volumes/Share (nfs, nodev, nosuid)"
 
 @test "an absent standard and Legacy helper remains a valid CLI-only installation" {
   unset NTFSMAC_HELPER_PATH_OVERRIDE
+  export NTFSMAC_LEGACY_HELPER_PATH_OVERRIDE="$FIXTURE_DIR/missing-legacy-helper"
   export NTFSMAC_MODERN_HELPER_REGISTERED_OVERRIDE=0
 
   run "$SCRIPT" --json

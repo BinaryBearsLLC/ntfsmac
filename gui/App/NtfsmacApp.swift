@@ -52,13 +52,14 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
         settings.restoreMigratedLaunchAtLoginIntentIfNeeded()
         let updateChecker = UpdateChecker()
         let eventNotifier = MountEventNotifier(isEnabled: { settings.notificationsEnabled })
+        let uiDemoMode = ProcessInfo.processInfo.environment["NTFSMAC_UI_DEMO"]
         let driveScanner: DriveScanner
         let mountController: MountController
         let remountController: RemountController
 
         // See `DemoScaffold.swift`: inert unless NTFSMAC_UI_DEMO is explicitly set. Real installs
         // never set it, so this branch is limited to deliberate live-screen audits.
-        if let demoMode = ProcessInfo.processInfo.environment["NTFSMAC_UI_DEMO"] {
+        if let demoMode = uiDemoMode {
             driveScanner = DemoScaffold.driveScanner()
             mountController = DemoScaffold.mountController(
                 mode: demoMode,
@@ -84,7 +85,9 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
 
         let cliInstallChecker = CLIInstallChecker()
         let cliAutoStager = CLIAutoStager(checker: cliInstallChecker)
-        let fullDiskAccessController = FullDiskAccessController()
+        let fullDiskAccessController = uiDemoMode == nil
+            ? FullDiskAccessController()
+            : DemoScaffold.fullDiskAccessController()
         let helperUninstaller = HelperUninstaller(onUninstallComplete: {
             helperInstaller.reset()
             fullDiskAccessController.reset()
@@ -112,7 +115,19 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
         )
         .popoverGlassBackground()
 
-        let popoverController = MenuBarPopoverController(content: content, initialState: appState.state)
+        let applyPollingCadence: @MainActor (Bool) -> Void = { isVisible in
+            let cadence = PopoverPollingCadence.resolve(isPopoverVisible: isVisible)
+            driveScanner.startPolling(interval: cadence.driveScanInterval)
+            mountController.startPolling(
+                knownDrives: { driveScanner.drives },
+                interval: cadence.mountReconcileInterval
+            )
+        }
+        let popoverController = MenuBarPopoverController(
+            content: content,
+            initialState: appState.state,
+            onVisibilityChange: applyPollingCadence
+        )
         self.popoverController = popoverController
         self.driveScanner = driveScanner
         self.mountController = mountController
@@ -132,7 +147,7 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
             .removeDuplicates()
             .sink { state in
                 Task { @MainActor in
-                    if state == .installing || state == .notChecked {
+                    if uiDemoMode == nil && (state == .installing || state == .notChecked) {
                         cliAutoStager.reset()
                         fullDiskAccessController.reset()
                     }
@@ -142,8 +157,7 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
 
-        driveScanner.startPolling()
-        mountController.startPolling { driveScanner.drives }
+        applyPollingCadence(false)
         Task {
             await updateChecker.checkAutomaticallyIfNeeded(
                 currentVersion: ProductVersion.current().release

@@ -6,9 +6,9 @@ import HelperShared
 /// "Error state" tables into the single popover `NtfsmacApp.swift` presents; every subview used
 /// here is unmodified, already-reviewed production code — this file only composes them per the
 /// state machine `AppState.state` already defines.
-/// Header status dot (comp's `dotPulseGreen`/`dotPulseYellow` keyframes) — pulses for every
-/// active/mounted state, static for idle/error, same opacity-fade technique `StatusIconView`
-/// already uses for the tray icon (no `.symbolEffect`, stays macOS 13.0-compatible).
+/// Header status dot — pulses only during the transient mounting state and remains static for
+/// idle, mounted, warning, and error states. It uses an opacity fade rather than the macOS 14-only
+/// `.symbolEffect`, preserving the macOS 13.0 deployment floor.
 /// No-drives empty-state copy, extracted as testable constants (same pattern as
 /// `DirtyBanner.bannerCopy`) — `PopoverStateRenderTests` renders to an `ImageRenderer` image
 /// which can't be grepped for text, so the strings live here for `EmptyStateCopyTests`.
@@ -118,16 +118,38 @@ public struct QuitConfirmationPresentation: Equatable, Sendable {
 private struct HeaderStatusDot: View {
     let color: Color
     let isPulsing: Bool
+
+    var body: some View {
+        Group {
+            if isPulsing {
+                PulsingHeaderStatusDot(color: color)
+            } else {
+                Circle()
+                    .fill(color)
+                    .frame(width: 9, height: 9)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// Keep the repeating transaction inside a conditional child. When mounting finishes SwiftUI
+/// removes this child entirely, which tears down its display-link animation instead of leaving a
+/// dormant `repeatForever` transaction attached to the long-lived popover view graph.
+private struct PulsingHeaderStatusDot: View {
+    let color: Color
     @State private var isDim = false
 
     var body: some View {
-        Circle().fill(color).frame(width: 9, height: 9)
-            .opacity(isPulsing && isDim ? 0.45 : 1.0)
+        Circle()
+            .fill(color)
+            .frame(width: 9, height: 9)
+            .opacity(isDim ? 0.45 : 1.0)
             .onAppear {
-                guard isPulsing else { return }
-                withAnimation(.easeInOut(duration: 1.3).repeatForever(autoreverses: true)) { isDim = true }
+                withAnimation(.easeInOut(duration: 1.3).repeatForever(autoreverses: true)) {
+                    isDim = true
+                }
             }
-            .accessibilityHidden(true)
     }
 }
 
@@ -487,7 +509,7 @@ public struct PopoverContentView: View {
                 Text(headerSubtitle).font(.system(size: 11)).foregroundStyle(.secondary)
             }
             Spacer()
-            HeaderStatusDot(color: style.color, isPulsing: appState.state != .idle && appState.state != .error)
+            HeaderStatusDot(color: style.color, isPulsing: style.isPulsing)
                 .help(TooltipCopy.status(for: appState.state))
         }
     }
@@ -608,8 +630,9 @@ public struct PopoverContentView: View {
 
     /// `ui/prototype.html`'s footer (comp lines 230-238/504-513/617-626): exactly
     /// `[gear][Diagnose (flex:1)][Quit]` in every non-error state — no Refresh slot here at all
-    /// (`DriveScanner` already polls every 5s; the on-demand Refresh pill lives in `emptyState`
-    /// only, per GUI-PLAN.md's "Popover — idle" table). Previously this had a 4th SF-Symbol
+    /// (`DriveScanner` already performs visibility-aware periodic scans; the on-demand Refresh
+    /// pill lives in `emptyState` only, per GUI-PLAN.md's "Popover — idle" table). Previously this
+    /// had a 4th SF-Symbol
     /// refresh button in the wrong position, plus SF Symbols instead of the comp's literal glyphs.
     private var footer: some View {
         HStack(spacing: 5) {

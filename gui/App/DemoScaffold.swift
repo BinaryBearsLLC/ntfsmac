@@ -47,6 +47,13 @@ enum DemoScaffold {
         DriveScanner(runner: DemoCommandRunner())
     }
 
+    /// A screen-audit run must never probe a real raw device using one of the synthetic disk IDs
+    /// above. Starting in the granted state keeps the demo entirely inside its fake mount stack;
+    /// production launches still create the normal session-scoped controller in `NtfsmacApp`.
+    static func fullDiskAccessController() -> FullDiskAccessController {
+        FullDiskAccessController(initialState: .granted)
+    }
+
     /// Separate from `NTFSMAC_UI_DEMO`: install-outcome and mount-state are orthogonal axes, and
     /// unlike mounting, `HelperInstaller`'s real path is a one-shot OS auth dialog — faking
     /// denied/failed here avoids clicking "Cancel" on a real `SMJobBless` prompt repeatedly during

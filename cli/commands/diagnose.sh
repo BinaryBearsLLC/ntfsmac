@@ -566,7 +566,11 @@ check_helper_installed() {
     return
   fi
 
-  helper_path="/Library/PrivilegedHelperTools/com.binarybears.ntfsmac.helper"
+  # Keep the standalone Legacy-path probe independently replaceable in fixtures. The existing
+  # NTFSMAC_HELPER_PATH_OVERRIDE above remains the complete short-circuit used by older tests;
+  # this narrower override lets SMAppService registration tests exercise the modern launchd
+  # branch without inheriting a real Legacy installation from the host running the suite.
+  helper_path="${NTFSMAC_LEGACY_HELPER_PATH_OVERRIDE-/Library/PrivilegedHelperTools/com.binarybears.ntfsmac.helper}"
   # The Legacy SMJobBless artifact is normally root:wheel 0544. An unprivileged caller therefore
   # cannot use `-x` to infer whether launchd/root can execute it; presence as a regular file is the
   # honest installation signal available to this read-only command.

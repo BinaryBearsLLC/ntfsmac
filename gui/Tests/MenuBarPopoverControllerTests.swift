@@ -64,6 +64,16 @@ import Testing
     #expect(!PopoverVisibility.isVisible(isShown: false, windowIsVisible: false))
 }
 
+@Test func pollingCadenceIsResponsiveOnlyWhileThePopoverIsVisible() {
+    let background = PopoverPollingCadence.resolve(isPopoverVisible: false)
+    let interactive = PopoverPollingCadence.resolve(isPopoverVisible: true)
+
+    #expect(background.driveScanInterval == .seconds(60))
+    #expect(background.mountReconcileInterval == .seconds(30))
+    #expect(interactive.driveScanInterval == .seconds(15))
+    #expect(interactive.mountReconcileInterval == .seconds(5))
+}
+
 @MainActor
 @Test func popoverWindowInteractivityRestoresPhysicalMouseDelivery() {
     let window = NSWindow(

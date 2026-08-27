@@ -157,8 +157,9 @@ public final class DriveScanner: ObservableObject {
         pollTask?.cancel()
     }
 
-    /// ponytail: fixed 5s poll, no backoff/jitter — add a `3-preferences` knob if a real drive
-    /// swap ever needs to show up faster, or if this proves too chatty against `anylinuxfs`.
+    /// The application supplies a visibility-aware interval: opening the popover restarts this
+    /// loop and therefore performs an immediate scan, while the hidden menu-bar app uses a slower
+    /// cadence so VM-backed inventory probes do not create sustained background CPU activity.
     public func startPolling(interval: Duration = .seconds(5)) {
         pollTask?.cancel()
         pollTask = Task { [weak self] in
