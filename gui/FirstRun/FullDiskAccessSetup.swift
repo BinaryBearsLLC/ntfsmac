@@ -20,9 +20,41 @@ public enum FullDiskAccessState: Equatable, Sendable {
     case failed(String)
 }
 
+/// Decides whether drive access needs UI attention without treating an absent drive as an
+/// incomplete installation. Full Disk Access cannot be verified without a real partition, but
+/// there is also nothing privileged to authorize while no supported drive is connected.
+///
+/// The grant itself deliberately remains session-scoped: every launch probes the helper again as
+/// soon as a supported partition appears. This policy changes presentation only; it never caches
+/// or assumes permission.
+enum FullDiskAccessPresentationPolicy {
+    static func shouldPresentSetup(
+        state: FullDiskAccessState,
+        deviceID: String?,
+        driveDiscoveryFailed: Bool
+    ) -> Bool {
+        guard state != .granted else { return false }
+        return deviceID != nil || driveDiscoveryFailed
+    }
+
+    /// Diagnose accepts three values: confirmed, denied, or unavailable. An unprobed no-drive
+    /// session is unavailable evidence, not a denial.
+    static func diagnosticGrantEvidence(for state: FullDiskAccessState) -> Bool? {
+        switch state {
+        case .granted:
+            true
+        case .needsAuthorization, .waitingForAuthorization:
+            false
+        case .notChecked, .checking, .waitingForDrive, .failed:
+            nil
+        }
+    }
+}
+
 /// Session-scoped gate for the helper's raw-device permission. It deliberately does not cache a
 /// prior success across launches: a quick read-only probe catches permission revocation or a
-/// replaced helper before the main Mount button becomes available.
+/// replaced helper before the main Mount button becomes available. When no drive exists, the
+/// presentation policy above allows the normal idle UI without weakening this gate.
 @MainActor
 public final class FullDiskAccessController: ObservableObject {
     @Published public private(set) var state: FullDiskAccessState
@@ -89,6 +121,11 @@ enum DriveDiscoveryFailureCopy {
     static let message = "ntfsmac could not prepare its disk runtime. Try again, or open Settings to check for an update."
 
     static func isVisible(for rawError: String?) -> Bool { rawError != nil }
+}
+
+enum NoDriveAccessCopy {
+    static let title = "No drives found"
+    static let message = "Connect an NTFS or ext drive when ready. ntfsmac will verify access before mounting."
 }
 
 /// Minimal setup step shown after helper/CLI preparation and before the normal popover. The
@@ -196,8 +233,8 @@ public struct FullDiskAccessSetupView: View {
                     .ntfsmacKeyboardFocus()
             } else {
                 messageCard(
-                    title: "Connect a supported drive",
-                    message: "Connect an NTFS or ext drive to finish setup. ntfsmac will verify access without changing the disk."
+                    title: NoDriveAccessCopy.title,
+                    message: NoDriveAccessCopy.message
                 )
             }
         case .needsAuthorization:

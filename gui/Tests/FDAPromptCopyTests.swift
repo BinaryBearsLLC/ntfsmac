@@ -21,4 +21,10 @@ import HelperShared
         #expect(!DriveDiscoveryFailureCopy.message.contains(rawError))
         #expect(!DriveDiscoveryFailureCopy.message.contains("/Users/"))
     }
+
+    @Test func noDriveFallbackDoesNotClaimSetupIsIncomplete() {
+        #expect(NoDriveAccessCopy.title == "No drives found")
+        #expect(NoDriveAccessCopy.message.contains("verify access before mounting"))
+        #expect(!NoDriveAccessCopy.message.lowercased().contains("finish setup"))
+    }
 }

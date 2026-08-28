@@ -272,11 +272,17 @@ private func renderPopover(
     #expect(size != nil)
 }
 
-@MainActor @Test func fdaPromptStateRendersWithoutCollapsing() async throws {
+@MainActor @Test func fdaPromptWithDetectedDriveRendersWithoutCollapsing() async throws {
     let (helperInstaller, cliInstallChecker, cleanup) = try await makeInstalledDependencies()
     defer { cleanup() }
     let appState = AppState()
     let controller = MountController(helper: FakeHelper(), appState: appState)
+    let scanner = DriveScanner(
+        runner: SeededListRunner(output: sampleListOutput),
+        anylinuxfsPath: "/stub/anylinuxfs"
+    )
+    await scanner.refresh()
+    #expect(scanner.drives.count == 1)
     let fullDiskAccessController = FullDiskAccessController(initialState: .waitingForDrive)
     #expect(!fullDiskAccessController.isGranted)
 
@@ -285,9 +291,35 @@ private func renderPopover(
         mountController: controller,
         helperInstaller: helperInstaller,
         cliInstallChecker: cliInstallChecker,
+        driveScanner: scanner,
         fullDiskAccessController: fullDiskAccessController
     )
+    #expect(size?.width == 300, "a detected drive with unverified access must use the FDA setup route")
     #expect(size != nil, "Full Disk Access setup (including Settings and Quit) must render without trapping the user")
+}
+
+@MainActor @Test func noDriveWithUnprobedFDAStateRendersNormalIdleContent() async throws {
+    let (helperInstaller, cliInstallChecker, cleanup) = try await makeInstalledDependencies()
+    defer { cleanup() }
+    let appState = AppState()
+    let controller = MountController(helper: FakeHelper(), appState: appState)
+    let fullDiskAccessController = FullDiskAccessController(initialState: .notChecked)
+
+    #expect(!FullDiskAccessPresentationPolicy.shouldPresentSetup(
+        state: fullDiskAccessController.state,
+        deviceID: nil,
+        driveDiscoveryFailed: false
+    ))
+    let size = renderPopover(
+        appState: appState,
+        mountController: controller,
+        helperInstaller: helperInstaller,
+        cliInstallChecker: cliInstallChecker,
+        fullDiskAccessController: fullDiskAccessController
+    )
+
+    #expect(size?.width == 320, "no drive must use the normal idle route, not the 300-point setup card")
+    #expect(size != nil, "no-drive relaunch must render the normal idle popover")
 }
 
 @MainActor @Test func driveDiscoveryFailureRendersInSetupAndMainContent() async throws {

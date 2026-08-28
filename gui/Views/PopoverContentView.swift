@@ -283,7 +283,11 @@ public struct PopoverContentView: View {
                     onOpenSettings: navigation.showSettings,
                     onQuit: { requestQuit(commandPressed: false) }
                 )
-            } else if !fullDiskAccessController.isGranted {
+            } else if FullDiskAccessPresentationPolicy.shouldPresentSetup(
+                state: fullDiskAccessController.state,
+                deviceID: driveScanner.drives.first?.identifier,
+                driveDiscoveryFailed: DriveDiscoveryFailureCopy.isVisible(for: driveScanner.lastError)
+            ) {
                 FullDiskAccessSetupView(
                     controller: fullDiskAccessController,
                     deviceID: driveScanner.drives.first?.identifier,
@@ -477,7 +481,9 @@ public struct PopoverContentView: View {
                     runner: diagnoseRunner,
                     mountState: appState.state,
                     detectedDriveCount: visibleDrives.count,
-                    fullDiskAccessGranted: fullDiskAccessController.isGranted,
+                    fullDiskAccessGranted: FullDiskAccessPresentationPolicy.diagnosticGrantEvidence(
+                        for: fullDiskAccessController.state
+                    ),
                     onHide: { diagnosePresentation.hide() }
                 )
             }

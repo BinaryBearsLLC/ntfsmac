@@ -58,7 +58,8 @@ of diagnosis.
 For Standard, test:
 
 1. clean install and helper approval/denial recovery;
-2. Full Disk Access guidance and drive discovery;
+2. relaunch without a drive shows **No drives found**, then a detected drive triggers Full Disk
+   Access verification and any required guidance;
 3. mount, write, flush/reread hash comparison, unmount, remount, and reread;
 4. Diagnose, safe Quit, update check, and complete uninstall;
 5. migration from an installed Legacy helper when applicable.

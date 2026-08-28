@@ -29,7 +29,9 @@ Colour is always paired with text or an accessible label. Missing evidence never
 ## Setup and discovery
 
 The first-run order is helper approval, CLI/runtime staging, drive discovery, and Full Disk Access
-verification against a real partition. Settings and Quit remain reachable throughout.
+verification against a real partition. With no supported drive, the normal idle UI reports **No
+drives found**; absence of media is not incomplete setup. When a partition appears, the app probes
+Full Disk Access again for that launch before enabling Mount. Settings and Quit remain reachable.
 
 If drive discovery fails, both setup and the normal empty state show **Unable to check connected
 drives** with **Try Again**. Raw command output is never shown because it can contain personal

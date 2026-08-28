@@ -40,7 +40,11 @@ Intel Macs are not supported.
    [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases/latest).
 2. Open the DMG and drag `ntfsmac.app` to Applications.
 3. Launch **ntfsmac** and approve the guided helper setup.
-4. In Full Disk Access, enable the entry identified in the app's instructions.
+4. Connect a supported drive and, when prompted, enable the Full Disk Access entry identified by
+   the app.
+
+With no supported drive connected, ntfsmac shows **No drives found**. It verifies Full Disk Access
+when a supported partition is detected.
 
 Official BinaryBears DMGs are Developer ID signed, notarized by Apple, stapled, and published with
 a SHA-256 checksum. Draft releases are not final downloads.
