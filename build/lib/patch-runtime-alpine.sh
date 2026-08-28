@@ -73,6 +73,16 @@ markers = [
     ),
     ("\t\tImageName:         imageName,\n", "\t\tImageName:         imageName,\n\t\tSourceReference:   dockerRef,\n"),
     ('docker.ParseReference(fmt.Sprintf("//%s:%s", cfg.ImageName, cfg.Tag))', 'docker.ParseReference("//" + cfg.SourceReference)'),
+    (
+        '\t\tSourceCtx: &types.SystemContext{\n\t\t\tOSChoice: "linux",\n\t\t},',
+        '\t\tSourceCtx: &types.SystemContext{\n'
+        '\t\t\tOSChoice: "linux",\n'
+        '\t\t\t// The pinned public runtime must not inherit optional signature-storage\n'
+        '\t\t\t// metadata from ~/.config/containers/registries.d. An unreadable user\n'
+        '\t\t\t// directory must not block ntfsmac before drive discovery starts.\n'
+        '\t\t\tRegistriesDirPath: filepath.Join(cfg.ImageBasePath, ".ntfsmac-empty-registries.d"),\n'
+        '\t\t},',
+    ),
     ('flag.StringVar(&dockerRef, "docker-ref", "alpine:latest", "Docker/OCI image reference (e.g. alpine:latest, alpine:edge)")', f'flag.StringVar(&dockerRef, "docker-ref", "{ref}", "Digest-pinned Docker/OCI image reference")'),
 ]
 for old, new in markers:
@@ -83,6 +93,6 @@ for old, new in markers:
 if "alpine:latest" in text:
     raise SystemExit(f"init-rootfs: HARD-STOP — floating Alpine reference remains in {path}")
 path.write_text(text)
-print(f"init-rootfs: patched Docker reference parsing and default to {ref}")
+print(f"init-rootfs: patched Docker reference parsing, isolated registry metadata, and default to {ref}")
 PYEOF
 }

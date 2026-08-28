@@ -1,87 +1,66 @@
 # BinaryBears release guide
 
-Official releases are built from `dev`, use SemVer beginning at `v3.0.0`, and are published in two
-steps: draft artifacts first, human validation second. GUI releases produce the standard
-SMAppService DMG and the explicitly labelled Legacy SMJobBless DMG by default.
+Official releases come from `dev` and ship two Apple Silicon installers by default:
 
-## v3.1.0 DMG branding
+- Standard: `SMAppService` helper for macOS 13+.
+- Legacy: explicitly labelled `SMJobBless` compatibility build.
 
-The v3.1.0 standard and Legacy DMGs use the official BinaryBears logo assets supplied by the
-maintainer. Do not substitute generated, traced, redrawn, placeholder, or otherwise unapproved
-marks. Both installers share the approved brand system; the visible app remains `ntfsmac`, and
-only the compatibility artifact is labelled `Legacy`.
+GitHub Actions creates a draft. Publish only that tested draft; never rebuild or replace its files.
 
-After the assets are integrated, inspect both mounted DMGs at their actual Finder size and confirm
-logo clarity, spacing, drag direction, app/Applications alignment, and naming before continuing to
-the local release candidate. Automated image/layout/signature checks supplement but do not replace
-that visual approval.
+## 1. Local release gate
 
-Only release-required installer artwork belongs in `build/dmg-assets/`. Design experiments and
-local DMG-interface testers stay outside the tracked tree.
+Before tagging:
 
-## Local release candidate
+1. Keep `CFBundleShortVersionString` and `CFBundleVersion` identical in the app and both helper
+   plists.
+2. Run the shell suite plus the complete Standard and Legacy Swift suites.
+3. Build both DMGs with the official BinaryBears artwork and Developer ID identity.
+4. Verify architecture, nested signatures, version, checksums, DMG contents, visible app name,
+   helper variant, and mounted-Finder layout.
+5. Exercise the changed behavior and a known-clean install/mount/write/reread/unmount cycle on the
+   Standard build. Repeat the applicable install, mount, and uninstall checks on Legacy.
 
-1. Set the same `CFBundleShortVersionString` and `CFBundleVersion` in the app, standard-helper, and
-   Legacy-helper plists.
-2. Run the automated suites for both helper variants on the completed candidate.
-3. Build both Developer ID-signed local RCs and notarize them.
-4. Verify each app/helper identity, arm64 architecture, nested signatures, notarization ticket,
-   Gatekeeper assessment, DMG contents, visible app name, and SHA-256.
-5. On the standard artifact, exercise clean registration, Login Items approval and denial,
-   Legacy-to-standard migration, mismatch repair, Full Disk Access, a known-clean mount/write/
-   reread/unmount, update-check behavior, and complete uninstall. For the positive update path,
-   install a temporary locally re-signed copy whose displayed version is lower than the current
-   public stable release; verify that Settings opens that exact release, then remove the fixture.
-   Never commit or upload the synthetic old build.
-6. Repeat the applicable clean install, mount, and uninstall checks on the Legacy artifact.
+Do not tag a candidate that has not passed these checks. Contributor builds may remain ad-hoc;
+official artifacts must be Developer ID signed, notarized, stapled, and Gatekeeper accepted.
 
-Do not create a release tag until this candidate passes.
+## 2. Signed source tag
 
-## Signed source tag
-
-Create an SSH-signed tag whose version exactly matches the plist:
+Run from the exact `dev` commit that passed the gate:
 
 ```sh
-git tag -s v3.1.0 -m "ntfsmac 3.1.0"
-git verify-tag v3.1.0
-git push origin v3.1.0
+VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' gui/Info.plist)"
+git tag -s "v${VERSION}" -m "ntfsmac ${VERSION}"
+git verify-tag "v${VERSION}"
+git push origin dev "v${VERSION}"
 ```
 
-The tag must be reachable from `origin/dev`. Pushing it does not publish a release.
+The signed tag must point to the current `origin/dev` commit. Pushing it does not publish a release.
 
-## GitHub secrets
+## 3. Build the draft
 
-Configure these repository Actions secrets, matching the working USB-Bench release setup:
+Run **Release notarized DMG** from `dev`, enter the version without `v`, and keep Legacy enabled.
+The workflow:
 
-| Secret | Purpose |
-| --- | --- |
-| `APPLE_CERTIFICATE_P12_BASE64` | Base64 Developer ID certificate and private key export |
-| `APPLE_CERTIFICATE_PASSWORD` | Password for the `.p12` export |
-| `APPLE_SIGNING_IDENTITY` | Full Developer ID Application identity |
-| `APPLE_API_KEY_BASE64` | Base64 App Store Connect `.p8` key |
-| `APPLE_API_KEY_ID` | App Store Connect key ID |
-| `APPLE_API_ISSUER_ID` | App Store Connect issuer ID |
+- verifies the signed tag and matching plist versions;
+- reruns all source and test gates;
+- imports release credentials into a temporary Keychain;
+- builds, signs, notarizes, staples, and verifies both DMGs;
+- creates one draft release with both DMGs and both `.sha256` files.
 
-Never commit certificate files, API keys, passwords, Keychain profiles, or encoded secret values.
+Credentials stay in Keychain or encrypted GitHub Actions secrets and never enter Git.
 
-## Draft and publish
+## 4. Validate and publish
 
-1. Run **Release notarized DMG** manually from `dev`, enter the version without `v`, and leave
-   **include legacy** enabled for the normal dual release. Disable it only after an explicit product
-   decision; the local builder has the equivalent `--no-legacy` control.
-2. The workflow verifies the signed tag and version, runs the release gates, imports credentials
-   into a temporary Keychain, builds, signs, notarizes, staples, verifies, and creates a draft.
-3. Download both `ntfsmac-X.Y.Z-Apple-Silicon.dmg` and
-   `ntfsmac-X.Y.Z-Legacy-Apple-Silicon.dmg`, together with both `.sha256` files, from that draft.
-4. Confirm both checksums, confirm both DMGs contain an app named exactly `ntfsmac.app`, and run
-   the final smoke matrix for both variants.
-5. Publish the existing draft in GitHub. Do not rebuild or replace its files.
+Download the four draft assets and confirm:
 
-Any failure returns to `dev` for a new commit and tag. Never overwrite a published release tag or
-artifact.
+- each checksum matches its DMG;
+- both mounted DMGs contain an app named exactly `ntfsmac.app`;
+- signatures, stapling, and Gatekeeper pass on the downloaded files;
+- the changed behavior and a short Standard/Legacy smoke test pass.
 
-## GitHub Pages
+Publish the existing draft and verify the public release page, assets, latest-release endpoint,
+update checker, CI, and Pages links. If any gate fails, fix `dev` and create a new commit/tag; never
+overwrite a published tag or artifact.
 
-The static site lives under `site/` and is deployed by the Pages workflow from `dev`. GitHub Pages
-must be configured once with **GitHub Actions** as its build source. The site has no analytics and
-links to the latest published release, falling back to the Releases page when the API is unavailable.
+Only approved artwork belongs in `build/dmg-assets/`. Historical validation detail belongs in the
+dated files under `docs/testing/`, not in this operating guide.

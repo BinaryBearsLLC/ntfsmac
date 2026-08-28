@@ -287,6 +287,10 @@ public struct PopoverContentView: View {
                 FullDiskAccessSetupView(
                     controller: fullDiskAccessController,
                     deviceID: driveScanner.drives.first?.identifier,
+                    driveDiscoveryFailed: DriveDiscoveryFailureCopy.isVisible(for: driveScanner.lastError),
+                    onRetryDriveDiscovery: {
+                        Task { await driveScanner.refresh() }
+                    },
                     onOpenSettings: navigation.showSettings,
                     onQuit: { requestQuit(commandPressed: false) }
                 )
@@ -580,7 +584,11 @@ public struct PopoverContentView: View {
     private var headerSubtitle: String {
         switch appState.state {
         case .idle:
-            driveScanner.drives.isEmpty ? "No drives found" : "\(driveScanner.drives.count) drive(s) detected"
+            if driveScanner.drives.isEmpty && DriveDiscoveryFailureCopy.isVisible(for: driveScanner.lastError) {
+                "Drive check failed"
+            } else {
+                driveScanner.drives.isEmpty ? "No drives found" : "\(driveScanner.drives.count) drive(s) detected"
+            }
         case .mounting: "Mounting…"
         case .mountedReadWrite: "Mounted read/write"
         case .mountedReadOnly, .mountedReadOnlyDirty: "Mounted read-only"
@@ -604,8 +612,10 @@ public struct PopoverContentView: View {
             .frame(width: 44, height: 44)
 
             VStack(spacing: 4) {
-                Text(EmptyStateCopy.title).font(.system(size: 12.5, weight: .medium)).foregroundStyle(.secondary)
-                Text(EmptyStateCopy.subtitle)
+                Text(DriveDiscoveryFailureCopy.isVisible(for: driveScanner.lastError) ? DriveDiscoveryFailureCopy.title : EmptyStateCopy.title)
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text(DriveDiscoveryFailureCopy.isVisible(for: driveScanner.lastError) ? DriveDiscoveryFailureCopy.message : EmptyStateCopy.subtitle)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary.opacity(0.7))
                     .multilineTextAlignment(.center)
@@ -616,7 +626,7 @@ public struct PopoverContentView: View {
             } label: {
                 HStack(spacing: 6) {
                     RefreshGlyph()
-                    Text("Refresh")
+                    Text(DriveDiscoveryFailureCopy.isVisible(for: driveScanner.lastError) ? "Try Again" : "Refresh")
                 }
             }
             .buttonStyle(.glassNeutral(colorScheme: colorScheme))

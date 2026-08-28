@@ -82,12 +82,23 @@ enum FDAPromptCopy {
     }
 }
 
+/// Drive discovery runs before the Full Disk Access probe. Keep its raw command output out of
+/// the setup UI because it can contain user paths; the detailed evidence remains in Diagnose.
+enum DriveDiscoveryFailureCopy {
+    static let title = "Unable to check connected drives"
+    static let message = "ntfsmac could not prepare its disk runtime. Try again, or open Settings to check for an update."
+
+    static func isVisible(for rawError: String?) -> Bool { rawError != nil }
+}
+
 /// Minimal setup step shown after helper/CLI preparation and before the normal popover. The
 /// controller keeps probing after System Settings opens, so granting access completes setup
 /// automatically instead of consuming and losing the user's first Mount action.
 public struct FullDiskAccessSetupView: View {
     @ObservedObject public var controller: FullDiskAccessController
     public let deviceID: String?
+    public let driveDiscoveryFailed: Bool
+    public let onRetryDriveDiscovery: () -> Void
     public let onOpenSettings: () -> Void
     public let onQuit: () -> Void
 
@@ -96,11 +107,15 @@ public struct FullDiskAccessSetupView: View {
     public init(
         controller: FullDiskAccessController,
         deviceID: String?,
+        driveDiscoveryFailed: Bool = false,
+        onRetryDriveDiscovery: @escaping () -> Void = {},
         onOpenSettings: @escaping () -> Void,
         onQuit: @escaping () -> Void
     ) {
         self.controller = controller
         self.deviceID = deviceID
+        self.driveDiscoveryFailed = driveDiscoveryFailed
+        self.onRetryDriveDiscovery = onRetryDriveDiscovery
         self.onOpenSettings = onOpenSettings
         self.onQuit = onQuit
     }
@@ -171,10 +186,20 @@ public struct FullDiskAccessSetupView: View {
         case .notChecked, .checking:
             progressCard("Checking disk access…")
         case .waitingForDrive:
-            messageCard(
-                title: "Connect a supported drive",
-                message: "Connect an NTFS or ext drive to finish setup. ntfsmac will verify access without changing the disk."
-            )
+            if driveDiscoveryFailed {
+                messageCard(
+                    title: DriveDiscoveryFailureCopy.title,
+                    message: DriveDiscoveryFailureCopy.message
+                )
+                Button("Try Again", action: onRetryDriveDiscovery)
+                    .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                    .ntfsmacKeyboardFocus()
+            } else {
+                messageCard(
+                    title: "Connect a supported drive",
+                    message: "Connect an NTFS or ext drive to finish setup. ntfsmac will verify access without changing the disk."
+                )
+            }
         case .needsAuthorization:
             authorizationCard(waiting: false)
         case .waitingForAuthorization:
