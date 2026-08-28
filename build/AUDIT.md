@@ -85,6 +85,9 @@ Dry-run evidence for upstream `v0.19.0`:
 - The init-rootfs patch preserves the full digest reference for the registry pull while using a
   deterministic digest-derived local OCI tag. `build/init-rootfs.sh` still independently checks
   Docker Hub's arm64 manifest digest before building or pulling.
+- The same patch gives containers/image an application-owned empty `registries.d` path. The pinned
+  public pull therefore cannot be blocked by unreadable optional signature-storage metadata under
+  the user's `~/.config/containers/` directory, and ntfsmac never changes that user configuration.
 - Runtime caches migrate side-by-side. Legacy, mismatched, invalid, and interrupted directories are
   retained; no install, Diagnose, or Settings action downloads or removes a rootfs. A mount either
   reuses a complete matching cache or initializes the pinned cache after preserving incompatible

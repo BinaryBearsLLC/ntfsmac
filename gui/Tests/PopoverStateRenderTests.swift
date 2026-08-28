@@ -290,6 +290,40 @@ private func renderPopover(
     #expect(size != nil, "Full Disk Access setup (including Settings and Quit) must render without trapping the user")
 }
 
+@MainActor @Test func driveDiscoveryFailureRendersInSetupAndMainContent() async throws {
+    let (helperInstaller, cliInstallChecker, cleanup) = try await makeInstalledDependencies()
+    defer { cleanup() }
+    let appState = AppState()
+    let controller = MountController(helper: FakeHelper(), appState: appState)
+    let rawError = "open /Users/private/.config/containers/registries.d: permission denied"
+    let scanner = DriveScanner(
+        runner: SeededListRunner(output: rawError, exitCode: 1),
+        anylinuxfsPath: "/stub/anylinuxfs"
+    )
+    await scanner.refresh()
+    #expect(scanner.drives.isEmpty)
+    #expect(DriveDiscoveryFailureCopy.isVisible(for: scanner.lastError))
+
+    let setupSize = renderPopover(
+        appState: appState,
+        mountController: controller,
+        helperInstaller: helperInstaller,
+        cliInstallChecker: cliInstallChecker,
+        driveScanner: scanner,
+        fullDiskAccessController: FullDiskAccessController(initialState: .waitingForDrive)
+    )
+    let mainSize = renderPopover(
+        appState: appState,
+        mountController: controller,
+        helperInstaller: helperInstaller,
+        cliInstallChecker: cliInstallChecker,
+        driveScanner: scanner
+    )
+
+    #expect(setupSize != nil, "drive-discovery failure must render in the setup gate")
+    #expect(mainSize != nil, "drive-discovery failure must render after setup is complete")
+}
+
 // "Other available" section split: idle-with-drives renders the detected drives as the primary
 // list (mountable rows + a Refresh pill, no "Other available" label) — must not collapse. Drive
 // scanner seeded via the same FakeListRunner seam DriveScannerTests uses (real `anylinuxfs list`
@@ -333,9 +367,13 @@ private func renderPopover(
 // has real parsed drives without spawning a process. Same shape as DriveScannerTests' FakeListRunner.
 private final class SeededListRunner: PrivilegedCommandRunning {
     let output: String
-    init(output: String) { self.output = output }
+    let exitCode: Int32
+    init(output: String, exitCode: Int32 = 0) {
+        self.output = output
+        self.exitCode = exitCode
+    }
     func run(_ executablePath: String, _ arguments: [String]) -> CommandResult {
-        CommandResult(output: output, exitCode: 0)
+        CommandResult(output: output, exitCode: exitCode)
     }
     func runPipingStdin(_ input: String, to executablePath: String, _ arguments: [String]) -> CommandResult {
         CommandResult(output: "", exitCode: 0)

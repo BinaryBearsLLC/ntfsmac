@@ -9,4 +9,16 @@ import HelperShared
         #expect(FDAPromptCopy.helperServiceName == helperMachServiceName)
         #expect(FDAPromptCopy.instructions.contains("Full Disk Access"))
     }
+
+    @Test func driveDiscoveryFailureUsesSafeActionableCopy() {
+        let rawError = "open /Users/private/.config/containers/registries.d: permission denied"
+
+        #expect(DriveDiscoveryFailureCopy.isVisible(for: rawError))
+        #expect(!DriveDiscoveryFailureCopy.isVisible(for: nil))
+        #expect(DriveDiscoveryFailureCopy.title == "Unable to check connected drives")
+        #expect(DriveDiscoveryFailureCopy.message.contains("Try again"))
+        #expect(DriveDiscoveryFailureCopy.message.contains("Settings"))
+        #expect(!DriveDiscoveryFailureCopy.message.contains(rawError))
+        #expect(!DriveDiscoveryFailureCopy.message.contains("/Users/"))
+    }
 }

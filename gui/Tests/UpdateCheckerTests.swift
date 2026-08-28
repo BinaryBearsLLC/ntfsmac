@@ -31,6 +31,7 @@ private func updateDefaults() -> UserDefaults {
 @Test func semanticVersionsAreStrictAndComparable() {
     #expect(SemanticVersion(tag: "v3.0.1")! > SemanticVersion(tag: "3.0.0")!)
     #expect(SemanticVersion(tag: "3.1.0")! > SemanticVersion(tag: "3.0.99")!)
+    #expect(SemanticVersion(tag: "3.1.1")! > SemanticVersion(tag: "3.1.0")!)
     #expect(SemanticVersion(tag: "3.0") == nil)
     #expect(SemanticVersion(tag: "3.0.0-beta") == nil)
     #expect(SemanticVersion(tag: "03.0.0") == nil)

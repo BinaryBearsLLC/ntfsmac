@@ -101,27 +101,17 @@ read at that time; it cannot guarantee against later media failure.
 Reports omit usernames, volume labels, device identifiers, serial numbers, mount paths, IP
 addresses, DNS servers, route tables, and VPN provider details.
 
-### v3.1.0 interaction changes
+### Current behavior
 
-The v3.1.0 source line integrates these behaviors. GitHub Releases remains authoritative for the
-currently published version and its signed artifacts:
-
-- Diagnose presents four plain-language categories. Connection protection is part of that result
-  rather than a separate SECURITY section; implementation details remain in the CLI and
-  Command-click JSON export for support.
-- Quit is immediate with no mounted drive. With a mounted drive it offers **Unmount and Quit**,
-  **Quit Anyway**, and **Cancel**. `Don't show again` can remember only the safe unmount action.
-  Command-click **Quit** clears that choice and restores the confirmation; there is no Settings
-  reset. Quit is disabled during Verified Copy and mount/unmount operations.
-- The Settings header keeps Back, the centred Settings title/version, and the icon-only update
-  action aligned as one balanced row.
-- Pointer focus no longer leaves the thick stacked blue halo. A thin focus outline appears only
-  after deliberate keyboard traversal on macOS 14+, while macOS 13 retains its native accessible
-  focus behavior.
-- The standard helper is health-checked before the candidate removes any installed Legacy helper.
-  Approval denial or a failed replacement leaves Legacy intact and exposes a repairable state.
-- Both v3.1.0 DMGs use the official BinaryBears artwork supplied by the maintainer; no placeholder
-  branding is included.
+- Diagnose presents four plain-language categories; technical evidence remains available through
+  the CLI and Command-click JSON export.
+- Quit protects mounted drives with **Unmount and Quit**, **Quit Anyway**, and **Cancel**. Only the
+  safe unmount action can be remembered.
+- Standard and Legacy builds share the same reviewed mount/runtime path. The standard helper is
+  verified before any working Legacy helper is removed.
+- Drive-discovery failures are shown as errors with a retry action instead of being reported as
+  “no drive connected”.
+- Both DMGs use the approved BinaryBears artwork and preserve the visible app name **ntfsmac**.
 
 ## How it works
 
@@ -141,7 +131,7 @@ call after hot-unplug or guest failure.
 
 ## Security and updates
 
-v3.1.0 summarizes measured protection evidence inside Diagnose and fails closed to an
+ntfsmac summarizes measured protection evidence inside Diagnose and fails closed to an
 explicit unavailable/attention state when evidence is missing. The CLI retains its reason-coded
 detail. See [SECURITY.md](SECURITY.md) for the reporting boundary.
 
@@ -151,13 +141,10 @@ offers to open that release in the browser. Automatic network failures remain si
 
 ## Project status
 
-The current fork baseline completed its measured P0/P1 acceptance ledger with no remaining measured
-failure. Two resource-dependent extended cells remain explicitly blocked, not silently counted as
-passes. `v3.0.0` was published on 2026-08-18 after the downloaded GitHub DMG passed checksum,
-Gatekeeper, install, mount, write/reread, and unmount validation. The `dev` source line contains the
-`v3.1.0` dual-distribution work; the Releases page, not the branch README, is the source of truth
-for whether that version has completed its signed/notarized draft and downloaded-DMG acceptance
-gates.
+`v3.1.0` introduced the standard SMAppService build while retaining a labelled Legacy DMG. The
+`v3.1.1` patch fixes first-run runtime initialization when optional user container-registry
+metadata is unreadable. [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases/latest)
+is the authoritative source for the latest signed and notarized build.
 
 - [Roadmap](docs/BINARYBEARS_ROADMAP.md)
 - [Validation ledger](docs/testing/BINARYBEARS_VALIDATION_RESULTS_2026-08-12.md)
