@@ -18,4 +18,11 @@ import Testing
         #expect(subtitle.contains("NTFS") || subtitle.lowercased().contains("ntfs"), "subtitle must mention NTFS — got: \(subtitle)")
         #expect(subtitle.lowercased().contains("ext"), "subtitle must mention ext — got: \(subtitle)")
     }
+
+    @Test func coldRuntimePreparationIsNotPresentedAsSetupOrFailure() {
+        let copy = "\(PreparingStateCopy.title) \(PreparingStateCopy.subtitle)".lowercased()
+        #expect(copy.contains("preparing") || copy.contains("setting up"))
+        #expect(!copy.contains("full disk access"))
+        #expect(!copy.contains("failed"))
+    }
 }

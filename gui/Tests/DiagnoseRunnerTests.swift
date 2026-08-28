@@ -105,6 +105,21 @@ private final class FakeRunner: PrivilegedCommandRunning {
     #expect(rows.first { $0.id == "permissions" }?.nextAction?.contains("Full Disk Access") == true)
 }
 
+@Test func noDriveDiagnosticsDoNotInventAPermissionProblem() throws {
+    let report = try JSONDecoder().decode(DiagnoseReport.self, from: Data(expandedJSON.utf8))
+    let permissions = DiagnoseMacroSummary.rows(
+        for: report,
+        mountState: .idle,
+        detectedDriveCount: 0,
+        fullDiskAccessGranted: nil
+    ).first { $0.id == "permissions" }
+
+    #expect(permissions?.state == .idle)
+    #expect(permissions?.summary == "Checked when needed")
+    #expect(permissions?.nextAction == nil)
+    #expect(permissions?.userFacingText.contains("System Settings") == false)
+}
+
 @Test func guiDiagnosticsShowEveryCategoryWhileChecking() {
     #expect(DiagnoseMacroSummary.checkingRows.map(\.title) == DiagnoseMacroSummary.categoryTitles)
     #expect(DiagnoseMacroSummary.checkingRows.allSatisfy { $0.state == .checking })

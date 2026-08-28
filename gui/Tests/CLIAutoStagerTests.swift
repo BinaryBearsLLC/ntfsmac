@@ -37,6 +37,7 @@ final class FakeCLIStaging: CLIStaging {
     await stager.stageIfNeeded()
 
     #expect(helper.calls.count == 1, "CLI present but possibly stale — must still call stageCLI so the helper can no-op-or-reinstall")
+    #expect(stager.hasVerifiedCurrentCLI)
 }
 
 @MainActor @Test func stageIfNeededCallsHelperWithBundledInstallScriptPath() async {
@@ -48,6 +49,7 @@ final class FakeCLIStaging: CLIStaging {
 
     #expect(helper.calls.count == 1)
     #expect(helper.calls[0].installScriptPath == "/Applications/ntfsmac.app/Contents/Resources/cli-src/install.sh")
+    #expect(!stager.hasVerifiedCurrentCLI, "a successful helper reply is not enough when the expected executables are still absent")
 }
 
 @MainActor @Test func stageIfNeededOnlyAttemptsOncePerLaunch() async {
@@ -69,6 +71,8 @@ final class FakeCLIStaging: CLIStaging {
     await stager.stageIfNeeded()
 
     #expect(helper.calls.isEmpty)
+    #expect(!stager.hasVerifiedCurrentCLI)
+    #expect(stager.lastFailureReason != nil)
 }
 
 @MainActor @Test func stageIfNeededSurfacesTheFailureReasonWhenStagingThrows() async {
@@ -80,6 +84,7 @@ final class FakeCLIStaging: CLIStaging {
     await stager.stageIfNeeded()
 
     #expect(stager.lastFailureReason == "rejected: cli-src content does not match the hash pinned into this helper at build time — refusing (possible tampering)")
+    #expect(!stager.hasVerifiedCurrentCLI)
 }
 
 @MainActor @Test func stageIfNeededSurfacesTheFailureReasonWhenInstallScriptExitsNonzero() async {
@@ -95,6 +100,7 @@ final class FakeCLIStaging: CLIStaging {
     await stager.stageIfNeeded()
 
     #expect(stager.lastFailureReason == "install.sh: HARD-STOP — ntfsmac requires Apple Silicon (arm64), detected 'x86_64'")
+    #expect(!stager.hasVerifiedCurrentCLI)
 }
 
 @MainActor @Test func retryBypassesTheOneShotGuardAndClearsTheFailureReasonOnSuccess() async {
@@ -119,5 +125,51 @@ final class FakeCLIStaging: CLIStaging {
     await stager.retry()
 
     #expect(helper.calls.count == callsAfterFirstAttempt + 1, "retry() must actually re-invoke staging, not just re-check the filesystem")
-    #expect(stager.lastFailureReason == nil)
+    #expect(stager.lastFailureReason != nil, "the helper reply succeeded, but the missing executable check must still fail closed")
+    #expect(!stager.hasVerifiedCurrentCLI)
+}
+
+@MainActor @Test func resetRevokesCurrentCLIVerification() async throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let binPath = dir.appendingPathComponent("ntfsmac").path
+    FileManager.default.createFile(atPath: binPath, contents: Data())
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binPath)
+
+    let checker = CLIInstallChecker(candidatePaths: [binPath], anylinuxfsPaths: [binPath])
+    let stager = CLIAutoStager(
+        helper: FakeCLIStaging(),
+        checker: checker,
+        bundleResourcesURL: URL(fileURLWithPath: "/Applications/ntfsmac.app/Contents/Resources")
+    )
+
+    await stager.stageIfNeeded()
+    #expect(stager.hasVerifiedCurrentCLI)
+
+    stager.reset()
+    #expect(!stager.hasVerifiedCurrentCLI)
+}
+
+@Test func backendActivationRequiresCurrentHelperAndVerifiedCLI() {
+    #expect(BackendActivationPolicy.canScan(
+        helperState: .installed,
+        cliInstalled: true,
+        cliVerifiedForCurrentHelper: true
+    ))
+    #expect(!BackendActivationPolicy.canScan(
+        helperState: .readyToInstall,
+        cliInstalled: true,
+        cliVerifiedForCurrentHelper: true
+    ))
+    #expect(!BackendActivationPolicy.canScan(
+        helperState: .installed,
+        cliInstalled: true,
+        cliVerifiedForCurrentHelper: false
+    ))
+    #expect(!BackendActivationPolicy.canScan(
+        helperState: .installed,
+        cliInstalled: false,
+        cliVerifiedForCurrentHelper: true
+    ))
 }

@@ -30,11 +30,10 @@ public enum FullDiskAccessState: Equatable, Sendable {
 enum FullDiskAccessPresentationPolicy {
     static func shouldPresentSetup(
         state: FullDiskAccessState,
-        deviceID: String?,
-        driveDiscoveryFailed: Bool
+        deviceID: String?
     ) -> Bool {
         guard state != .granted else { return false }
-        return deviceID != nil || driveDiscoveryFailed
+        return deviceID != nil
     }
 
     /// Diagnose accepts three values: confirmed, denied, or unavailable. An unprobed no-drive
@@ -118,9 +117,11 @@ enum FDAPromptCopy {
 /// the setup UI because it can contain user paths; the detailed evidence remains in Diagnose.
 enum DriveDiscoveryFailureCopy {
     static let title = "Unable to check connected drives"
-    static let message = "ntfsmac could not prepare its disk runtime. Try again, or open Settings to check for an update."
+    static let message = "ntfsmac could not initialize its disk runtime. Try again. If it continues, check for an update in Settings."
 
-    static func isVisible(for rawError: String?) -> Bool { rawError != nil }
+    static func isVisible(for rawError: String?, detectedDriveCount: Int = 0) -> Bool {
+        rawError != nil && detectedDriveCount == 0
+    }
 }
 
 enum NoDriveAccessCopy {
@@ -134,8 +135,6 @@ enum NoDriveAccessCopy {
 public struct FullDiskAccessSetupView: View {
     @ObservedObject public var controller: FullDiskAccessController
     public let deviceID: String?
-    public let driveDiscoveryFailed: Bool
-    public let onRetryDriveDiscovery: () -> Void
     public let onOpenSettings: () -> Void
     public let onQuit: () -> Void
 
@@ -144,15 +143,11 @@ public struct FullDiskAccessSetupView: View {
     public init(
         controller: FullDiskAccessController,
         deviceID: String?,
-        driveDiscoveryFailed: Bool = false,
-        onRetryDriveDiscovery: @escaping () -> Void = {},
         onOpenSettings: @escaping () -> Void,
         onQuit: @escaping () -> Void
     ) {
         self.controller = controller
         self.deviceID = deviceID
-        self.driveDiscoveryFailed = driveDiscoveryFailed
-        self.onRetryDriveDiscovery = onRetryDriveDiscovery
         self.onOpenSettings = onOpenSettings
         self.onQuit = onQuit
     }
@@ -223,20 +218,10 @@ public struct FullDiskAccessSetupView: View {
         case .notChecked, .checking:
             progressCard("Checking disk access…")
         case .waitingForDrive:
-            if driveDiscoveryFailed {
-                messageCard(
-                    title: DriveDiscoveryFailureCopy.title,
-                    message: DriveDiscoveryFailureCopy.message
-                )
-                Button("Try Again", action: onRetryDriveDiscovery)
-                    .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                    .ntfsmacKeyboardFocus()
-            } else {
-                messageCard(
-                    title: NoDriveAccessCopy.title,
-                    message: NoDriveAccessCopy.message
-                )
-            }
+            messageCard(
+                title: NoDriveAccessCopy.title,
+                message: NoDriveAccessCopy.message
+            )
         case .needsAuthorization:
             authorizationCard(waiting: false)
         case .waitingForAuthorization:
@@ -315,5 +300,93 @@ public struct FullDiskAccessSetupView: View {
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.secondary.opacity(0.08)))
+    }
+}
+
+/// Runtime discovery has no relationship to Full Disk Access. Keep it in a dedicated state so
+/// registry/download failures cannot send people back through a permission flow that already
+/// succeeded. Raw command output remains available only through the developer diagnostic export.
+public struct DriveDiscoveryFailureView: View {
+    public let isRetrying: Bool
+    public let onRetry: () -> Void
+    public let onOpenSettings: () -> Void
+    public let onQuit: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    public init(
+        isRetrying: Bool = false,
+        onRetry: @escaping () -> Void,
+        onOpenSettings: @escaping () -> Void,
+        onQuit: @escaping () -> Void
+    ) {
+        self.isRetrying = isRetrying
+        self.onRetry = onRetry
+        self.onOpenSettings = onOpenSettings
+        self.onQuit = onQuit
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 9) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.ntfsYellow.opacity(0.14))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.ntfsYellow.opacity(0.28)))
+                    Image(systemName: "externaldrive.badge.exclamationmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.ntfsYellow)
+                }
+                .frame(width: 28, height: 28)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("ntfsmac").font(.system(size: 13, weight: .semibold))
+                    Text("Drive runtime").font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Circle().fill(Color.ntfsYellow).frame(width: 9, height: 9)
+            }
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(DriveDiscoveryFailureCopy.title)
+                    .font(.system(size: 12.5, weight: .semibold))
+                Text(DriveDiscoveryFailureCopy.message)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button(action: onRetry) {
+                    HStack(spacing: 6) {
+                        if isRetrying {
+                            ProgressView().controlSize(.small)
+                        }
+                        Text(isRetrying ? "Trying Again…" : "Try Again")
+                    }
+                }
+                .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                .ntfsmacKeyboardFocus()
+                .disabled(isRetrying)
+            }
+            .padding(12)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.secondary.opacity(0.08)))
+
+            Divider()
+            HStack {
+                Button(action: onOpenSettings) {
+                    SettingsGearGlyph(color: .secondary)
+                }
+                .buttonStyle(.glassIcon(colorScheme: colorScheme))
+                .ntfsmacKeyboardFocus()
+                .accessibilityLabel("Open Settings")
+                .help(TooltipCopy.text(for: .settings))
+                Spacer()
+                Button("Quit", action: onQuit)
+                    .buttonStyle(.glassFooter(colorScheme: colorScheme))
+                    .ntfsmacKeyboardFocus()
+                    .accessibilityLabel("Quit ntfsmac")
+            }
+        }
+        .padding(12)
+        .frame(width: 300)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }

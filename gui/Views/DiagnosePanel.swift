@@ -115,7 +115,12 @@ public enum DiagnoseMacroSummary {
             appReadiness(report),
             driveStatus(report, mountState: mountState, detectedDriveCount: detectedDriveCount),
             connectionProtection(report, mountState: mountState),
-            permissions(report, fullDiskAccessGranted: fullDiskAccessGranted),
+            permissions(
+                report,
+                mountState: mountState,
+                detectedDriveCount: detectedDriveCount,
+                fullDiskAccessGranted: fullDiskAccessGranted
+            ),
         ]
     }
 
@@ -276,6 +281,8 @@ public enum DiagnoseMacroSummary {
 
     private static func permissions(
         _ report: DiagnoseReport,
+        mountState: MountState?,
+        detectedDriveCount: Int?,
         fullDiskAccessGranted: Bool?
     ) -> DiagnoseMacroRow {
         if fullDiskAccessGranted == false {
@@ -283,6 +290,16 @@ public enum DiagnoseMacroSummary {
         }
         if report.helperInstalled == false {
             return .init(id: "permissions", title: "Permissions", state: .attention, summary: "Approval needed", explanation: "macOS has not yet approved ntfsmac's drive-access component.", nextAction: "Open System Settings > General > Login Items and allow ntfsmac.")
+        }
+        if fullDiskAccessGranted == nil, mountState == .idle, detectedDriveCount == 0 {
+            return .init(
+                id: "permissions",
+                title: "Permissions",
+                state: .idle,
+                summary: "Checked when needed",
+                explanation: "Connect a supported drive and ntfsmac will verify Full Disk Access before mounting.",
+                nextAction: nil
+            )
         }
         guard fullDiskAccessGranted == true, report.helperInstalled == true else {
             return .init(id: "permissions", title: "Permissions", state: .unavailable, summary: "Could not confirm", explanation: "ntfsmac could not confirm every macOS permission it needs.", nextAction: "Review ntfsmac in System Settings, then run Diagnose again.")

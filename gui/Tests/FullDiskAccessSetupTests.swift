@@ -42,8 +42,7 @@ private final class FakeDiskAccessChecker: FullDiskAccessChecking, Sendable {
     for state in unverifiedStates {
         #expect(!FullDiskAccessPresentationPolicy.shouldPresentSetup(
             state: state,
-            deviceID: nil,
-            driveDiscoveryFailed: false
+            deviceID: nil
         ))
     }
 }
@@ -51,31 +50,26 @@ private final class FakeDiskAccessChecker: FullDiskAccessChecking, Sendable {
 @Test func detectedDriveStillRequiresARealAccessProbe() {
     #expect(FullDiskAccessPresentationPolicy.shouldPresentSetup(
         state: .notChecked,
-        deviceID: "disk6s1",
-        driveDiscoveryFailed: false
+        deviceID: "disk6s1"
     ))
     #expect(FullDiskAccessPresentationPolicy.shouldPresentSetup(
         state: .needsAuthorization,
-        deviceID: "disk6s1",
-        driveDiscoveryFailed: false
+        deviceID: "disk6s1"
     ))
     #expect(!FullDiskAccessPresentationPolicy.shouldPresentSetup(
         state: .granted,
-        deviceID: "disk6s1",
-        driveDiscoveryFailed: false
+        deviceID: "disk6s1"
     ))
 }
 
-@Test func discoveryFailureStillSurfacesWithoutInventingAMissingDrive() {
-    #expect(FullDiskAccessPresentationPolicy.shouldPresentSetup(
+@Test func discoveryFailureNeverMasqueradesAsFullDiskAccessSetup() {
+    #expect(!FullDiskAccessPresentationPolicy.shouldPresentSetup(
         state: .waitingForDrive,
-        deviceID: nil,
-        driveDiscoveryFailed: true
+        deviceID: nil
     ))
     #expect(!FullDiskAccessPresentationPolicy.shouldPresentSetup(
         state: .granted,
-        deviceID: nil,
-        driveDiscoveryFailed: true
+        deviceID: nil
     ))
 }
 

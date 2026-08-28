@@ -17,6 +17,11 @@ enum EmptyStateCopy {
     static let subtitle = "Connect an NTFS or ext drive to\nget started"
 }
 
+enum PreparingStateCopy {
+    static let title = "Preparing ntfsmac…"
+    static let subtitle = "Setting up the disk runtime for its first check."
+}
+
 /// "Other available devices" section copy — the unmounted-drives list shown below the mounted
 /// list when one or more drives are already mounted. Says "devices" (not "drives") and only
 /// renders once something is primary: before mounting, the detected drives are just "the drives",
@@ -276,25 +281,29 @@ public struct PopoverContentView: View {
                     onOpenSettings: navigation.showSettings,
                     onQuit: { requestQuit(commandPressed: false) }
                 )
-            } else if !cliInstallChecker.isInstalled {
+            } else if !cliInstallChecker.isInstalled || cliAutoStager.lastFailureReason != nil {
                 CLIMissingView(
                     checker: cliInstallChecker,
                     stager: cliAutoStager,
                     onOpenSettings: navigation.showSettings,
                     onQuit: { requestQuit(commandPressed: false) }
                 )
+            } else if driveDiscoveryFailed {
+                DriveDiscoveryFailureView(
+                    isRetrying: driveScanner.isRefreshing,
+                    onRetry: {
+                        Task { await refreshAll() }
+                    },
+                    onOpenSettings: navigation.showSettings,
+                    onQuit: { requestQuit(commandPressed: false) }
+                )
             } else if FullDiskAccessPresentationPolicy.shouldPresentSetup(
                 state: fullDiskAccessController.state,
-                deviceID: driveScanner.drives.first?.identifier,
-                driveDiscoveryFailed: DriveDiscoveryFailureCopy.isVisible(for: driveScanner.lastError)
+                deviceID: driveScanner.drives.first?.identifier
             ) {
                 FullDiskAccessSetupView(
                     controller: fullDiskAccessController,
                     deviceID: driveScanner.drives.first?.identifier,
-                    driveDiscoveryFailed: DriveDiscoveryFailureCopy.isVisible(for: driveScanner.lastError),
-                    onRetryDriveDiscovery: {
-                        Task { await driveScanner.refresh() }
-                    },
                     onOpenSettings: navigation.showSettings,
                     onQuit: { requestQuit(commandPressed: false) }
                 )
@@ -313,7 +322,7 @@ public struct PopoverContentView: View {
                 navigation.showSettings()
             }
         }
-        .task {
+        .task(id: cliAutoStager.hasVerifiedCurrentCLI) {
             await refreshAll()
         }
     }
@@ -533,6 +542,13 @@ public struct PopoverContentView: View {
         driveScanner.drives.filter { !mountController.physicallyMissingDriveIDs.contains($0.id) }
     }
 
+    private var driveDiscoveryFailed: Bool {
+        DriveDiscoveryFailureCopy.isVisible(
+            for: driveScanner.lastError,
+            detectedDriveCount: driveScanner.drives.count
+        )
+    }
+
     private var driveActionsDisabled: Bool {
         mountController.hasStorageOperationInFlight || verifiedCopyController.isActive || quitPresentation.isWorking
     }
@@ -583,6 +599,11 @@ public struct PopoverContentView: View {
     }
 
     private func refreshAll() async {
+        guard BackendActivationPolicy.canScan(
+            helperState: helperInstaller.state,
+            cliInstalled: cliInstallChecker.isInstalled,
+            cliVerifiedForCurrentHelper: cliAutoStager.hasVerifiedCurrentCLI
+        ) else { return }
         await driveScanner.refresh()
         await mountController.reconcile(knownDrives: driveScanner.drives)
     }
@@ -590,7 +611,9 @@ public struct PopoverContentView: View {
     private var headerSubtitle: String {
         switch appState.state {
         case .idle:
-            if driveScanner.drives.isEmpty && DriveDiscoveryFailureCopy.isVisible(for: driveScanner.lastError) {
+            if !driveScanner.hasCompletedInitialScan {
+                "Preparing ntfsmac…"
+            } else if driveDiscoveryFailed {
                 "Drive check failed"
             } else {
                 driveScanner.drives.isEmpty ? "No drives found" : "\(driveScanner.drives.count) drive(s) detected"
@@ -613,32 +636,38 @@ public struct PopoverContentView: View {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(Color.secondary.opacity(0.08))
                     .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.secondary.opacity(0.12)))
-                DriveGlyphEmpty(color: .secondary)
+                if !driveScanner.hasCompletedInitialScan {
+                    ProgressView().controlSize(.small)
+                } else {
+                    DriveGlyphEmpty(color: .secondary)
+                }
             }
             .frame(width: 44, height: 44)
 
             VStack(spacing: 4) {
-                Text(DriveDiscoveryFailureCopy.isVisible(for: driveScanner.lastError) ? DriveDiscoveryFailureCopy.title : EmptyStateCopy.title)
+                Text(driveScanner.hasCompletedInitialScan ? EmptyStateCopy.title : PreparingStateCopy.title)
                     .font(.system(size: 12.5, weight: .medium))
                     .foregroundStyle(.secondary)
-                Text(DriveDiscoveryFailureCopy.isVisible(for: driveScanner.lastError) ? DriveDiscoveryFailureCopy.message : EmptyStateCopy.subtitle)
+                Text(driveScanner.hasCompletedInitialScan ? EmptyStateCopy.subtitle : PreparingStateCopy.subtitle)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary.opacity(0.7))
                     .multilineTextAlignment(.center)
             }
 
-            Button {
-                Task { await refreshAll() }
-            } label: {
-                HStack(spacing: 6) {
-                    RefreshGlyph()
-                    Text(DriveDiscoveryFailureCopy.isVisible(for: driveScanner.lastError) ? "Try Again" : "Refresh")
+            if driveScanner.hasCompletedInitialScan {
+                Button {
+                    Task { await refreshAll() }
+                } label: {
+                    HStack(spacing: 6) {
+                        RefreshGlyph()
+                        Text("Refresh")
+                    }
                 }
+                .buttonStyle(.glassNeutral(colorScheme: colorScheme))
+                .ntfsmacKeyboardFocus()
+                .accessibilityLabel("Refresh drives")
+                .help(TooltipCopy.text(for: .refresh))
             }
-            .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-            .ntfsmacKeyboardFocus()
-            .accessibilityLabel("Refresh drives")
-            .help(TooltipCopy.text(for: .refresh))
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)

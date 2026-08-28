@@ -19,6 +19,7 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
     private var popoverController: MenuBarPopoverController?
     private var driveScanner: DriveScanner?
     private var mountController: MountController?
+    private var isPopoverVisible = false
     private var cancellables: Set<AnyCancellable> = []
     private var pendingOpenRequest = false
     private var openGUINotificationInstalled = false
@@ -115,7 +116,17 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
         )
         .popoverGlassBackground()
 
-        let applyPollingCadence: @MainActor (Bool) -> Void = { isVisible in
+        let applyPollingCadence: @MainActor (Bool) -> Void = { [weak self] isVisible in
+            self?.isPopoverVisible = isVisible
+            guard BackendActivationPolicy.canScan(
+                helperState: helperInstaller.state,
+                cliInstalled: cliInstallChecker.isInstalled,
+                cliVerifiedForCurrentHelper: cliAutoStager.hasVerifiedCurrentCLI
+            ) else {
+                driveScanner.stopPolling()
+                mountController.stopPolling()
+                return
+            }
             let cadence = PopoverPollingCadence.resolve(isPopoverVisible: isVisible)
             driveScanner.startPolling(interval: cadence.driveScanInterval)
             mountController.startPolling(
@@ -156,6 +167,22 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
                 }
             }
             .store(in: &cancellables)
+
+        Publishers.CombineLatest3(
+            helperInstaller.$state,
+            cliInstallChecker.$isInstalled,
+            cliAutoStager.$hasVerifiedCurrentCLI
+        )
+        .removeDuplicates { previous, current in
+            previous.0 == current.0 && previous.1 == current.1 && previous.2 == current.2
+        }
+        .sink { [weak self] _, _, _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                applyPollingCadence(self.isPopoverVisible)
+            }
+        }
+        .store(in: &cancellables)
 
         applyPollingCadence(false)
         Task {

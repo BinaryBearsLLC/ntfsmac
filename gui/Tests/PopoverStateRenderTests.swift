@@ -304,17 +304,24 @@ private func renderPopover(
     let appState = AppState()
     let controller = MountController(helper: FakeHelper(), appState: appState)
     let fullDiskAccessController = FullDiskAccessController(initialState: .notChecked)
+    let scanner = DriveScanner(
+        runner: SeededListRunner(output: ""),
+        anylinuxfsPath: "/stub/anylinuxfs"
+    )
+    await scanner.refresh()
 
     #expect(!FullDiskAccessPresentationPolicy.shouldPresentSetup(
         state: fullDiskAccessController.state,
-        deviceID: nil,
-        driveDiscoveryFailed: false
+        deviceID: nil
     ))
+    #expect(scanner.hasCompletedInitialScan)
+    #expect(scanner.lastError == nil)
     let size = renderPopover(
         appState: appState,
         mountController: controller,
         helperInstaller: helperInstaller,
         cliInstallChecker: cliInstallChecker,
+        driveScanner: scanner,
         fullDiskAccessController: fullDiskAccessController
     )
 
@@ -322,7 +329,7 @@ private func renderPopover(
     #expect(size != nil, "no-drive relaunch must render the normal idle popover")
 }
 
-@MainActor @Test func driveDiscoveryFailureRendersInSetupAndMainContent() async throws {
+@MainActor @Test func driveDiscoveryFailureUsesDedicatedRuntimeState() async throws {
     let (helperInstaller, cliInstallChecker, cleanup) = try await makeInstalledDependencies()
     defer { cleanup() }
     let appState = AppState()
@@ -336,7 +343,11 @@ private func renderPopover(
     #expect(scanner.drives.isEmpty)
     #expect(DriveDiscoveryFailureCopy.isVisible(for: scanner.lastError))
 
-    let setupSize = renderPopover(
+    #expect(!FullDiskAccessPresentationPolicy.shouldPresentSetup(
+        state: .waitingForDrive,
+        deviceID: nil
+    ))
+    let size = renderPopover(
         appState: appState,
         mountController: controller,
         helperInstaller: helperInstaller,
@@ -344,16 +355,9 @@ private func renderPopover(
         driveScanner: scanner,
         fullDiskAccessController: FullDiskAccessController(initialState: .waitingForDrive)
     )
-    let mainSize = renderPopover(
-        appState: appState,
-        mountController: controller,
-        helperInstaller: helperInstaller,
-        cliInstallChecker: cliInstallChecker,
-        driveScanner: scanner
-    )
 
-    #expect(setupSize != nil, "drive-discovery failure must render in the setup gate")
-    #expect(mainSize != nil, "drive-discovery failure must render after setup is complete")
+    #expect(size?.width == 300, "drive-discovery failure must use its dedicated runtime card")
+    #expect(size != nil, "drive-discovery failure must render without falling into the permission flow")
 }
 
 // "Other available" section split: idle-with-drives renders the detected drives as the primary
