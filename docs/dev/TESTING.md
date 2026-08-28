@@ -24,17 +24,20 @@ separately; do not count a skipped render suite as executed.
 
 ## Issue #24 regression
 
-The release must prove both layers:
+The release must prove all related layers:
 
-1. The scratch-built `init-rootfs` source supplies an application-owned empty
-   `RegistriesDirPath` to containers/image.
-2. With a temporary home whose `.config/containers/registries.d` is unreadable, the old binary
-   reproduces `permission denied` while the fixed binary proceeds to the intended registry access.
-3. The setup gate and normal empty state render the safe discovery error and retry action without
-   exposing the raw personal path.
+1. `init-rootfs` supplies application-owned registry files/directories and an empty auth context;
+   it never inherits the user's containers or Docker configuration.
+2. The functional resolver test passes with poisoned, unreadable registry and credential files.
+3. The first runtime scan is single-flight, sequential, visibly preparing, and has a longer bounded
+   timeout; recurring scans retain their shorter bound. No scan starts until the current helper has
+   verified and staged the bundled CLI, even when an older executable is already installed.
+4. Runtime failure has a dedicated retry view, while no media shows normal idle UI and neutral
+   permission diagnostics.
+5. A clean app copied to `/Applications` passes the same flow in both Standard and Legacy builds.
 
-The structural regression is in `tests/build/runtime-config-isolation.bats`; GUI copy and render
-coverage are in `FDAPromptCopyTests` and `PopoverStateRenderTests`.
+Coverage lives in `runtime-config-isolation.bats`, `DriveScannerTests`, `FDAPromptCopyTests`,
+`DiagnoseRunnerTests`, and `PopoverStateRenderTests`.
 
 ## Local package gate
 

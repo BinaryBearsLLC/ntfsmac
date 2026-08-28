@@ -28,14 +28,19 @@ Colour is always paired with text or an accessible label. Missing evidence never
 
 ## Setup and discovery
 
-The first-run order is helper approval, CLI/runtime staging, drive discovery, and Full Disk Access
-verification against a real partition. With no supported drive, the normal idle UI reports **No
-drives found**; absence of media is not incomplete setup. When a partition appears, the app probes
-Full Disk Access again for that launch before enabling Mount. Settings and Quit remain reachable.
+The first-run order is helper approval, CLI staging, drive discovery, and Full Disk Access
+verification against a real partition. The first disk check initializes the pinned runtime once,
+with a visible **Preparing ntfsmac…** state. With no supported drive, the normal idle UI then
+reports **No drives found**; absence of media is not incomplete setup. When a partition appears,
+the app probes Full Disk Access for that launch before enabling Mount.
 
-If drive discovery fails, both setup and the normal empty state show **Unable to check connected
-drives** with **Try Again**. Raw command output is never shown because it can contain personal
-paths. A runtime failure must not be presented as “connect a drive”.
+Automatic drive and mount polling remains stopped until the current helper has accepted the
+bundled CLI tree and its executables have been verified. An older installed CLI is never used
+during helper replacement.
+
+If discovery fails, a dedicated **Drive runtime** state shows **Unable to check connected drives**
+with **Try Again**. It never uses the Full Disk Access header. Raw output remains in the developer
+diagnostic only because it can contain personal paths. Settings and Quit stay reachable.
 
 ## Idle controls
 
@@ -74,6 +79,8 @@ The normal UI summarizes the same CLI evidence into four categories:
 - Permissions
 
 Each category has a semantic status, short explanation, and a next action only when useful.
+With no drive, Permissions reports **Checked when needed** instead of inventing an authorization
+problem.
 Technical identifiers, paths, IP details, runtime pins, PF/routes, and raw keys remain outside the
 normal UI. **Hide** changes presentation only; running Diagnose again produces a fresh result.
 

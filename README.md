@@ -113,7 +113,7 @@ addresses, DNS servers, route tables, and VPN provider details.
   safe unmount action can be remembered.
 - Standard and Legacy builds share the same reviewed mount/runtime path. The standard helper is
   verified before any working Legacy helper is removed.
-- Drive-discovery failures are shown as errors with a retry action instead of being reported as
+- Drive-runtime failures have their own retry state and are never presented as Full Disk Access or
   “no drive connected”.
 - Both DMGs use the approved BinaryBears artwork and preserve the visible app name **ntfsmac**.
 
@@ -145,10 +145,10 @@ offers to open that release in the browser. Automatic network failures remain si
 
 ## Project status
 
-`v3.1.0` introduced the standard SMAppService build while retaining a labelled Legacy DMG. The
-`v3.1.1` patch fixes first-run runtime initialization when optional user container-registry
-metadata is unreadable. [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases/latest)
-is the authoritative source for the latest signed and notarized build.
+`v3.1.0` introduced the standard SMAppService build while retaining a labelled Legacy DMG.
+`v3.1.1` isolated one optional container-registry metadata path; follow-up hardening for the full
+OCI configuration and first runtime check is in development. [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases/latest)
+is the authoritative source for signed and notarized builds.
 
 - [Roadmap](docs/BINARYBEARS_ROADMAP.md)
 - [Validation ledger](docs/testing/BINARYBEARS_VALIDATION_RESULTS_2026-08-12.md)
