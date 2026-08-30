@@ -633,3 +633,15 @@ All root YAML files parsed and 14 focused action/toolchain/lock tests passed. Th
 runner and recursive submodule behavior remain a remote gate: no workflow was triggered. The
 checkout ref in the vendored anylinuxfs project's own workflow is inert for ntfsmac and was not
 altered inside the pinned upstream submodule.
+
+## actions/setup-go v7.0.0 full-SHA update (dependency refresh, 2026-08-30)
+
+CI and release now use immutable setup-go commit
+`b7ad1dad31e06c5925ef5d2fc7ad053ef454303e` (v7.0.0), recorded in
+`ACTIONS_SETUP_GO_COMMIT`, instead of floating major ref v5. Go itself remains exactly 1.26.7.
+The reviewed action manifest retains the `go-version` input; v7 uses Node 24 and ESM and requires
+the runner generation introduced for setup-go v6 (runner 2.327.1 or newer).
+
+Both workflow files parsed, 15 focused action/lock/Go-toolchain tests passed, and the unchanged
+init-rootfs module compiled under locked Go 1.26.7. No hosted workflow was dispatched, so action
+execution and cache behavior remain remote gates.

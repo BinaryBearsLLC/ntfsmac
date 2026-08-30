@@ -429,6 +429,31 @@ separate upstream source commit, so it is not treated as an effective ntfsmac ac
 No runtime binary, package, hardware, signing, notarization, release, or remote/public state was
 changed.
 
+## Checkpoint N — actions/setup-go v7.0.0
+
+Status: local workflow/module validation complete; hosted GitHub runner execution is pending.
+
+Only the Go setup action changed. CI and release moved from mutable major ref
+`actions/setup-go@v5` to current v7.0.0 full commit
+`b7ad1dad31e06c5925ef5d2fc7ad053ef454303e`, recorded as
+`ACTIONS_SETUP_GO_COMMIT` and enforced by tests. The selected compiler remains exact Go 1.26.7
+from `sources.lock`; no Go module or runtime source changed.
+
+v6 introduced the action's Node 24 runtime and minimum runner 2.327.1; v7 retains Node 24, moves
+the implementation to ESM, and updates its action/cache dependencies. The reviewed v7 manifest
+continues to accept the exact `go-version` input used by ntfsmac.
+
+- v7.0.0 action manifest SHA-256:
+  `cbfae748992b96b9a1bfa3f1679d17c898c78375aad8a0d0184820683c82c482`;
+- CI/release workflow YAML parse: PASS;
+- action/lock/Go-toolchain Bats gate: PASS, 15/15;
+- unchanged init-rootfs Go module compile/test under Go 1.26.7: PASS for both packages (no test
+  files);
+- hosted action download/cache/toolchain resolution: not run locally and not claimed because no
+  remote workflow was triggered.
+
+No hardware, signing, notarization, installation, release, or remote/public action was performed.
+
 ## Validation categories
 
 - Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed

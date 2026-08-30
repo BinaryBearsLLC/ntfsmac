@@ -26,3 +26,19 @@ setup() {
   run grep -hE 'uses: actions/checkout@(v[0-9]+|main|master)$' "${WORKFLOWS[@]}"
   [ "$status" -ne 0 ]
 }
+
+@test "CI and release pin actions/setup-go to the reviewed full commit" {
+  local expected refs
+  expected="$($LOCK_SH get ACTIONS_SETUP_GO_COMMIT)"
+  [[ "$expected" =~ ^[0-9a-f]{40}$ ]]
+  refs="$(grep -hE 'uses: actions/setup-go@' "${WORKFLOWS[@]}" |
+    sed -E 's/.*@([0-9a-f]{40}).*/\1/')"
+  [ "$(wc -l <<< "$refs" | tr -d ' ')" -eq 2 ]
+  run grep -Ev "^${expected}$" <<< "$refs"
+  [ "$status" -ne 0 ]
+}
+
+@test "root workflows contain no floating setup-go ref" {
+  run grep -hE 'uses: actions/setup-go@(v[0-9]+|main|master)$' "${WORKFLOWS[@]}"
+  [ "$status" -ne 0 ]
+}
