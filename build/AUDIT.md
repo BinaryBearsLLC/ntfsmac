@@ -1,7 +1,7 @@
 # build/AUDIT.md — `v-audit` (PLAN.md §6)
 
 Every package/feature decision below is backed by evidence read from the real
-`vendor/src/anylinuxfs` submodule at commit `8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3`
+`vendor/src/anylinuxfs` submodule at commit `28d308bb9ed15611118fa51d998b988b3ee62459`
 (`ANYLINUXFS_COMMIT` in `build/sources.lock`) — never guessed. File:line citations are given
 for every non-obvious call. Scope test: {ntfs-3g mount, rpc.nfsd export, blkid device
 detection} per PLAN.md §6 `v-audit`.
@@ -73,6 +73,39 @@ Dry-run evidence for upstream `v0.19.0`:
 - This is **not an accepted pin change**. Dependency-advisory review, candidate build/package
   gates, and real-hardware validation remain outstanding, so `sources.lock` and the submodule stay
   on the audited `0.18.0`/`8aa9ccd` state.
+
+## anylinuxfs v0.19.0 local pin validation (2026-08-30)
+
+The earlier dry-run was resumed on the dedicated local dependency-refresh branch. The exact
+four-commit delta and upstream identity were rechecked before moving the submodule. The local pin
+now advances from `8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3` to the official `v0.19.0` commit
+`28d308bb9ed15611118fa51d998b988b3ee62459`; `ANYLINUXFS_VERSION` and
+`VMPROXY_VERSION` advance together from `0.18.0` to `0.19.0`. The previous commit remains the
+rollback target.
+
+- The delta remains limited to twelve Cargo/Go manifests and lockfiles. It changes no executable
+  source, Alpine list, download contract, runtime patch marker, libkrun resolution, or supported
+  filesystem scope. `local_patch_compatibility=pass` and `repository_mutated=false`.
+- `build/build-all.sh` built the arm64 host CLI, arm64 Linux static `vmproxy`, `init-rootfs`, and
+  `vmrunner-sys`; Cargo tests passed 8 `common-utils` + 41 `anylinuxfs` + 9 `vmproxy`. Both Go
+  modules compile for their intended targets (`init-rootfs` on Darwin and `freebsd-bootstrap`
+  with `GOOS=freebsd GOARCH=arm64`). The Darwin build has the hypervisor entitlement, an ad-hoc
+  signature, no quarantine xattr, and no dynamic libblkid/libuuid dependency.
+- The complete Bats gate passed 355/355. A clean `build.command gui` run, with the candidate
+  gitlink staged so setup could not restore the old committed submodule, passed 307/307 Swift
+  tests for both Standard and Legacy, built both apps and DMGs, verified both DMG checksums, and
+  verified local Developer ID signatures. The first packaging attempt was interrupted when it
+  exposed that pre-commit gitlink condition and is not counted as candidate evidence.
+- `cargo-audit 0.22.2` and `govulncheck 1.7.0` found the same actionable findings in the previous
+  pin and in v0.19.0: three Rust vulnerabilities in the anylinuxfs lock, plus reachable Go
+  findings in the Go 1.26.5 standard library, gRPC 1.81.1, and the transitive OpenPGP package.
+  The update therefore introduces no advisory-count regression, but it is not represented as a
+  clean scan. The upstream one-commit gRPC fix and toolchain/transitive findings are separate
+  dependency checkpoints rather than being folded into this version update.
+- Native VM startup still stops before guest execution with
+  `start vm error: Invalid argument (errno 22)`. No disk was mounted or accessed. The pin is
+  locally validated for continued dependency work only; hardware acceptance and release approval
+  remain outstanding. No notarization, installation, push, or publication was performed.
 
 ## Runtime Alpine pin and cache migration (P0.1, 2026-08-05)
 

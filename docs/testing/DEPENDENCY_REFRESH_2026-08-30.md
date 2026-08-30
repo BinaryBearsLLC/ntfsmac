@@ -9,7 +9,7 @@ checkpoint. GitHub issue #24 remains isolated in its original task and is not in
 - Worktree: `/Users/andrea/.codex/worktrees/7409/ntfsmac`
 - Starting commit: `416cb2e1281270e3b7cb67fa1ecf4ca4db3dbf82` (`dev`, `origin/dev`, `v3.1.1`)
 - Starting state: clean detached worktree; the dedicated branch was created before edits
-- anylinuxfs submodule: clean at `8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3`
+- anylinuxfs baseline submodule: clean at `8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3`
 - Publication boundary: no push, release, deployment, or remote mutation is authorized
 
 ## Baseline before dependency work
@@ -97,11 +97,46 @@ Native hardware gate: the project's libkrun VM still fails before guest setup wi
 `start vm error: Invalid argument (errno 22)`. Therefore the Docker-isolated guest execution is a
 local compatibility pass, not a claim that the packaged native VM or a real NTFS drive passed.
 
+## Checkpoint C — anylinuxfs v0.19.0
+
+Status: local source/build validation complete; hardware acceptance outstanding.
+
+The submodule moved from `8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3` to the official v0.19.0
+release commit `28d308bb9ed15611118fa51d998b988b3ee62459`. `ANYLINUXFS_VERSION` and
+`VMPROXY_VERSION` moved together from 0.18.0 to 0.19.0. No other top-level pin changed.
+
+- read-only preflight: four commits, twelve manifest/lock files, no implementation source,
+  Alpine manifest, download contract, libkrun pin, mount/NFS/vmnet path, or local patch marker;
+- focused policy/lock/submodule gate: PASS, 12/12; build preflight: PASS;
+- real build: PASS for arm64 anylinuxfs, static Linux/aarch64 vmproxy, init-rootfs, and
+  vmrunner-sys; `anylinuxfs --version` reports 0.19.0;
+- Cargo tests: PASS, 58/58 across common-utils (8), anylinuxfs (41), and vmproxy (9);
+- Go compilation: PASS for init-rootfs on Darwin and freebsd-bootstrap cross-compiled for
+  FreeBSD/arm64; the latter is intentionally not a Darwin binary;
+- local artifact checks: arm64 architectures PASS, static libblkid PASS, hypervisor entitlement
+  present, ad-hoc signature present, quarantine absent;
+- advisory comparison: `cargo-audit 0.22.2` and `govulncheck 1.7.0` report the same findings on
+  the old pin and v0.19.0. This is no regression, but not a clean security scan. The separately
+  available upstream gRPC fix, Go 1.26.6 toolchain fix, and Rust transitive findings are kept out
+  of this checkpoint.
+- complete Bats gate: PASS, 355/355;
+- `build.command gui`: PASS on the exact candidate; Standard Swift 307/307 and Legacy Swift
+  307/307 (expected SMJob deprecation warnings only), both apps and both DMGs built, both DMG
+  checksums verified, and local Developer ID signatures verified. `PopoverStateRenderTests`
+  compiled but remained skipped by the documented macOS 26.6.2 guard.
+
+Native VM startup again returned `EINVAL` before guest setup. No disk was mounted or accessed.
+No notarization, installation, push, or publication was performed.
+
 ## Validation categories
 
-- Local source/build/tests: checkpoint A passed 350/350 Bats plus 307/307 in each Swift variant.
-  `PopoverStateRenderTests` compiled but remained skipped by the documented macOS 26.6.2 guard.
+- Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B and C passed 355/355.
+  Checkpoint C also passed 307/307 in each Swift variant and mounted-DMG verification for both
+  outputs. `PopoverStateRenderTests` compiled but remained skipped by the documented macOS 26.6.2
+  guard.
 - Hardware: no real-drive test; local VM guest setup blocked as documented above.
-- Signing: ad-hoc local signatures and required hypervisor entitlement only.
+- Signing: standalone runtime gates used ad-hoc signatures; checkpoint C packaging also verified
+  the locally available BinaryBears Developer ID on both app variants. Required hypervisor
+  entitlements passed.
 - Notarization: not run.
 - Remote/public state: untouched; no push or release.

@@ -31,7 +31,7 @@ setup() {
   CANDIDATE_COMMIT="$(git -C "$FIXTURE" rev-parse HEAD)"
   git -C "$FIXTURE" checkout -q --detach "$PINNED_COMMIT"
 
-  printf 'ANYLINUXFS_VERSION=0.18.0\nANYLINUXFS_COMMIT=%s\nALPINE_TAG=3.23.5\nALPINE_DIGEST=sha256:d858bb5442632a31bd4bca6c5e601dbe6b536fd7942092ea6a08a0a95805693c\n' \
+  printf 'ANYLINUXFS_VERSION=0.19.0\nANYLINUXFS_COMMIT=%s\nALPINE_TAG=3.23.5\nALPINE_DIGEST=sha256:d858bb5442632a31bd4bca6c5e601dbe6b536fd7942092ea6a08a0a95805693c\n' \
     "$PINNED_COMMIT" > "$LOCK_FIXTURE"
   grep -E '^ALPINE_(BASE_PACKAGES|PACKAGES|APKS)_SHA256=' "$REPO_ROOT/build/sources.lock" >> "$LOCK_FIXTURE"
 }
@@ -69,12 +69,12 @@ setup() {
   done
 }
 
-@test "policy records the exact v0.19.0 dry-run without changing the production pin" {
+@test "policy preserves the v0.19.0 dry-run record and production pin matches the accepted tag" {
   run grep -F "28d308bb9ed15611118fa51d998b988b3ee62459" "$POLICY"
   [ "$status" -eq 0 ]
   run grep -F "deferred, not rejected" "$POLICY"
   [ "$status" -eq 0 ]
   run "$REPO_ROOT/build/lib/lock.sh" get ANYLINUXFS_COMMIT
   [ "$status" -eq 0 ]
-  [ "$output" = "8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3" ]
+  [ "$output" = "28d308bb9ed15611118fa51d998b988b3ee62459" ]
 }

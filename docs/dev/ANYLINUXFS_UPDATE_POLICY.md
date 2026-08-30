@@ -15,7 +15,7 @@ Fetch candidate objects explicitly, then run the repository preflight with a tag
 
 ```sh
 git -C vendor/src/anylinuxfs fetch --prune origin
-./build/audit-anylinuxfs-update.sh v0.19.0
+./build/audit-anylinuxfs-update.sh "CANDIDATE_TAG_OR_COMMIT"
 ```
 
 The script requires a clean submodule at the currently locked commit. It verifies repository
@@ -93,3 +93,22 @@ Record every item below in `build/AUDIT.md` and in the pull-request description.
 - Decision: **deferred, not rejected**. This roadmap unit validates the audit workflow; it does
   not update the production pin. Candidate build, dependency-advisory review, and the required
   hardware matrix remain mandatory in a later dedicated pin-update branch.
+
+## Local pin update: v0.19.0 validated 2026-08-30
+
+The dedicated dependency-refresh branch resumed the deferred candidate and moved the local pin to
+the exact `v0.19.0` commit after the source, patch, build, and test gates passed. The four-commit
+delta is still manifest/lock-only, and the previous `8aa9ccd` commit remains the rollback target.
+
+Advisory scans were run rather than inferred clean: v0.19.0 has the same three actionable Rust
+findings and the same six reachable Go findings as the previous pin on Go 1.26.5. Those findings
+are recorded in `build/AUDIT.md` and are handled as separate dependency/toolchain checkpoints.
+Native VM and real-drive gates remain outstanding because libkrun exits with `EINVAL` before the
+guest starts. This is a local maintenance-branch update, not hardware, notarization, or release
+approval.
+
+The complete local repository gate passed 355/355. `build.command gui` then rebuilt the exact
+candidate and produced both Standard and Legacy apps/DMGs; 307/307 Swift tests passed for each
+variant, both app signatures and both DMG checksums verified. The available BinaryBears Developer
+ID was used locally by that packaging run. No notarization, installation, push, or publication was
+performed.
