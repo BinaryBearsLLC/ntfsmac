@@ -162,6 +162,29 @@ separate major-version compatibility candidate and is not folded into this patch
 - Native VM startup retains the pre-guest `EINVAL` limitation. No disk is accessed; no real-drive
   test, installation, notarization, push, release, or publication is performed.
 
+## libkrun 1.19.x availability review (2026-08-30)
+
+No libkrun pin changes in this checkpoint. Both anylinuxfs consumers declare `libkrun = "1.19.3"`
+and both Cargo lockfiles resolve the same crates.io `libkrun 1.19.3` package and checksum
+`f414a63a9e7f9134c71581eca90ef5dfdf55693d9c602ba2a81794a0ebee716d`.
+
+- The official crates.io API and `cargo info` report 1.19.3 as the newest published, non-yanked
+  crate. `cargo info libkrun@1.19.4` fails because that package version is not in the registry.
+- The official libkrun repository does have a `v1.19.4` GitHub release. Its two-commit delta from
+  `v1.19.3` includes the version-family bump plus a macOS virtio-fs security-context fix, but its
+  workspace crates were not published to crates.io. The protected `stable-1.19.x` branch is newer
+  still and is not an immutable package source.
+- Switching the vendored anylinuxfs manifests to an unpublished Git dependency would change the
+  supply model and require coordinating the full libkrun workspace family. That is not treated as
+  a routine pin update and is not introduced implicitly.
+- Dedicated validation with the unchanged registry lock passes 41/41 anylinuxfs tests and a
+  release `vmrunner-sys` build without its default FreeBSD feature. `cargo metadata --locked`
+  confirms `libkrun 1.19.3` from crates.io in both consumers.
+
+Decision: retain 1.19.3 as the newest reproducible published crate. Re-evaluate when 1.19.4 or a
+newer compatible 1.19.x crate is published. No hardware, signing, notarization, or remote gate is
+claimed from this no-change review.
+
 ## Runtime Alpine pin and cache migration (P0.1, 2026-08-05)
 
 - `ALPINE_TAG`, the linux/arm64 `ALPINE_DIGEST`, and `ANYLINUXFS_COMMIT` remain the only inputs.

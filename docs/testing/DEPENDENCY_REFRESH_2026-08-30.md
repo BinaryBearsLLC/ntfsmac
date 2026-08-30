@@ -187,6 +187,27 @@ The host-global Homebrew Go installation was not changed.
 The native VM remains blocked before guest execution by the existing `EINVAL`. No drive was
 mounted or accessed. No installation, notarization, push, release, or publication was performed.
 
+## Checkpoint F — libkrun 1.19.x review, no pin change
+
+Status: current reproducible pin retained.
+
+Both anylinuxfs and vmrunner-sys declare libkrun 1.19.3 and resolve the same exact crates.io
+package/checksum from their Cargo locks. The registry reports 1.19.3 as its newest non-yanked
+libkrun crate. GitHub release `v1.19.4` exists and contains a macOS virtio-fs security-context fix,
+but `cargo info libkrun@1.19.4` fails because the crate was not published.
+
+Changing to a Git/workspace dependency would be a supply-model change rather than a normal crate
+update and would require editing the vendored anylinuxfs dependency declarations. That is deferred
+instead of being hidden inside this review.
+
+- anylinuxfs `cargo test --locked`: PASS, 41/41;
+- vmrunner-sys `cargo build --release --locked --no-default-features`: PASS;
+- `cargo metadata --locked`: both consumers resolve `libkrun 1.19.3` from crates.io;
+- pin/files changed: none.
+
+No hardware, signing, notarization, push, release, or publication action was performed for this
+no-change checkpoint.
+
 ## Validation categories
 
 - Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed
