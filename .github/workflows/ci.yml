@@ -39,7 +39,7 @@ jobs:
         id: rust-toolchain
         run: echo "version=$(./build/lib/lock.sh get RUST_TOOLCHAIN_VERSION)" >> "$GITHUB_OUTPUT"
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master/v1 2026-08-05
         with:
           toolchain: ${{ steps.rust-toolchain.outputs.version }}
           targets: aarch64-unknown-linux-musl
@@ -57,7 +57,7 @@ jobs:
         id: rust-toolchain
         run: echo "version=$(./build/lib/lock.sh get RUST_TOOLCHAIN_VERSION)" >> "$GITHUB_OUTPUT"
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master/v1 2026-08-05
         with:
           toolchain: ${{ steps.rust-toolchain.outputs.version }}
       - name: Install build dependencies

@@ -606,3 +606,16 @@ tests; the full Bats suite passed 367/367. Both Standard and Legacy GUI builds p
 tests, produced checksum-valid DMGs, and passed read-only mounted-app Developer ID/Hardened Runtime
 verification. The native VM still exits with the existing pre-guest `EINVAL`, so no hardware,
 guest, or real-drive result is claimed.
+
+## Immutable Rust setup action (dependency refresh, 2026-08-30)
+
+The three CI/release references to `dtolnay/rust-toolchain@stable` are now immutable full-SHA
+references to `6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772`, current `master`/`v1` at review time.
+GitHub requires a literal revision in `uses`, so the same value is duplicated in the workflows and
+recorded as `RUST_TOOLCHAIN_ACTION_COMMIT`; Bats enforces equality. The action implementation at
+that commit is in `master` history and accepts the explicit Rust 1.98.0 input already established
+in the preceding checkpoint.
+
+Local workflow parsing, 12 focused lock/toolchain tests, exact-toolchain preflight, and 8 unchanged
+common-utils tests passed. A hosted-runner result requires a remote workflow run and remains
+unverified because this task has not pushed or otherwise mutated GitHub.

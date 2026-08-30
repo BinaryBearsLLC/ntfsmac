@@ -40,6 +40,18 @@ setup() {
   done
 }
 
+@test "CI and release pin the Rust setup action to the reviewed full commit" {
+  local expected refs
+  expected="$($LOCK_SH get RUST_TOOLCHAIN_ACTION_COMMIT)"
+  [[ "$expected" =~ ^[0-9a-f]{40}$ ]]
+  refs="$(grep -hE 'uses: dtolnay/rust-toolchain@' \
+    "$REPO_ROOT/.github/workflows/ci.yml" "$REPO_ROOT/.github/workflows/release.yml" |
+    sed -E 's/.*@([0-9a-f]{40}).*/\1/')"
+  [ "$(wc -l <<< "$refs" | tr -d ' ')" -eq 3 ]
+  run grep -Ev "^${expected}$" <<< "$refs"
+  [ "$status" -ne 0 ]
+}
+
 @test "helper rejects a malformed toolchain pin before invoking rustup" {
   local lock
   lock="$BATS_TEST_TMPDIR/sources.lock"

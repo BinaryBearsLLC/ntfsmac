@@ -372,6 +372,31 @@ regression.
 The native libkrun VM still returns `EINVAL` before guest execution. No drive was accessed or
 mounted. No installation, notarization, push, release, or publication was performed.
 
+## Checkpoint L — dtolnay/rust-toolchain action pin
+
+Status: local workflow/source validation complete; hosted GitHub runner execution is pending.
+
+Only the Rust setup action reference changed. All three CI/release uses moved from the mutable
+`dtolnay/rust-toolchain@stable` branch to reviewed full commit
+`6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772` (current `master`/`v1`, 2026-08-05).
+`RUST_TOOLCHAIN_VERSION` remains 1.98.0 and every compiler, source, package, and runtime pin is
+unchanged. Because GitHub does not permit expressions in `uses`, `sources.lock` records the action
+commit and regression tests require each literal workflow SHA to match it.
+
+The pinned action's `action.yml` was compared with the previously selected `stable` revision. Its
+only input-schema difference is that `toolchain` is required rather than defaulting to `stable`;
+ntfsmac already passes the exact lock explicitly, so the executed install path is unchanged. The
+full SHA is in the action's `master` history, satisfying the action maintainer's persistence rule
+for immutable pins.
+
+- workflow YAML parse: PASS for CI and release;
+- focused Rust action/toolchain/lock Bats gate: PASS, 12/12;
+- exact Rust 1.98.0 preflight: PASS;
+- unchanged common-utils compile/test under the locked toolchain: PASS, 8/8;
+- hosted GitHub Actions execution: not run locally and not claimed, because no push was made.
+
+No hardware, signing, notarization, installation, release, or remote/public action was performed.
+
 ## Validation categories
 
 - Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed
