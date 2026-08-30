@@ -1,7 +1,7 @@
 # build/AUDIT.md — `v-audit` (PLAN.md §6)
 
 Every package/feature decision below is backed by evidence read from the real
-`vendor/src/anylinuxfs` submodule at commit `28d308bb9ed15611118fa51d998b988b3ee62459`
+`vendor/src/anylinuxfs` submodule at commit `0a4472bd7507c1f9a57894547c1af7ea4382d99f`
 (`ANYLINUXFS_COMMIT` in `build/sources.lock`) — never guessed. File:line citations are given
 for every non-obvious call. Scope test: {ntfs-3g mount, rpc.nfsd export, blkid device
 detection} per PLAN.md §6 `v-audit`.
@@ -106,6 +106,32 @@ rollback target.
   `start vm error: Invalid argument (errno 22)`. No disk was mounted or accessed. The pin is
   locally validated for continued dependency work only; hardware acceptance and release approval
   remain outstanding. No notarization, installation, push, or publication was performed.
+
+## anylinuxfs gRPC 1.82.1 security follow-up (2026-08-30)
+
+This checkpoint advances only the anylinuxfs submodule from the accepted `v0.19.0` commit
+`28d308bb9ed15611118fa51d998b988b3ee62459` to its direct upstream descendant
+`0a4472bd7507c1f9a57894547c1af7ea4382d99f`. The single upstream commit changes only
+`init-rootfs/go.mod` and `init-rootfs/go.sum`, updating `google.golang.org/grpc` from `1.81.1`
+to `1.82.1`; package versions and every other top-level source/runtime pin remain unchanged. The
+v0.19.0 commit is the rollback target.
+
+- The read-only anylinuxfs audit reports one commit and two dependency files. It finds no Rust or
+  Go implementation-source change, Alpine package-list change, dependency-download-contract
+  change, mount/NFS/vmnet-path change, or local-patch incompatibility.
+- `go test ./...` passes for `init-rootfs`. `build/build-all.sh` rebuilds the complete local
+  runtime and passes all 58 Cargo tests; the complete Bats gate passes 355/355. Native VM startup
+  reaches the same pre-guest `EINVAL` limitation and no disk is accessed.
+- `govulncheck 1.7.0` on Go 1.26.5 decreases from six reachable findings to five. The prior gRPC
+  finding (`GO-2026-6061`) is absent after the update. Four standard-library findings fixed by
+  Go 1.26.6 and the transitive `x/crypto/openpgp` finding with no published fix remain separate
+  checkpoints; this result is not represented as a clean scan.
+- A clean `build.command gui` run on the exact staged gitlink passes 307/307 Swift tests for both
+  Standard and Legacy, builds both app/DMG variants, verifies the two SHA-256 sidecars and local
+  Developer ID signatures, and passes a second check against both read-only mounted DMGs. The
+  mounted bundles report version 3.1.1 and satisfy their designated requirements.
+- No real-drive/hardware test, installation, notarization, push, release, or publication was
+  performed.
 
 ## Runtime Alpine pin and cache migration (P0.1, 2026-08-05)
 

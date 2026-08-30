@@ -112,3 +112,20 @@ candidate and produced both Standard and Legacy apps/DMGs; 307/307 Swift tests p
 variant, both app signatures and both DMG checksums verified. The available BinaryBears Developer
 ID was used locally by that packaging run. No notarization, installation, push, or publication was
 performed.
+
+## Local security follow-up: gRPC 1.82.1 validated 2026-08-30
+
+The next isolated checkpoint accepts the direct upstream descendant
+`0a4472bd7507c1f9a57894547c1af7ea4382d99f`. Its single commit changes only
+`init-rootfs/go.mod` and `init-rootfs/go.sum`, updating gRPC `1.81.1` to `1.82.1`; it does not
+change anylinuxfs/vmproxy package versions, implementation source, Alpine inputs, download
+contracts, or other top-level pins. The read-only source/patch audit passed before the gitlink was
+moved, and `28d308bb9ed15611118fa51d998b988b3ee62459` remains the rollback target.
+
+`govulncheck 1.7.0` decreases from six reachable findings to five and no longer reports the gRPC
+advisory. The remaining Go standard-library and transitive OpenPGP findings are not folded into
+this checkpoint. The exact candidate passed `init-rootfs` Go tests, the complete runtime build and
+58 Cargo tests, 355/355 Bats tests, 307/307 Swift tests in each app variant, Developer ID and DMG
+checksum verification, and a read-only mounted-DMG signature/version check for both outputs.
+Native VM startup still stops before the guest with `EINVAL`; no drive was touched. No
+installation, notarization, push, release, or publication was performed.

@@ -128,15 +128,45 @@ release commit `28d308bb9ed15611118fa51d998b988b3ee62459`. `ANYLINUXFS_VERSION` 
 Native VM startup again returned `EINVAL` before guest setup. No disk was mounted or accessed.
 No notarization, installation, push, or publication was performed.
 
+## Checkpoint D — init-rootfs gRPC 1.82.1
+
+Status: local source/build validation complete; hardware acceptance outstanding.
+
+The anylinuxfs submodule moved one upstream commit from the accepted v0.19.0 release commit
+`28d308bb9ed15611118fa51d998b988b3ee62459` to
+`0a4472bd7507c1f9a57894547c1af7ea4382d99f`. The exact delta changes only
+`init-rootfs/go.mod` and `init-rootfs/go.sum`, updating `google.golang.org/grpc` from `1.81.1`
+to `1.82.1`. `ANYLINUXFS_VERSION`, `VMPROXY_VERSION`, libkrun, Alpine, and every other top-level
+pin are unchanged.
+
+- read-only update audit: PASS; one commit, two dependency files, no implementation-source,
+  Alpine-list, download-contract, mount/NFS/vmnet-path, or local-patch change;
+- focused policy/lock/submodule gate: PASS, 12/12; build preflight: PASS;
+- `go test ./...` for `init-rootfs`: PASS;
+- complete runtime build: PASS; Cargo tests: PASS, 58/58;
+- advisory comparison with `govulncheck 1.7.0` on Go 1.26.5: six reachable findings before,
+  five after; gRPC `GO-2026-6061` is no longer reported. Four standard-library findings fixed in
+  Go 1.26.6 and one transitive OpenPGP finding without a published fix remain;
+- complete Bats gate: PASS, 355/355;
+- `build.command gui`: PASS on the exact candidate; Standard Swift 307/307 and Legacy Swift
+  307/307, both apps/DMGs built, both sidecar checksums verified, and local Developer ID
+  signatures verified;
+- mounted-artifact gate: PASS for both DMGs attached read-only; each mounted app reports version
+  3.1.1 and passes deep/strict designated-requirement verification.
+
+The native libkrun VM still returns `start vm error: Invalid argument (errno 22)` before guest
+execution. No disk was mounted or accessed. No installation, notarization, push, release, or
+publication was performed.
+
 ## Validation categories
 
-- Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B and C passed 355/355.
-  Checkpoint C also passed 307/307 in each Swift variant and mounted-DMG verification for both
-  outputs. `PopoverStateRenderTests` compiled but remained skipped by the documented macOS 26.6.2
-  guard.
+- Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed
+  355/355. Checkpoints C and D also passed 307/307 in each Swift variant and mounted-DMG
+  verification for both outputs. `PopoverStateRenderTests` compiled but remained skipped by the
+  documented macOS 26.6.2 guard.
 - Hardware: no real-drive test; local VM guest setup blocked as documented above.
-- Signing: standalone runtime gates used ad-hoc signatures; checkpoint C packaging also verified
-  the locally available BinaryBears Developer ID on both app variants. Required hypervisor
-  entitlements passed.
+- Signing: standalone runtime gates used ad-hoc signatures; checkpoint C and D packaging also
+  verified the locally available BinaryBears Developer ID on both app variants. Required
+  hypervisor entitlements passed.
 - Notarization: not run.
 - Remote/public state: untouched; no push or release.

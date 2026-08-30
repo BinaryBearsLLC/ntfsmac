@@ -69,12 +69,12 @@ setup() {
   done
 }
 
-@test "policy preserves the v0.19.0 dry-run record and production pin matches the accepted tag" {
+@test "policy preserves the v0.19.0 dry-run record and production pin matches the audited commit" {
   run grep -F "28d308bb9ed15611118fa51d998b988b3ee62459" "$POLICY"
   [ "$status" -eq 0 ]
   run grep -F "deferred, not rejected" "$POLICY"
   [ "$status" -eq 0 ]
   run "$REPO_ROOT/build/lib/lock.sh" get ANYLINUXFS_COMMIT
   [ "$status" -eq 0 ]
-  [ "$output" = "28d308bb9ed15611118fa51d998b988b3ee62459" ]
+  [ "$output" = "0a4472bd7507c1f9a57894547c1af7ea4382d99f" ]
 }
