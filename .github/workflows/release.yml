@@ -127,9 +127,13 @@ jobs:
         with:
           go-version: ${{ steps.go-toolchain.outputs.version }}
 
+      - name: Resolve locked Rust toolchain
+        id: rust-toolchain
+        run: echo "version=$(./build/lib/lock.sh get RUST_TOOLCHAIN_VERSION)" >> "$GITHUB_OUTPUT"
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: ${{ steps.rust-toolchain.outputs.version }}
           targets: aarch64-unknown-linux-musl
 
       - name: Run release source gates

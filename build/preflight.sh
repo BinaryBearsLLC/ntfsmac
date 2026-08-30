@@ -9,6 +9,8 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 source "$SCRIPT_DIR/lib/lock.sh"
 # shellcheck source=lib/go-toolchain.sh
 source "$SCRIPT_DIR/lib/go-toolchain.sh"
+# shellcheck source=lib/rust-toolchain.sh
+source "$SCRIPT_DIR/lib/rust-toolchain.sh"
 
 FAIL=0
 
@@ -56,11 +58,45 @@ check_go_toolchain() {
   printf '%-20s %-10s %s\n' "go" "OK" "$version_output (locked)"
 }
 
+check_rust_toolchain() {
+  local expected rustc_output cargo_output actual
+  expected="$(rust_locked_toolchain_version)" || {
+    printf '%-20s %-10s %s\n' "rust" "FAIL" "invalid or missing RUST_TOOLCHAIN_VERSION"
+    FAIL=1
+    return
+  }
+  if ! rustc_output="$(rust_with_locked_toolchain rustc --version 2>&1)"; then
+    printf '%-20s %-10s %s\n' "rustc" "FAIL" "$rustc_output"
+    FAIL=1
+    return
+  fi
+  actual="$(awk '{print $2}' <<< "$rustc_output")"
+  if [[ "$actual" != "$expected" ]]; then
+    printf '%-20s %-10s %s\n' "rustc" "FAIL" "expected $expected, selected $actual"
+    FAIL=1
+    return
+  fi
+  if ! cargo_output="$(rust_with_locked_toolchain cargo --version 2>&1)"; then
+    printf '%-20s %-10s %s\n' "cargo" "FAIL" "$cargo_output"
+    FAIL=1
+    return
+  fi
+  printf '%-20s %-10s %s\n' "rustc" "OK" "$rustc_output (locked)"
+  printf '%-20s %-10s %s\n' "cargo" "OK" "$cargo_output (Rust $expected)"
+
+  if ! rustup target list --installed --toolchain "$expected" 2>/dev/null |
+      grep -qx 'aarch64-unknown-linux-musl'; then
+    printf '%-20s %-10s %s\n' "rust target" "FAIL" "aarch64-unknown-linux-musl missing for Rust $expected"
+    FAIL=1
+    return
+  fi
+  printf '%-20s %-10s %s\n' "rust target" "OK" "aarch64-unknown-linux-musl (Rust $expected)"
+}
+
 echo "=== ntfsmac build preflight ==="
 check_arch
 check_tool "git" git
-check_tool "cargo" cargo
-check_tool "rustc" rustc
+check_rust_toolchain
 check_go_toolchain
 check_tool "umoci" umoci
 check_tool "lld" ld.lld

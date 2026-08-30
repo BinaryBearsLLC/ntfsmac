@@ -30,6 +30,8 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 source "$SCRIPT_DIR/lib/lock.sh"
 # shellcheck source=lib/go-toolchain.sh
 source "$SCRIPT_DIR/lib/go-toolchain.sh"
+# shellcheck source=lib/rust-toolchain.sh
+source "$SCRIPT_DIR/lib/rust-toolchain.sh"
 # shellcheck source=../cli/lib/runtime-alpine.sh
 source "$REPO_ROOT/cli/lib/runtime-alpine.sh"
 # shellcheck source=lib/patch-runtime-alpine.sh
@@ -326,6 +328,7 @@ run_init_rootfs() {
 
 main() {
   local tag digest rootfs
+  rust_activate_locked_toolchain || exit 1
   runtime_alpine_load || exit 1
   tag="$ALPINE_RUNTIME_TAG"
   digest="$ALPINE_RUNTIME_DIGEST"

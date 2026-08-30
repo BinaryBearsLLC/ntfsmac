@@ -35,9 +35,13 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ steps.go-toolchain.outputs.version }}
+      - name: Resolve locked Rust toolchain
+        id: rust-toolchain
+        run: echo "version=$(./build/lib/lock.sh get RUST_TOOLCHAIN_VERSION)" >> "$GITHUB_OUTPUT"
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: ${{ steps.rust-toolchain.outputs.version }}
           targets: aarch64-unknown-linux-musl
       - name: bats
         run: tests/run-all.sh
@@ -49,8 +53,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: Resolve locked Rust toolchain
+        id: rust-toolchain
+        run: echo "version=$(./build/lib/lock.sh get RUST_TOOLCHAIN_VERSION)" >> "$GITHUB_OUTPUT"
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ steps.rust-toolchain.outputs.version }}
       - name: Install build dependencies
         run: |
           brew install llvm lld xz util-linux gettext pkg-config

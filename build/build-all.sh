@@ -18,6 +18,8 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 # shellcheck source=lib/lock.sh
 source "$SCRIPT_DIR/lib/lock.sh"
+# shellcheck source=lib/rust-toolchain.sh
+source "$SCRIPT_DIR/lib/rust-toolchain.sh"
 # shellcheck source=../cli/lib/runtime-alpine.sh
 source "$REPO_ROOT/cli/lib/runtime-alpine.sh"
 # shellcheck source=lib/patch-runtime-alpine.sh
@@ -403,6 +405,7 @@ run_tests() {
 }
 
 main() {
+  rust_activate_locked_toolchain || exit 1
   echo "build-all: orchestrating fetch-prebuilt, build-gvproxy, init-rootfs first"
   "$REPO_ROOT/build/fetch-prebuilt.sh" || { echo "build-all: HARD-STOP — fetch-prebuilt.sh failed" >&2; exit 1; }
   "$REPO_ROOT/build/build-gvproxy.sh" || { echo "build-all: HARD-STOP — build-gvproxy.sh failed" >&2; exit 1; }

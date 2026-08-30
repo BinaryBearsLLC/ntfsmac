@@ -334,13 +334,51 @@ Validation:
 The native libkrun VM again stopped with `EINVAL` before guest execution. No live NFS/vmnet path,
 real drive, installation, notarization, push, release, or publication was exercised.
 
+## Checkpoint K — Rust toolchain 1.98.0
+
+Status: local source/build/package validation complete; GitHub Action implementation pin remains
+the next isolated checkpoint.
+
+The build previously inherited the developer's rustup `stable` toolchain (Rust 1.96.0 at the
+baseline) and CI/release also selected floating `stable`. It now locks
+`RUST_TOOLCHAIN_VERSION=1.98.0`, the official stable release dated 2026-08-20. A shared helper
+selects that exact version through `RUSTUP_TOOLCHAIN` without changing the user's default;
+preflight requires both rustc/cargo and `aarch64-unknown-linux-musl` for the locked toolchain.
+The interactive builder offers to install only that version and target. CI/release read the same
+lock and pass it explicitly to the existing Rust setup action. The action reference itself is
+deliberately unchanged here.
+
+Validation:
+
+- official manifest SHA-256:
+  `3f7d139b73bbbd0004ef6e58b430831c68cdad2b1f64ee2eb35d54c09199489a`;
+- focused lock/helper/preflight/build-wiring gate: PASS, 11/11;
+- direct upstream host tests on the unchanged source tree: PASS, 57/57 (common-utils 8,
+  anylinuxfs 41, vmproxy 8);
+- real project build: PASS with rustc 1.98.0 / Cargo 1.98.0, including host anylinuxfs,
+  Linux/aarch64-musl vmproxy, vmrunner-sys through its required cross-wrapper layout, and the
+  patched runtime test suite 58/58;
+- complete Bats gate: PASS, 367/367;
+- `build.command gui`: PASS; Standard Swift 307/307 and Legacy Swift 307/307 with only expected
+  SMJob deprecation warnings, both apps/DMGs/checksum sidecars verified;
+- mounted-artifact gate: PASS for both DMGs attached read-only; app version 3.1.1, deep/strict
+  designated-requirement verification, local BinaryBears Developer ID, and Hardened Runtime.
+
+A direct `cargo build` from the raw `vmrunner-sys` submodule directory was rejected because that
+directory lacks the sibling Linux cross-wrapper layout expected by `krun-init-blob`. The actual
+project build creates the documented layout and passed; this was a harness error, not a candidate
+regression.
+
+The native libkrun VM still returns `EINVAL` before guest execution. No drive was accessed or
+mounted. No installation, notarization, push, release, or publication was performed.
+
 ## Validation categories
 
 - Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed
   355/355; checkpoints E and H passed 360/360; checkpoint J passed 362/362. Checkpoints C through
-  E, H, and J also passed 307/307 in each Swift variant and mounted-DMG verification for both
-  outputs. `PopoverStateRenderTests` compiled but remained skipped by the documented macOS 26.6.2
-  guard.
+  E, H, J, and K also passed 307/307 in each Swift variant and mounted-DMG verification for both
+  outputs. Checkpoint K passed 367/367 Bats. `PopoverStateRenderTests` compiled but remained
+  skipped by the documented macOS 26.6.2 guard.
 - Hardware: no real-drive test; local VM guest setup blocked as documented above.
 - Signing: standalone runtime gates used ad-hoc signatures; checkpoints C through E, H, and J
   packaging also verified the locally available BinaryBears Developer ID on both app variants.

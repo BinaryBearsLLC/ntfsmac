@@ -6,6 +6,10 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+# shellcheck source=build/lib/lock.sh
+source "$REPO_ROOT/build/lib/lock.sh"
+# shellcheck source=build/lib/rust-toolchain.sh
+source "$REPO_ROOT/build/lib/rust-toolchain.sh"
 DIST_DIR="$REPO_ROOT/dist"
 BINARYBEARS_SIGNING_IDENTITY="Developer ID Application: BinaryBears LLC (SQY8T23X8N)"
 INTERACTIVE=0
@@ -344,6 +348,8 @@ install_rustup() {
 }
 
 ensure_rust_toolchain() {
+  local expected
+  expected="$(rust_locked_toolchain_version)" || fail "The Rust toolchain pin is invalid."
   load_cargo_path
   if ! command -v cargo >/dev/null 2>&1 || ! command -v rustc >/dev/null 2>&1 || ! command -v rustup >/dev/null 2>&1; then
     warn "The rustup-managed Rust toolchain was not found."
@@ -357,20 +363,32 @@ ensure_rust_toolchain() {
 
   command -v cargo >/dev/null 2>&1 || fail "cargo is still missing after Rust setup."
   command -v rustc >/dev/null 2>&1 || fail "rustc is still missing after Rust setup."
-  command -v rustup >/dev/null 2>&1 || fail "rustup is required to manage the Linux ARM64 target."
+  command -v rustup >/dev/null 2>&1 || fail "rustup is required to manage the locked Rust toolchain."
 
-  if ! rustup target list --installed | grep -qx 'aarch64-unknown-linux-musl'; then
-    warn "Rust target aarch64-unknown-linux-musl is missing."
-    if confirm "Install the required Rust target automatically?"; then
-      rustup target add aarch64-unknown-linux-musl || fail "The Rust Linux ARM64 target could not be installed."
+  if ! rustup run "$expected" rustc --version >/dev/null 2>&1; then
+    warn "Locked Rust $expected is not installed."
+    if confirm "Install the locked Rust $expected toolchain automatically?"; then
+      rustup toolchain install "$expected" --profile minimal --no-self-update || \
+        fail "Rust $expected could not be installed."
+    else
+      fail "Rust $expected is required to continue."
+    fi
+  fi
+
+  if ! rustup target list --installed --toolchain "$expected" | grep -qx 'aarch64-unknown-linux-musl'; then
+    warn "Rust target aarch64-unknown-linux-musl is missing for Rust $expected."
+    if confirm "Install the required Rust target for Rust $expected automatically?"; then
+      rustup target add --toolchain "$expected" aarch64-unknown-linux-musl || \
+        fail "The Rust Linux ARM64 target could not be installed for Rust $expected."
     else
       fail "The Rust Linux ARM64 target is required to build vmproxy."
     fi
   fi
 
-  ok "Rust: $(rustc --version)"
+  rust_activate_locked_toolchain || fail "Rust $expected could not be selected."
+  ok "Rust: $(rustc --version) (locked)"
   ok "Cargo: $(cargo --version)"
-  ok "Rust target: aarch64-unknown-linux-musl"
+  ok "Rust target: aarch64-unknown-linux-musl (Rust $expected)"
 }
 
 prepare_toolchain() {

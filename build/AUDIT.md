@@ -584,3 +584,25 @@ v0.55.0, a clean binary vulnerability scan, Developer ID signature, and Hardened
 
 Native VM startup still fails before guest execution with `EINVAL`; no drive, notarization, or
 remote action was performed.
+
+## Rust 1.98.0 exact toolchain contract (dependency refresh, 2026-08-30)
+
+Rust was previously an implicit build input: local builds used whichever rustup `stable` happened
+to select, and CI/release also requested `stable`. `build/sources.lock` now records exact
+`RUST_TOOLCHAIN_VERSION=1.98.0`. `build/lib/rust-toolchain.sh` validates the patch-version shape,
+selects it with rustup without changing the user's default, and fails closed when unavailable.
+Both Rust-bearing build entrypoints activate it before Cargo runs; preflight additionally requires
+the Linux/aarch64-musl target for that exact toolchain. The interactive builder and both workflows
+resolve the same lock instead of independently choosing a compiler.
+
+The official 2026-08-20 stable channel manifest identifies rustc 1.98.0 and matched SHA-256
+`3f7d139b73bbbd0004ef6e58b430831c68cdad2b1f64ee2eb35d54c09199489a` when reviewed. The
+GitHub Action reference remains a separate supply-chain component and is intentionally unchanged
+in this checkpoint.
+
+Local evidence: exact-toolchain preflight passed; the unchanged upstream tree passed 57 host Rust
+tests; the real project build passed host and Linux/aarch64 cross-compilation plus 58 patched-tree
+tests; the full Bats suite passed 367/367. Both Standard and Legacy GUI builds passed 307/307 Swift
+tests, produced checksum-valid DMGs, and passed read-only mounted-app Developer ID/Hardened Runtime
+verification. The native VM still exits with the existing pre-guest `EINVAL`, so no hardware,
+guest, or real-drive result is claimed.
