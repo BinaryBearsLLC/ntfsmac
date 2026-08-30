@@ -124,6 +124,49 @@ check_anylinuxfs_runs() {
   return 0
 }
 
+check_vmnet_helper_runs() {
+  local expected_version expected_commit out help flag
+  expected_version="$(lock_get VMNET_HELPER_VERSION)" || {
+    fail "VMNET_HELPER_VERSION missing from sources.lock"
+    return 1
+  }
+  expected_commit="$(lock_get VMNET_HELPER_COMMIT)" || {
+    fail "VMNET_HELPER_COMMIT missing from sources.lock"
+    return 1
+  }
+  if xattr -p com.apple.quarantine "$BIN_DIR/vmnet-helper" >/dev/null 2>&1; then
+    fail "$BIN_DIR/vmnet-helper carries com.apple.quarantine, refusing to execute it"
+    return 1
+  fi
+  if ! out="$("$BIN_DIR/vmnet-helper" --version 2>&1)"; then
+    fail "vmnet-helper --version failed: $out"
+    return 1
+  fi
+  if [[ "$out" != *"version: $expected_version"* ]]; then
+    fail "vmnet-helper version does not match sources.lock — expected $expected_version, got: $out"
+    return 1
+  fi
+  if [[ "$out" != *"commit: $expected_commit"* ]]; then
+    fail "vmnet-helper commit does not match sources.lock — expected $expected_commit, got: $out"
+    return 1
+  fi
+  if ! help="$("$BIN_DIR/vmnet-helper" --help 2>&1)"; then
+    fail "vmnet-helper --help failed: $help"
+    return 1
+  fi
+  # Keep this in sync with anylinuxfs/src/vm_network/darwin.rs. A helper release that drops one
+  # of these options is not compatible even if its version, commit, and asset hash are valid.
+  for flag in --socket --operation-mode --start-address --end-address --subnet-mask \
+              --enable-tso --enable-checksum-offload; do
+    if [[ "$help" != *"$flag"* ]]; then
+      fail "vmnet-helper is missing the anylinuxfs-required CLI option $flag"
+      return 1
+    fi
+  done
+  echo "verify-vendor: vmnet-helper runs — $expected_version ($expected_commit)"
+  return 0
+}
+
 main() {
   local failed=0
   check_binaries_present || failed=1
@@ -134,6 +177,7 @@ main() {
   check_kernel_pin_match || failed=1
   NTFSMAC_VENDOR_BIN_DIR="$BIN_DIR" "$SCRIPT_DIR/verify-runtime-alpine.sh" || failed=1
   check_anylinuxfs_runs || failed=1
+  check_vmnet_helper_runs || failed=1
 
   if [[ $failed -ne 0 ]]; then
     echo "verify-vendor: one or more checks failed, see above" >&2

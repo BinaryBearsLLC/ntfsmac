@@ -226,15 +226,56 @@ a separate dependency decision.
 No VM boot, drive access, notarization, push, release, or publication was performed for this
 no-change checkpoint.
 
+## Checkpoint H — vmnet-helper v0.13.0
+
+Status: local source/build/package validation complete; live networking and hardware acceptance
+outstanding.
+
+The vendored prebuilt moved from v0.12.0 (`0caef043005c7d9f03422a9914bc9d3d4637dc84`)
+to the official v0.13.0 release (`222c121ba31e49856c9ec6c3a14426b49d77c8fe`). The
+release asset is byte-pinned as
+`dd4355c053c0f04357285ee50169bfce7d04de3f0f49c0356487b099175ab120`.
+No anylinuxfs, gvproxy, libkrun, libkrunfw, Alpine, or guest-package pin changed in this
+checkpoint.
+
+The upstream asset is a universal x86_64/arm64 Mach-O. Contrary to the previous project-table
+description, it is ad-hoc signed rather than Apple-signed; the signature is valid and includes
+`com.apple.security.virtualization`. The project table now records the actual supply chain:
+upstream ad-hoc signature at fetch time, followed by ntfsmac's existing local re-sign step during
+packaging. The local lock additionally records the source commit reported by the binary, and
+`verify-vendor.sh` now fails closed if the fetched binary's version, commit, or any anylinuxfs-used
+CLI option drifts.
+
+Validation:
+
+- fresh official-asset download and locked SHA-256: PASS;
+- embedded `--version` / source commit, universal architecture, valid upstream ad-hoc signature,
+  and virtualization entitlement: PASS;
+- compatibility of `--socket`, operation mode, subnet, TSO, and checksum-offload arguments used
+  by anylinuxfs: PASS;
+- focused lock/fetch Bats gate: PASS, 11/11; preflight and ShellCheck/Bash syntax: PASS;
+- vendored-runtime verifier: PASS; anylinuxfs Cargo tests: PASS, 41/41;
+- complete Bats gate: PASS, 360/360;
+- `build.command gui`: PASS; the complete Rust suite passed 58/58, Standard Swift passed 307/307,
+  Legacy Swift passed 307/307 with only the expected SMJob deprecation warnings, and both apps,
+  DMGs, and checksum sidecars were produced and verified;
+- mounted-artifact gate: PASS for both read-only DMGs; each embedded helper reports v0.13.0 and
+  the locked commit, passes deep app signature verification, carries BinaryBears Developer ID plus
+  Hardened Runtime, and retains the virtualization entitlement.
+
+The native libkrun VM still returns `start vm error: Invalid argument (errno 22)` before guest
+execution. Therefore no live vmnet traffic, NFS transport, VM guest, or real drive was exercised.
+No installation, notarization, push, release, or publication was performed.
+
 ## Validation categories
 
 - Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed
-  355/355; checkpoint E passed 360/360. Checkpoints C through E also passed 307/307 in each Swift
-  variant and mounted-DMG verification for both outputs. `PopoverStateRenderTests` compiled but
-  remained skipped by the documented macOS 26.6.2 guard.
+  355/355; checkpoints E and H passed 360/360. Checkpoints C through E and H also passed 307/307
+  in each Swift variant and mounted-DMG verification for both outputs. `PopoverStateRenderTests`
+  compiled but remained skipped by the documented macOS 26.6.2 guard.
 - Hardware: no real-drive test; local VM guest setup blocked as documented above.
-- Signing: standalone runtime gates used ad-hoc signatures; checkpoint C through E packaging also
-  verified the locally available BinaryBears Developer ID on both app variants. Required
-  hypervisor entitlements passed.
+- Signing: standalone runtime gates used ad-hoc signatures; checkpoints C through E and H
+  packaging also verified the locally available BinaryBears Developer ID on both app variants.
+  Required hypervisor/virtualization entitlements passed.
 - Notarization: not run.
 - Remote/public state: untouched; no push or release.

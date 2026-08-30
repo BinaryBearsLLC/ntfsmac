@@ -33,10 +33,12 @@ LIBKRUNFW_IMAGES_SHA256=1de75a3d4ef2eccd41df10f2eac8435dbaba52371fa42b0b0384fd9c
 LIBKRUNFW_MODULES_ASSET=modules.squashfs
 LIBKRUNFW_MODULES_SHA256=86ed485e4e46ba265261a55e25c92ea15f6118003fcec95a8bafde8ad39f697f
 
-# vmnet-helper (Apple-signed, vendored prebuilt) — https://github.com/nirs/vmnet-helper
-VMNET_HELPER_VERSION=v0.12.0
+# vmnet-helper (upstream ad-hoc-signed universal prebuilt; re-signed by ntfsmac packaging)
+# https://github.com/nirs/vmnet-helper/releases/tag/v0.13.0
+VMNET_HELPER_VERSION=v0.13.0
+VMNET_HELPER_COMMIT=222c121ba31e49856c9ec6c3a14426b49d77c8fe
 VMNET_HELPER_ASSET=vmnet-helper.tar.gz
-VMNET_HELPER_SHA256=0f123c29565e36278aca57e13917d3a7db098e8c1552389f9332331c9dfc6381
+VMNET_HELPER_SHA256=dd4355c053c0f04357285ee50169bfce7d04de3f0f49c0356487b099175ab120
 
 # gvproxy — built from source per PLAN.md §V (anylinuxfs itself uses a prebuilt "gvproxy-darwin"
 # binary via download-dependencies.sh; ntfsmac builds from source instead — locked decision,

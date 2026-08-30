@@ -18,6 +18,7 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"kernel pin OK"* ]]
   [[ "$output" == *"anylinuxfs runs"* ]]
+  [[ "$output" == *"vmnet-helper runs"* ]]
   [[ "$output" == *"all checks passed"* ]]
 }
 

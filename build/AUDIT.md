@@ -515,3 +515,31 @@ base-plus-add-on manifest. `ntfs-3g --version` and `ntfsinfo --version` both rep
 and `scanelf` resolved the driver, probe, and inspector to `libntfs-3g.so.90`. No filesystem was
 mounted. The native libkrun path remains a separate hardware gate because it still fails before
 guest setup with `start vm error: Invalid argument (errno 22)`.
+
+## vmnet-helper v0.13.0 dependency update (2026-08-30)
+
+The official `nirs/vmnet-helper` release asset moved from v0.12.0 to v0.13.0. The exact consumed
+asset is locked by version, embedded source commit, and SHA-256 in `build/sources.lock`:
+
+- version: `v0.13.0`;
+- commit: `222c121ba31e49856c9ec6c3a14426b49d77c8fe`;
+- `vmnet-helper.tar.gz` SHA-256:
+  `dd4355c053c0f04357285ee50169bfce7d04de3f0f49c0356487b099175ab120`.
+
+A fresh fetch matched the asset hash and produced a universal x86_64/arm64 binary whose own
+`--version` output matches both locked identifiers. The upstream binary is validly **ad-hoc**
+signed, not Apple-signed as the older source table stated, and carries
+`com.apple.security.virtualization`. ntfsmac's existing package build then replaces that signature
+with the local BinaryBears Developer ID, Hardened Runtime, and the same required entitlement.
+
+The v0.13.0 CLI still accepts every argument passed by anylinuxfs's Darwin network backend:
+`--socket`, `--operation-mode`, `--start-address`, `--end-address`, `--subnet-mask`,
+`--enable-tso`, and `--enable-checksum-offload`. `build/verify-vendor.sh` now enforces the locked
+version and commit plus that interface contract so a valid but incompatible future asset cannot
+pass integration silently.
+
+Local validation passed 41/41 anylinuxfs tests, 360/360 Bats tests, 58/58 Cargo tests in the full
+build, and 307/307 Swift tests in each Standard and Legacy variant. Both read-only-mounted DMGs
+contained the locked helper with a valid Developer ID signature and virtualization entitlement.
+No live VM/network/drive gate passed: libkrun still exits with `EINVAL` before guest setup. No
+notarization or remote action was performed.
