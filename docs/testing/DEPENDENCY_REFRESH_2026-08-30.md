@@ -62,6 +62,41 @@ setup. The exact installation command and resulting installed package database a
 claimed as hardware-validated yet. The build reports this explicitly instead of treating it as an
 installed-package pass.
 
+## Checkpoint B — ntfs-3g 2026.7.7-r0 security update
+
+Status: implementation and local source gates complete.
+
+Only `ntfs-3g`, `ntfs-3g-libs`, and `ntfs-3g-progs` changed, from `2026.2.25-r0` to
+`2026.7.7-r0`. Stable Alpine v3.23/v3.24 did not yet carry the patched build, so the three APKs
+are byte-pinned to `edge/main`; runtime validation rejects edge for every other package and the
+guest never enables an edge repository.
+
+Provenance and compatibility evidence:
+
+- Tuxera source SHA-256:
+  `d67b769025d32860549d35c2147e45024d172f81c540d750390ce3602c059dab`;
+- Alpine aports commit: `905147fb282a60cd622b45c7421db8a116cf80ab`;
+- all three APKs are aarch64, share the same origin/build commit, contain an Alpine RSA signature
+  envelope, and match their recorded SHA-256;
+- driver and utilities now require `libntfs-3g.so.90`; the libraries package provides SONAME 90;
+- `ntfs-3g.probe` and `ntfsinfo` remain packaged.
+
+Validation:
+
+- focused Alpine/APK/diagnostic Bats gate: PASS, 46/46;
+- rootfs/runtime Bats gate: PASS, 26/26;
+- complete Bats gate: PASS, 355/355;
+- focused modern and Legacy `DiagnoseRunnerTests`: PASS, 21/21 each; Legacy emitted only the
+  expected SMJobBless deprecation warnings;
+- real arm64 container, Alpine OCI digest pin, `--network none`, APK cache read-only:
+  `apk --no-network` PASS, exact 70-package database PASS, `ntfs-3g --version` = 2026.7.7,
+  `ntfsinfo --version` = 2026.7.7, SONAME/link resolution PASS;
+- no volume was mounted and no real disk was accessed.
+
+Native hardware gate: the project's libkrun VM still fails before guest setup with
+`start vm error: Invalid argument (errno 22)`. Therefore the Docker-isolated guest execution is a
+local compatibility pass, not a claim that the packaged native VM or a real NTFS drive passed.
+
 ## Validation categories
 
 - Local source/build/tests: checkpoint A passed 350/350 Bats plus 307/307 in each Swift variant.

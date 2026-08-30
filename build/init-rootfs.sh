@@ -103,7 +103,13 @@ verify_apk_lock() {
       return 1
     fi
     case "$channel" in
-      "v${ALPINE_RUNTIME_TAG%.*}/main"|"v${ALPINE_RUNTIME_TAG%.*}/community"|edge/main|edge/community) ;;
+      "v${ALPINE_RUNTIME_TAG%.*}/main"|"v${ALPINE_RUNTIME_TAG%.*}/community") ;;
+      edge/main|edge/community)
+        if [[ ! "$constraint" =~ ^ntfs-3g(-libs|-progs)?=2026\.7\.7-r0$ ]]; then
+          echo "init-rootfs: HARD-STOP — Alpine edge is approved only for the ntfs-3g 2026.7.7-r0 security family" >&2
+          return 1
+        fi
+        ;;
       *)
         echo "init-rootfs: HARD-STOP — Alpine APK artifact lock contains an unapproved channel: $channel" >&2
         return 1

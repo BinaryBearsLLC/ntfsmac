@@ -353,3 +353,34 @@ explicit hardware gate rather than a claimed pass.
 The lock is byte-identifying and fail-closed, but the APKs are not vendored: a future CDN removal
 will stop the build rather than float to another artifact. Long-term offline availability would
 require publishing an approved internal artifact mirror, which is outside this local-only task.
+
+## ntfs-3g 2026.7.7 security update (2026-08-30)
+
+Tuxera's 2026.7.7 security release fixes CVE-2026-42616, CVE-2026-42617,
+CVE-2026-42618, CVE-2026-46569, CVE-2026-46570, CVE-2026-46571,
+CVE-2026-46572, CVE-2026-56135, and CVE-2026-56136. The upstream source archive was downloaded
+from Tuxera and matched SHA-256
+`d67b769025d32860549d35c2147e45024d172f81c540d750390ce3602c059dab`; its SHA-512 also matched
+Alpine aports commit `905147fb282a60cd622b45c7421db8a116cf80ab`.
+
+Alpine v3.23 and v3.24 still published 2026.2.25-r0 during this update, while Alpine edge
+published the fixed `2026.7.7-r0` build. Enabling edge or mixing repository indexes globally was
+rejected. Only the three coherent ntfs-3g APKs use `edge/main`; `build/init-rootfs.sh` hard-stops
+if any other package attempts to use edge. Their locked SHA-256 values are:
+
+- `ntfs-3g`: `8dac8919f88a891495102c891057f3d674f3dee90b25d4a9ac0efa5573854598`;
+- `ntfs-3g-libs`: `ef2aa221c49233e7bb72ef65b3529eb3909c4b35946c6350329fb344284fa69b`;
+- `ntfs-3g-progs`: `4ef0c100465bbbd86e7e791dbeaadd216f622f07d2379f12ad5df14f44c60d41`.
+
+The family moves coherently from `libntfs-3g.so.89` to `libntfs-3g.so.90`: the driver and
+utilities require `.90`, and the libraries package provides SONAME `libntfs-3g.so.90`. The
+required `ntfs-3g.probe` and `ntfsinfo` tools remain present. No other package, OCI image,
+anylinuxfs source, kernel, networking helper, or build-tool dependency changed in this checkpoint.
+
+Local non-destructive container validation used the exact digest-pinned aarch64 Alpine base with
+networking disabled and mounted the locked APK cache read-only. `apk --no-network` installed all
+54 add-on APKs with signature checks active; the resulting database matched the exact 70-package
+base-plus-add-on manifest. `ntfs-3g --version` and `ntfsinfo --version` both reported 2026.7.7,
+and `scanelf` resolved the driver, probe, and inspector to `libntfs-3g.so.90`. No filesystem was
+mounted. The native libkrun path remains a separate hardware gate because it still fails before
+guest setup with `start vm error: Invalid argument (errno 22)`.

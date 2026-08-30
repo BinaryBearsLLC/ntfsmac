@@ -375,14 +375,14 @@ nas.example:/share on /Volumes/Share (nfs, nodev, nosuid)"
   printf '%s' "$ALPINE_BASE_PACKAGES_SHA256" > "$rootfs/etc/ntfsmac-alpine-base-packages.sha256"
   printf '%s' "$ALPINE_PACKAGES_SHA256" > "$rootfs/etc/ntfsmac-alpine-packages.sha256"
   printf '%s' "$ALPINE_APKS_SHA256" > "$rootfs/etc/ntfsmac-alpine-apks.sha256"
-  write_guest_versions "$rootfs" "3.23.5" "2026.2.25-r0" "2.6.4-r6"
+  write_guest_versions "$rootfs" "3.23.5" "2026.7.7-r0" "2.6.4-r6"
 
   run "$SCRIPT" --json
   [ "$status" -eq 0 ]
   [[ "$output" == *'"alpine_runtime_state":"initialized"'* ]]
   [[ "$output" == *'"alpine_installed_cache":"pinned"'* ]]
   [[ "$output" == *'"alpine_installed_version":"3.23.5"'* ]]
-  [[ "$output" == *'"ntfs_3g_version":"2026.2.25-r0"'* ]]
+  [[ "$output" == *'"ntfs_3g_version":"2026.7.7-r0"'* ]]
   [[ "$output" == *'"nfs_utils_version":"2.6.4-r6"'* ]]
 }
 

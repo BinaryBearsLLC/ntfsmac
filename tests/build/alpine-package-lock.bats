@@ -82,7 +82,31 @@ setup() {
 }
 
 @test "the current lock records one coherent ntfs-3g package family" {
-  run grep -E '^ntfs-3g(-libs|-progs)?=2026\.2\.25-r0$' "$PACKAGE_LOCK"
+  run grep -E '^ntfs-3g(-libs|-progs)?=2026\.7\.7-r0$' "$PACKAGE_LOCK"
   [ "$status" -eq 0 ]
   [ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq 3 ]
+}
+
+@test "only the ntfs-3g security family may use the edge channel" {
+  run awk '$2 ~ /^edge\// && $1 !~ /^ntfs-3g(-libs|-progs)?=2026\.7\.7-r0$/ { print; bad=1 } END { exit bad }' "$APK_LOCK"
+  [ "$status" -eq 0 ]
+  [ "$(awk '$2 == "edge/main" { count++ } END { print count + 0 }' "$APK_LOCK")" -eq 3 ]
+}
+
+@test "runtime validation rejects edge for a non-ntfs package" {
+  local fixture expected
+  fixture="$BATS_TEST_TMPDIR/unapproved-edge.lock"
+  sed 's/^bash=5\.3\.3-r1 v3\.23\/main /bash=5.3.3-r1 edge\/main /' "$APK_LOCK" > "$fixture"
+  expected="$(shasum -a 256 "$fixture" | awk '{print $1}')"
+
+  run env FIXTURE="$fixture" EXPECTED="$expected" bash -c '
+    source build/init-rootfs.sh
+    runtime_alpine_load
+    APK_LOCK="$FIXTURE"
+    ALPINE_APKS_SHA256="$EXPECTED"
+    verify_apk_lock
+  '
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"edge is approved only for the ntfs-3g"* ]]
 }
