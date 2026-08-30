@@ -11,7 +11,7 @@ jobs:
     name: shellcheck + bats
     runs-on: macos-26 # arm64 (Apple Silicon) runner — required, no Intel fallback (L7)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
       - name: Install shellcheck + bats-core
@@ -50,7 +50,7 @@ jobs:
     name: cargo test (vendored crates)
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
       - name: Resolve locked Rust toolchain
@@ -72,7 +72,7 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Test standard SMAppService distribution
         run: >-
           ./build/run-swift-tests.sh modern

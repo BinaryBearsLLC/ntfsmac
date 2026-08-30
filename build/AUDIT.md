@@ -619,3 +619,17 @@ in the preceding checkpoint.
 Local workflow parsing, 12 focused lock/toolchain tests, exact-toolchain preflight, and 8 unchanged
 common-utils tests passed. A hosted-runner result requires a remote workflow run and remains
 unverified because this task has not pushed or otherwise mutated GitHub.
+
+## actions/checkout v7.0.1 full-SHA update (dependency refresh, 2026-08-30)
+
+All five root-workflow checkout references now use immutable commit
+`3d3c42e5aac5ba805825da76410c181273ba90b1` (v7.0.1), recorded in
+`ACTIONS_CHECKOUT_COMMIT`. This replaces three floating v4 refs and one older pinned v4 ref; the
+Pages workflow already used the accepted commit. The reviewed manifest retains every input used
+by ntfsmac and moves the JavaScript runtime from Node 20 to Node 24. Upstream requires runner
+2.327.1 or newer for this runtime generation.
+
+All root YAML files parsed and 14 focused action/toolchain/lock tests passed. The GitHub-hosted
+runner and recursive submodule behavior remain a remote gate: no workflow was triggered. The
+checkout ref in the vendored anylinuxfs project's own workflow is inert for ntfsmac and was not
+altered inside the pinned upstream submodule.

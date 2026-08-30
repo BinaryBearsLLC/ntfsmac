@@ -397,6 +397,38 @@ for immutable pins.
 
 No hardware, signing, notarization, installation, release, or remote/public action was performed.
 
+## Checkpoint M — actions/checkout v7.0.1
+
+Status: local workflow/source validation complete; hosted GitHub runner execution is pending.
+
+Only the root-workflow checkout action changed. Three CI references formerly used floating `v4`,
+the release workflow used an older v4 commit, and Pages already used v7.0.1. All five now resolve
+to the current v7.0.1 full commit
+`3d3c42e5aac5ba805825da76410c181273ba90b1`, also recorded as
+`ACTIONS_CHECKOUT_COMMIT` and enforced by tests. Checkout inputs used by ntfsmac (`submodules`,
+`fetch-depth`, and `persist-credentials`) remain supported by the reviewed action manifest.
+
+The upgrade changes the action runtime from Node 20 to Node 24. Upstream declares runner 2.327.1
+as the minimum from checkout v5 onward; ntfsmac uses GitHub-hosted `macos-26` and
+`ubuntu-24.04`, but compatibility still requires a hosted run before it can be claimed. v7 also
+adds the upstream unsafe-fork checkout guard; these workflows do not use `pull_request_target` or
+`workflow_run`.
+
+- v7.0.1 action manifest SHA-256 reviewed locally:
+  `d59219cb79590abdb877deaa14e3b65a00c05318bf5a6f3b989b9162b5d08c35`;
+- all root workflow YAML files parse: PASS;
+- checkout/action/toolchain/lock Bats gate: PASS, 14/14;
+- all five root references are full SHA and equal the lock: PASS;
+- hosted checkout, recursive submodule fetch, and release-tag checkout: not run locally and not
+  claimed because no push/workflow dispatch was performed.
+
+The `actions/checkout@v4` text inside the pinned anylinuxfs submodule belongs to that upstream
+project's own CI and is never executed by ntfsmac's root workflows; changing it would require a
+separate upstream source commit, so it is not treated as an effective ntfsmac action pin.
+
+No runtime binary, package, hardware, signing, notarization, release, or remote/public state was
+changed.
+
 ## Validation categories
 
 - Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed
