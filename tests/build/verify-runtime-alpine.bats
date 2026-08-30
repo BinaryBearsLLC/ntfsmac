@@ -12,7 +12,11 @@ setup() {
 
   printf '#!/bin/bash\n# %s\n# %s\n# %s\n' \
     "$ALPINE_RUNTIME_REF" "$ALPINE_RUNTIME_BASE_DIR" "$ALPINE_RUNTIME_VERSION" > "$BIN_DIR/anylinuxfs"
-  printf '#!/bin/bash\n# %s\n' "$ALPINE_RUNTIME_REF" > "$BIN_DIR/init-rootfs"
+  printf '# %s\n# %s\n# %s\n' \
+    "$ALPINE_BASE_PACKAGES_SHA256" "$ALPINE_PACKAGES_SHA256" "$ALPINE_APKS_SHA256" >> "$BIN_DIR/anylinuxfs"
+  printf '#!/bin/bash\n# %s\n# %s\n# %s\n# %s\n' \
+    "$ALPINE_RUNTIME_REF" "$ALPINE_BASE_PACKAGES_SHA256" "$ALPINE_PACKAGES_SHA256" \
+    "$ALPINE_APKS_SHA256" > "$BIN_DIR/init-rootfs"
   chmod +x "$BIN_DIR/anylinuxfs" "$BIN_DIR/init-rootfs"
 }
 
@@ -39,6 +43,14 @@ teardown() {
   NTFSMAC_VENDOR_BIN_DIR="$BIN_DIR" run "$SCRIPT"
   [ "$status" -ne 0 ]
   [[ "$output" == *"does not contain the approved digest-only"* ]]
+}
+
+@test "rejects a binary missing the approved package lock" {
+  printf '#!/bin/bash\n# %s\n' "$ALPINE_RUNTIME_REF" > "$BIN_DIR/init-rootfs"
+  chmod +x "$BIN_DIR/init-rootfs"
+  NTFSMAC_VENDOR_BIN_DIR="$BIN_DIR" run "$SCRIPT"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"package lock hash"* ]]
 }
 
 @test "rejects floating bytes anywhere in the staged shipping tree" {

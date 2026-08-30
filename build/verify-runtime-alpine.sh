@@ -36,6 +36,18 @@ main() {
       fail "$bin does not contain the approved digest-only reference $ALPINE_RUNTIME_REF"
       failed=1
     fi
+    if ! binary_contains "$BIN_DIR/$bin" "$ALPINE_BASE_PACKAGES_SHA256"; then
+      fail "$bin does not contain the approved Alpine base package lock hash"
+      failed=1
+    fi
+    if ! binary_contains "$BIN_DIR/$bin" "$ALPINE_PACKAGES_SHA256"; then
+      fail "$bin does not contain the approved Alpine add-on package lock hash"
+      failed=1
+    fi
+    if ! binary_contains "$BIN_DIR/$bin" "$ALPINE_APKS_SHA256"; then
+      fail "$bin does not contain the approved Alpine APK artifact lock hash"
+      failed=1
+    fi
   done
 
   if [[ -x "$BIN_DIR/anylinuxfs" ]]; then
@@ -61,6 +73,7 @@ main() {
 
   [[ "$failed" -eq 0 ]] || exit 1
   echo "verify-runtime-alpine: approved Alpine $ALPINE_RUNTIME_TAG runtime $ALPINE_RUNTIME_REF"
+  echo "verify-runtime-alpine: approved package locks $ALPINE_BASE_PACKAGES_SHA256 / $ALPINE_PACKAGES_SHA256 / $ALPINE_APKS_SHA256"
   echo "verify-runtime-alpine: versioned cache $ALPINE_RUNTIME_BASE_DIR"
 }
 

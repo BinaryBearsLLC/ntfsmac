@@ -55,12 +55,16 @@ PYEOF
 
 patch_init_rootfs_runtime_alpine() {
   local init_rootfs_dir="$1"
-  python3 - "$init_rootfs_dir/main.go" "$ALPINE_RUNTIME_REF" <<'PYEOF'
+  local apk_lock="$2"
+  python3 - "$init_rootfs_dir/main.go" "$ALPINE_RUNTIME_REF" \
+    "$ALPINE_BASE_PACKAGES_SHA256" "$ALPINE_PACKAGES_SHA256" \
+    "$ALPINE_APKS_SHA256" "$apk_lock" <<'PYEOF'
 from pathlib import Path
 import sys
 
 path = Path(sys.argv[1])
-ref = sys.argv[2]
+ref, base_packages_sha, packages_sha, apks_sha, apk_lock_path = sys.argv[2:]
+apk_manifest = Path(apk_lock_path).read_text().rstrip("\n")
 text = path.read_text()
 
 markers = [
@@ -89,6 +93,76 @@ for old, new in markers:
     if text.count(old) != 1:
         raise SystemExit(f"init-rootfs: HARD-STOP — runtime pin patch marker drifted in {path}: {old[:80]!r}")
     text = text.replace(old, new, 1)
+
+custom_packages_marker = '''\t// Load custom packages from config
+\tcustomPackages := loadCustomPackages(cfg.UserStore)
+
+\t// Default packages
+\tdefaultPackages := getDefaultPackages()
+
+\t// Combine default and custom packages
+\tallPackages := append(defaultPackages, customPackages...)
+\tpackagesStr := strings.Join(allPackages, " ")
+'''
+locked_packages = '''\t// ntfsmac ships one reviewed package closure. Per-user additions would make the
+\t// guest mutable and bypass the package lock, so reject them before VM setup.
+\tcustomPackages := loadCustomPackages(cfg.UserStore)
+\tif len(customPackages) != 0 {
+\t\treturn fmt.Errorf("ntfsmac package lock does not allow custom Alpine packages")
+\t}
+
+\tdefaultPackages := getDefaultPackages()
+\tallPackages := defaultPackages
+\tpackagesStr := strings.Join(allPackages, " ")
+'''
+if text.count(custom_packages_marker) != 1:
+    raise SystemExit(f"init-rootfs: HARD-STOP — custom package patch marker drifted in {path}")
+text = text.replace(custom_packages_marker, locked_packages, 1)
+
+setup_marker = '''%s
+apk --update --no-cache add %s
+MOD_PATH="modules/$(uname -r)"
+'''
+locked_setup = '''%s
+# The second fmt placeholder is retained so upstream's package-count/reporting path stays intact.
+# ntfsmac locked package set: %s
+APK_DIR=/var/cache/ntfsmac-apks
+mkdir -p "$APK_DIR"
+while read -r APK_CONSTRAINT APK_CHANNEL APK_SHA256; do
+    APK_NAME="${APK_CONSTRAINT%%=*}"
+    APK_VERSION="${APK_CONSTRAINT#*=}"
+    APK_FILE="${APK_NAME}-${APK_VERSION}.apk"
+    APK_PATH="$APK_DIR/$APK_FILE"
+    APK_URL="https://dl-cdn.alpinelinux.org/alpine/$APK_CHANNEL/aarch64/$APK_FILE"
+    if ! wget -q -O "$APK_PATH.download" "$APK_URL"; then
+        echo "ntfsmac: locked Alpine APK download failed: $APK_FILE" >&2
+        exit 1
+    fi
+    if ! printf '%%s  %%s\\n' "$APK_SHA256" "$APK_PATH.download" | sha256sum -c -; then
+        echo "ntfsmac: locked Alpine APK checksum failed: $APK_FILE" >&2
+        exit 1
+    fi
+    mv -f "$APK_PATH.download" "$APK_PATH"
+done <<'NTFSMAC_APK_LOCK'
+__APK_MANIFEST__
+NTFSMAC_APK_LOCK
+if ! apk --no-network --no-cache add "$APK_DIR"/*.apk; then
+    echo "ntfsmac: locked Alpine package installation failed" >&2
+    exit 1
+fi
+echo "__BASE_PACKAGES_SHA__" > /etc/ntfsmac-alpine-base-packages.sha256
+echo "__PACKAGES_SHA__" > /etc/ntfsmac-alpine-packages.sha256
+echo "__APKS_SHA__" > /etc/ntfsmac-alpine-apks.sha256
+MOD_PATH="modules/$(uname -r)"
+'''
+locked_setup = (locked_setup
+    .replace("__APK_MANIFEST__", apk_manifest)
+    .replace("__BASE_PACKAGES_SHA__", base_packages_sha)
+    .replace("__PACKAGES_SHA__", packages_sha)
+    .replace("__APKS_SHA__", apks_sha))
+if text.count(setup_marker) != 1:
+    raise SystemExit(f"init-rootfs: HARD-STOP — package setup patch marker drifted in {path}")
+text = text.replace(setup_marker, locked_setup, 1)
 
 if "alpine:latest" in text:
     raise SystemExit(f"init-rootfs: HARD-STOP — floating Alpine reference remains in {path}")

@@ -12,10 +12,13 @@ runtime_alpine_load() {
     return 1
   fi
 
-  local tag digest commit digest_hex
+  local tag digest commit digest_hex base_packages_sha packages_sha apks_sha package_hash
   tag="$(lock_get ALPINE_TAG)" || return 1
   digest="$(lock_get ALPINE_DIGEST)" || return 1
   commit="$(lock_get ANYLINUXFS_COMMIT)" || return 1
+  base_packages_sha="$(lock_get ALPINE_BASE_PACKAGES_SHA256)" || return 1
+  packages_sha="$(lock_get ALPINE_PACKAGES_SHA256)" || return 1
+  apks_sha="$(lock_get ALPINE_APKS_SHA256)" || return 1
 
   case "$tag" in
     TODO-UNRESOLVED)
@@ -50,22 +53,30 @@ runtime_alpine_load() {
     echo "runtime-alpine: HARD-STOP — ANYLINUXFS_COMMIT must contain 40 lowercase hexadecimal characters" >&2
     return 1
   fi
+  for package_hash in "$base_packages_sha" "$packages_sha" "$apks_sha"; do
+    if [[ ${#package_hash} -ne 64 ]] || [[ "$package_hash" == *[!0-9a-f]* ]]; then
+      echo "runtime-alpine: HARD-STOP — Alpine runtime lock hashes must contain 64 lowercase hexadecimal characters" >&2
+      return 1
+    fi
+  done
 
-  # Revision 3 completes the guest package contract for opt-in NTFS3 read/write safety:
-  # `ntfs-3g.probe` checks hibernation/logfile eligibility and read-only `ntfsinfo` rejects the
-  # scheduled-check/dirty flag that the kernel NTFS3 driver enforces but ntfs-3g intentionally
-  # ignores. Keep this application-owned revision in both the directory and marker so an earlier,
-  # otherwise identical base image cannot silently reuse a rootfs missing either required tool.
-  ALPINE_RUNTIME_REVISION="3"
+  # Revision 4 makes the complete base and add-on package manifests part of the runtime contract.
+  # Exact package constraints replace the previous floating `apk add` resolution. Keep the lock
+  # hash in both the directory and marker so a package-only update cannot reuse an older rootfs.
+  ALPINE_RUNTIME_REVISION="4"
   ALPINE_RUNTIME_TAG="$tag"
   ALPINE_RUNTIME_DIGEST="$digest"
+  ALPINE_BASE_PACKAGES_SHA256="$base_packages_sha"
+  ALPINE_PACKAGES_SHA256="$packages_sha"
+  ALPINE_APKS_SHA256="$apks_sha"
   # containers/image rejects a Docker reference containing both tag and digest. The pull uses the
   # immutable digest-only reference; build/init-rootfs.sh separately proves that ALPINE_TAG's arm64
   # manifest resolves to this exact digest before either runtime binary is produced.
   ALPINE_RUNTIME_REF="docker.io/library/alpine@${digest}"
-  ALPINE_RUNTIME_BASE_DIR="alpine-${tag}-${digest_hex:0:12}-${commit:0:12}-r${ALPINE_RUNTIME_REVISION}"
-  ALPINE_RUNTIME_VERSION="ntfsmac-alpine-v${ALPINE_RUNTIME_REVISION}|tag=${tag}|digest=${digest}|anylinuxfs=${commit}"
+  ALPINE_RUNTIME_BASE_DIR="alpine-${tag}-${digest_hex:0:12}-${commit:0:12}-${packages_sha:0:12}-${apks_sha:0:12}-r${ALPINE_RUNTIME_REVISION}"
+  ALPINE_RUNTIME_VERSION="ntfsmac-alpine-v${ALPINE_RUNTIME_REVISION}|tag=${tag}|digest=${digest}|anylinuxfs=${commit}|base_packages=${base_packages_sha}|packages=${packages_sha}|apks=${apks_sha}"
   export ALPINE_RUNTIME_TAG ALPINE_RUNTIME_DIGEST ALPINE_RUNTIME_REF
+  export ALPINE_BASE_PACKAGES_SHA256 ALPINE_PACKAGES_SHA256 ALPINE_APKS_SHA256
   export ALPINE_RUNTIME_BASE_DIR ALPINE_RUNTIME_VERSION ALPINE_RUNTIME_REVISION
 }
 
@@ -76,7 +87,7 @@ runtime_alpine_cache_path() {
 
 # Prints one fixed, privacy-safe state token. It never prints paths or cache contents.
 runtime_alpine_cache_state() {
-  local runtime_home="$1" base marker fstab
+  local runtime_home="$1" base marker fstab base_packages_marker packages_marker apks_marker
   base="$(runtime_alpine_cache_path "$runtime_home")"
 
   if [[ ! -e "$base" && ! -L "$base" ]]; then
@@ -99,6 +110,17 @@ runtime_alpine_cache_state() {
   fi
   if [[ "$(tr -d '\r\n' < "$marker" 2>/dev/null)" != "$ALPINE_RUNTIME_VERSION" ]]; then
     printf 'mismatch\n'
+    return 0
+  fi
+
+  base_packages_marker="$base/rootfs/etc/ntfsmac-alpine-base-packages.sha256"
+  packages_marker="$base/rootfs/etc/ntfsmac-alpine-packages.sha256"
+  apks_marker="$base/rootfs/etc/ntfsmac-alpine-apks.sha256"
+  if [[ ! -f "$base_packages_marker" || ! -f "$packages_marker" || ! -f "$apks_marker" ]] ||
+     [[ "$(tr -d '\r\n' < "$base_packages_marker" 2>/dev/null)" != "$ALPINE_BASE_PACKAGES_SHA256" ]] ||
+     [[ "$(tr -d '\r\n' < "$packages_marker" 2>/dev/null)" != "$ALPINE_PACKAGES_SHA256" ]] ||
+     [[ "$(tr -d '\r\n' < "$apks_marker" 2>/dev/null)" != "$ALPINE_APKS_SHA256" ]]; then
+    printf 'incomplete\n'
     return 0
   fi
 

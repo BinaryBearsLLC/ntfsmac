@@ -5,9 +5,12 @@
 # digest against ALPINE_DIGEST before doing anything else (abort on mismatch — never
 # trust :latest or an unpinned pull). Builds a *patched copy* of vendored anylinuxfs's
 # init-rootfs (Go) + vmrunner-sys (Rust/CGO) — the vendored submodule itself is never
-# edited — swapping its embedded default-alpine-packages.txt for our audited trimmed
-# list (build/alpine-packages.trimmed.txt) so exactly those packages get installed,
-# not upstream's un-trimmed default+custom set. Output lands under vendor/rootfs/
+# edited — swapping its embedded default-alpine-packages.txt for the exact, complete
+# add-on closure in build/alpine-packages.lock. build/alpine-apks.lock also fixes the source
+# channel and SHA-256 of every APK; the guest installs only those local verified artifacts with
+# apk networking disabled. The direct feature set remains audited in build/alpine-packages.trimmed.txt.
+# Custom packages are rejected in the ntfsmac build so they cannot bypass the locks. Output lands
+# under vendor/rootfs/
 # (redirected via $HOME using the `osusergo` build tag, since upstream's cgo user
 # lookup ignores $HOME otherwise).
 #
@@ -49,8 +52,130 @@ CACHE_DIR="${NTFSMAC_ROOTFS_CACHE_DIR:-${TMPDIR:-/tmp}/ntfsmac-build/init-rootfs
 # dir outside the repo. Flagged in build/AUDIT.md — PLAN.md's literal "output
 # under vendor/rootfs/" wording can't be satisfied on-volume; open decision for the maintainer.
 ROOTFS_HOME="${NTFSMAC_VENDOR_ROOTFS_DIR:-${TMPDIR:-/tmp}/ntfsmac-build/rootfs-home}"
-TRIMMED_LIST="$REPO_ROOT/build/alpine-packages.trimmed.txt"
+BASE_PACKAGE_LOCK="$REPO_ROOT/build/alpine-base-packages.lock"
+PACKAGE_LOCK="$REPO_ROOT/build/alpine-packages.lock"
+APK_LOCK="$REPO_ROOT/build/alpine-apks.lock"
+APK_CACHE_ROOT="${NTFSMAC_ALPINE_APK_CACHE_DIR:-${TMPDIR:-/tmp}/ntfsmac-build/alpine-apks}"
 BIN_DIR="${NTFSMAC_VENDOR_BIN_DIR:-$REPO_ROOT/vendor/bin}"
+
+verify_package_lock() {
+  local lock_file="$1" expected_sha="$2" label="$3" actual_sha
+  if [[ ! -s "$lock_file" ]]; then
+    echo "init-rootfs: HARD-STOP — $label lock is missing or empty: $lock_file" >&2
+    return 1
+  fi
+  if ! LC_ALL=C sort -cu "$lock_file"; then
+    echo "init-rootfs: HARD-STOP — $label lock must be sorted and contain unique entries" >&2
+    return 1
+  fi
+  if grep -Ev '^[a-z0-9][a-z0-9+_.-]*=[A-Za-z0-9][A-Za-z0-9+_.:~-]*-r[0-9]+$' "$lock_file" >/dev/null; then
+    echo "init-rootfs: HARD-STOP — $label lock contains an invalid or non-exact package constraint" >&2
+    return 1
+  fi
+  actual_sha="$(shasum -a 256 "$lock_file" | awk '{print $1}')"
+  if [[ "$actual_sha" != "$expected_sha" ]]; then
+    echo "init-rootfs: HARD-STOP — $label lock sha256 mismatch (expected $expected_sha, got $actual_sha)" >&2
+    return 1
+  fi
+  echo "init-rootfs: verified $label lock ($actual_sha)"
+}
+
+verify_apk_lock() {
+  local actual_sha constraints constraint channel sha extra
+  if [[ ! -s "$APK_LOCK" ]]; then
+    echo "init-rootfs: HARD-STOP — Alpine APK artifact lock is missing or empty: $APK_LOCK" >&2
+    return 1
+  fi
+  actual_sha="$(shasum -a 256 "$APK_LOCK" | awk '{print $1}')"
+  if [[ "$actual_sha" != "$ALPINE_APKS_SHA256" ]]; then
+    echo "init-rootfs: HARD-STOP — Alpine APK artifact lock sha256 mismatch (expected $ALPINE_APKS_SHA256, got $actual_sha)" >&2
+    return 1
+  fi
+
+  mkdir -p "$CACHE_DIR"
+  constraints="$CACHE_DIR/alpine-apk.constraints"
+  : > "$constraints"
+  while IFS=' ' read -r constraint channel sha extra; do
+    if [[ -n "$extra" ]] ||
+       [[ ! "$constraint" =~ ^[a-z0-9][a-z0-9+_.-]*=[A-Za-z0-9][A-Za-z0-9+_.:~-]*-r[0-9]+$ ]] ||
+       [[ ! "$sha" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "init-rootfs: HARD-STOP — Alpine APK artifact lock contains an invalid entry" >&2
+      return 1
+    fi
+    case "$channel" in
+      "v${ALPINE_RUNTIME_TAG%.*}/main"|"v${ALPINE_RUNTIME_TAG%.*}/community"|edge/main|edge/community) ;;
+      *)
+        echo "init-rootfs: HARD-STOP — Alpine APK artifact lock contains an unapproved channel: $channel" >&2
+        return 1
+        ;;
+    esac
+    printf '%s\n' "$constraint" >> "$constraints"
+  done < "$APK_LOCK"
+  if ! LC_ALL=C sort -cu "$constraints" || ! cmp -s "$PACKAGE_LOCK" "$constraints"; then
+    echo "init-rootfs: HARD-STOP — Alpine APK artifact lock does not match the exact add-on package manifest" >&2
+    return 1
+  fi
+  echo "init-rootfs: verified Alpine APK artifact lock ($actual_sha)"
+}
+
+verify_apk_artifacts() {
+  local artifact_cache constraint channel expected_sha extra name version file url destination download actual_sha
+  artifact_cache="$APK_CACHE_ROOT/$ALPINE_APKS_SHA256"
+  mkdir -p "$artifact_cache"
+  while IFS=' ' read -r constraint channel expected_sha extra; do
+    name="${constraint%%=*}"
+    version="${constraint#*=}"
+    file="${name}-${version}.apk"
+    url="https://dl-cdn.alpinelinux.org/alpine/${channel}/aarch64/${file}"
+    destination="$artifact_cache/$file"
+    if [[ -f "$destination" ]]; then
+      actual_sha="$(shasum -a 256 "$destination" | awk '{print $1}')"
+      [[ "$actual_sha" == "$expected_sha" ]] && continue
+    fi
+    download="${destination}.download.$$"
+    if ! curl -fsSL "$url" -o "$download"; then
+      rm -f -- "$download"
+      echo "init-rootfs: HARD-STOP — could not fetch locked Alpine APK $file" >&2
+      return 1
+    fi
+    actual_sha="$(shasum -a 256 "$download" | awk '{print $1}')"
+    if [[ "$actual_sha" != "$expected_sha" ]]; then
+      rm -f -- "$download"
+      echo "init-rootfs: HARD-STOP — Alpine APK sha256 mismatch for $file (expected $expected_sha, got $actual_sha)" >&2
+      return 1
+    fi
+    mv -f -- "$download" "$destination"
+  done < "$APK_LOCK"
+  echo "init-rootfs: verified all locked Alpine APK artifacts"
+}
+
+verify_rootfs_package_versions() {
+  local rootfs="$1" label="$2"
+  shift 2
+  local installed="$rootfs/lib/apk/db/installed"
+  local actual="$CACHE_DIR/${label}.installed" expected="$CACHE_DIR/${label}.expected" delta
+  if [[ ! -f "$installed" ]]; then
+    echo "init-rootfs: HARD-STOP — unpacked rootfs package database is missing" >&2
+    return 1
+  fi
+  awk 'BEGIN { RS=""; FS="\n" }
+    {
+      package=""; version=""
+      for (i = 1; i <= NF; i++) {
+        if ($i ~ /^P:/) package=substr($i, 3)
+        if ($i ~ /^V:/) version=substr($i, 3)
+      }
+      if (package != "" && version != "") print package "=" version
+    }' "$installed" | LC_ALL=C sort -u > "$actual"
+  cat "$@" | LC_ALL=C sort -u > "$expected"
+  delta="$(LC_ALL=C comm -3 "$expected" "$actual")"
+  if [[ -n "$delta" ]]; then
+    echo "init-rootfs: HARD-STOP — $label package manifest is not exact:" >&2
+    printf '%s\n' "$delta" >&2
+    return 1
+  fi
+  echo "init-rootfs: verified exact $label package manifest"
+}
 
 # verify_alpine_digest <tag> <expected_digest>
 # ALPINE_DIGEST is pinned to the linux/arm64 PLATFORM manifest digest (not the
@@ -103,8 +228,8 @@ prepare_build_copy() {
   cp -R "$REPO_ROOT/vendor/src/anylinuxfs/init-rootfs" "$CACHE_DIR/init-rootfs"
   cp "$REPO_ROOT/vendor/src/anylinuxfs/anylinuxfs/cc_linux" "$CACHE_DIR/anylinuxfs/cc_linux"
   chmod +x "$CACHE_DIR/anylinuxfs/cc_linux"
-  cp "$TRIMMED_LIST" "$CACHE_DIR/init-rootfs/default-alpine-packages.txt"
-  patch_init_rootfs_runtime_alpine "$CACHE_DIR/init-rootfs"
+  cp "$PACKAGE_LOCK" "$CACHE_DIR/init-rootfs/default-alpine-packages.txt"
+  patch_init_rootfs_runtime_alpine "$CACHE_DIR/init-rootfs" "$APK_LOCK"
 }
 
 # build_vmrunner_sys — settled PLAN.md decision: try without -F freebsd first.
@@ -192,18 +317,33 @@ run_init_rootfs() {
 }
 
 main() {
-  local tag digest
+  local tag digest rootfs
   runtime_alpine_load || exit 1
   tag="$ALPINE_RUNTIME_TAG"
   digest="$ALPINE_RUNTIME_DIGEST"
 
+  verify_package_lock "$BASE_PACKAGE_LOCK" "$ALPINE_BASE_PACKAGES_SHA256" "Alpine base package" || exit 1
+  verify_package_lock "$PACKAGE_LOCK" "$ALPINE_PACKAGES_SHA256" "Alpine add-on package" || exit 1
+  verify_apk_lock || exit 1
   verify_alpine_digest "$tag" "$digest" || exit 1
 
   prepare_build_copy
+  verify_apk_artifacts || exit 1
   build_vmrunner_sys || exit 1
   build_init_rootfs_bin
   vendor_init_rootfs_bin
   run_init_rootfs "$ALPINE_RUNTIME_REF" "$ALPINE_RUNTIME_BASE_DIR"
+
+  rootfs="$ROOTFS_HOME/.anylinuxfs/$ALPINE_RUNTIME_BASE_DIR/rootfs"
+  if [[ -f "$rootfs/etc/ntfsmac-alpine-base-packages.sha256" &&
+        -f "$rootfs/etc/ntfsmac-alpine-packages.sha256" &&
+        -f "$rootfs/etc/ntfsmac-alpine-apks.sha256" ]]; then
+    verify_rootfs_package_versions "$rootfs" "complete Alpine runtime" \
+      "$BASE_PACKAGE_LOCK" "$PACKAGE_LOCK" || exit 1
+  else
+    verify_rootfs_package_versions "$rootfs" "Alpine base" "$BASE_PACKAGE_LOCK" || exit 1
+    echo "init-rootfs: NOTE — VM setup did not complete; the exact add-on manifest was generated but not installed"
+  fi
 
   echo "init-rootfs: done — inspect $ROOTFS_HOME for the generated rootfs and vm-setup.sh"
   echo "init-rootfs: NTFSMAC_ROOTFS_HOME=$ROOTFS_HOME"

@@ -33,6 +33,7 @@ setup() {
 
   printf 'ANYLINUXFS_VERSION=0.18.0\nANYLINUXFS_COMMIT=%s\nALPINE_TAG=3.23.5\nALPINE_DIGEST=sha256:d858bb5442632a31bd4bca6c5e601dbe6b536fd7942092ea6a08a0a95805693c\n' \
     "$PINNED_COMMIT" > "$LOCK_FIXTURE"
+  grep -E '^ALPINE_(BASE_PACKAGES|PACKAGES|APKS)_SHA256=' "$REPO_ROOT/build/sources.lock" >> "$LOCK_FIXTURE"
 }
 
 @test "candidate audit is read-only and leaves approval pending" {

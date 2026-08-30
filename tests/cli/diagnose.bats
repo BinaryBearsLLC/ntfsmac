@@ -44,6 +44,7 @@ setup() {
   printf 'ANYLINUXFS_VERSION=0.18.0\n' >> "$FIXTURE_DIR/sources.lock"
   printf 'ALPINE_TAG=3.23.5\n' >> "$FIXTURE_DIR/sources.lock"
   printf 'ALPINE_DIGEST=sha256:d858bb5442632a31bd4bca6c5e601dbe6b536fd7942092ea6a08a0a95805693c\n' >> "$FIXTURE_DIR/sources.lock"
+  grep -E '^ALPINE_(BASE_PACKAGES|PACKAGES|APKS)_SHA256=' "$REPO_ROOT/build/sources.lock" >> "$FIXTURE_DIR/sources.lock"
   printf 'ANYLINUXFS_COMMIT=8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3\n' >> "$FIXTURE_DIR/sources.lock"
   printf 'VMPROXY_VERSION=0.18.0\n' >> "$FIXTURE_DIR/sources.lock"
   printf 'LIBKRUN_VERSION=1.19.3\n' >> "$FIXTURE_DIR/sources.lock"
@@ -371,6 +372,9 @@ nas.example:/share on /Volumes/Share (nfs, nodev, nosuid)"
   : > "$rootfs/usr/local/bin/entrypoint.sh"
   : > "$rootfs/vmproxy"
   printf 'rpc_pipefs\nnfsd\n' > "$rootfs/etc/fstab"
+  printf '%s' "$ALPINE_BASE_PACKAGES_SHA256" > "$rootfs/etc/ntfsmac-alpine-base-packages.sha256"
+  printf '%s' "$ALPINE_PACKAGES_SHA256" > "$rootfs/etc/ntfsmac-alpine-packages.sha256"
+  printf '%s' "$ALPINE_APKS_SHA256" > "$rootfs/etc/ntfsmac-alpine-apks.sha256"
   write_guest_versions "$rootfs" "3.23.5" "2026.2.25-r0" "2.6.4-r6"
 
   run "$SCRIPT" --json

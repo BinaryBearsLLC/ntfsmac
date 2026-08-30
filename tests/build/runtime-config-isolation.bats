@@ -16,7 +16,7 @@ setup() {
     source "$REPO_ROOT/cli/lib/runtime-alpine.sh"
     source "$REPO_ROOT/build/lib/patch-runtime-alpine.sh"
     runtime_alpine_load
-    patch_init_rootfs_runtime_alpine "$SCRATCH"
+    patch_init_rootfs_runtime_alpine "$SCRATCH" "$REPO_ROOT/build/alpine-apks.lock"
     grep -F "RegistriesDirPath: filepath.Join(cfg.ImageBasePath, \".ntfsmac-empty-registries.d\")" "$SCRATCH/main.go"
     test "$(grep -c "RegistriesDirPath:" "$SCRATCH/main.go")" -eq 1
   '

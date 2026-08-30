@@ -3,15 +3,20 @@
 #
 # Runs the real build (network pull of alpine at the locked tag+digest, real cargo/go
 # build of a patched init-rootfs) — same live-verification pattern as fetch-prebuilt.bats
-# and gvproxy.bats. Greps the generated vm-setup.sh (the package manifest for this rootfs
+# and gvproxy.bats. Checks the generated vm-setup.sh (the package manifest for this rootfs
 # — see build/init-rootfs.sh's header for why full VM-boot package installation isn't
-# reachable yet: it needs vendor/bin/vmproxy, a v-anylinuxfs-build artifact) for our
-# trimmed package list: ntfs-3g, its read/write safety probe package, and nfs-utils (which
-# provides rpc.nfsd) present; every audited-cut package absent.
+# reachable yet: it needs vendor/bin/vmproxy, a v-anylinuxfs-build artifact) against
+# the exact full add-on closure. The smaller trimmed list remains the reviewed direct
+# feature set; exact transitive versions come from build/alpine-packages.lock.
 
 setup() {
   REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
   SCRIPT="$REPO_ROOT/build/init-rootfs.sh"
+  # shellcheck source=../../build/lib/lock.sh
+  source "$REPO_ROOT/build/lib/lock.sh"
+  # shellcheck source=../../cli/lib/runtime-alpine.sh
+  source "$REPO_ROOT/cli/lib/runtime-alpine.sh"
+  runtime_alpine_load
 }
 
 @test "init-rootfs.sh exists and is executable" {
@@ -28,30 +33,72 @@ setup() {
   [[ "$output" == *"HARD-STOP"* ]]
 }
 
-@test "generated vm-setup.sh package manifest matches the trimmed list exactly" {
+@test "generated vm-setup.sh package manifest matches the exact add-on lock" {
   run "$SCRIPT"
   local rootfs_home
   rootfs_home="$(echo "$output" | sed -n 's/^init-rootfs: NTFSMAC_ROOTFS_HOME=//p' | tail -1)"
   [ -n "$rootfs_home" ]
 
   local setup_script
-  setup_script="$(find "$rootfs_home" -path '*/rootfs/usr/local/bin/vm-setup.sh' 2>/dev/null | head -1)"
+  setup_script="$rootfs_home/.anylinuxfs/$ALPINE_RUNTIME_BASE_DIR/rootfs/usr/local/bin/vm-setup.sh"
   [ -n "$setup_script" ]
   [ -f "$setup_script" ]
 
-  run grep 'apk --update --no-cache add' "$setup_script"
+  run grep '^# ntfsmac locked package set: ' "$setup_script"
   [ "$status" -eq 0 ]
+  local package_args actual expected
+  package_args="${output#*: }"
+  actual="$(tr ' ' '\n' <<< "$package_args" | LC_ALL=C sort)"
+  expected="$(cat "$REPO_ROOT/build/alpine-packages.lock")"
+  [ "$actual" = "$expected" ]
 
-  # present: our trimmed list (nfs-utils provides rpc.nfsd; lvm2 provides /etc/lvm/{archive,
-  # backup} that vmproxy's guest init hard-requires, see AUDIT.md's corrected lvm2 entry)
-  for pkg in bash blkid cryptsetup lsblk lvm2 mount nfs-utils ntfs-3g ntfs-3g-progs squashfs-tools; do
-    [[ "$output" == *"$pkg"* ]]
-  done
+  actual="$(awk '/^done <<.*NTFSMAC_APK_LOCK/ { capture=1; next } capture && /^NTFSMAC_APK_LOCK$/ { exit } capture { print }' "$setup_script")"
+  expected="$(cat "$REPO_ROOT/build/alpine-apks.lock")"
+  [ "$actual" = "$expected" ]
 
-  # absent: every audited-cut package
-  for pkg in btrfs-progs mdadm zfs; do
-    [[ "$output" != *"$pkg"* ]]
-  done
+  run grep -F 'apk --no-network --no-cache add "$APK_DIR"/*.apk' "$setup_script"
+  [ "$status" -eq 0 ]
+  run grep -F 'apk --update' "$setup_script"
+  [ "$status" -ne 0 ]
+  run grep -E '%!\((MISSING|EXTRA)' "$setup_script"
+  [ "$status" -ne 0 ]
+
+  run grep -F "echo \"$(sed -n 's/^ALPINE_PACKAGES_SHA256=//p' "$REPO_ROOT/build/sources.lock")\" > /etc/ntfsmac-alpine-packages.sha256" "$setup_script"
+  [ "$status" -eq 0 ]
+  run grep -F "echo \"$(sed -n 's/^ALPINE_APKS_SHA256=//p' "$REPO_ROOT/build/sources.lock")\" > /etc/ntfsmac-alpine-apks.sha256" "$setup_script"
+  [ "$status" -eq 0 ]
+}
+
+@test "patched init-rootfs rejects custom packages that bypass the lock" {
+  local cache_dir
+  cache_dir="$(mktemp -d)"
+  NTFSMAC_ROOTFS_CACHE_DIR="$cache_dir" run bash -c '
+    source build/init-rootfs.sh
+    runtime_alpine_load
+    prepare_build_copy
+    grep -F "ntfsmac package lock does not allow custom Alpine packages" "$CACHE_DIR/init-rootfs/main.go"
+  '
+  rm -rf "$cache_dir"
+  [ "$status" -eq 0 ]
+}
+
+@test "rootfs package verification rejects an unexpected extra package" {
+  local rootfs lock cache
+  rootfs="$BATS_TEST_TMPDIR/rootfs-extra"
+  lock="$BATS_TEST_TMPDIR/expected-packages.lock"
+  cache="$BATS_TEST_TMPDIR/package-verifier-cache"
+  mkdir -p "$rootfs/lib/apk/db" "$cache"
+  printf 'P:bash\nV:5.3.3-r1\n\nP:unexpected\nV:1.0-r0\n' > "$rootfs/lib/apk/db/installed"
+  printf 'bash=5.3.3-r1\n' > "$lock"
+
+  NTFSMAC_ROOTFS_CACHE_DIR="$cache" run bash -c '
+    source build/init-rootfs.sh
+    verify_rootfs_package_versions "$1" test "$2"
+  ' _ "$rootfs" "$lock"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"package manifest is not exact"* ]]
+  [[ "$output" == *"unexpected=1.0-r0"* ]]
 }
 
 @test "vendors the built init-rootfs binary to vendor/bin/init-rootfs" {

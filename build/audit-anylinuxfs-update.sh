@@ -110,7 +110,7 @@ git -C "$SOURCE_DIR" archive "$candidate_commit" | tar -x -C "$audit_tmp"
 runtime_alpine_load || fail "could not derive the locked Alpine runtime contract"
 patch_anylinuxfs_runtime_alpine "$audit_tmp" >/dev/null \
   || fail "runtime Alpine patch no longer applies to the candidate"
-patch_init_rootfs_runtime_alpine "$audit_tmp/init-rootfs" >/dev/null \
+patch_init_rootfs_runtime_alpine "$audit_tmp/init-rootfs" "$REPO_ROOT/build/alpine-apks.lock" >/dev/null \
   || fail "init-rootfs runtime patch no longer applies to the candidate"
 
 source_status_after=$(git -C "$SOURCE_DIR" status --porcelain)

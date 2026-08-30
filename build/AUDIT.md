@@ -315,3 +315,41 @@ and (2) `otool -L vendor/bin/anylinuxfs` has no `libblkid` entry (slow, real bui
 headers + authors `.pc` — fast, no source build) and asserts the stage is dylib-free, the
 `.pc` chain pulls `uuid`+`intl` statically, and `pkg-config --static --libs blkid` resolves
 to the staged archives.
+
+## Reproducible Alpine package contract (dependency refresh, 2026-08-30)
+
+The immutable Alpine OCI digest fixed the 16-package base filesystem, but the first-boot command
+previously ran an unconstrained `apk --update --no-cache add` for only the ten reviewed direct
+packages. That allowed Alpine's live repository indexes to choose a different 54-package
+transitive closure without changing `sources.lock` or the OCI digest.
+
+The runtime contract is now revision 4 and has three independently hashed inputs:
+
+- `build/alpine-base-packages.lock`: the exact 16-package manifest owned by the OCI digest;
+- `build/alpine-packages.lock`: the exact 54-package ntfsmac add-on closure;
+- `build/alpine-apks.lock`: the source channel and SHA-256 of each of those 54 APK files.
+
+The scratch-built `init-rootfs` embeds the exact manifests, rejects per-user custom packages, and
+downloads only the locked APK URLs. Each download is SHA-256 checked before it is renamed into the
+guest cache. Installation then uses the local official APKs with `apk --no-network`; it does not
+refresh repository indexes, enable Alpine edge globally, or use `--allow-untrusted`. The three
+aggregate hashes are embedded in both runtime binaries and the rootfs marker. A version-only or
+byte-level artifact change therefore receives a distinct cache identity and cannot reuse an older
+rootfs silently.
+
+The base package list is deliberately not reinstalled from current repositories: four package
+versions in the digest-owned Alpine 3.23.5 base were already absent from the live v3.23 indexes
+during this audit. Re-fetching that base would make an otherwise immutable OCI pin unreproducible.
+Instead, the unpacked base database is compared with the digest-owned manifest.
+
+Local evidence for this infrastructure-only checkpoint: all 54 APK files were downloaded from the
+recorded official Alpine channels and matched their recorded SHA-256; the real Rust/Go rootfs build
+generated the locked setup script and produced an arm64 `init-rootfs` with the hypervisor
+entitlement. No dependency version changed in this checkpoint (`ntfs-3g` remains 2026.2.25-r0).
+The local Hypervisor.framework setup still returns `Invalid argument (errno 22)` before guest
+setup, so execution of `apk --no-network add` and the installed 54-package database remain an
+explicit hardware gate rather than a claimed pass.
+
+The lock is byte-identifying and fail-closed, but the APKs are not vendored: a future CDN removal
+will stop the build rather than float to another artifact. Long-term offline availability would
+require publishing an approved internal artifact mirror, which is outside this local-only task.

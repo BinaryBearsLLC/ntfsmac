@@ -30,25 +30,31 @@ make_initialized_cache() {
   : > "$base/rootfs/usr/local/bin/entrypoint.sh"
   : > "$base/rootfs/vmproxy"
   printf 'rpc_pipefs\nnfsd\n' > "$base/rootfs/etc/fstab"
+  printf '%s' "$ALPINE_BASE_PACKAGES_SHA256" > "$base/rootfs/etc/ntfsmac-alpine-base-packages.sha256"
+  printf '%s' "$ALPINE_PACKAGES_SHA256" > "$base/rootfs/etc/ntfsmac-alpine-packages.sha256"
+  printf '%s' "$ALPINE_APKS_SHA256" > "$base/rootfs/etc/ntfsmac-alpine-apks.sha256"
 }
 
 @test "derives one digest-only pull reference plus tag-aware cache and marker from sources.lock" {
   [[ "$ALPINE_RUNTIME_REF" == "docker.io/library/alpine@sha256:"* ]]
   [[ "$ALPINE_RUNTIME_BASE_DIR" == "alpine-${ALPINE_RUNTIME_TAG}-"* ]]
-  [[ "$ALPINE_RUNTIME_BASE_DIR" == *"-r3" ]]
-  [[ "$ALPINE_RUNTIME_VERSION" == "ntfsmac-alpine-v3|"* ]]
+  [[ "$ALPINE_RUNTIME_BASE_DIR" == *"-${ALPINE_PACKAGES_SHA256:0:12}-${ALPINE_APKS_SHA256:0:12}-r4" ]]
+  [[ "$ALPINE_RUNTIME_VERSION" == "ntfsmac-alpine-v4|"* ]]
   [[ "$ALPINE_RUNTIME_VERSION" == *"digest=${ALPINE_RUNTIME_DIGEST}"* ]]
   [[ "$ALPINE_RUNTIME_VERSION" == *"anylinuxfs="* ]]
+  [[ "$ALPINE_RUNTIME_VERSION" == *"base_packages=${ALPINE_BASE_PACKAGES_SHA256}"* ]]
+  [[ "$ALPINE_RUNTIME_VERSION" == *"packages=${ALPINE_PACKAGES_SHA256}"* ]]
+  [[ "$ALPINE_RUNTIME_VERSION" == *"apks=${ALPINE_APKS_SHA256}"* ]]
   [[ "$ALPINE_RUNTIME_REF" != *"latest"* ]]
   [[ "$ALPINE_RUNTIME_REF" != *":${ALPINE_RUNTIME_TAG}@"* ]]
 }
 
-@test "v3 package contract never reuses the prior v2 cache" {
+@test "v4 package contract never reuses the prior v3 cache" {
   local current_base previous_base
   current_base="$(runtime_alpine_cache_path "$TEST_HOME")"
-  previous_base="${current_base%-r3}-r2"
+  previous_base="${current_base%-r4}-r3"
   mkdir -p "$previous_base/rootfs"
-  printf 'ntfsmac-alpine-v2' > "$previous_base/rootfs.ver"
+  printf 'ntfsmac-alpine-v3' > "$previous_base/rootfs.ver"
 
   run runtime_alpine_prepare_cache "$TEST_HOME"
 
@@ -58,9 +64,29 @@ make_initialized_cache() {
   [ ! -e "$current_base" ]
 }
 
-@test "v3 cache is incomplete without the read-only dirty-flag inspector" {
+@test "v4 cache is incomplete without the read-only dirty-flag inspector" {
   make_initialized_cache
   rm "$(runtime_alpine_cache_path "$TEST_HOME")/rootfs/usr/bin/ntfsinfo"
+
+  run runtime_alpine_cache_state "$TEST_HOME"
+
+  [ "$status" -eq 0 ]
+  [ "$output" = "incomplete" ]
+}
+
+@test "v4 cache is incomplete without the exact package-lock marker" {
+  make_initialized_cache
+  rm "$(runtime_alpine_cache_path "$TEST_HOME")/rootfs/etc/ntfsmac-alpine-packages.sha256"
+
+  run runtime_alpine_cache_state "$TEST_HOME"
+
+  [ "$status" -eq 0 ]
+  [ "$output" = "incomplete" ]
+}
+
+@test "v4 cache is incomplete without the exact APK artifact marker" {
+  make_initialized_cache
+  rm "$(runtime_alpine_cache_path "$TEST_HOME")/rootfs/etc/ntfsmac-alpine-apks.sha256"
 
   run runtime_alpine_cache_state "$TEST_HOME"
 
@@ -150,4 +176,18 @@ make_initialized_cache() {
   run runtime_alpine_load
   [ "$status" -ne 0 ]
   [[ "$output" == *"64 lowercase hexadecimal"* ]]
+}
+
+@test "invalid package lock metadata fails closed" {
+  sed -i '' 's/^ALPINE_PACKAGES_SHA256=.*/ALPINE_PACKAGES_SHA256=not-a-digest/' "$LOCK_FIXTURE"
+  run runtime_alpine_load
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"runtime lock hashes"* ]]
+}
+
+@test "invalid APK artifact lock metadata fails closed" {
+  sed -i '' 's/^ALPINE_APKS_SHA256=.*/ALPINE_APKS_SHA256=not-a-digest/' "$LOCK_FIXTURE"
+  run runtime_alpine_load
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"runtime lock hashes"* ]]
 }
