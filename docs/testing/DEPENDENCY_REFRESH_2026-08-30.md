@@ -292,14 +292,57 @@ checkpoint and will not be hidden inside this no-change result.
 No VM, real drive, installation, notarization, push, release, or publication action was performed
 for this checkpoint.
 
+## Checkpoint J — gvproxy x/crypto v0.55.0 security overlay
+
+Status: local source/build/package validation complete; upstream VM integration harness and native
+hardware acceptance outstanding.
+
+The gvproxy source release remains v0.8.9 at commit
+`9cfc86f66679ef0feed0f20ba1df558fe2bef5c6`. Only its direct Go security dependency is
+updated, from `golang.org/x/crypto v0.50.0` to the current v0.55.0. Go's minimum-version
+selection necessarily moves the compatible `x/*` graph in the disposable build tree:
+
+- `x/mod` 0.35.0 → 0.38.0;
+- `x/net` 0.53.0 → 0.57.0;
+- `x/sync` 0.20.0 → 0.22.0;
+- `x/sys` 0.43.0 → 0.47.0;
+- `x/text` 0.36.0 → 0.41.0;
+- `x/tools` 0.43.0 → 0.48.0.
+
+This is one atomic module-graph update driven by the direct x/crypto pin, not an unreviewed gvproxy
+source advance. `build-gvproxy.sh` exports the exact v0.8.9 commit into a new temporary directory,
+resolves the exact overlay with Go 1.26.7 and the Go checksum database, regenerates the vendored
+graph there, and hard-stops unless the resulting `go.mod`/`go.sum` aggregate equals
+`8e39b57de838dd933fc2be46fc2233b2435cbdef2d812b9b62548244257a3b62`. The cached
+upstream checkout remains byte-clean.
+
+Validation:
+
+- malformed/unresolved pins and a deliberately wrong overlay hash fail closed: PASS;
+- exact source build, gvproxy version v0.8.9, Go 1.26.7, embedded x/crypto v0.55.0: PASS;
+- all self-contained upstream unit-test packages: PASS; `test-qemu`/`test-vfkit` remain the
+  separately documented unstaged integration harnesses;
+- `govulncheck 1.7.0` source and final-binary scans: 0 reachable vulnerabilities, down from five
+  on the unmodified release graph; two required-module findings are not called by the binary;
+- focused lock/toolchain/gvproxy Bats gates: PASS; complete Bats gate: PASS, 362/362;
+- `build.command gui`: PASS; Cargo tests 58/58, Standard Swift 307/307, Legacy Swift 307/307 with
+  expected deprecation warnings only, both apps/DMGs/checksum sidecars verified;
+- mounted-artifact gate: PASS for both read-only DMGs; embedded gvproxy reports v0.8.9, Go 1.26.7,
+  and x/crypto v0.55.0, passes the binary vulnerability scan, and carries local BinaryBears
+  Developer ID plus Hardened Runtime.
+
+The native libkrun VM again stopped with `EINVAL` before guest execution. No live NFS/vmnet path,
+real drive, installation, notarization, push, release, or publication was exercised.
+
 ## Validation categories
 
 - Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed
-  355/355; checkpoints E and H passed 360/360. Checkpoints C through E and H also passed 307/307
-  in each Swift variant and mounted-DMG verification for both outputs. `PopoverStateRenderTests`
-  compiled but remained skipped by the documented macOS 26.6.2 guard.
+  355/355; checkpoints E and H passed 360/360; checkpoint J passed 362/362. Checkpoints C through
+  E, H, and J also passed 307/307 in each Swift variant and mounted-DMG verification for both
+  outputs. `PopoverStateRenderTests` compiled but remained skipped by the documented macOS 26.6.2
+  guard.
 - Hardware: no real-drive test; local VM guest setup blocked as documented above.
-- Signing: standalone runtime gates used ad-hoc signatures; checkpoints C through E and H
+- Signing: standalone runtime gates used ad-hoc signatures; checkpoints C through E, H, and J
   packaging also verified the locally available BinaryBears Developer ID on both app variants.
   Required hypervisor/virtualization entitlements passed.
 - Notarization: not run.

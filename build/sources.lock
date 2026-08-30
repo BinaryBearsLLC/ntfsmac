@@ -45,6 +45,11 @@ VMNET_HELPER_SHA256=dd4355c053c0f04357285ee50169bfce7d04de3f0f49c0356487b099175a
 # not a drift bug). https://github.com/containers/gvisor-tap-vsock, tag v0.8.9.
 GVPROXY_VERSION=v0.8.9
 GVPROXY_COMMIT=9cfc86f66679ef0feed0f20ba1df558fe2bef5c6
+# Security overlay applied to an archive of the exact gvproxy commit. The locked Go toolchain
+# updates this direct module plus only the minimum compatible x/* graph, then the aggregate
+# go.mod/go.sum hash below must match before the vendored build may start.
+GVPROXY_X_CRYPTO_VERSION=v0.55.0
+GVPROXY_GO_OVERLAY_SHA256=8e39b57de838dd933fc2be46fc2233b2435cbdef2d812b9b62548244257a3b62
 
 # Alpine rootfs base (pulled by init-rootfs via umoci) — Docker Hub library/alpine.
 # Pinned to a specific patch tag + digest, never :latest (L9/HARD-STOP).

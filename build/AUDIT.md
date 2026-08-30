@@ -560,3 +560,27 @@ reported as passing.
 The release itself is not security-clean: `govulncheck 1.7.0` reports five reachable SSH findings
 in direct dependency `golang.org/x/crypto v0.50.0`, fixed in v0.52.0. That dependency update is a
 separate checkpoint; it is not mixed into this release review.
+
+## gvproxy x/crypto v0.55.0 security overlay (2026-08-30)
+
+The v0.8.9 source pin is retained. Its direct `golang.org/x/crypto` dependency moves from v0.50.0
+to current v0.55.0 in a disposable build-tree overlay. Minimum-version selection also updates the
+compatible Go `x/mod`, `x/net`, `x/sync`, `x/sys`, `x/text`, and `x/tools` graph; no gvproxy
+implementation source changes.
+
+The overlay does not mutate the cached upstream checkout. `git archive` exports exact commit
+`9cfc86f66679ef0feed0f20ba1df558fe2bef5c6`; locked Go 1.26.7 resolves the exact direct
+module, regenerates its vendored graph, and the build hard-stops unless the resulting `go.mod` plus
+`go.sum` aggregate matches
+`8e39b57de838dd933fc2be46fc2233b2435cbdef2d812b9b62548244257a3b62`. The produced
+binary is also inspected to ensure it actually embeds x/crypto v0.55.0.
+
+Self-contained upstream unit tests pass. Both source and binary `govulncheck 1.7.0` scans report
+zero reachable vulnerabilities, compared with five on v0.50.0. The two upstream QEMU/vfkit
+integration harnesses remain unverified because their separately staged executables and VM harness
+were not present. Full local validation passed 362/362 Bats, 58/58 Cargo, and 307/307 Swift tests
+per variant. Both read-only-mounted DMGs contain gvproxy v0.8.9 built by Go 1.26.7 with x/crypto
+v0.55.0, a clean binary vulnerability scan, Developer ID signature, and Hardened Runtime.
+
+Native VM startup still fails before guest execution with `EINVAL`; no drive, notarization, or
+remote action was performed.
