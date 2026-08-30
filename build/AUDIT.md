@@ -645,3 +645,33 @@ the runner generation introduced for setup-go v6 (runner 2.327.1 or newer).
 Both workflow files parsed, 15 focused action/lock/Go-toolchain tests passed, and the unchanged
 init-rootfs module compiled under locked Go 1.26.7. No hosted workflow was dispatched, so action
 execution and cache behavior remain remote gates.
+
+## Alpine 3.24.1 exact guest closure (dependency refresh, 2026-08-31)
+
+The guest base moves from Alpine 3.23.5 to current stable patch 3.24.1 for linux/arm64, identified
+by official manifest digest
+`sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18`. The closure
+shape remains deliberately unchanged: 16 base packages plus 54 add-on APKs, or 70 installed
+packages. The corresponding base, add-on, and APK-artifact lock SHA-256 values are
+`00afb49158f9a22de9da83c5ecac44d29e50c9460f24d21d952bd4af1f43d370`,
+`99fc0338f8c2768c3c9dc5416fe26adf5195b572a96c49eb7d0ce426e920c1fe`, and
+`6c06f60d19d0b03aca323613838f4cc76bdf3c22a370aa38739d5a5f7087496e`.
+
+All ordinary add-ons resolve from Alpine v3.24 stable repositories. The three coherent ntfs-3g
+packages remain the sole `edge/main` exception and remain at the separately reviewed security
+version 2026.7.7-r0. Major compatibility movements include musl 1.2.6, util-linux 2.42.1,
+cryptsetup 2.8.6, Python 3.14.7, and SquashFS tools 4.7.5.
+
+A fresh official ARM64 image extraction reproduced the base lock. All 54 add-on APK files were
+downloaded and hashed, then installed from a read-only cache with `apk --no-network` inside an
+ephemeral ARM64 container. Package signature checks remained active, the database matched all 70
+exact package entries, and executable/linkage smoke checks passed for the disk, crypto, LVM, NFS,
+Python, SquashFS, and NTFS tools used by the guest. Docker Desktop was stopped after this isolated
+check and no host disk was exposed.
+
+Focused runtime tests passed 76/76, the project build passed 58/58 Rust tests, and the complete
+Bats suite passed 372/372. Standard and Legacy GUI builds each passed 307/307 Swift tests and
+produced checksum-valid DMGs. Both DMGs were mounted read-only and passed app version, deep/strict
+Developer ID, Hardened Runtime, and embedded Alpine-contract verification. The native libkrun
+path still fails before guest execution with `EINVAL`; no real drive, installation, notarization,
+or remote action was performed.

@@ -42,8 +42,8 @@ setup() {
   sha="$(shasum -a 256 "$FIXTURE_DIR/kernel/modules.squashfs" | awk '{print $1}')"
   printf 'LIBKRUNFW_MODULES_SHA256=%s\n' "$sha" > "$FIXTURE_DIR/sources.lock"
   printf 'ANYLINUXFS_VERSION=0.18.0\n' >> "$FIXTURE_DIR/sources.lock"
-  printf 'ALPINE_TAG=3.23.5\n' >> "$FIXTURE_DIR/sources.lock"
-  printf 'ALPINE_DIGEST=sha256:d858bb5442632a31bd4bca6c5e601dbe6b536fd7942092ea6a08a0a95805693c\n' >> "$FIXTURE_DIR/sources.lock"
+  printf 'ALPINE_TAG=3.24.1\n' >> "$FIXTURE_DIR/sources.lock"
+  printf 'ALPINE_DIGEST=sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18\n' >> "$FIXTURE_DIR/sources.lock"
   grep -E '^ALPINE_(BASE_PACKAGES|PACKAGES|APKS)_SHA256=' "$REPO_ROOT/build/sources.lock" >> "$FIXTURE_DIR/sources.lock"
   printf 'ANYLINUXFS_COMMIT=8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3\n' >> "$FIXTURE_DIR/sources.lock"
   printf 'VMPROXY_VERSION=0.18.0\n' >> "$FIXTURE_DIR/sources.lock"
@@ -141,8 +141,8 @@ write_guest_versions() {
   [[ "$output" == *'"vmnet_helper_version":"v0.12.0"'* ]]
   [[ "$output" == *'"vmnet_helper_version_status":"match"'* ]]
   [[ "$output" == *'"vmnet_helper_source_commit":"0caef043005c7d9f03422a9914bc9d3d4637dc84"'* ]]
-  [[ "$output" == *'"alpine_runtime_tag":"3.23.5"'* ]]
-  [[ "$output" == *'"alpine_runtime_digest":"sha256:d858bb5442632a31bd4bca6c5e601dbe6b536fd7942092ea6a08a0a95805693c"'* ]]
+  [[ "$output" == *'"alpine_runtime_tag":"3.24.1"'* ]]
+  [[ "$output" == *'"alpine_runtime_digest":"sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18"'* ]]
   [[ "$output" == *'"alpine_runtime_state":"not_initialized"'* ]]
   [[ "$output" == *'"alpine_installed_cache":"none"'* ]]
   [[ "$output" == *'"alpine_installed_version":"not_installed"'* ]]
@@ -375,13 +375,13 @@ nas.example:/share on /Volumes/Share (nfs, nodev, nosuid)"
   printf '%s' "$ALPINE_BASE_PACKAGES_SHA256" > "$rootfs/etc/ntfsmac-alpine-base-packages.sha256"
   printf '%s' "$ALPINE_PACKAGES_SHA256" > "$rootfs/etc/ntfsmac-alpine-packages.sha256"
   printf '%s' "$ALPINE_APKS_SHA256" > "$rootfs/etc/ntfsmac-alpine-apks.sha256"
-  write_guest_versions "$rootfs" "3.23.5" "2026.7.7-r0" "2.6.4-r6"
+  write_guest_versions "$rootfs" "3.24.1" "2026.7.7-r0" "2.6.4-r6"
 
   run "$SCRIPT" --json
   [ "$status" -eq 0 ]
   [[ "$output" == *'"alpine_runtime_state":"initialized"'* ]]
   [[ "$output" == *'"alpine_installed_cache":"pinned"'* ]]
-  [[ "$output" == *'"alpine_installed_version":"3.23.5"'* ]]
+  [[ "$output" == *'"alpine_installed_version":"3.24.1"'* ]]
   [[ "$output" == *'"ntfs_3g_version":"2026.7.7-r0"'* ]]
   [[ "$output" == *'"nfs_utils_version":"2.6.4-r6"'* ]]
 }

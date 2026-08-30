@@ -66,15 +66,15 @@ GVPROXY_GO_OVERLAY_SHA256=8e39b57de838dd933fc2be46fc2233b2435cbdef2d812b9b625482
 
 # Alpine rootfs base (pulled by init-rootfs via umoci) — Docker Hub library/alpine.
 # Pinned to a specific patch tag + digest, never :latest (L9/HARD-STOP).
-ALPINE_TAG=3.23.5
-ALPINE_DIGEST=sha256:d858bb5442632a31bd4bca6c5e601dbe6b536fd7942092ea6a08a0a95805693c
+ALPINE_TAG=3.24.1
+ALPINE_DIGEST=sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18
 # The immutable OCI digest owns the 16-package base manifest. The second lock owns the complete
 # 54-package add-on closure installed for ntfsmac; all lock hashes are part of the runtime marker.
-ALPINE_BASE_PACKAGES_SHA256=85e9215b8f88eccf3fdac72339f8d50f1006654e3055475a5e61a2ab654bdf42
-ALPINE_PACKAGES_SHA256=741e6d9492808f21c9ee14da78d8fa2ce5ed7625d13169a21e7936b6f2989544
+ALPINE_BASE_PACKAGES_SHA256=00afb49158f9a22de9da83c5ecac44d29e50c9460f24d21d952bd4af1f43d370
+ALPINE_PACKAGES_SHA256=99fc0338f8c2768c3c9dc5416fe26adf5195b572a96c49eb7d0ce426e920c1fe
 # Every add-on APK is also pinned to an Alpine channel and byte-level SHA-256. The guest downloads
 # only these artifacts and installs them locally with network access disabled for apk itself.
-ALPINE_APKS_SHA256=c38c8971d12c553d2aa6703bb0197b8ea805e6fef1ad4880a9d38450a26c5416
+ALPINE_APKS_SHA256=6c06f60d19d0b03aca323613838f4cc76bdf3c22a370aa38739d5a5f7087496e
 
 # util-linux — Homebrew BUILD-toolchain dep (not a runtime dep, not built from source here).
 # anylinuxfs depends on libblkid-rs/libblkid-rs-sys for host-side FS probing; the submodule's

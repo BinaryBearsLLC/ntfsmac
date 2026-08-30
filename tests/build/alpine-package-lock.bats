@@ -96,7 +96,7 @@ setup() {
 @test "runtime validation rejects edge for a non-ntfs package" {
   local fixture expected
   fixture="$BATS_TEST_TMPDIR/unapproved-edge.lock"
-  sed 's/^bash=5\.3\.3-r1 v3\.23\/main /bash=5.3.3-r1 edge\/main /' "$APK_LOCK" > "$fixture"
+  sed -E 's/^(bash=[^ ]+) v3\.24\/main /\1 edge\/main /' "$APK_LOCK" > "$fixture"
   expected="$(shasum -a 256 "$fixture" | awk '{print $1}')"
 
   run env FIXTURE="$fixture" EXPECTED="$expected" bash -c '

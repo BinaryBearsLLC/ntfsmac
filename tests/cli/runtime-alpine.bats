@@ -156,7 +156,7 @@ make_initialized_cache() {
   previous_base="$(runtime_alpine_cache_path "$TEST_HOME")"
 
   sed -i '' \
-    's/^ALPINE_TAG=.*/ALPINE_TAG=3.23.6/; s/^ALPINE_DIGEST=.*/ALPINE_DIGEST=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/' \
+    's/^ALPINE_TAG=.*/ALPINE_TAG=3.24.2/; s/^ALPINE_DIGEST=.*/ALPINE_DIGEST=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/' \
     "$LOCK_FIXTURE"
   runtime_alpine_load
   local upgraded_base

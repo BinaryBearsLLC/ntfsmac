@@ -454,16 +454,58 @@ continues to accept the exact `go-version` input used by ntfsmac.
 
 No hardware, signing, notarization, installation, release, or remote/public action was performed.
 
+## Checkpoint O — Alpine 3.24.1 guest base and exact package closure
+
+Status: local source/build/package validation complete; native VM and real-drive acceptance
+outstanding.
+
+Only the Alpine guest base and its exact package closure changed. The release moves from 3.23.5
+to current stable patch 3.24.1 for linux/arm64, locked to official manifest digest
+`sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18`. The package
+names and closure sizes are unchanged: 16 OCI-base packages, 54 add-on APKs, 70 installed
+packages in total. The regenerated lock hashes are:
+
+- base manifest: `00afb49158f9a22de9da83c5ecac44d29e50c9460f24d21d952bd4af1f43d370`;
+- add-on manifest: `99fc0338f8c2768c3c9dc5416fe26adf5195b572a96c49eb7d0ce426e920c1fe`;
+- exact APK artifact lock: `6c06f60d19d0b03aca323613838f4cc76bdf3c22a370aa38739d5a5f7087496e`.
+
+The main compatibility changes include musl 1.2.5 to 1.2.6, util-linux 2.41.4 to 2.42.1,
+cryptsetup 2.8.1 to 2.8.6, Python 3.12.14 to 3.14.7, SquashFS tools 4.7.4 to 4.7.5, and
+the corresponding library/revision updates. The previously isolated ntfs-3g security family
+remains exactly 2026.7.7-r0. It is still the only family allowed from `edge/main`; every other
+add-on APK resolves from Alpine v3.24 stable repositories.
+
+Reproducibility and compatibility evidence:
+
+- fresh official ARM64 base extraction reproduced the exact 16-package lock;
+- all 54 APK artifacts were downloaded once, hashed byte-for-byte, and then mounted read-only
+  into an ephemeral ARM64 container with networking disabled;
+- `apk --no-network` verified signatures, installed exactly 70 packages, and matched the expected
+  database; executable/linkage smoke checks passed for bash, blkid, cryptsetup, lsblk, LVM,
+  mount, NFS utilities, Python 3.14.7, SquashFS 4.7.5, and ntfs-3g 2026.7.7;
+- focused Alpine/runtime/diagnostic gates: PASS, 76/76;
+- real project build: PASS with 58/58 Rust tests; complete Bats gate: PASS, 372/372;
+- `build.command gui`: PASS; Standard Swift 307/307 and Legacy Swift 307/307 with expected
+  deprecation warnings only, both apps/DMGs/checksum sidecars verified;
+- mounted-artifact gate: PASS for both DMGs attached read-only; app version 3.1.1, deep/strict
+  Developer ID verification, Hardened Runtime, and the exact Alpine 3.24.1 digest/cache/package
+  contract present in each bundle.
+
+Docker Desktop was started only for the isolated no-network container checks and stopped again
+afterward. No host disk was exposed to a container. The native libkrun VM still returns `EINVAL`
+before guest execution, so no live guest NFS/vmnet path, disk mount, or hardware result is
+claimed. No installation, notarization, push, release, or publication was performed.
+
 ## Validation categories
 
 - Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed
   355/355; checkpoints E and H passed 360/360; checkpoint J passed 362/362. Checkpoints C through
-  E, H, J, and K also passed 307/307 in each Swift variant and mounted-DMG verification for both
-  outputs. Checkpoint K passed 367/367 Bats. `PopoverStateRenderTests` compiled but remained
-  skipped by the documented macOS 26.6.2 guard.
+  E, H, J, K, and O also passed 307/307 in each Swift variant and mounted-DMG verification for
+  both outputs. Checkpoint K passed 367/367 Bats; checkpoint O passed 372/372.
+  `PopoverStateRenderTests` compiled but remained skipped by the documented macOS 26.6.2 guard.
 - Hardware: no real-drive test; local VM guest setup blocked as documented above.
 - Signing: standalone runtime gates used ad-hoc signatures; checkpoints C through E, H, and J
-  packaging also verified the locally available BinaryBears Developer ID on both app variants.
-  Required hypervisor/virtualization entitlements passed.
+  packaging also verified the locally available BinaryBears Developer ID on both app variants;
+  checkpoint O repeated that gate. Required hypervisor/virtualization entitlements passed.
 - Notarization: not run.
 - Remote/public state: untouched; no push or release.
