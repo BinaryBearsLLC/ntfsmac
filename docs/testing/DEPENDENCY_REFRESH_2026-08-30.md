@@ -496,16 +496,46 @@ afterward. No host disk was exposed to a container. The native libkrun VM still 
 before guest execution, so no live guest NFS/vmnet path, disk mount, or hardware result is
 claimed. No installation, notarization, push, release, or publication was performed.
 
+## Checkpoint P — Go toolchain 1.27.0
+
+Status: local source/build/package validation complete; hosted GitHub runner execution and native
+hardware acceptance outstanding.
+
+Only the exact Go compiler pin changed, from 1.26.7 to the current stable 1.27.0 release. The
+official darwin/arm64 archive metadata reports SHA-256
+`90493b3bbd5e10f91d12153198bf1994fd756399b4fec93b49b0c6e2acdeeb3e`; local builds obtain
+the authenticated toolchain through `GOTOOLCHAIN=go1.27.0` and the existing checksum-database
+path. No Go module, gvproxy source, security-overlay version, or overlay hash changed.
+
+Validation:
+
+- exact-toolchain preflight and focused Go/action wiring gates: PASS, 9/9;
+- unchanged init-rootfs module compile/test: PASS for both packages (no test files);
+- exact gvproxy v0.8.9 source build with x/crypto v0.55.0: PASS; the locked module-overlay hash
+  remained byte-identical and the output reports Go 1.27.0;
+- `govulncheck 1.7.0` under the candidate toolchain: gvproxy has 0 reachable vulnerabilities;
+  init-rootfs retains the already recorded GO-2026-5932 OpenPGP finding, for which the database
+  provides no fixed version;
+- real project build: PASS with 58/58 Rust tests; complete Bats gate: PASS, 372/372;
+- `build.command gui`: PASS; Standard Swift 307/307 and Legacy Swift 307/307 with expected
+  deprecation warnings only, both apps/DMGs/checksum sidecars verified;
+- mounted-artifact gate: PASS for both DMGs attached read-only; deep/strict Developer ID and
+  Hardened Runtime verification passed, and both embedded Go binaries report Go 1.27.0.
+
+The native libkrun VM still returns the existing pre-guest `EINVAL`; no real drive was accessed or
+mounted. Hosted `actions/setup-go`, installation, notarization, push, release, and publication
+were not exercised.
+
 ## Validation categories
 
 - Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed
   355/355; checkpoints E and H passed 360/360; checkpoint J passed 362/362. Checkpoints C through
-  E, H, J, K, and O also passed 307/307 in each Swift variant and mounted-DMG verification for
-  both outputs. Checkpoint K passed 367/367 Bats; checkpoint O passed 372/372.
+  E, H, J, K, O, and P also passed 307/307 in each Swift variant and mounted-DMG verification for
+  both outputs. Checkpoint K passed 367/367 Bats; checkpoints O and P passed 372/372.
   `PopoverStateRenderTests` compiled but remained skipped by the documented macOS 26.6.2 guard.
 - Hardware: no real-drive test; local VM guest setup blocked as documented above.
 - Signing: standalone runtime gates used ad-hoc signatures; checkpoints C through E, H, and J
   packaging also verified the locally available BinaryBears Developer ID on both app variants;
-  checkpoint O repeated that gate. Required hypervisor/virtualization entitlements passed.
+  checkpoints O and P repeated that gate. Required hypervisor/virtualization entitlements passed.
 - Notarization: not run.
 - Remote/public state: untouched; no push or release.

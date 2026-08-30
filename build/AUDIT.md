@@ -675,3 +675,25 @@ produced checksum-valid DMGs. Both DMGs were mounted read-only and passed app ve
 Developer ID, Hardened Runtime, and embedded Alpine-contract verification. The native libkrun
 path still fails before guest execution with `EINVAL`; no real drive, installation, notarization,
 or remote action was performed.
+
+## Go 1.27.0 exact toolchain update (dependency refresh, 2026-08-31)
+
+The build-toolchain pin moves from Go 1.26.7 to current stable Go 1.27.0. The official
+darwin/arm64 archive metadata reported SHA-256
+`90493b3bbd5e10f91d12153198bf1994fd756399b4fec93b49b0c6e2acdeeb3e`; the project continues
+to resolve the exact toolchain through authenticated `GOTOOLCHAIN` downloads without changing
+the host-global installation. No Go module or runtime-source pin changed.
+
+The unchanged init-rootfs module compiled under 1.27.0. The exact gvproxy v0.8.9 export rebuilt
+with the existing x/crypto v0.55.0 overlay, and the locked `go.mod`/`go.sum` aggregate hash did not
+change. Both shipped Go binaries report Go 1.27.0. A `govulncheck 1.7.0` scan executed under the
+candidate toolchain reported zero reachable gvproxy vulnerabilities. Init-rootfs retains the
+known GO-2026-5932 OpenPGP finding inherited through the image stack; the vulnerability database
+offers no fixed version, so there is no actionable package bump to mix into this compiler update.
+
+Exact preflight and 9 focused toolchain/action tests passed, followed by 58/58 Rust tests in the
+real project build and 372/372 Bats tests. Both GUI variants passed 307/307 Swift tests and emitted
+checksum-valid DMGs. Read-only-mounted Standard and Legacy apps passed deep/strict BinaryBears
+Developer ID and Hardened Runtime verification, and their embedded gvproxy/init-rootfs binaries
+both report Go 1.27.0. The native VM still stops before guest execution with `EINVAL`; no hardware,
+drive, notarization, or remote action was performed.

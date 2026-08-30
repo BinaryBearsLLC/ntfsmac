@@ -13,7 +13,7 @@ VMPROXY_VERSION=0.19.0
 # Go build toolchain — exact supported patch line. Local builds select this version through
 # GOTOOLCHAIN (authenticated by the Go checksum database); CI resolves the same pin before
 # actions/setup-go. Do not use the host-global version or a floating "stable" selector.
-GO_TOOLCHAIN_VERSION=go1.26.7
+GO_TOOLCHAIN_VERSION=go1.27.0
 
 # Rust build toolchain — exact current stable release. Local builds select it through rustup's
 # RUSTUP_TOOLCHAIN override; CI/release resolve the same pin before dtolnay/rust-toolchain.
