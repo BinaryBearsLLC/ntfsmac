@@ -543,3 +543,20 @@ build, and 307/307 Swift tests in each Standard and Legacy variant. Both read-on
 contained the locked helper with a valid Developer ID signature and virtualization entitlement.
 No live VM/network/drive gate passed: libkrun still exits with `EINVAL` before guest setup. No
 notarization or remote action was performed.
+
+## gvproxy v0.8.9 release review (2026-08-30)
+
+The official release feed still identifies v0.8.9 / commit
+`9cfc86f66679ef0feed0f20ba1df558fe2bef5c6` as current. This matches both
+`build/sources.lock` and anylinuxfs's independent 0.8.9 download pin, so no top-level gvproxy pin
+changed. A fresh source build with locked Go 1.26.7 passed, the binary metadata contains the exact
+module version and clean VCS revision, and all self-contained upstream unit-test packages passed.
+
+The upstream `test-qemu` and `test-vfkit` packages require a separately staged integration
+environment (`../bin/gvproxy`, QEMU/vfkit, and VM fixtures). A literal `go test ./...` stopped on
+those missing harness prerequisites; those two suites are therefore unverified rather than
+reported as passing.
+
+The release itself is not security-clean: `govulncheck 1.7.0` reports five reachable SSH findings
+in direct dependency `golang.org/x/crypto v0.50.0`, fixed in v0.52.0. That dependency update is a
+separate checkpoint; it is not mixed into this release review.

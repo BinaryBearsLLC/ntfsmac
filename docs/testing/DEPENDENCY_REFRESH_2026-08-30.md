@@ -267,6 +267,31 @@ The native libkrun VM still returns `start vm error: Invalid argument (errno 22)
 execution. Therefore no live vmnet traffic, NFS transport, VM guest, or real drive was exercised.
 No installation, notarization, push, release, or publication was performed.
 
+## Checkpoint I — gvproxy v0.8.9 review, no top-level pin change
+
+Status: current release retained; reachable Go dependency findings move to the next isolated
+checkpoint.
+
+The official `containers/gvisor-tap-vsock` release feed still names v0.8.9 as latest and resolves
+the existing commit `9cfc86f66679ef0feed0f20ba1df558fe2bef5c6`. anylinuxfs's own
+`download-dependencies.sh` independently pins 0.8.9, so there is no top-level version drift. The
+source build completed from that exact clean commit with the locked Go 1.26.7 toolchain, and the
+binary metadata records module v0.8.9 plus the expected VCS revision.
+
+All upstream unit-test packages passed. The repository's `test-qemu` and `test-vfkit` packages
+are integration harnesses rather than self-contained unit suites: a literal `go test ./...`
+downloaded their Fedora CoreOS fixture and then stopped because the harness-specific
+`../bin/gvproxy` and `vfkit` executables were not staged. They are recorded as not run, not as a
+product regression or pass.
+
+`govulncheck 1.7.0` finds five reachable `x/crypto/ssh` findings in the release's direct
+`golang.org/x/crypto v0.50.0` dependency. All five report a fix in v0.52.0. The top-level release
+pin remains unchanged in this review; the transitive security update is handled next as its own
+checkpoint and will not be hidden inside this no-change result.
+
+No VM, real drive, installation, notarization, push, release, or publication action was performed
+for this checkpoint.
+
 ## Validation categories
 
 - Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed
