@@ -9,6 +9,8 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 # shellcheck source=lib/lock.sh
 source "$SCRIPT_DIR/lib/lock.sh"
+# shellcheck source=lib/go-toolchain.sh
+source "$SCRIPT_DIR/lib/go-toolchain.sh"
 
 CACHE_DIR="${NTFSMAC_GVPROXY_CACHE_DIR:-$REPO_ROOT/build/.cache/gvisor-tap-vsock}"
 BIN_DIR="${NTFSMAC_VENDOR_BIN_DIR:-$REPO_ROOT/vendor/bin}"
@@ -62,7 +64,7 @@ main() {
   fi
 
   echo "build-gvproxy: building gvproxy @ $commit"
-  (cd "$CACHE_DIR" && go build -o "$BIN_DIR/gvproxy" ./cmd/gvproxy)
+  (cd "$CACHE_DIR" && go_with_locked_toolchain build -o "$BIN_DIR/gvproxy" ./cmd/gvproxy)
   chmod +x "$BIN_DIR/gvproxy"
   echo "build-gvproxy: done — $BIN_DIR/gvproxy"
 }

@@ -10,6 +10,11 @@ ANYLINUXFS_VERSION=0.19.0
 ANYLINUXFS_COMMIT=0a4472bd7507c1f9a57894547c1af7ea4382d99f
 VMPROXY_VERSION=0.19.0
 
+# Go build toolchain — exact supported patch line. Local builds select this version through
+# GOTOOLCHAIN (authenticated by the Go checksum database); CI resolves the same pin before
+# actions/setup-go. Do not use the host-global version or a floating "stable" selector.
+GO_TOOLCHAIN_VERSION=go1.26.7
+
 # libkrun (Cargo dependency of anylinuxfs + vmrunner-sys), branch stable-1.19.x.
 # Per PLAN.md §1/CLAUDE.md: exact commit comes from Cargo.lock, not hand-edited here.
 LIBKRUN_BRANCH=stable-1.19.x

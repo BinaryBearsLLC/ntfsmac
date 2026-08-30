@@ -133,6 +133,35 @@ v0.19.0 commit is the rollback target.
 - No real-drive/hardware test, installation, notarization, push, release, or publication was
   performed.
 
+## Go 1.26.7 locked toolchain update (2026-08-30)
+
+The local and CI build toolchain advances from the previously unpinned host Go 1.26.5 to the
+exact `go1.26.7` patch release. The [official Go release history](https://go.dev/doc/devel/release)
+records security fixes in 1.26.6 and an additional `net/http` fix in 1.26.7. Go 1.27.0 is a
+separate major-version compatibility candidate and is not folded into this patch-line checkpoint.
+
+- `GO_TOOLCHAIN_VERSION` is now a required `sources.lock` pin. Local Go build entrypoints use
+  `GOTOOLCHAIN=<exact-version>` through one shared helper; the host Homebrew installation remains
+  untouched. Per the [official toolchain documentation](https://go.dev/doc/toolchain), a selected
+  downloaded toolchain is distributed as a Go module and authenticated by the checksum database.
+- Both GitHub workflows resolve the same lock value before `actions/setup-go`; the previous
+  floating `stable` selector is gone. The preflight verifies the exact selected patch version and
+  fails closed on a missing, malformed, or mismatched lock.
+- The complete runtime build passes all 58 Cargo tests and produces arm64 `gvproxy` and
+  `init-rootfs` Mach-O binaries whose embedded build metadata reports `go1.26.7`. Both pass local
+  signature verification. The complete Bats gate passes 360/360, including five new exact-pin and
+  anti-drift tests.
+- `govulncheck 1.7.0`, itself built and run with Go 1.26.7 against the pinned `init-rootfs`
+  module, reports one reachable finding instead of the five seen after the gRPC checkpoint. The
+  four standard-library findings are absent; only `GO-2026-5932` remains for the transitive,
+  unmaintained `x/crypto/openpgp` package, for which the database publishes no fix.
+- `build.command gui` passes 307/307 Swift tests for Standard and Legacy, builds and locally signs
+  both app/DMG variants, and verifies their SHA-256 sidecars. Both DMGs then pass a read-only mount,
+  deep/strict app-signature check, version 3.1.1 check, and embedded Go metadata check for both
+  `gvproxy` and `init-rootfs`.
+- Native VM startup retains the pre-guest `EINVAL` limitation. No disk is accessed; no real-drive
+  test, installation, notarization, push, release, or publication is performed.
+
 ## Runtime Alpine pin and cache migration (P0.1, 2026-08-05)
 
 - `ALPINE_TAG`, the linux/arm64 `ALPINE_DIGEST`, and `ANYLINUXFS_COMMIT` remain the only inputs.

@@ -28,6 +28,8 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 # shellcheck source=lib/lock.sh
 source "$SCRIPT_DIR/lib/lock.sh"
+# shellcheck source=lib/go-toolchain.sh
+source "$SCRIPT_DIR/lib/go-toolchain.sh"
 # shellcheck source=../cli/lib/runtime-alpine.sh
 source "$REPO_ROOT/cli/lib/runtime-alpine.sh"
 # shellcheck source=lib/patch-runtime-alpine.sh
@@ -251,7 +253,7 @@ build_vmrunner_sys() {
 }
 
 build_init_rootfs_bin() {
-  (cd "$CACHE_DIR/init-rootfs" && CGO_ENABLED=1 go build -tags 'containers_image_openpgp osusergo' -ldflags="-w -s" -o bin/init-rootfs .)
+  (cd "$CACHE_DIR/init-rootfs" && CGO_ENABLED=1 go_with_locked_toolchain build -tags 'containers_image_openpgp osusergo' -ldflags="-w -s" -o bin/init-rootfs .)
 }
 
 # vendor_init_rootfs_bin — copies the built binary out of the ephemeral cache into

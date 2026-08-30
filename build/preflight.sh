@@ -4,6 +4,12 @@
 # Never installs anything; never assumes a tool exists. Refuses non-arm64 hosts.
 set -uo pipefail
 
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+# shellcheck source=lib/lock.sh
+source "$SCRIPT_DIR/lib/lock.sh"
+# shellcheck source=lib/go-toolchain.sh
+source "$SCRIPT_DIR/lib/go-toolchain.sh"
+
 FAIL=0
 
 check_arch() {
@@ -29,12 +35,33 @@ check_tool() {
   printf '%-20s %-10s %s\n' "$name" "OK" "$version_output"
 }
 
+check_go_toolchain() {
+  local expected version_output actual
+  expected="$(go_locked_toolchain_version)" || {
+    printf '%-20s %-10s %s\n' "go" "FAIL" "invalid or missing GO_TOOLCHAIN_VERSION"
+    FAIL=1
+    return
+  }
+  if ! version_output="$(go_with_locked_toolchain version 2>&1)"; then
+    printf '%-20s %-10s %s\n' "go" "FAIL" "$version_output"
+    FAIL=1
+    return
+  fi
+  actual="$(awk '{print $3}' <<< "$version_output")"
+  if [[ "$actual" != "$expected" ]]; then
+    printf '%-20s %-10s %s\n' "go" "FAIL" "expected $expected, selected $actual"
+    FAIL=1
+    return
+  fi
+  printf '%-20s %-10s %s\n' "go" "OK" "$version_output (locked)"
+}
+
 echo "=== ntfsmac build preflight ==="
 check_arch
 check_tool "git" git
 check_tool "cargo" cargo
 check_tool "rustc" rustc
-check_tool "go" go version
+check_go_toolchain
 check_tool "umoci" umoci
 check_tool "lld" ld.lld
 check_tool "codesign" codesign -v

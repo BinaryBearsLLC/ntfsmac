@@ -28,10 +28,13 @@ jobs:
         run: |
           brew install llvm lld umoci xz util-linux gettext pkg-config
           echo "/opt/homebrew/opt/llvm/bin" >> $GITHUB_PATH
+      - name: Resolve locked Go toolchain
+        id: go-toolchain
+        run: echo "version=$(./build/lib/lock.sh get GO_TOOLCHAIN_VERSION | sed 's/^go//')" >> "$GITHUB_OUTPUT"
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: 'stable'
+          go-version: ${{ steps.go-toolchain.outputs.version }}
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
