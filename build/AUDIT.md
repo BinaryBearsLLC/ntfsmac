@@ -185,6 +185,26 @@ Decision: retain 1.19.3 as the newest reproducible published crate. Re-evaluate 
 newer compatible 1.19.x crate is published. No hardware, signing, notarization, or remote gate is
 claimed from this no-change review.
 
+## nohajc/libkrunfw release review (2026-08-30)
+
+No libkrunfw pin changes in this checkpoint. The official GitHub releases API for the required
+`nohajc/libkrunfw` fork reports `v6.12.62-rev1` as its latest non-draft, non-prerelease release,
+so the existing source and runtime contract are current.
+
+- GitHub's published digest for `linux-aarch64-Images-v6.12.62-anylinuxfs.tar.gz` is
+  `1de75a3d4ef2eccd41df10f2eac8435dbaba52371fa42b0b0384fd9cf9a1f3ce`, exactly matching
+  `LIBKRUNFW_IMAGES_SHA256`.
+- GitHub's published digest for `modules.squashfs` is
+  `86ed485e4e46ba265261a55e25c92ea15f6118003fcec95a8bafde8ad39f697f`, exactly matching
+  `LIBKRUNFW_MODULES_SHA256`.
+- A fresh `build/fetch-prebuilt.sh` download verifies both hashes and produces the expected ARM64
+  16K and 4K kernel images plus the SquashFS module archive. `build/verify-vendor.sh` passes the
+  runtime kernel pin and existing architecture/quarantine/signature checks.
+
+Decision: retain `v6.12.62-rev1`; there is no newer fork release to apply. The fetch helper also
+downloads the separately pinned vmnet-helper by design, but that component is not evaluated or
+accepted by this checkpoint. No VM boot, real-drive, notarization, or remote action is claimed.
+
 ## Runtime Alpine pin and cache migration (P0.1, 2026-08-05)
 
 - `ALPINE_TAG`, the linux/arm64 `ALPINE_DIGEST`, and `ANYLINUXFS_COMMIT` remain the only inputs.

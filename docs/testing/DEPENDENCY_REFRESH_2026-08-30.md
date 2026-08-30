@@ -208,6 +208,24 @@ instead of being hidden inside this review.
 No hardware, signing, notarization, push, release, or publication action was performed for this
 no-change checkpoint.
 
+## Checkpoint G — nohajc/libkrunfw review, no pin change
+
+Status: current release retained.
+
+The official release feed for the required `nohajc` fork still names `v6.12.62-rev1` as latest.
+Its published SHA-256 values for both consumed assets exactly match `sources.lock`:
+
+- Images archive: `1de75a3d4ef2eccd41df10f2eac8435dbaba52371fa42b0b0384fd9cf9a1f3ce`;
+- modules archive: `86ed485e4e46ba265261a55e25c92ea15f6118003fcec95a8bafde8ad39f697f`.
+
+A fresh download verified both assets and extracted ARM64 16K/4K kernel images; the module archive
+is valid SquashFS. `build/verify-vendor.sh` passed the runtime-kernel pin and existing vendor
+checks. No source or pin changed. vmnet-helper is downloaded by the shared fetch script but remains
+a separate dependency decision.
+
+No VM boot, drive access, notarization, push, release, or publication was performed for this
+no-change checkpoint.
+
 ## Validation categories
 
 - Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed
