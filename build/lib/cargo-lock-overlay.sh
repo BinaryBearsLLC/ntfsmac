@@ -25,45 +25,59 @@ cargo_lock_package_versions() {
   ' "$lock_file"
 }
 
+cargo_update_exact_if_present() {
+  local crate_dir="$1" package="$2" version_key="$3"
+  local lock_file="$crate_dir/Cargo.lock"
+  local expected_version versions version
+
+  expected_version="$(lock_get "$version_key")" || {
+    echo "cargo-lock-overlay: HARD-STOP — $version_key missing from sources.lock" >&2
+    return 1
+  }
+  if [[ ! "$expected_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "cargo-lock-overlay: HARD-STOP — malformed $package version" >&2
+    return 1
+  fi
+
+  versions="$(cargo_lock_package_versions "$lock_file" "$package")"
+  [[ -n "$versions" ]] || return 0
+
+  if ! rust_with_locked_toolchain cargo update --manifest-path "$crate_dir/Cargo.toml" \
+        -p "$package" --precise "$expected_version"; then
+    echo "cargo-lock-overlay: HARD-STOP — could not resolve $package $expected_version" >&2
+    return 1
+  fi
+  versions="$(cargo_lock_package_versions "$lock_file" "$package")"
+  while IFS= read -r version; do
+    if [[ "$version" != "$expected_version" ]]; then
+      echo "cargo-lock-overlay: HARD-STOP — resolved $package $version, expected $expected_version" >&2
+      return 1
+    fi
+  done <<< "$versions"
+}
+
 cargo_apply_lock_overlay() {
   local crate_dir="$1" expected_hash_key="$2"
   local lock_file="$crate_dir/Cargo.lock"
-  local anyhow_version expected_hash actual_hash versions version
+  local expected_hash actual_hash
 
   if [[ ! -f "$crate_dir/Cargo.toml" || ! -f "$lock_file" ]]; then
     echo "cargo-lock-overlay: HARD-STOP — Cargo manifest or lock missing in $crate_dir" >&2
     return 1
   fi
 
-  anyhow_version="$(lock_get CARGO_ANYHOW_VERSION)" || {
-    echo "cargo-lock-overlay: HARD-STOP — CARGO_ANYHOW_VERSION missing from sources.lock" >&2
-    return 1
-  }
   expected_hash="$(lock_get "$expected_hash_key")" || {
     echo "cargo-lock-overlay: HARD-STOP — $expected_hash_key missing from sources.lock" >&2
     return 1
   }
-  if [[ ! "$anyhow_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ||
-        ! "$expected_hash" =~ ^[0-9a-f]{64}$ ]]; then
-    echo "cargo-lock-overlay: HARD-STOP — malformed crate version or lock hash" >&2
+  if [[ ! "$expected_hash" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "cargo-lock-overlay: HARD-STOP — malformed lock hash" >&2
     return 1
   fi
 
-  versions="$(cargo_lock_package_versions "$lock_file" anyhow)"
-  if [[ -n "$versions" ]]; then
-    if ! rust_with_locked_toolchain cargo update --manifest-path "$crate_dir/Cargo.toml" \
-          -p anyhow --precise "$anyhow_version"; then
-      echo "cargo-lock-overlay: HARD-STOP — could not resolve anyhow $anyhow_version" >&2
-      return 1
-    fi
-    versions="$(cargo_lock_package_versions "$lock_file" anyhow)"
-    while IFS= read -r version; do
-      if [[ "$version" != "$anyhow_version" ]]; then
-        echo "cargo-lock-overlay: HARD-STOP — resolved anyhow $version, expected $anyhow_version" >&2
-        return 1
-      fi
-    done <<< "$versions"
-  fi
+  cargo_update_exact_if_present "$crate_dir" anyhow CARGO_ANYHOW_VERSION || return 1
+  cargo_update_exact_if_present "$crate_dir" crossbeam-epoch \
+    CARGO_CROSSBEAM_EPOCH_VERSION || return 1
 
   actual_hash="$(shasum -a 256 "$lock_file" | awk '{print $1}')"
   if [[ "$actual_hash" != "$expected_hash" ]]; then

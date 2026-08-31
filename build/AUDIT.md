@@ -717,3 +717,23 @@ and Legacy GUI builds each passed 307/307 Swift tests and produced checksum-vali
 were attached read-only and passed deep/strict BinaryBears Developer ID and Hardened Runtime
 verification. The native VM remains blocked before guest execution by `EINVAL`; no hardware,
 drive, installation, notarization, push, release, publication, or remote action was performed.
+
+## crossbeam-epoch 0.9.20 security update (dependency refresh, 2026-08-31)
+
+The anylinuxfs Cargo graph now resolves exact crossbeam-epoch 0.9.20 instead of 0.9.18, removing
+RUSTSEC-2026-0204. The update is applied only to a disposable anylinuxfs build copy and the complete
+post-overlay Cargo.lock is pinned to SHA-256
+`5b78d0605ef0f495f3104f45d2710dd2f4217c7c5fdbcbf76f70933282963ad4`. Other workspace
+locks and the upstream submodule remain unchanged.
+
+Nine focused overlay/lock tests and shell static analysis passed. The real project build supplied
+the required static-libblkid and Linux cross-build environment and passed all 58 upstream Rust
+tests (8 common-utils, 41 anylinuxfs, and 9 vmproxy). Cargo-audit 0.22.2 no longer reports the
+crossbeam advisory; the two quick-xml vulnerabilities and the bincode/lru warnings remain visible
+for their own checkpoints. The complete Bats suite passed 375/375.
+
+Standard and Legacy GUI builds each passed 307/307 Swift tests and emitted checksum-valid DMGs.
+Both DMGs were attached read-only and passed version 3.1.1, deep/strict BinaryBears Developer ID
+(Team SQY8T23X8N), and Hardened Runtime checks. The native VM remains blocked before guest
+execution by `EINVAL`; no hardware, drive, installation, notarization, push, release, publication,
+or remote action was performed.

@@ -9,9 +9,11 @@ setup() {
 }
 
 @test "Cargo overlay pins exact versions and complete lock hashes" {
-  run "$LOCK_SH" get CARGO_ANYHOW_VERSION
-  [ "$status" -eq 0 ]
-  [[ "$output" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+  for key in CARGO_ANYHOW_VERSION CARGO_CROSSBEAM_EPOCH_VERSION; do
+    run "$LOCK_SH" get "$key"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+  done
 
   for key in CARGO_ANYLINUXFS_LOCK_SHA256 CARGO_COMMON_UTILS_LOCK_SHA256 \
              CARGO_VMPROXY_LOCK_SHA256 CARGO_VMRUNNER_SYS_LOCK_SHA256; do
@@ -21,24 +23,32 @@ setup() {
   done
 }
 
-@test "overlay updates a disposable common-utils lock and leaves the submodule clean" {
+@test "overlay updates disposable locks and leaves the submodule clean" {
   local fixture before_status after_status
-  fixture="$BATS_TEST_TMPDIR/common-utils"
-  cp -R "$REPO_ROOT/vendor/src/anylinuxfs/common-utils" "$fixture"
+  fixture="$BATS_TEST_TMPDIR/anylinuxfs-copy"
+  mkdir -p "$fixture"
+  cp -R "$REPO_ROOT/vendor/src/anylinuxfs/common-utils" "$fixture/common-utils"
+  cp -R "$REPO_ROOT/vendor/src/anylinuxfs/anylinuxfs" "$fixture/anylinuxfs"
   before_status="$(git -C "$REPO_ROOT/vendor/src/anylinuxfs" status --porcelain)"
 
   run bash -c '
     source "$1"
     source "$2"
     source "$3"
-    cargo_apply_lock_overlay "$4" CARGO_COMMON_UTILS_LOCK_SHA256
+    cargo_apply_lock_overlay "$4/common-utils" CARGO_COMMON_UTILS_LOCK_SHA256
+    cargo_apply_lock_overlay "$4/anylinuxfs" CARGO_ANYLINUXFS_LOCK_SHA256
   ' _ "$LOCK_SH" "$RUST_HELPER" "$OVERLAY_HELPER" "$fixture"
   [ "$status" -eq 0 ]
   [[ "$output" == *"common-utils lock verified"* ]]
+  [[ "$output" == *"anylinuxfs lock verified"* ]]
   run bash -c 'source "$1"; cargo_lock_package_versions "$2" anyhow' _ \
-    "$OVERLAY_HELPER" "$fixture/Cargo.lock"
+    "$OVERLAY_HELPER" "$fixture/anylinuxfs/Cargo.lock"
   [ "$status" -eq 0 ]
   [ "$output" = "1.0.104" ]
+  run bash -c 'source "$1"; cargo_lock_package_versions "$2" crossbeam-epoch' _ \
+    "$OVERLAY_HELPER" "$fixture/anylinuxfs/Cargo.lock"
+  [ "$status" -eq 0 ]
+  [ "$output" = "0.9.20" ]
 
   after_status="$(git -C "$REPO_ROOT/vendor/src/anylinuxfs" status --porcelain)"
   [ "$after_status" = "$before_status" ]
