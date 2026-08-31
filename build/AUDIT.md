@@ -298,10 +298,10 @@ written to `build/alpine-packages.trimmed.txt`.
 normal **crates.io** semver dependency, not a direct git dependency. `CLAUDE.md`'s table says
 "Cargo.lock exact commit — not hand-edited," which assumes a git dependency; in reality the pin
 that matters is the crates.io package version + Cargo.lock's checksum for that exact published
-crate (still not hand-edited — same spirit, different mechanism). `build/sources.lock`'s
-`LIBKRUN_COMMIT=SEE_CARGO_LOCK` entry still holds (Cargo.lock remains the source of truth), but
-recorded here since it's a real discrepancy from the assumption in CLAUDE.md, not an invented
-fact — flagged here for awareness, not blocking.
+crate (still not hand-edited — same spirit, different mechanism). `build/sources.lock` now records
+that archive checksum explicitly as `LIBKRUN_CRATE_SHA256`, and a regression test compares it with
+both consumer lockfiles. This is a real discrepancy from the assumption in CLAUDE.md, not an
+invented fact; the reproducibility control follows the actual registry supply path.
 
 ## `init-freebsd` / `gvproxy-darwin` — confirms settled cuts are real, not just theoretical
 
@@ -737,6 +737,19 @@ Both DMGs were attached read-only and passed version 3.1.1, deep/strict BinaryBe
 (Team SQY8T23X8N), and Hardened Runtime checks. The native VM remains blocked before guest
 execution by `EINVAL`; no hardware, drive, installation, notarization, push, release, publication,
 or remote action was performed.
+
+## libkrun registry checksum coverage, no version change (dependency refresh, 2026-08-31)
+
+Crates.io still exposes 1.19.3 as the newest published libkrun package; upstream GitHub tag
+v1.19.4 is still not published there. The version decision therefore remains unchanged. The
+historical `LIBKRUN_COMMIT=SEE_CARGO_LOCK` placeholder was inaccurate because both consumers use a
+registry archive rather than a git dependency.
+
+`sources.lock` now records the real crates.io archive SHA-256
+`f414a63a9e7f9134c71581eca90ef5dfdf55693d9c602ba2a81794a0ebee716d`, and a focused test
+checks version, registry source, and checksum in both consumer Cargo.lock files. The lock gate
+passed 7/7. No dependency graph changed and no build, hardware, signing, notarization, or remote
+result is claimed from this metadata-only correction.
 
 ## bincode maintenance review, no pin change (dependency refresh, 2026-08-31)
 

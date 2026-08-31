@@ -687,6 +687,22 @@ was triggered, so Pages artifact upload, OIDC deployment, and runner compatibili
 gates. No local runtime, hardware, signing, notarization, push, release, or publication action was
 performed.
 
+## Checkpoint W — libkrun registry checksum coverage, no version change
+
+Status: current published crate retained; central lock corrected to match the actual supply path.
+
+The fresh registry/repository review still finds 1.19.3 as the newest published libkrun crate.
+GitHub tag v1.19.4 remains unavailable on crates.io, so the earlier no-change version decision is
+unchanged. The inventory did find a misleading historical key: `LIBKRUN_COMMIT=SEE_CARGO_LOCK`
+described a git commit even though both consumers use the crates.io archive.
+
+That placeholder is replaced by exact archive SHA-256
+`f414a63a9e7f9134c71581eca90ef5dfdf55693d9c602ba2a81794a0ebee716d`. A focused lock test
+now verifies version 1.19.3, registry source, and this checksum in both anylinuxfs and vmrunner-sys
+Cargo.lock files. The lock gate passed 7/7. No dependency version or compiled graph changed, so no
+additional build, hardware, signing, notarization, push, release, publication, or remote result is
+claimed for this metadata correction.
+
 ## Validation categories
 
 - Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed

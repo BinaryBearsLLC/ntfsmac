@@ -45,11 +45,12 @@ CARGO_COMMON_UTILS_LOCK_SHA256=55236dcb0d669545d39c9978e9d98750a248baa734529d13d
 CARGO_VMPROXY_LOCK_SHA256=efe9f05b13f9152fdcd0518bcf516aee1bc7bb7ea2364fb84724197baa21c0ff
 CARGO_VMRUNNER_SYS_LOCK_SHA256=621de7110d06ab7a06b8900d098bf8819b2ef95298fb5a57436746137d5f50c4
 
-# libkrun (Cargo dependency of anylinuxfs + vmrunner-sys), branch stable-1.19.x.
-# Per PLAN.md §1/CLAUDE.md: exact commit comes from Cargo.lock, not hand-edited here.
+# libkrun (Cargo dependency of anylinuxfs + vmrunner-sys). Both consumers resolve the published
+# crates.io package, whose exact archive checksum is repeated below and checked against both
+# Cargo.lock files. The upstream stable branch is retained only as the release-review line.
 LIBKRUN_BRANCH=stable-1.19.x
 LIBKRUN_VERSION=1.19.3
-LIBKRUN_COMMIT=SEE_CARGO_LOCK
+LIBKRUN_CRATE_SHA256=f414a63a9e7f9134c71581eca90ef5dfdf55693d9c602ba2a81794a0ebee716d
 
 # libkrunfw — nohajc's fork release (NOT containers/libkrunfw upstream).
 # https://github.com/nohajc/libkrunfw/releases/tag/v6.12.62-rev1

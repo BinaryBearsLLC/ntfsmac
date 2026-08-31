@@ -24,7 +24,7 @@ setup() {
              CARGO_ANYLINUXFS_LOCK_SHA256 \
              CARGO_COMMON_UTILS_LOCK_SHA256 CARGO_VMPROXY_LOCK_SHA256 \
              CARGO_VMRUNNER_SYS_LOCK_SHA256 \
-             LIBKRUN_BRANCH LIBKRUN_VERSION LIBKRUN_COMMIT \
+             LIBKRUN_BRANCH LIBKRUN_VERSION LIBKRUN_CRATE_SHA256 \
              LIBKRUNFW_VERSION LIBKRUNFW_IMAGES_SHA256 LIBKRUNFW_MODULES_SHA256 \
              VMNET_HELPER_VERSION VMNET_HELPER_COMMIT VMNET_HELPER_SHA256 \
              GVPROXY_VERSION GVPROXY_COMMIT GVPROXY_X_CRYPTO_VERSION GVPROXY_GO_OVERLAY_SHA256 \
@@ -55,4 +55,21 @@ setup() {
   run "$LOCK_SH" get ALPINE_TAG
   [ "$status" -eq 0 ]
   [[ "$output" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+}
+
+@test "libkrun registry version and checksum match both upstream Cargo locks" {
+  local expected_version expected_checksum cargo_lock block
+  expected_version="$($LOCK_SH get LIBKRUN_VERSION)"
+  expected_checksum="$($LOCK_SH get LIBKRUN_CRATE_SHA256)"
+  [[ "$expected_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+  [[ "$expected_checksum" =~ ^[0-9a-f]{64}$ ]]
+
+  for cargo_lock in \
+    "$REPO_ROOT/vendor/src/anylinuxfs/anylinuxfs/Cargo.lock" \
+    "$REPO_ROOT/vendor/src/anylinuxfs/vmrunner-sys/Cargo.lock"; do
+    block="$(awk 'BEGIN { RS = "" } /name = "libkrun"/ { print; exit }' "$cargo_lock")"
+    [[ "$block" == *"version = \"$expected_version\""* ]]
+    [[ "$block" == *'source = "registry+https://github.com/rust-lang/crates.io-index"'* ]]
+    [[ "$block" == *"checksum = \"$expected_checksum\""* ]]
+  done
 }
