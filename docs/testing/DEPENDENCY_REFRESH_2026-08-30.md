@@ -669,6 +669,24 @@ vulnerabilities and exactly this one allowed warning in both graphs. No warning 
 No hardware, drive, installation, signing, notarization, push, release, publication, or remote
 action was performed for this no-change checkpoint.
 
+## Checkpoint V — GitHub Pages action pins, no version change
+
+Status: latest upstream tags verified; central lock coverage added; hosted execution outstanding.
+
+The three Pages actions were reviewed independently against their official tag refs and were
+already current and immutable in `pages.yml`:
+
+- actions/configure-pages v6.0.0 at `45bfe0192ca1faeb007ade9deae92b16b8254a0d`;
+- actions/upload-pages-artifact v5.0.0 at `fc324d3547104276b827a68afc52ff2a11cc49c9`;
+- actions/deploy-pages v5.0.0 at `cd2ce8fcbc39b97be8ca5fce6e763baed58fa128`.
+
+No workflow ref changed. The missing reproducibility control was closed by recording all three
+commits in `sources.lock` and adding one exact workflow-vs-lock test per action. The combined
+lock/action focused gate passed 13/13, and every root workflow parsed as YAML. No hosted workflow
+was triggered, so Pages artifact upload, OIDC deployment, and runner compatibility remain remote
+gates. No local runtime, hardware, signing, notarization, push, release, or publication action was
+performed.
+
 ## Validation categories
 
 - Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed

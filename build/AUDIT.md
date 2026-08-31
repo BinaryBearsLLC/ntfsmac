@@ -755,6 +755,19 @@ No graph changed, so this review does not claim another build, signing, hardware
 remote result. The immediately preceding scans already show zero vulnerabilities and this single
 allowed maintenance warning in both affected graphs.
 
+## GitHub Pages action pin coverage, no version change (dependency refresh, 2026-08-31)
+
+Official tag refs confirmed that configure-pages v6.0.0
+(`45bfe0192ca1faeb007ade9deae92b16b8254a0d`), upload-pages-artifact v5.0.0
+(`fc324d3547104276b827a68afc52ff2a11cc49c9`), and deploy-pages v5.0.0
+(`cd2ce8fcbc39b97be8ca5fce6e763baed58fa128`) remain current. The workflow was already pinned
+to those immutable commits, so no action version changed.
+
+Their commits are now also recorded in `sources.lock`, with one exact workflow-vs-lock test per
+action. The focused lock/action gate passed 13/13 and all root workflows parsed as YAML. No hosted
+workflow was dispatched; Pages upload/deployment remains a remote-only result. No runtime,
+hardware, signing, notarization, push, release, or publication action was performed.
+
 ## lru 0.18.3 security update (dependency refresh, 2026-08-31)
 
 Both libkrun-derived graphs now resolve exact lru 0.18.3: anylinuxfs moves from 0.17.0 and

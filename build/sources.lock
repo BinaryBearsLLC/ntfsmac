@@ -27,6 +27,10 @@ RUST_TOOLCHAIN_ACTION_COMMIT=6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
 # expressions are not supported there. Root workflows only; submodule-owned CI is not executed.
 ACTIONS_CHECKOUT_COMMIT=3d3c42e5aac5ba805825da76410c181273ba90b1
 ACTIONS_SETUP_GO_COMMIT=b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+# GitHub Pages actions — latest reviewed release tags, pinned by immutable commit in pages.yml.
+ACTIONS_CONFIGURE_PAGES_COMMIT=45bfe0192ca1faeb007ade9deae92b16b8254a0d
+ACTIONS_UPLOAD_PAGES_ARTIFACT_COMMIT=fc324d3547104276b827a68afc52ff2a11cc49c9
+ACTIONS_DEPLOY_PAGES_COMMIT=cd2ce8fcbc39b97be8ca5fce6e763baed58fa128
 
 # Cargo dependency overlay applied only to disposable copies of the pinned anylinuxfs source.
 # Each exact version is followed by hashes of the complete post-overlay lockfiles; this keeps the

@@ -42,3 +42,27 @@ setup() {
   run grep -hE 'uses: actions/setup-go@(v[0-9]+|main|master)$' "${WORKFLOWS[@]}"
   [ "$status" -ne 0 ]
 }
+
+@test "Pages workflow pins actions/configure-pages to the reviewed full commit" {
+  local expected
+  expected="$($LOCK_SH get ACTIONS_CONFIGURE_PAGES_COMMIT)"
+  [[ "$expected" =~ ^[0-9a-f]{40}$ ]]
+  run grep -F "uses: actions/configure-pages@${expected}" "$REPO_ROOT/.github/workflows/pages.yml"
+  [ "$status" -eq 0 ]
+}
+
+@test "Pages workflow pins actions/upload-pages-artifact to the reviewed full commit" {
+  local expected
+  expected="$($LOCK_SH get ACTIONS_UPLOAD_PAGES_ARTIFACT_COMMIT)"
+  [[ "$expected" =~ ^[0-9a-f]{40}$ ]]
+  run grep -F "uses: actions/upload-pages-artifact@${expected}" "$REPO_ROOT/.github/workflows/pages.yml"
+  [ "$status" -eq 0 ]
+}
+
+@test "Pages workflow pins actions/deploy-pages to the reviewed full commit" {
+  local expected
+  expected="$($LOCK_SH get ACTIONS_DEPLOY_PAGES_COMMIT)"
+  [[ "$expected" =~ ^[0-9a-f]{40}$ ]]
+  run grep -F "uses: actions/deploy-pages@${expected}" "$REPO_ROOT/.github/workflows/pages.yml"
+  [ "$status" -eq 0 ]
+}
