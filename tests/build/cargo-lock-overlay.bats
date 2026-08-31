@@ -9,7 +9,8 @@ setup() {
 }
 
 @test "Cargo overlay pins exact versions and complete lock hashes" {
-  for key in CARGO_ANYHOW_VERSION CARGO_CROSSBEAM_EPOCH_VERSION; do
+  for key in CARGO_ANYHOW_VERSION CARGO_CROSSBEAM_EPOCH_VERSION \
+             CARGO_PLIST_VERSION CARGO_QUICK_XML_VERSION; do
     run "$LOCK_SH" get "$key"
     [ "$status" -eq 0 ]
     [[ "$output" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
@@ -49,6 +50,14 @@ setup() {
     "$OVERLAY_HELPER" "$fixture/anylinuxfs/Cargo.lock"
   [ "$status" -eq 0 ]
   [ "$output" = "0.9.20" ]
+  run bash -c 'source "$1"; cargo_lock_package_versions "$2" plist' _ \
+    "$OVERLAY_HELPER" "$fixture/anylinuxfs/Cargo.lock"
+  [ "$status" -eq 0 ]
+  [ "$output" = "1.10.0" ]
+  run bash -c 'source "$1"; cargo_lock_package_versions "$2" quick-xml' _ \
+    "$OVERLAY_HELPER" "$fixture/anylinuxfs/Cargo.lock"
+  [ "$status" -eq 0 ]
+  [ "$output" = "0.41.0" ]
 
   after_status="$(git -C "$REPO_ROOT/vendor/src/anylinuxfs" status --porcelain)"
   [ "$after_status" = "$before_status" ]

@@ -78,6 +78,8 @@ cargo_apply_lock_overlay() {
   cargo_update_exact_if_present "$crate_dir" anyhow CARGO_ANYHOW_VERSION || return 1
   cargo_update_exact_if_present "$crate_dir" crossbeam-epoch \
     CARGO_CROSSBEAM_EPOCH_VERSION || return 1
+  cargo_update_exact_if_present "$crate_dir" plist CARGO_PLIST_VERSION || return 1
+  cargo_update_exact_if_present "$crate_dir" quick-xml CARGO_QUICK_XML_VERSION || return 1
 
   actual_hash="$(shasum -a 256 "$lock_file" | awk '{print $1}')"
   if [[ "$actual_hash" != "$expected_hash" ]]; then

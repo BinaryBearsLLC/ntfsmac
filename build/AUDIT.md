@@ -737,3 +737,23 @@ Both DMGs were attached read-only and passed version 3.1.1, deep/strict BinaryBe
 (Team SQY8T23X8N), and Hardened Runtime checks. The native VM remains blocked before guest
 execution by `EINVAL`; no hardware, drive, installation, notarization, push, release, publication,
 or remote action was performed.
+
+## plist 1.10.0 / quick-xml 0.41.0 security closure (dependency refresh, 2026-08-31)
+
+The resolved direct plist dependency moves from 1.8.0 to exact 1.10.0 and its quick-xml parser
+moves from 0.38.4 to exact 0.41.0. plist 1.10.0 constrains quick-xml to `^0.41`; therefore 0.42.0
+was tested and correctly rejected by Cargo as incompatible, while 0.41.0 meets both RustSec fixed
+version boundaries. The complete disposable anylinuxfs lock is pinned to SHA-256
+`f4ef1a47f41be32e90b3ee1f0cd195e3d125df513df7b6df9ccd4a235eb06922`; the other
+workspace locks and pinned submodule remain unchanged.
+
+Nine focused overlay/lock tests and shell static analysis passed. The real build compiled the exact
+pair and passed 58/58 upstream Rust tests. Cargo-audit 0.22.2 reports zero vulnerabilities: both
+RUSTSEC-2026-0194 and RUSTSEC-2026-0195 are gone. The independent lru warning and non-drop-in
+bincode maintenance warning remain visible. The complete Bats suite passed 375/375.
+
+Standard and Legacy GUI builds each passed 307/307 Swift tests and emitted checksum-valid DMGs.
+Both DMGs were attached read-only and passed version 3.1.1, deep/strict BinaryBears Developer ID
+(Team SQY8T23X8N), and Hardened Runtime checks. The native VM remains blocked before guest
+execution by `EINVAL`; no hardware, drive, installation, notarization, push, release, publication,
+or remote action was performed.
