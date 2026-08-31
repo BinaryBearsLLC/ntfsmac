@@ -648,6 +648,27 @@ The native libkrun VM still returns the existing pre-guest `EINVAL`; no real dri
 mounted. No installation, notarization, push, release, publication, or remote workflow was
 performed.
 
+## Checkpoint U — bincode maintenance review, no pin change
+
+Status: reviewed; no compatible dependency update exists.
+
+The remaining RUSTSEC-2025-0141 result is an informational `unmaintained` advisory, not a known
+vulnerability, and the advisory declares no patched version. Both affected graphs resolve bincode
+2.0.1 through the same chain: imago 0.2.3, krun-devices 0.1.0-1.19.3, and libkrun 1.19.3. The
+current imago 0.2.4 release was also inspected and still declares `bincode = "2"`.
+
+A disposable exact-version probe of bincode 3.0.0 failed safely because imago requires `^2`; the
+Cargo.lock remained byte-identical to the accepted post-lru hash. Downgrading to the advisory's
+historically complete 1.3.3 release is likewise API- and serialization-format-incompatible with
+imago's bincode 2 encode/decode implementation. Replacing the serialization library would require
+an upstream imago/libkrun design and disk-format compatibility project, not a pin refresh.
+
+No source or dependency graph changed, so no second build result is claimed for this review. The
+immediately preceding lru checkpoint's fresh `cargo-audit 0.22.2` scans remain the evidence: zero
+vulnerabilities and exactly this one allowed warning in both graphs. No warning was suppressed.
+No hardware, drive, installation, signing, notarization, push, release, publication, or remote
+action was performed for this no-change checkpoint.
+
 ## Validation categories
 
 - Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed

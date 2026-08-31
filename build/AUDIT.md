@@ -738,6 +738,23 @@ Both DMGs were attached read-only and passed version 3.1.1, deep/strict BinaryBe
 execution by `EINVAL`; no hardware, drive, installation, notarization, push, release, publication,
 or remote action was performed.
 
+## bincode maintenance review, no pin change (dependency refresh, 2026-08-31)
+
+RUSTSEC-2025-0141 classifies bincode as unmaintained, supplies no patched version, and does not
+describe a concrete vulnerability. Both ntfsmac-relevant occurrences of bincode 2.0.1 are owned by
+imago through krun-devices/libkrun. The current imago 0.2.4 manifest still requires bincode major
+version 2.
+
+An exact bincode 3.0.0 resolver probe was executed only against a disposable accepted lockfile and
+failed as expected because imago requires `^2`; the lock hash did not change. Bincode 1.3.3 is not
+a compatible downgrade for imago's bincode 2 APIs or serialized QCOW2 metadata. Eliminating the
+warning therefore requires an upstream serialization/API and on-disk compatibility migration, not
+a safe lock overlay. The warning remains visible and unsuppressed.
+
+No graph changed, so this review does not claim another build, signing, hardware, notarization, or
+remote result. The immediately preceding scans already show zero vulnerabilities and this single
+allowed maintenance warning in both affected graphs.
+
 ## lru 0.18.3 security update (dependency refresh, 2026-08-31)
 
 Both libkrun-derived graphs now resolve exact lru 0.18.3: anylinuxfs moves from 0.17.0 and
