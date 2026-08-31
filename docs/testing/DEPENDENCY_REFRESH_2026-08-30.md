@@ -703,6 +703,33 @@ Cargo.lock files. The lock gate passed 7/7. No dependency version or compiled gr
 additional build, hardware, signing, notarization, push, release, publication, or remote result is
 claimed for this metadata correction.
 
+## Checkpoint X — Homebrew build-toolchain review, no repository pin change
+
+Status: local baseline verified; mutable fresh-runner versions reported separately.
+
+These are build-only formula names, not shipped runtime dependencies. The official formula catalog
+and the installed/tested environment were compared without upgrading the user's global Homebrew
+installation:
+
+| Formula | Current catalog | Locally tested |
+|---|---:|---:|
+| shellcheck | 0.11.0 | 0.11.0 |
+| bats-core | 1.14.0 | 1.14.0 |
+| llvm / lld | 23.1.0 | 22.1.8 |
+| umoci | 0.6.0 | 0.6.0 |
+| xz | 5.8.3 | 5.8.3 |
+| util-linux | 2.42.2 | 2.42.2 |
+| gettext | 1.0 | 1.0 |
+| pkgconf (`pkg-config`) | 3.0.6 | 3.0.4 |
+
+The exact local preflight passed, including static libblkid/libuuid and libintl archives. The
+shipped anylinuxfs binary is statically linked against these build inputs, so no Homebrew dylib is
+a runtime dependency. Root workflows intentionally install formula names on fresh hosted runners;
+therefore LLVM/LLD 23.1.0 and pkgconf 3.0.6 compatibility is a remote CI gate, not a local result.
+Changing the global Homebrew installation solely for this repository would exceed the worktree
+scope and was not done. No hardware, signing, notarization, push, release, or publication action
+was performed for this review.
+
 ## Validation categories
 
 - Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed

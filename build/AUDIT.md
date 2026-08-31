@@ -751,6 +751,19 @@ checks version, registry source, and checksum in both consumer Cargo.lock files.
 passed 7/7. No dependency graph changed and no build, hardware, signing, notarization, or remote
 result is claimed from this metadata-only correction.
 
+## Homebrew build-toolchain inventory, no repository pin change (dependency refresh, 2026-08-31)
+
+Official formula metadata reports shellcheck 0.11.0, bats-core 1.14.0, LLVM/LLD 23.1.0, umoci
+0.6.0, xz 5.8.3, util-linux 2.42.2, gettext 1.0, and pkgconf 3.0.6. The local environment actually
+used for all reported builds matches those versions except LLVM/LLD 22.1.8 and pkgconf 3.0.4.
+
+The exact local preflight passed, including the static util-linux/gettext archives. anylinuxfs is
+verified not to carry a dynamic libblkid dependency, so these formulas remain build-only. The
+repository's workflows install current formula names on fresh runners rather than promising
+byte-reproducible Homebrew kegs. The user's global Homebrew installation was not upgraded for this
+repository; LLVM/LLD 23.1.0 and pkgconf 3.0.6 therefore remain hosted-runner compatibility gates.
+No hardware, signing, notarization, push, release, or publication action was performed.
+
 ## bincode maintenance review, no pin change (dependency refresh, 2026-08-31)
 
 RUSTSEC-2025-0141 classifies bincode as unmaintained, supplies no patched version, and does not
