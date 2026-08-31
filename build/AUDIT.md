@@ -832,3 +832,24 @@ Both DMGs were attached read-only and passed version 3.1.1, deep/strict BinaryBe
 (Team SQY8T23X8N), and Hardened Runtime checks. The native VM remains blocked before guest
 execution by `EINVAL`; no hardware, drive, installation, notarization, push, release, publication,
 or remote action was performed.
+
+## Final dependency-refresh gate (2026-08-31)
+
+The branch-tip local gate passed 379/379 Bats tests, 58/58 upstream Rust tests in the final build,
+and 307/307 Swift tests for both Standard and Legacy applications. Cargo-audit 0.22.2 reports zero
+vulnerabilities across the effective graphs; only the reviewed, unsuppressed bincode 2.0.1
+maintenance warning remains in the two libkrun-derived graphs. Govulncheck 1.7.0 reports no
+vulnerability in the exact gvproxy v0.8.9 plus x/crypto v0.55.0 overlay. Init-rootfs retains
+GO-2026-5932 through its OpenPGP image path, with no fixed module version available.
+
+Both version 3.1.1 DMGs passed SHA-256 verification and were mounted read-only. Their apps passed
+deep/strict Developer ID verification for BinaryBears Team SQY8T23X8N, report Hardened Runtime
+26.5.0, and satisfy the embedded Alpine 3.24.1 digest/package-lock contract. The mounted gvproxy
+metadata contains x/crypto v0.55.0, and the shipped anylinuxfs binary has no dynamic
+libblkid/libmount/libuuid dependency.
+
+Hardware acceptance is not claimed: the most recent native libkrun attempt stopped before guest
+execution with `EINVAL`, and no real drive was accessed or mounted. Docker was stopped after the
+isolated Alpine package test. Notarization and hosted workflows were not run. No installation,
+push, release, publication, or other remote mutation was performed, and the separate GitHub issue
+#24 work is absent from this branch.

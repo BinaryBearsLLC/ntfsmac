@@ -730,13 +730,59 @@ Changing the global Homebrew installation solely for this repository would excee
 scope and was not done. No hardware, signing, notarization, push, release, or publication action
 was performed for this review.
 
+## Checkpoint Y — final consolidated local gate
+
+Status: the dependency-refresh branch is locally complete; hardware, notarization, and remote
+acceptance remain explicitly separate.
+
+The effective dependency inventory was reviewed to closure after the isolated checkpoints:
+
+- Alpine is locked to the official ARM64 3.24.1 image digest, with exact base, add-on, and APK
+  artifact locks; ntfs-3g 2026.7.7-r0 remains the only documented `edge/main` exception;
+- anylinuxfs is pinned to the reviewed v0.19.0 source plus the separately validated gRPC 1.82.1
+  and Cargo security overlays;
+- libkrun remains at the newest published crate, 1.19.3, with its crates.io checksum enforced;
+  libkrunfw remains at the current reviewed v6.12.62-rev1 release;
+- vmnet-helper is updated to v0.13.0; gvproxy remains at current v0.8.9 with the isolated
+  x/crypto v0.55.0 security overlay;
+- the build toolchains are exact Go 1.27.0 and Rust 1.98.0; the relevant GitHub Actions are
+  immutable full-SHA pins; Homebrew inputs were inventoried separately as mutable CI tooling;
+- Cargo overlays resolve anyhow 1.0.104, crossbeam-epoch 0.9.20, plist 1.10.0 with compatible
+  quick-xml 0.41.0, and lru 0.18.3. Bincode 2.0.1 remains visible and unsuppressed because its
+  maintenance advisory provides no patched release and the owning imago graph requires major 2.
+
+Final evidence at the branch tip:
+
+- complete Bats gate: PASS, 379/379;
+- `build.command gui`: PASS; Standard Swift 307/307 and Legacy Swift 307/307, with only the
+  documented Legacy API warnings and the macOS 26.6.2 Popover render-test skip;
+- upstream Rust suites: PASS, 58/58 during the final build;
+- `cargo-audit 0.22.2`: zero vulnerabilities in all four effective Cargo graphs; common-utils and
+  vmproxy are fully clean, while anylinuxfs and vmrunner-sys report only the reviewed bincode
+  informational maintenance warning;
+- `govulncheck 1.7.0` built and run with Go 1.27.0: the exact disposable gvproxy overlay is clean;
+  init-rootfs retains the already isolated reachable GO-2026-5932 OpenPGP finding, for which the
+  vulnerability database provides no fixed version;
+- both final DMGs passed SHA-256 verification, were attached read-only, and contained bundle
+  version 3.1.1. Both apps passed deep/strict Developer ID verification for Team SQY8T23X8N and
+  report Hardened Runtime 26.5.0;
+- both mounted apps passed the embedded Alpine runtime-contract gate. Their gvproxy metadata
+  contains x/crypto v0.55.0, and anylinuxfs has no dynamic libblkid/libmount/libuuid dependency.
+
+The most recent native libkrun attempt still stopped before guest execution with `EINVAL`, so no
+hardware or real-drive claim is made. No real disk was accessed or mounted, Docker was used only
+for the isolated package closure and stopped afterward, and no installation was performed.
+Notarization was not run. No hosted workflow, push, release, publication, or other remote mutation
+was performed. The GitHub issue #24 work remains outside this branch and worktree.
+
 ## Validation categories
 
 - Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed
   355/355; checkpoints E and H passed 360/360; checkpoint J passed 362/362. Checkpoints C through
   E, H, J, K, O, P, Q, R, S, and T also passed 307/307 in each Swift variant and mounted-DMG
   verification for both outputs. Checkpoint K passed 367/367 Bats; checkpoints O and P passed
-  372/372; checkpoints Q through T passed 375/375.
+  372/372; checkpoints Q through T passed 375/375. The final consolidated branch-tip gate passed
+  379/379 Bats, 58/58 upstream Rust tests, and 307/307 Swift tests in each app variant.
   `PopoverStateRenderTests` compiled but remained skipped by the documented macOS 26.6.2 guard.
 - Hardware: no real-drive test; local VM guest setup blocked as documented above.
 - Signing: standalone runtime gates used ad-hoc signatures; checkpoints C through E, H, and J
