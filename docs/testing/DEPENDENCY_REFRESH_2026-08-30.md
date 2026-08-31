@@ -620,18 +620,46 @@ The native libkrun VM still returns the existing pre-guest `EINVAL`; no real dri
 mounted. No installation, notarization, push, release, publication, or remote workflow was
 performed.
 
+## Checkpoint T — lru 0.18.3 security update
+
+Status: local source/build/package validation complete; native hardware acceptance outstanding.
+
+Only `lru` changed, to exact 0.18.3, in the two libkrun-derived Cargo graphs: anylinuxfs moved
+from 0.17.0 and vmrunner-sys from 0.18.0. The complete post-overlay lockfile SHA-256 values are
+`27ba0a27915d80ab1e3ea22ab878a4c5f0ff35416e4fd79f101c160354e8d996` for anylinuxfs and
+`621de7110d06ab7a06b8900d098bf8819b2ef95298fb5a57436746137d5f50c4` for vmrunner-sys.
+The common-utils/vmproxy locks and pinned upstream submodule remain unchanged.
+
+Validation:
+
+- focused overlay/lock gates: PASS, 9/9; both affected graphs resolve 0.18.3, wrong lock hashes
+  hard-stop, and shell static analysis passed;
+- real project build: PASS; vmrunner-sys compiled cleanly and the upstream Rust suites passed
+  58/58 (8 common-utils, 41 anylinuxfs, 9 vmproxy);
+- `cargo-audit 0.22.2`: zero vulnerabilities and no lru warning in either affected graph; only
+  the independently reviewed bincode 2.0.1 unmaintained warning remains;
+- complete Bats gate: PASS, 375/375;
+- `build.command gui`: PASS; Standard Swift 307/307 and Legacy Swift 307/307 with expected
+  deprecation warnings only, both apps/DMGs/checksum sidecars verified;
+- mounted-artifact gate: PASS for both DMGs attached read-only; app version 3.1.1, deep/strict
+  Developer ID verification for Team SQY8T23X8N, and Hardened Runtime passed.
+
+The native libkrun VM still returns the existing pre-guest `EINVAL`; no real drive was accessed or
+mounted. No installation, notarization, push, release, publication, or remote workflow was
+performed.
+
 ## Validation categories
 
 - Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed
   355/355; checkpoints E and H passed 360/360; checkpoint J passed 362/362. Checkpoints C through
-  E, H, J, K, O, P, Q, R, and S also passed 307/307 in each Swift variant and mounted-DMG
+  E, H, J, K, O, P, Q, R, S, and T also passed 307/307 in each Swift variant and mounted-DMG
   verification for both outputs. Checkpoint K passed 367/367 Bats; checkpoints O and P passed
-  372/372; checkpoints Q through S passed 375/375.
+  372/372; checkpoints Q through T passed 375/375.
   `PopoverStateRenderTests` compiled but remained skipped by the documented macOS 26.6.2 guard.
 - Hardware: no real-drive test; local VM guest setup blocked as documented above.
 - Signing: standalone runtime gates used ad-hoc signatures; checkpoints C through E, H, and J
   packaging also verified the locally available BinaryBears Developer ID on both app variants;
-  checkpoints O through S repeated that gate. Required hypervisor/virtualization entitlements
+  checkpoints O through T repeated that gate. Required hypervisor/virtualization entitlements
   passed.
 - Notarization: not run.
 - Remote/public state: untouched; no push or release.

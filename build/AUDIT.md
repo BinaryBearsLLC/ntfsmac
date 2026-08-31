@@ -738,6 +738,25 @@ Both DMGs were attached read-only and passed version 3.1.1, deep/strict BinaryBe
 execution by `EINVAL`; no hardware, drive, installation, notarization, push, release, publication,
 or remote action was performed.
 
+## lru 0.18.3 security update (dependency refresh, 2026-08-31)
+
+Both libkrun-derived graphs now resolve exact lru 0.18.3: anylinuxfs moves from 0.17.0 and
+vmrunner-sys from 0.18.0. Their complete disposable lockfiles are pinned respectively to SHA-256
+`27ba0a27915d80ab1e3ea22ab878a4c5f0ff35416e4fd79f101c160354e8d996` and
+`621de7110d06ab7a06b8900d098bf8819b2ef95298fb5a57436746137d5f50c4`. The other workspace
+locks and the pinned upstream submodule remain unchanged.
+
+Nine focused overlay/lock tests and shell static analysis passed. The real build compiled
+vmrunner-sys and passed 58/58 upstream Rust tests. Cargo-audit 0.22.2 reports zero vulnerabilities
+and no lru warning in either affected graph; only the separately reviewed bincode 2.0.1
+unmaintained warning remains. The complete Bats suite passed 375/375.
+
+Standard and Legacy GUI builds each passed 307/307 Swift tests and emitted checksum-valid DMGs.
+Both DMGs were attached read-only and passed version 3.1.1, deep/strict BinaryBears Developer ID
+(Team SQY8T23X8N), and Hardened Runtime checks. The native VM remains blocked before guest
+execution by `EINVAL`; no hardware, drive, installation, notarization, push, release, publication,
+or remote action was performed.
+
 ## plist 1.10.0 / quick-xml 0.41.0 security closure (dependency refresh, 2026-08-31)
 
 The resolved direct plist dependency moves from 1.8.0 to exact 1.10.0 and its quick-xml parser
