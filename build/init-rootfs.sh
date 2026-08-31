@@ -32,6 +32,8 @@ source "$SCRIPT_DIR/lib/lock.sh"
 source "$SCRIPT_DIR/lib/go-toolchain.sh"
 # shellcheck source=lib/rust-toolchain.sh
 source "$SCRIPT_DIR/lib/rust-toolchain.sh"
+# shellcheck source=lib/cargo-lock-overlay.sh
+source "$SCRIPT_DIR/lib/cargo-lock-overlay.sh"
 # shellcheck source=../cli/lib/runtime-alpine.sh
 source "$REPO_ROOT/cli/lib/runtime-alpine.sh"
 # shellcheck source=lib/patch-runtime-alpine.sh
@@ -236,6 +238,7 @@ prepare_build_copy() {
   mkdir -p "$CACHE_DIR/anylinuxfs"
   cp -R "$REPO_ROOT/vendor/src/anylinuxfs/vmrunner-sys" "$CACHE_DIR/vmrunner-sys"
   cp -R "$REPO_ROOT/vendor/src/anylinuxfs/init-rootfs" "$CACHE_DIR/init-rootfs"
+  cargo_apply_lock_overlay "$CACHE_DIR/vmrunner-sys" CARGO_VMRUNNER_SYS_LOCK_SHA256 || return 1
   cp "$REPO_ROOT/vendor/src/anylinuxfs/anylinuxfs/cc_linux" "$CACHE_DIR/anylinuxfs/cc_linux"
   chmod +x "$CACHE_DIR/anylinuxfs/cc_linux"
   cp "$PACKAGE_LOCK" "$CACHE_DIR/init-rootfs/default-alpine-packages.txt"

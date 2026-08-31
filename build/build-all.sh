@@ -20,6 +20,8 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 source "$SCRIPT_DIR/lib/lock.sh"
 # shellcheck source=lib/rust-toolchain.sh
 source "$SCRIPT_DIR/lib/rust-toolchain.sh"
+# shellcheck source=lib/cargo-lock-overlay.sh
+source "$SCRIPT_DIR/lib/cargo-lock-overlay.sh"
 # shellcheck source=../cli/lib/runtime-alpine.sh
 source "$REPO_ROOT/cli/lib/runtime-alpine.sh"
 # shellcheck source=lib/patch-runtime-alpine.sh
@@ -45,6 +47,10 @@ prepare_build_copy() {
   for crate in common-utils anylinuxfs vmproxy; do
     cp -R "$REPO_ROOT/vendor/src/anylinuxfs/$crate" "$CACHE_DIR/$crate"
   done
+
+  cargo_apply_lock_overlay "$CACHE_DIR/common-utils" CARGO_COMMON_UTILS_LOCK_SHA256 || return 1
+  cargo_apply_lock_overlay "$CACHE_DIR/anylinuxfs" CARGO_ANYLINUXFS_LOCK_SHA256 || return 1
+  cargo_apply_lock_overlay "$CACHE_DIR/vmproxy" CARGO_VMPROXY_LOCK_SHA256 || return 1
 
   # anylinuxfs/src/{cmd_mount,vm_image,main}.rs embed several sibling files via
   # include_str!("../../...") — real, found by a failed build attempt, not guessed.

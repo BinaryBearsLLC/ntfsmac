@@ -526,16 +526,55 @@ The native libkrun VM still returns the existing pre-guest `EINVAL`; no real dri
 mounted. Hosted `actions/setup-go`, installation, notarization, push, release, and publication
 were not exercised.
 
+## Checkpoint Q — anyhow 1.0.104 Cargo security overlay
+
+Status: local source/build/package validation complete; native hardware acceptance outstanding.
+
+Only `anyhow` changed, from 1.0.102 to 1.0.104, in the three pinned anylinuxfs workspaces that
+resolve it: common-utils, anylinuxfs, and vmproxy. The vendored anylinuxfs submodule remains
+byte-clean. A new fail-closed helper applies the exact update only to disposable build copies and
+then verifies the complete resulting Cargo.lock files against these SHA-256 locks:
+
+- anylinuxfs: `7f9e86699198a6909de3e28bd3b049df99bda0a0ec5747c15baea9af9fba3624`;
+- common-utils: `55236dcb0d669545d39c9978e9d98750a248baa734529d13d385fd0ea745cd03`;
+- vmproxy: `efe9f05b13f9152fdcd0518bcf516aee1bc7bb7ea2364fb84724197baa21c0ff`;
+- unchanged vmrunner-sys control lock:
+  `4a082a8c6963bd05c9dc109fa7dd6871bf4d31220106ee76aba5d286382ce45c`.
+
+The update clears RUSTSEC-2026-0190 from the affected workspaces. The deliberately separate
+crossbeam-epoch, quick-xml, lru, and bincode findings remain visible at this checkpoint and are
+not hidden or combined with this update.
+
+Validation:
+
+- overlay/lock focused gates: PASS, 9/9; the tests also prove that a wrong complete-lock hash
+  hard-stops and that the pinned upstream submodule is left unchanged;
+- upstream crate tests after overlay: PASS, common-utils 8/8, anylinuxfs 41/41, vmproxy 9/9;
+- post-overlay `cargo audit`: common-utils and vmproxy have zero vulnerabilities and zero
+  warnings; anylinuxfs no longer reports the anyhow advisory and retains only the separately
+  tracked crossbeam-epoch/quick-xml vulnerabilities plus bincode/lru warnings;
+- real project build: PASS with 58/58 Rust tests; complete Bats gate: PASS, 375/375;
+- `build.command gui`: PASS; Standard Swift 307/307 and Legacy Swift 307/307 with expected
+  deprecation warnings only, both apps/DMGs/checksum sidecars verified;
+- mounted-artifact gate: PASS for both DMGs attached read-only; deep/strict Developer ID and
+  Hardened Runtime verification passed.
+
+The native libkrun VM still returns the existing pre-guest `EINVAL`; no real drive was accessed or
+mounted. No installation, notarization, push, release, publication, or remote workflow was
+performed.
+
 ## Validation categories
 
 - Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed
   355/355; checkpoints E and H passed 360/360; checkpoint J passed 362/362. Checkpoints C through
-  E, H, J, K, O, and P also passed 307/307 in each Swift variant and mounted-DMG verification for
-  both outputs. Checkpoint K passed 367/367 Bats; checkpoints O and P passed 372/372.
+  E, H, J, K, O, P, and Q also passed 307/307 in each Swift variant and mounted-DMG verification
+  for both outputs. Checkpoint K passed 367/367 Bats; checkpoints O and P passed 372/372;
+  checkpoint Q passed 375/375.
   `PopoverStateRenderTests` compiled but remained skipped by the documented macOS 26.6.2 guard.
 - Hardware: no real-drive test; local VM guest setup blocked as documented above.
 - Signing: standalone runtime gates used ad-hoc signatures; checkpoints C through E, H, and J
   packaging also verified the locally available BinaryBears Developer ID on both app variants;
-  checkpoints O and P repeated that gate. Required hypervisor/virtualization entitlements passed.
+  checkpoints O, P, and Q repeated that gate. Required hypervisor/virtualization entitlements
+  passed.
 - Notarization: not run.
 - Remote/public state: untouched; no push or release.

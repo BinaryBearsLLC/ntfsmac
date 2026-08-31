@@ -697,3 +697,23 @@ checksum-valid DMGs. Read-only-mounted Standard and Legacy apps passed deep/stri
 Developer ID and Hardened Runtime verification, and their embedded gvproxy/init-rootfs binaries
 both report Go 1.27.0. The native VM still stops before guest execution with `EINVAL`; no hardware,
 drive, notarization, or remote action was performed.
+
+## anyhow 1.0.104 exact Cargo overlay (dependency refresh, 2026-08-31)
+
+The three pinned anylinuxfs workspaces that resolve anyhow now build with exact version 1.0.104,
+removing RUSTSEC-2026-0190. The vendored submodule is not modified: a fail-closed build helper
+updates disposable common-utils, anylinuxfs, and vmproxy copies and verifies the complete resulting
+Cargo.lock SHA-256 values from `sources.lock`. The unchanged vmrunner-sys lock is also checked as a
+control. This preserves the reviewed source commit while making the security graph deterministic.
+
+Nine focused overlay/lock tests passed, including submodule-cleanliness and intentional lock-hash
+failure cases. The overlaid upstream workspaces passed 8 common-utils, 41 anylinuxfs, and 9 vmproxy
+tests. Post-overlay cargo-audit results are clean for common-utils and vmproxy; the anyhow advisory
+is absent from anylinuxfs, while the independently queued crossbeam-epoch, quick-xml, lru, and
+bincode findings remain reported rather than being mixed into this checkpoint.
+
+The real project build passed 58/58 Rust tests and the complete Bats suite passed 375/375. Standard
+and Legacy GUI builds each passed 307/307 Swift tests and produced checksum-valid DMGs. Both DMGs
+were attached read-only and passed deep/strict BinaryBears Developer ID and Hardened Runtime
+verification. The native VM remains blocked before guest execution by `EINVAL`; no hardware,
+drive, installation, notarization, push, release, publication, or remote action was performed.
