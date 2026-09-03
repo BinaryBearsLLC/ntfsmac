@@ -21,6 +21,7 @@ private let sampleDrive = Drive(identifier: "disk4s2", fsType: "ntfs", label: "M
 private final class FakeHelper: HelperMounting, MountSnapshotProviding {
     var mountResult: Result<CommandResult, Error> = .success(CommandResult(output: "mounted", exitCode: 0))
     var unmountFailureDevices: Set<String> = []
+    var snapshotReadOnlyOverride: Bool?
     private var mounted: [String: ObservedMount] = [:]
     func mount(device: String, driver: FsDriver, mountPoint: String?, readOnly: Bool) async throws -> CommandResult {
         let result = try mountResult.get()
@@ -29,7 +30,7 @@ private final class FakeHelper: HelperMounting, MountSnapshotProviding {
                 deviceIdentifier: device,
                 mountPoint: mountPoint ?? "/Volumes/\(device)",
                 fsDriver: driver.rawValue,
-                isReadOnly: readOnly
+                isReadOnly: snapshotReadOnlyOverride ?? readOnly
             )
         }
         return result
@@ -83,7 +84,6 @@ private func renderPopover(
         appState: appState,
         driveScanner: driveScanner,
         mountController: mountController,
-        remountController: RemountController(appState: appState),
         diagnoseRunner: DiagnoseRunner(),
         helperInstaller: helperInstaller,
         helperUninstaller: HelperUninstaller(),
@@ -190,7 +190,7 @@ private func renderPopover(
     #expect(appState.state == .mountedReadWrite)
 
     let size = renderPopover(appState: appState, mountController: controller, helperInstaller: helperInstaller, cliInstallChecker: cliInstallChecker)
-    #expect(size != nil, "multi-mount popover (two Open/Unmount rows plus Eject All) must render a non-empty image")
+    #expect(size != nil, "multi-mount popover (two Open in Finder/Unmount rows plus Eject All) must render a non-empty image")
 }
 
 @MainActor @Test func ejectAllPartialResultRendersWithoutHidingFailedDrive() async throws {
@@ -233,17 +233,20 @@ private func renderPopover(
     let (helperInstaller, cliInstallChecker, cleanup) = try await makeInstalledDependencies()
     defer { cleanup() }
     let appState = AppState()
-    let controller = MountController(helper: FakeHelper(), appState: appState)
+    let helper = FakeHelper()
+    helper.snapshotReadOnlyOverride = true
+    helper.mountResult = .success(CommandResult(
+        output: "The volume is dirty and was mounted read-only.",
+        exitCode: 0
+    ))
+    let controller = MountController(helper: helper, appState: appState)
     await controller.mount(sampleDrive)
-    // Matches `DirtyStateTests`' own precedent: dirty detection happens post-mount (real code
-    // path in `RemountController`'s remount-completion check), so tests drive to it the same
-    // way that code does — `mountedDrive` stays set from the real `mount()` call above.
-    appState.state = .mountedReadOnlyDirty
+    #expect(appState.state == .mountedReadOnlyDirty)
     #expect(controller.mountedDrive == sampleDrive)
-    #expect(DirtyBanner.isVisible(for: appState.state))
+    #expect(DirtyBanner.copy(for: controller.mountedDrives.first?.readOnlyReason) != nil)
 
     let size = renderPopover(appState: appState, mountController: controller, helperInstaller: helperInstaller, cliInstallChecker: cliInstallChecker)
-    #expect(size != nil, "dirty-state popover (warning banner + Mount read/write anyway) must render a non-empty image")
+    #expect(size != nil, "unsafe Windows state must render guidance without a read/write override")
 }
 
 @MainActor @Test func errorStateRendersWithoutCollapsing() async throws {

@@ -25,4 +25,8 @@ import Testing
         #expect(!copy.contains("full disk access"))
         #expect(!copy.contains("failed"))
     }
+
+    @Test func mountedDriveActionNamesFinderExplicitly() {
+        #expect(DriveRowCopy.openInFinder == "Open in Finder")
+    }
 }

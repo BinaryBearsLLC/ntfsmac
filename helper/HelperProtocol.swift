@@ -554,7 +554,7 @@ public final class HelperService: NSObject, HelperXPCProtocol {
     /// `resolveNtfsmacPrefix()` fresh rather than freezing a snapshot at `HelperService.init`.
     /// That distinction matters because `main.swift` creates one `HelperService` per XPC
     /// connection, and the GUI opens several independent connections at launch
-    /// (`MountController`, `RemountController`, `CLIAutoStager`, `HelperInstaller`,
+    /// (`MountController`, `CLIAutoStager`, `HelperInstaller`,
     /// `HelperUninstaller` each default-construct their own `HelperClient()`) — often before
     /// first-run CLI staging (`stageCLI`) has finished writing the binary, or before a later
     /// brew relink/reinstall changes which candidate prefix is live. A snapshot taken at that

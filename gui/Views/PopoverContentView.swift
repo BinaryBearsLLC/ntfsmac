@@ -158,11 +158,18 @@ private struct PulsingHeaderStatusDot: View {
     }
 }
 
+/// Diagnostics describe the set of active storage sessions, not just the aggregate icon state.
+/// Including mounted IDs invalidates a report when one of several same-mode drives is added or
+/// removed while the aggregate `MountState` remains unchanged.
+private struct DiagnoseStorageContext: Equatable {
+    let mountState: MountState
+    let mountedDriveIDs: Set<String>
+}
+
 public struct PopoverContentView: View {
     @ObservedObject public var appState: AppState
     @ObservedObject public var driveScanner: DriveScanner
     @ObservedObject public var mountController: MountController
-    @ObservedObject public var remountController: RemountController
     @ObservedObject public var diagnoseRunner: DiagnoseRunner
     @ObservedObject public var securityStatusReader: SecurityStatusReader
     @ObservedObject public var helperInstaller: HelperInstaller
@@ -179,6 +186,7 @@ public struct PopoverContentView: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var diagnosePresentation = DiagnosePanelPresentation()
+    @State private var diagnoseReportContext: DiagnoseStorageContext?
     @State private var quitPresentation = QuitConfirmationPresentation()
     @State private var finderErrorMessage: String?
     private let quitPreferenceStore = QuitPreferenceStore()
@@ -187,7 +195,6 @@ public struct PopoverContentView: View {
         appState: AppState,
         driveScanner: DriveScanner,
         mountController: MountController,
-        remountController: RemountController,
         diagnoseRunner: DiagnoseRunner,
         securityStatusReader: SecurityStatusReader = SecurityStatusReader(),
         helperInstaller: HelperInstaller,
@@ -204,7 +211,6 @@ public struct PopoverContentView: View {
         self.appState = appState
         self.driveScanner = driveScanner
         self.mountController = mountController
-        self.remountController = remountController
         self.diagnoseRunner = diagnoseRunner
         self.securityStatusReader = securityStatusReader
         self.helperInstaller = helperInstaller
@@ -226,7 +232,6 @@ public struct PopoverContentView: View {
         appState: AppState,
         driveScanner: DriveScanner,
         mountController: MountController,
-        remountController: RemountController,
         diagnoseRunner: DiagnoseRunner,
         securityStatusReader: SecurityStatusReader = SecurityStatusReader(),
         helperInstaller: HelperInstaller,
@@ -241,7 +246,6 @@ public struct PopoverContentView: View {
             appState: appState,
             driveScanner: driveScanner,
             mountController: mountController,
-            remountController: remountController,
             diagnoseRunner: diagnoseRunner,
             securityStatusReader: securityStatusReader,
             helperInstaller: helperInstaller,
@@ -317,6 +321,19 @@ public struct PopoverContentView: View {
                 mountController.clearError()
             }
         }
+        .onChange(of: diagnoseStorageContext) { newContext in
+            diagnoseReportContext = nil
+            diagnoseRunner.invalidateForStorageStateChange()
+            guard DiagnoseRefreshPolicy.shouldRunAutomatically(
+                panelIsVisible: diagnosePresentation.isVisible,
+                mountState: newContext.mountState
+            ) else { return }
+            Task { @MainActor in
+                guard diagnoseStorageContext == newContext, diagnosePresentation.isVisible else { return }
+                await diagnoseRunner.run()
+                diagnoseReportContext = diagnoseStorageContext == newContext ? newContext : nil
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .ntfsmacOpenSettings)) { _ in
             if !verifiedCopyController.isActive {
                 navigation.showSettings()
@@ -331,12 +348,12 @@ public struct PopoverContentView: View {
         VStack(alignment: .leading, spacing: 8) {
             header
 
-            // `ui/prototype.html`'s dirty-journal warning banner sits directly under the header,
-            // above the drive row (comp lines 572-581) — was previously rendered after
-            // Speed/Security instead, `DirtyBanner.isVisible` still gates it so it's a no-op
-            // outside `.mountedReadOnlyDirty`.
-            if let mounted = mountController.mountedDrive {
-                DirtyBannerView(appState: appState, remountController: remountController, drive: mounted)
+            // A requested read-only mount is healthy and needs no warning. Any unexpected cause is
+            // shown explicitly without offering a forced read/write retry.
+            if let reason = DirtyBanner.preferredReason(
+                among: mountController.mountedDrives.compactMap(\.readOnlyReason)
+            ) {
+                DirtyBannerView(reason: reason)
             }
 
             Divider()
@@ -373,7 +390,7 @@ public struct PopoverContentView: View {
                     DriveRow(
                         drive: entry.drive,
                         isMounted: true,
-                        isDirty: entry.isDirty,
+                        hasReadOnlyWarning: entry.hasReadOnlyWarning,
                         actionsDisabled: driveActionsDisabled,
                         onOpenInFinder: entry.isVerified ? {
                             let opened = finderOpener.open(
@@ -473,7 +490,7 @@ public struct PopoverContentView: View {
                 quitConfirmation
             }
 
-            if let errorMessage = mountController.errorMessage ?? remountController.errorMessage, errorMessage != "FDA_REQUIRED" {
+            if let errorMessage = mountController.errorMessage, errorMessage != "FDA_REQUIRED" {
                 Text(errorMessage).font(.caption).foregroundStyle(Color.ntfsRed)
             }
 
@@ -493,6 +510,7 @@ public struct PopoverContentView: View {
                     fullDiskAccessGranted: FullDiskAccessPresentationPolicy.diagnosticGrantEvidence(
                         for: fullDiskAccessController.state
                     ),
+                    contextIsCurrent: diagnoseReportContext == diagnoseStorageContext,
                     onHide: { diagnosePresentation.hide() }
                 )
             }
@@ -567,15 +585,22 @@ public struct PopoverContentView: View {
 
     private func finderState(for entry: MountedDrive) -> MountState {
         if !entry.isVerified { return .mountedUnknown }
-        if entry.isDirty { return .mountedReadOnlyDirty }
+        if entry.requiresWindowsRepair { return .mountedReadOnlyDirty }
+        if entry.hasReadOnlyWarning { return .mountedReadOnlyUnexpected }
         return entry.isReadOnly ? .mountedReadOnly : .mountedReadWrite
+    }
+
+    private var diagnoseStorageContext: DiagnoseStorageContext {
+        DiagnoseStorageContext(
+            mountState: appState.state,
+            mountedDriveIDs: mountController.mountedDriveIDs
+        )
     }
 
     private func verifiedCopyAction(for entry: MountedDrive) -> (() -> Void)? {
         guard VerifiedCopyAvailability.isAvailable(
             isVerified: entry.isVerified,
             isReadOnly: entry.isReadOnly,
-            isDirty: entry.isDirty,
             mountPoint: entry.mountPoint
         ), let mountPoint = entry.mountPoint
         else {
@@ -620,7 +645,9 @@ public struct PopoverContentView: View {
             }
         case .mounting: "Mounting…"
         case .mountedReadWrite: "Mounted read/write"
-        case .mountedReadOnly, .mountedReadOnlyDirty: "Mounted read-only"
+        case .mountedReadOnly: "Mounted read-only"
+        case .mountedReadOnlyUnexpected: "Mounted read-only — cause unknown"
+        case .mountedReadOnlyDirty: "Mounted read-only — Windows needs attention"
         case .mountedUnknown: "Mount state needs verification"
         case .error: "Error"
         }
@@ -698,12 +725,24 @@ public struct PopoverContentView: View {
                 )
                 diagnosePresentation.show()
                 Task {
+                    diagnoseReportContext = nil
+                    let diagnosedContext = diagnoseStorageContext
                     switch mode {
                     case .summary:
                         await diagnoseRunner.run()
+                        diagnoseReportContext = diagnoseStorageContext == diagnosedContext
+                            ? diagnosedContext
+                            : nil
                     case .developerJSONExport:
                         if let document = await diagnoseRunner.runForDeveloperExport() {
+                            diagnoseReportContext = diagnoseStorageContext == diagnosedContext
+                                ? diagnosedContext
+                                : nil
                             DeveloperDiagnoseSavePanel.present(document: document)
+                        } else {
+                            diagnoseReportContext = diagnoseStorageContext == diagnosedContext
+                                ? diagnosedContext
+                                : nil
                         }
                     }
                 }

@@ -14,54 +14,150 @@ public protocol HelperMounting {
 
 extension HelperClient: HelperMounting {}
 
+/// Unprivileged fallback used only when the per-drive mount snapshot cannot expose the landed
+/// mode. The live host mount table remains evidence for read-only vs read/write; it is never used
+/// to infer *why* a mount became read-only.
+public protocol MountReadOnlyChecking: Sendable {
+    func isAnyNfsMountReadOnly() async -> Bool
+}
+
+public struct RealMountOptionsChecker: MountReadOnlyChecking {
+    public init() {}
+
+    public func isAnyNfsMountReadOnly() async -> Bool {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/sbin/mount")
+                process.arguments = ["-t", "nfs"]
+                let pipe = Pipe()
+                process.standardOutput = pipe
+                process.standardError = Pipe()
+                do {
+                    try process.run()
+                } catch {
+                    continuation.resume(returning: false)
+                    return
+                }
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                let output = String(data: data, encoding: .utf8) ?? ""
+                continuation.resume(returning: output.contains("read-only"))
+            }
+        }
+    }
+}
+
+/// Why a verified mount is read-only. Presence of a read-only mount is independent from its
+/// cause: only explicit backend evidence may attribute it to Windows or to unsupported media.
+public enum ReadOnlyReason: String, Equatable, Sendable {
+    case requested
+    case windowsDirty
+    case windowsHibernated
+    case unsafeWindowsState
+    case readOnlyMedia
+    case unsupportedWriteMode
+    case unknown
+
+    public var requiresAttention: Bool { self != .requested }
+
+    public var requiresWindowsRepair: Bool {
+        switch self {
+        case .windowsDirty, .windowsHibernated, .unsafeWindowsState: true
+        case .requested, .readOnlyMedia, .unsupportedWriteMode, .unknown: false
+        }
+    }
+}
+
 public enum MountFailureCopy {
     public static let unsafeWindowsVolume = "Windows left this NTFS volume in an unsafe state. ntfsmac did not mount it. Connect it to Windows, run chkdsk, disable Fast Startup, then fully shut down Windows."
 
     public static func conciseMessage(for output: String) -> String? {
+        unsafeWindowsReason(for: output) == nil ? nil : unsafeWindowsVolume
+    }
+
+    public static func unsafeWindowsReason(for output: String) -> ReadOnlyReason? {
         let normalized = output.lowercased()
-        let unsafeMarkers = [
-            "ntfs3 read/write refused",
-            "ntfsmac_ntfs3_rw_unsafe",
-            "volume is dirty",
-            "dirty bit is set",
-            "unclean file system",
-            "unclean filesystem",
+        let hibernationMarkers = [
             "windows is hibernated",
             "windows is hibernating",
             "metadata kept in windows cache",
             "hibernated volume",
         ]
-        return unsafeMarkers.contains(where: normalized.contains) ? unsafeWindowsVolume : nil
+        if hibernationMarkers.contains(where: normalized.contains) {
+            return .windowsHibernated
+        }
+
+        let dirtyMarkers = [
+            "volume is dirty",
+            "dirty bit is set",
+            "unclean file system",
+            "unclean filesystem",
+        ]
+        if dirtyMarkers.contains(where: normalized.contains) {
+            return .windowsDirty
+        }
+
+        let genericMarkers = [
+            "ntfs3 read/write refused",
+            "ntfsmac_ntfs3_rw_unsafe",
+            "windows left this volume in an unsafe state",
+        ]
+        return genericMarkers.contains(where: normalized.contains) ? .unsafeWindowsState : nil
     }
 }
 
-/// One mounted drive: the `Drive` plus its real mount point and per-drive read-only/dirty
-/// landing state. Multi-mount (PLAN.md / GUI-PLAN.md "v2") means the controller holds a list
-/// of these, not a single optional drive. `isDirty` is per-drive so `DriveRow`'s
-/// "Mount read/write anyway…" pill can surface on exactly the row that landed read-only on a
-/// dirty NTFS journal, not on every mounted row.
+public enum ReadOnlyReasonClassifier {
+    public static func classify(
+        requestedReadOnly: Bool,
+        landedReadOnly: Bool,
+        fsType: String,
+        output: String
+    ) -> ReadOnlyReason? {
+        guard landedReadOnly else { return nil }
+        if requestedReadOnly { return .requested }
+
+        let normalized = output.lowercased()
+        if fsType.lowercased() == "ntfs",
+           let windowsReason = MountFailureCopy.unsafeWindowsReason(for: output) {
+            return windowsReason
+        }
+        if ["media_writable: false", "write-protected", "write protected", "read-only media"]
+            .contains(where: normalized.contains) {
+            return .readOnlyMedia
+        }
+        if ["unsupported write", "write mode is unsupported", "read-write is unsupported"]
+            .contains(where: normalized.contains) {
+            return .unsupportedWriteMode
+        }
+        return .unknown
+    }
+}
+
+/// One mounted drive plus its independently observed mount point, driver, mode, and read-only
+/// cause. A read-only cause is never guessed from the mode alone.
 public struct MountedDrive: Identifiable, Equatable, Sendable {
     public let drive: Drive
     public var mountPoint: String?
     public var fsDriver: String?
-    public var isReadOnly: Bool
-    public var isDirty: Bool
+    public var readOnlyReason: ReadOnlyReason?
     public var isVerified: Bool
     public var id: String { drive.id }
+    public var isReadOnly: Bool { readOnlyReason != nil }
+    public var requiresWindowsRepair: Bool { readOnlyReason?.requiresWindowsRepair == true }
+    public var hasReadOnlyWarning: Bool { readOnlyReason?.requiresAttention == true }
 
     public init(
         drive: Drive,
         mountPoint: String?,
         fsDriver: String? = nil,
-        isReadOnly: Bool,
-        isDirty: Bool,
+        readOnlyReason: ReadOnlyReason?,
         isVerified: Bool = true
     ) {
         self.drive = drive
         self.mountPoint = mountPoint
         self.fsDriver = fsDriver
-        self.isReadOnly = isReadOnly
-        self.isDirty = isDirty
+        self.readOnlyReason = readOnlyReason
         self.isVerified = isVerified
     }
 }
@@ -363,19 +459,23 @@ public final class MountController: ObservableObject {
                     ? await readOnlyChecker.isAnyNfsMountReadOnly()
                     : false
                 let landedReadOnly = readOnly || (observed?.isReadOnly ?? fallbackReadOnly)
+                let readOnlyReason = ReadOnlyReasonClassifier.classify(
+                    requestedReadOnly: readOnly,
+                    landedReadOnly: landedReadOnly,
+                    fsType: drive.fsType,
+                    output: result.output
+                )
                 if let index = mountedDrives.firstIndex(where: { $0.id == drive.identifier }) {
                     mountedDrives[index].mountPoint = observed?.mountPoint ?? resolvedMountPoint
                     mountedDrives[index].fsDriver = observed?.fsDriver ?? resolvedDriver.rawValue
-                    mountedDrives[index].isReadOnly = landedReadOnly
-                    mountedDrives[index].isDirty = landedReadOnly && !readOnly
+                    mountedDrives[index].readOnlyReason = readOnlyReason
                     mountedDrives[index].isVerified = snapshot.isAuthoritative && observed?.isReadOnly != nil
                 } else {
                     mountedDrives.append(MountedDrive(
                         drive: drive,
                         mountPoint: resolvedMountPoint,
                         fsDriver: resolvedDriver.rawValue,
-                        isReadOnly: landedReadOnly,
-                        isDirty: landedReadOnly && !readOnly,
+                        readOnlyReason: readOnlyReason,
                         isVerified: false
                     ))
                     reconciliationWarning = warningMessage(for: snapshot.warningCode ?? "MOUNT_STATE_SOURCE_UNAVAILABLE")
@@ -540,12 +640,20 @@ public final class MountController: ObservableObject {
             let drive = known[observed.deviceIdentifier]
                 ?? prior?.drive
                 ?? fallbackDrive(for: observed)
+            let readOnlyReason: ReadOnlyReason?
+            switch observed.isReadOnly {
+            case true:
+                readOnlyReason = prior?.isReadOnly == true ? prior?.readOnlyReason : .unknown
+            case false:
+                readOnlyReason = nil
+            case nil:
+                readOnlyReason = prior?.readOnlyReason
+            }
             return MountedDrive(
                 drive: drive,
                 mountPoint: observed.mountPoint,
                 fsDriver: observed.fsDriver ?? prior?.fsDriver,
-                isReadOnly: observed.isReadOnly ?? prior?.isReadOnly ?? true,
-                isDirty: prior?.isDirty ?? false,
+                readOnlyReason: readOnlyReason,
                 isVerified: observed.isReadOnly != nil
                     && supportsPerDriveVerification
                     && !snapshot.unresponsiveDeviceIDs.contains(observed.deviceIdentifier)
@@ -604,9 +712,9 @@ public final class MountController: ObservableObject {
     }
 
     /// Derive the shared icon/banner state from the full mounted set. The icon reflects the
-    /// worst landing across all drives: any dirty → dirty banner; else any ro → read-only;
-    /// else read/write; empty → idle. `.mounting` is set imperatively at mount start and
-    /// overwritten here once the mount resolves.
+    /// worst landing across all drives: unsafe Windows state, unexpected read-only, requested
+    /// read-only, then read/write. `.mounting` is set imperatively at mount start and overwritten
+    /// here once the mount resolves.
     private func recomputeAggregateState() {
         if mountOperationsInFlight > 0 {
             appState.state = .mounting
@@ -614,8 +722,10 @@ public final class MountController: ObservableObject {
             appState.state = .idle
         } else if mountedDrives.contains(where: { !$0.isVerified }) {
             appState.state = .mountedUnknown
-        } else if mountedDrives.contains(where: { $0.isDirty }) {
+        } else if mountedDrives.contains(where: { $0.requiresWindowsRepair }) {
             appState.state = .mountedReadOnlyDirty
+        } else if mountedDrives.contains(where: { $0.hasReadOnlyWarning }) {
+            appState.state = .mountedReadOnlyUnexpected
         } else if mountedDrives.contains(where: { $0.isReadOnly }) {
             appState.state = .mountedReadOnly
         } else {
@@ -640,9 +750,7 @@ public final class MountController: ObservableObject {
         }
     }
 
-    /// GUI-PLAN.md "Error state": plain-language cause, not a raw Swift error dump. Not
-    /// `private` — `RemountController` (`3-dirty-ro-warning`) reuses it rather than
-    /// re-duplicating the same `HelperClientError` mapping.
+    /// GUI-PLAN.md "Error state": plain-language cause, not a raw Swift error dump.
     static func describe(_ error: Error) -> String {
         switch error {
         case HelperClientError.invalidDevice(let device):

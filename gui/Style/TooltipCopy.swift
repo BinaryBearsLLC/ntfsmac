@@ -11,7 +11,6 @@ public enum TooltipCopy {
         case verifiedCopy
         case unmount
         case ejectAll
-        case mountReadWriteAnyway
         case hideSecurity
         case showSecurity
         case quit
@@ -37,8 +36,6 @@ public enum TooltipCopy {
             "Safely unmount this drive and tear down its private network"
         case .ejectAll:
             "Try to unmount every drive and show each result"
-        case .mountReadWriteAnyway:
-            "Retry read/write mounting despite the unclean journal warning"
         case .hideSecurity:
             "Hide security status without changing the mount or helper"
         case .showSecurity:
@@ -54,7 +51,8 @@ public enum TooltipCopy {
         case .mounting: "Mount in progress"
         case .mountedReadWrite: "All mounted drives are read/write"
         case .mountedReadOnly: "At least one mounted drive is read-only"
-        case .mountedReadOnlyDirty: "At least one mounted NTFS drive has an unclean journal"
+        case .mountedReadOnlyUnexpected: "At least one drive mounted read-only for an unconfirmed reason"
+        case .mountedReadOnlyDirty: "At least one mounted NTFS drive has an unsafe Windows state"
         case .mountedUnknown: "Mounted state needs independent host verification"
         case .error: "ntfsmac needs attention"
         }

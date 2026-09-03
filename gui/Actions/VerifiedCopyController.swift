@@ -71,12 +71,10 @@ public enum VerifiedCopyAvailability {
     public static func isAvailable(
         isVerified: Bool,
         isReadOnly: Bool,
-        isDirty: Bool,
         mountPoint: String?
     ) -> Bool {
         isVerified
             && !isReadOnly
-            && !isDirty
             && !(mountPoint?.isEmpty ?? true)
     }
 }

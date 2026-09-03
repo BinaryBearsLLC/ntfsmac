@@ -1,40 +1,78 @@
 import SwiftUI
 
-/// GUI-PLAN.md "Read-only (dirty) state" table — exact copy, pure predicate. Split from the
-/// `View` below the same way `StatusIcon`/`StatusIconView` split (`gui/Status/StatusIcon.swift`)
-/// so `DirtyStateTests` can assert visibility without a SwiftUI view-inspection dependency.
-public enum DirtyBanner {
-    public static let bannerCopy =
-        "Mounted read-only — Windows left this drive in an unsafe state. Run chkdsk, disable Fast Startup, then fully shut down Windows."
+public struct ReadOnlyWarningCopy: Equatable, Sendable {
+    public let title: String
+    public let message: String
+}
 
-    public static func isVisible(for state: MountState) -> Bool {
-        state == .mountedReadOnlyDirty
+/// A read-only landing becomes a Windows warning only when the mount output contains matching
+/// evidence. Other causes stay explicit and never inherit dirty-volume repair advice.
+public enum DirtyBanner {
+    /// Prefer the most safety-relevant warning when multiple drives are mounted. Array order is
+    /// not a diagnosis: an unknown read-only drive must not hide explicit Windows evidence from
+    /// another mounted drive.
+    public static func preferredReason(among reasons: [ReadOnlyReason]) -> ReadOnlyReason? {
+        let actionable = reasons.filter(\.requiresAttention)
+        return actionable.first(where: \.requiresWindowsRepair) ?? actionable.first
+    }
+
+    public static func copy(for reason: ReadOnlyReason?) -> ReadOnlyWarningCopy? {
+        switch reason {
+        case .windowsDirty:
+            return .init(
+                title: "Windows volume needs repair",
+                message: "Mounted read-only because Windows marked this drive dirty. Run chkdsk, then eject it safely."
+            )
+        case .windowsHibernated:
+            return .init(
+                title: "Windows volume is hibernated",
+                message: "Mounted read-only. Disable Fast Startup and fully shut down Windows before reconnecting it."
+            )
+        case .unsafeWindowsState:
+            return .init(
+                title: "Unsafe Windows state",
+                message: "Mounted read-only to protect the drive. Run chkdsk, disable Fast Startup, then fully shut down Windows."
+            )
+        case .readOnlyMedia:
+            return .init(
+                title: "Drive is write-protected",
+                message: "The device reports read-only media. Check its lock or adapter before reconnecting it."
+            )
+        case .unsupportedWriteMode:
+            return .init(
+                title: "Write mode is unavailable",
+                message: "This filesystem or mount mode is available read-only. Run Diagnose for details."
+            )
+        case .unknown:
+            return .init(
+                title: "Write access unavailable",
+                message: "The drive mounted read-only for an unconfirmed reason. Run Diagnose before retrying."
+            )
+        case .requested, .none:
+            return nil
+        }
     }
 }
 
-/// Non-dismissable while RO-dirty. Production policy offers recovery guidance only: it never
-/// exposes a read/write override for an unclean or hibernated Windows volume.
+/// Non-dismissable while read-only needs attention. Recovery guidance never exposes a forced
+/// read/write override.
 public struct DirtyBannerView: View {
-    @ObservedObject public var appState: AppState
-    @ObservedObject public var remountController: RemountController
-    public let drive: Drive
+    public let reason: ReadOnlyReason
 
-    public init(appState: AppState, remountController: RemountController, drive: Drive) {
-        self.appState = appState
-        self.remountController = remountController
-        self.drive = drive
+    public init(reason: ReadOnlyReason) {
+        self.reason = reason
     }
 
     public var body: some View {
-        if DirtyBanner.isVisible(for: appState.state) {
+        if let copy = DirtyBanner.copy(for: reason) {
             HStack(alignment: .top, spacing: 9) {
                 WarningTriangleGlyph(color: .ntfsYellow)
                     .padding(.top, 1)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Unclean journal detected")
+                    Text(copy.title)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Color.ntfsYellow.opacity(0.9))
-                    Text(DirtyBanner.bannerCopy)
+                    Text(copy.message)
                         .font(.system(size: 11))
                         .foregroundStyle(Color.ntfsYellow.opacity(0.62))
                 }

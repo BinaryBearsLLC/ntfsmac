@@ -56,7 +56,6 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
         let uiDemoMode = ProcessInfo.processInfo.environment["NTFSMAC_UI_DEMO"]
         let driveScanner: DriveScanner
         let mountController: MountController
-        let remountController: RemountController
 
         // See `DemoScaffold.swift`: inert unless NTFSMAC_UI_DEMO is explicitly set. Real installs
         // never set it, so this branch is limited to deliberate live-screen audits.
@@ -67,14 +66,9 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
                 appState: appState,
                 notifier: eventNotifier
             )
-            remountController = DemoScaffold.remountController(
-                appState: appState,
-                notifier: eventNotifier
-            )
         } else {
             driveScanner = DriveScanner()
             mountController = MountController(notifier: eventNotifier, appState: appState)
-            remountController = RemountController(notifier: eventNotifier, appState: appState)
         }
 
         let helperInstaller: HelperInstaller
@@ -101,7 +95,6 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
             appState: appState,
             driveScanner: driveScanner,
             mountController: mountController,
-            remountController: remountController,
             diagnoseRunner: DiagnoseRunner(),
             helperInstaller: helperInstaller,
             helperUninstaller: helperUninstaller,

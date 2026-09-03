@@ -72,7 +72,7 @@ public extension ButtonStyle where Self == GlassPillButtonStyle {
             : GlassPillButtonStyle(fill: Color.ntfsRed.opacity(0.08), border: Color.ntfsRed.opacity(0.2), foreground: Color(red: 200.0 / 255, green: 30.0 / 255, blue: 20.0 / 255).opacity(0.85), horizontalPadding: 11)
     }
 
-    /// Warning pill — "Mount read/write anyway…". Comp: `rgba(255,214,10,0.1)` / `0.22` border.
+    /// Warning pill — used by explicit, safety-gated actions such as NTFS3 confirmation.
     static func glassWarning() -> GlassPillButtonStyle {
         GlassPillButtonStyle(fill: Color.ntfsYellow.opacity(0.1), border: Color.ntfsYellow.opacity(0.22), foreground: Color.ntfsYellow.opacity(0.78))
     }

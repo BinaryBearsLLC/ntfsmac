@@ -70,7 +70,9 @@ forces that credential-free fallback. See
 
 Open `ntfsmac.app`, select a detected drive, and choose **Mount**. The normal Mount action always
 uses `ntfs-3g`. The adjacent menu offers **NTFS3 (Experimental)** for controlled testing after
-Windows Fast Startup, dirty-volume, and `chkdsk` guidance.
+Windows Fast Startup, dirty-volume, and `chkdsk` guidance. Once mounted, **Open in Finder** opens
+the network-backed volume; Finder provides normal file browsing and writing when the mount is
+confirmed read/write.
 
 The CLI remains available for scripted and diagnostic use:
 
@@ -108,7 +110,10 @@ addresses, DNS servers, route tables, and VPN provider details.
 ### Current behavior
 
 - Diagnose presents four plain-language categories; technical evidence remains available through
-  the CLI and Command-click JSON export.
+  the CLI and Command-click JSON export. A mount-state change invalidates the visible result and
+  refreshes it automatically while the panel is open.
+- An unexpected read-only mount is attributed to Windows only when the backend provides matching
+  evidence. ntfsmac never offers a forced read/write override for an unsafe volume.
 - Quit protects mounted drives with **Unmount and Quit**, **Quit Anyway**, and **Cancel**. Only the
   safe unmount action can be remembered.
 - Standard and Legacy builds share the same reviewed mount/runtime path. The standard helper is

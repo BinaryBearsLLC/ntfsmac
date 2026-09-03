@@ -235,6 +235,7 @@ func kernelPinRawValuesAreRepresentedHonestly(rawValue: String) {
     (.mounting, .informational, "Starting with the mount"),
     (.mountedReadWrite, .warning, "Inactive while a drive is mounted"),
     (.mountedReadOnly, .warning, "Inactive while a drive is mounted"),
+    (.mountedReadOnlyUnexpected, .warning, "Inactive while a drive is mounted"),
     (.mountedReadOnlyDirty, .warning, "Inactive while a drive is mounted"),
     (.error, .unavailable, "Inactive — mount context unavailable"),
 ])
@@ -338,10 +339,40 @@ func bridgeDownUsesMountContext(argument: (MountState, DiagnoseStatus, String)) 
     #expect(presentation.phase(report: report, errorMessage: "failure", isRunning: true) == .hidden)
     presentation.show()
     #expect(presentation.phase(report: nil, errorMessage: nil, isRunning: true) == .running)
+    #expect(presentation.phase(report: nil, errorMessage: nil, isRunning: false, isStale: true) == .running)
+    #expect(presentation.phase(report: report, errorMessage: nil, isRunning: false, contextIsCurrent: false) == .running)
     #expect(presentation.phase(report: report, errorMessage: nil, isRunning: false) == .result)
     #expect(presentation.phase(report: nil, errorMessage: "failure", isRunning: false) == .error)
     presentation.hide()
     #expect(presentation.phase(report: report, errorMessage: nil, isRunning: false) == .hidden)
+}
+
+@MainActor
+@Test func storageStateChangeInvalidatesAnIdleReportBeforeMountedCopyCanUseIt() async {
+    let fake = FakeRunner()
+    fake.result = CommandResult(output: developerExportJSON, exitCode: 0)
+    let runner = DiagnoseRunner(runner: fake, ntfsmacPath: "/fake/ntfsmac", fileExists: { _ in true })
+
+    await runner.run()
+    #expect(runner.report?.securityActiveSessions == 0)
+
+    runner.invalidateForStorageStateChange()
+
+    #expect(runner.report == nil)
+    #expect(runner.errorMessage == nil)
+    #expect(runner.isStale)
+
+    await runner.run()
+    #expect(!runner.isStale)
+    #expect(runner.report?.securityActiveSessions == 0)
+    #expect(fake.calls.count == 2)
+}
+
+@Test func visibleDiagnosticsRefreshOnlyAfterMountingSettles() {
+    #expect(!DiagnoseRefreshPolicy.shouldRunAutomatically(panelIsVisible: false, mountState: .mountedReadWrite))
+    #expect(!DiagnoseRefreshPolicy.shouldRunAutomatically(panelIsVisible: true, mountState: .mounting))
+    #expect(DiagnoseRefreshPolicy.shouldRunAutomatically(panelIsVisible: true, mountState: .mountedReadWrite))
+    #expect(DiagnoseRefreshPolicy.shouldRunAutomatically(panelIsVisible: true, mountState: .idle))
 }
 
 @MainActor

@@ -40,7 +40,9 @@ Patch release for [issue #24](https://github.com/BinaryBearsLLC/ntfsmac/issues/2
 Follow-up issue evidence showed that `registries.conf` and other OCI inputs could still block the
 same public runtime pull. Current work isolates all registry and authentication inputs, serializes
 the longer first runtime check, prevents stale CLI scans during helper updates, and separates
-runtime, no-drive, and Full Disk Access states.
+runtime, no-drive, and Full Disk Access states. The next patch also refreshes Diagnostics after
+mount changes, reports read-only causes without guessing, removes the unsafe RW override path, and
+labels **Open in Finder** explicitly.
 
 Thanks to [@VixenSugo](https://github.com/VixenSugo) for reporting the issue, retesting both
 Standard and Legacy builds, and providing the diagnostics and video that exposed the remaining
