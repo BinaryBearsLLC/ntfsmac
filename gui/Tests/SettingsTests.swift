@@ -185,3 +185,18 @@ private func waitForLaunchAtLoginUpdate(_ settings: Settings) async {
     #expect(settings.launchAtLogin)
     #expect(defaults.bool(forKey: "com.khr898.ntfsmac.settings.launchAtLogin"))
 }
+
+@MainActor
+@Test func preservePrivateRelayDefaultsToFalseAndPersists() {
+    let defaults = makeIsolatedDefaults(#function)
+    let settings = Settings(defaults: defaults, loginService: FakeLoginService())
+
+    #expect(!settings.preservePrivateRelay)
+    settings.preservePrivateRelay = true
+    #expect(settings.preservePrivateRelay)
+    #expect(defaults.bool(forKey: "com.khr898.ntfsmac.settings.preservePrivateRelay"))
+
+    let reloaded = Settings(defaults: defaults, loginService: FakeLoginService())
+    #expect(reloaded.preservePrivateRelay)
+}
+

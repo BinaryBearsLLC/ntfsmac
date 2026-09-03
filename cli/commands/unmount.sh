@@ -27,6 +27,13 @@ usage() {
 }
 
 cmd_unmount() {
+  # Self-elevate via sudo so security teardown (releasing the PF token via pfctl -X,
+  # flushing the PF child anchor, removing host routes, and clearing /var/run state)
+  # has root privileges. Mirrors mount.sh and uninstall.sh.
+  if [[ $EUID -ne 0 && "${NTFSMAC_SKIP_ROOT_CHECK:-}" != "1" ]]; then
+    exec sudo "$0" "$@"
+  fi
+
   if [[ -z "$ANYLINUXFS_BIN" ]]; then
     echo "unmount: FATAL — anylinuxfs binary not found at any known install path (try reinstalling: sudo bash install.sh, or 'ntfsmac diagnose')" >&2
     return 1

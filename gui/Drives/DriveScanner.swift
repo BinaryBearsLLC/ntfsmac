@@ -1,5 +1,6 @@
 import Foundation
 import HelperShared
+import os
 
 /// One partition `anylinuxfs list` reports as mountable by ntfsmac: NTFS/BitLocker
 /// (the existing Windows set) or ext2/3/4. GUI-PLAN.md "Auto-detect compatible drives" —
@@ -127,13 +128,22 @@ public enum DriveListParser {
 /// `list --microsoft` and `list --linux`. `DriveListParser.allowedFsTypes` then filters to
 /// ntfsmac's narrower scope (NTFS-family + ext2/3/4) client-side. Reuses `HelperShared`'s
 /// `PrivilegedCommandRunning`/`RealCommandRunner` seam (already used by `HelperService`) instead
-/// of a second process-spawn helper — this call itself is unprivileged, only the runner shape
+public enum AlpineRuntimeCacheState: Sendable, Equatable {
+    case initialized
+    case notInitialized
+    case incomplete
+}
+
+/// `DriveListParser.allowedFsTypes` filters to ntfsmac's narrower scope (NTFS-family + ext2/3/4) client-side.
+/// Reuses `HelperShared`'s `PrivilegedCommandRunning`/`RealCommandRunner` seam (already used by `HelperService`)
+/// instead of a second process-spawn helper — this call itself is unprivileged, only the runner shape
 /// is reused. Production scans run away from the main actor because the first VM-backed list can
 /// take long enough to make the menu-bar popover appear hung.
 @MainActor
 public final class DriveScanner: ObservableObject {
     @Published public private(set) var drives: [Drive] = []
     @Published public private(set) var lastError: String?
+    @Published public private(set) var isInitializingRuntime: Bool = false
 
     // An explicit runner is the deterministic test/demo seam and remains actor-bound because the
     // shared protocol is intentionally not Sendable. Production leaves this nil and creates the
@@ -141,40 +151,157 @@ public final class DriveScanner: ObservableObject {
     private let runner: (any PrivilegedCommandRunning)?
     private let anylinuxfsPath: String
     private let scanTimeout: TimeInterval
+    private let firstRunTimeout: TimeInterval
+    private let cacheStateProvider: @MainActor () -> AlpineRuntimeCacheState
+    private let cachePreserver: @MainActor () -> Bool
     private var pollTask: Task<Void, Never>?
+    private var inFlightRefreshTask: Task<Void, Never>?
+    private var setupTask: Task<Void, Never>?
 
     public init(
         runner: (any PrivilegedCommandRunning)? = nil,
         anylinuxfsPath: String = "\(installPrefix)/bin/anylinuxfs",
-        scanTimeout: TimeInterval = 10
+        scanTimeout: TimeInterval = 10,
+        firstRunTimeout: TimeInterval? = nil,
+        cacheStateProvider: (@MainActor () -> AlpineRuntimeCacheState)? = nil,
+        cachePreserver: (@MainActor () -> Bool)? = nil
     ) {
         self.runner = runner
         self.anylinuxfsPath = anylinuxfsPath
         self.scanTimeout = scanTimeout
+        self.firstRunTimeout = firstRunTimeout ?? (scanTimeout < 1 ? scanTimeout : 240)
+        if let cacheStateProvider {
+            self.cacheStateProvider = cacheStateProvider
+        } else if runner != nil {
+            self.cacheStateProvider = { .initialized }
+        } else {
+            self.cacheStateProvider = { Self.defaultCacheState() }
+        }
+        self.cachePreserver = cachePreserver ?? { Self.defaultPreserveCache() }
     }
 
     deinit {
         pollTask?.cancel()
+        inFlightRefreshTask?.cancel()
+        setupTask?.cancel()
     }
 
-    /// ponytail: fixed 5s poll, no backoff/jitter — add a `3-preferences` knob if a real drive
-    /// swap ever needs to show up faster, or if this proves too chatty against `anylinuxfs`.
-    public func startPolling(interval: Duration = .seconds(5)) {
-        pollTask?.cancel()
-        pollTask = Task { [weak self] in
-            while !Task.isCancelled {
-                await self?.refresh()
-                try? await Task.sleep(for: interval)
-            }
+    public func simulateInitializingRuntime(_ initializing: Bool) {
+        self.isInitializingRuntime = initializing
+    }
+
+    public func waitForCurrentSetup() async {
+        if let setupTask {
+            await setupTask.value
+        } else if let inFlightRefreshTask {
+            await inFlightRefreshTask.value
         }
     }
 
-    public func stopPolling() {
-        pollTask?.cancel()
-        pollTask = nil
+    private func awaitTaskWithCallerCancellation(_ task: Task<Void, Never>) async {
+        guard !Task.isCancelled else { return }
+        let state = os.OSAllocatedUnfairLock<(resumed: Bool, continuation: CheckedContinuation<Void, Never>?)>(
+            initialState: (resumed: false, continuation: nil)
+        )
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                let alreadyCancelled = state.withLock { s -> Bool in
+                    if s.resumed {
+                        return true
+                    }
+                    s.continuation = continuation
+                    return false
+                }
+                if alreadyCancelled {
+                    continuation.resume()
+                    return
+                }
+                Task {
+                    await task.value
+                    let contToResume = state.withLock { s -> CheckedContinuation<Void, Never>? in
+                        if !s.resumed {
+                            s.resumed = true
+                            let c = s.continuation
+                            s.continuation = nil
+                            return c
+                        }
+                        return nil
+                    }
+                    contToResume?.resume()
+                }
+            }
+        } onCancel: {
+            let contToResume = state.withLock { s -> CheckedContinuation<Void, Never>? in
+                if !s.resumed {
+                    s.resumed = true
+                    let c = s.continuation
+                    s.continuation = nil
+                    return c
+                }
+                return nil
+            }
+            contToResume?.resume()
+        }
     }
 
     public func refresh() async {
+        if let setupTask {
+            await awaitTaskWithCallerCancellation(setupTask)
+            return
+        }
+
+        var state = cacheStateProvider()
+        if state == .incomplete {
+            _ = cachePreserver()
+            state = cacheStateProvider()
+            if state == .incomplete {
+                state = .notInitialized
+            }
+        }
+
+        if state != .initialized {
+            isInitializingRuntime = true
+            let task = Task.detached(priority: .userInitiated) { [weak self] in
+                guard let self else { return }
+                await self.performFirstRunSetup()
+            }
+            self.setupTask = task
+            await awaitTaskWithCallerCancellation(task)
+            return
+        }
+
+        if let existing = inFlightRefreshTask {
+            await awaitTaskWithCallerCancellation(existing)
+            return
+        }
+        let task = Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+            await self.performStandardScan()
+        }
+        inFlightRefreshTask = task
+        await awaitTaskWithCallerCancellation(task)
+        inFlightRefreshTask = nil
+    }
+
+    private func performFirstRunSetup() async {
+        defer {
+            isInitializingRuntime = false
+            setupTask = nil
+        }
+        let probeResult: CommandResult
+        if let runner {
+            probeResult = runner.run(anylinuxfsPath, ["list"])
+        } else {
+            probeResult = await Self.runOffMain(
+                anylinuxfsPath,
+                ["list"],
+                timeout: firstRunTimeout
+            )
+        }
+        applyResults([probeResult])
+    }
+
+    private func performStandardScan() async {
         let microsoft: CommandResult
         let linux: CommandResult
         if let runner {
@@ -193,18 +320,19 @@ public final class DriveScanner: ObservableObject {
             )
             (microsoft, linux) = await (microsoftProbe, linuxProbe)
         }
+        applyResults([microsoft, linux])
+    }
 
-        let successfulResults = [microsoft, linux].filter { $0.exitCode == 0 }
+    private func applyResults(_ results: [CommandResult]) {
+        let successfulResults = results.filter { $0.exitCode == 0 }
         if !successfulResults.isEmpty {
-            // A future anylinuxfs version may report a partition in both families. Preserve the
-            // Microsoft-then-Linux display order while ensuring a stable one-row-per-device list.
             var seenIdentifiers = Set<String>()
             drives = successfulResults
                 .flatMap { DriveListParser.parse($0.output) }
                 .filter { seenIdentifiers.insert($0.identifier).inserted }
         }
 
-        let failedResults = [microsoft, linux].filter { $0.exitCode != 0 }
+        let failedResults = results.filter { $0.exitCode != 0 }
         if failedResults.isEmpty {
             lastError = nil
         } else {
@@ -213,6 +341,71 @@ public final class DriveScanner: ObservableObject {
                 .filter { !$0.isEmpty }
                 .joined(separator: "\n")
         }
+    }
+
+    public static func defaultCacheState() -> AlpineRuntimeCacheState {
+        let fileManager = FileManager.default
+        let anylinuxfsDir = fileManager.homeDirectoryForCurrentUser.appendingPathComponent(".anylinuxfs")
+        guard let contents = try? fileManager.contentsOfDirectory(atPath: anylinuxfsDir.path) else {
+            return .notInitialized
+        }
+        let activeAlpineDirs = contents.filter { $0.hasPrefix("alpine-") && !$0.contains(".preserved-") }
+        guard !activeAlpineDirs.isEmpty else {
+            return .notInitialized
+        }
+        for dirName in activeAlpineDirs {
+            let base = anylinuxfsDir.appendingPathComponent(dirName)
+            let marker = base.appendingPathComponent("rootfs.ver")
+            let bash = base.appendingPathComponent("rootfs/bin/bash")
+            let nfsd = base.appendingPathComponent("rootfs/usr/sbin/rpc.nfsd")
+            if fileManager.fileExists(atPath: marker.path) &&
+               fileManager.fileExists(atPath: bash.path) &&
+               fileManager.fileExists(atPath: nfsd.path) {
+                return .initialized
+            }
+        }
+        return .incomplete
+    }
+
+    public static func defaultPreserveCache() -> Bool {
+        let fileManager = FileManager.default
+        let anylinuxfsDir = fileManager.homeDirectoryForCurrentUser.appendingPathComponent(".anylinuxfs")
+        guard let contents = try? fileManager.contentsOfDirectory(atPath: anylinuxfsDir.path) else {
+            return false
+        }
+        let incompleteDirs = contents.filter { $0.hasPrefix("alpine-") && !$0.contains(".preserved-") }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withYear, .withMonth, .withDay, .withTime]
+        let stamp = formatter.string(from: Date()).replacingOccurrences(of: ":", with: "")
+        var preservedAny = false
+        for dirName in incompleteDirs {
+            let source = anylinuxfsDir.appendingPathComponent(dirName)
+            let target = anylinuxfsDir.appendingPathComponent("\(dirName).preserved-\(stamp)")
+            do {
+                try fileManager.moveItem(at: source, to: target)
+                preservedAny = true
+            } catch {
+                // Ignore if cannot move
+            }
+        }
+        return preservedAny
+    }
+
+    /// ponytail: fixed 5s poll, no backoff/jitter — add a `3-preferences` knob if a real drive
+    /// swap ever needs to show up faster, or if this proves too chatty against `anylinuxfs`.
+    public func startPolling(interval: Duration = .seconds(5)) {
+        pollTask?.cancel()
+        pollTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.refresh()
+                try? await Task.sleep(for: interval)
+            }
+        }
+    }
+
+    public func stopPolling() {
+        pollTask?.cancel()
+        pollTask = nil
     }
 
     private nonisolated static func runOffMain(

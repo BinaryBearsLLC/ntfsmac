@@ -131,13 +131,34 @@ run_anylinuxfs_mount() {
     security_begin_prepared_mount "$device" || true
     security_prepare_available="1"
   fi
-  run_with_progress "${NTFSMAC_MOUNT_TIMEOUT:-240}" 15 "mount" - \
-    "$ANYLINUXFS_BIN" "${args[@]}" &
-  mount_job=$!
-  if [[ "$security_prepare_available" == "1" ]]; then
-    security_prepare_mount_transport "$device" "$mount_job" || true
-  fi
-  wait "$mount_job" || mount_result=$?
+  local attempt=0 max_attempts=3
+  while (( attempt < max_attempts )); do
+    attempt=$((attempt + 1))
+    mount_result="0"
+
+    # If another probe is running (e.g. anylinuxfs list), wait briefly for it to release the lock
+    local wait_start=$SECONDS
+    while pgrep -f "$ANYLINUXFS_BIN list" >/dev/null 2>&1 && (( SECONDS - wait_start < 10 )); do
+      sleep 0.5
+    done
+
+    run_with_progress "${NTFSMAC_MOUNT_TIMEOUT:-240}" 15 "mount" - \
+      "$ANYLINUXFS_BIN" "${args[@]}" &
+    mount_job=$!
+    if [[ "$security_prepare_available" == "1" ]]; then
+      security_prepare_mount_transport "$device" "$mount_job" || true
+    fi
+    wait "$mount_job" || mount_result=$?
+
+    if [[ "$mount_result" -eq 0 ]]; then
+      break
+    fi
+
+    if (( attempt < max_attempts )); then
+      sleep 1.5
+    fi
+  done
+
   if [[ "$mount_result" != "0" ]]; then
     if [[ "$security_prepare_available" == "1" ]] \
       && declare -F security_abort_prepared_mount >/dev/null 2>&1; then

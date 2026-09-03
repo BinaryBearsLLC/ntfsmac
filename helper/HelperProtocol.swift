@@ -302,6 +302,14 @@ public struct RealCommandRunner: PrivilegedCommandRunning {
                 env["HOME"] = String(cString: dir)
             }
         }
+        if let home = env["HOME"] {
+            let prefFile = URL(fileURLWithPath: home).appendingPathComponent("Library/Preferences/com.khr898.ntfsmac.plist")
+            if let dict = NSDictionary(contentsOf: prefFile),
+               let preserve = dict["com.khr898.ntfsmac.settings.preservePrivateRelay"] as? Bool,
+               preserve {
+                env["NTFSMAC_PRESERVE_PRIVATE_RELAY"] = "1"
+            }
+        }
         process.environment = env
     }
 

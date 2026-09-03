@@ -65,6 +65,11 @@ public final class Settings: ObservableObject {
             beginLaunchAtLoginUpdate(launchAtLogin)
         }
     }
+    @Published public var preservePrivateRelay: Bool {
+        didSet {
+            defaults.set(preservePrivateRelay, forKey: Keys.preservePrivateRelay)
+        }
+    }
     @Published public private(set) var isUpdatingLaunchAtLogin = false
     @Published public private(set) var launchAtLoginMessage: String?
 
@@ -85,6 +90,8 @@ public final class Settings: ObservableObject {
         confirmedLaunchAtLogin = initialValue
         launchAtLoginMessage = Self.message(for: registrationStatus)
         defaults.set(initialValue, forKey: Keys.launchAtLogin)
+
+        preservePrivateRelay = defaults.object(forKey: Keys.preservePrivateRelay) as? Bool ?? Defaults.preservePrivateRelay
     }
 
     /// Updates the real Service Management registration and then reads it back. The explicit
@@ -201,9 +208,11 @@ public final class Settings: ObservableObject {
     /// GUI-PLAN.md "Settings page" table's literal Default column.
     public enum Defaults {
         public static let launchAtLogin = false
+        public static let preservePrivateRelay = false
     }
 
     private enum Keys {
         static let launchAtLogin = "com.khr898.ntfsmac.settings.launchAtLogin"
+        static let preservePrivateRelay = "com.khr898.ntfsmac.settings.preservePrivateRelay"
     }
 }

@@ -15,7 +15,7 @@ source "$SCRIPT_DIR/../lib/interactive-select.sh"
 source "$SCRIPT_DIR/../lib/security-transaction.sh"
 
 usage() {
-  echo "usage: mount.sh [--fs-driver ntfs-3g|ntfs3] [--read-only] [--ignore-permissions] <device> [mount_point]" >&2
+  echo "usage: mount.sh [--fs-driver ntfs-3g|ntfs3] [--read-only] [--ignore-permissions] [--preserve-private-relay] <device> [mount_point]" >&2
 }
 
 cmd_mount() {
@@ -60,6 +60,10 @@ cmd_mount() {
       # set it explicitly for an ext drive the probe missed (e.g. a wedged `anylinuxfs list`).
       --ignore-permissions)
         ignore_perms="1"
+        shift
+        ;;
+      --preserve-private-relay)
+        export NTFSMAC_PRESERVE_PRIVATE_RELAY="1"
         shift
         ;;
       --)

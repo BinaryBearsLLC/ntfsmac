@@ -433,3 +433,96 @@ STUB
   [[ "$output" == *"lock.sh"* ]]
 }
 
+@test "mount with --preserve-private-relay skips pfctl -E but preserves exact VPN-bypass route" {
+  export NTFSMAC_SECURITY_BRIDGE_CANDIDATES_FILE="$STUB_DIR/bridge-candidates"
+  export NTFSMAC_PFCTL_BIN="$STUB_DIR/pfctl"
+  export NTFSMAC_ROUTE_BIN="$STUB_DIR/route"
+  export NTFSMAC_DEFAULT_INTERFACE_OVERRIDE="utun4"
+  export NTFSMAC_SECURITY_RESOLVED_IP_OVERRIDE="172.27.1.2"
+  export NTFSMAC_SECURITY_BRIDGE_INTERFACE_OVERRIDE="bridge100"
+  export NTFSMAC_SECURITY_STATUS_OUTPUT="/dev/disk2s1 on /Volumes/Test (ntfs-3g, soft) VM[cpus: 1, ram: 512 MiB]"
+  export NTFSMAC_SECURITY_MOUNT_OUTPUT="disk2s1.local:/mnt/Test on /Volumes/Test (nfs, soft)"
+  export NTFSMAC_SECURITY_NFSSTAT_OUTPUT="/Volumes/Test from disk2s1.local:/mnt/Test
+  -- Current mount parameters:
+     NFS parameters: vers=3,tcp,soft,port=2049,mountport=32767"
+  export PFCTL_LOG="$STUB_DIR/pfctl.calls"
+
+  cat > "$NTFSMAC_PFCTL_BIN" <<STUB
+#!/bin/bash
+printf '%s\n' "\$*" >> "$PFCTL_LOG"
+exit 0
+STUB
+  cat > "$NTFSMAC_ROUTE_BIN" <<STUB
+#!/bin/bash
+printf '%s\n' "\$*" >> "$STUB_DIR/route.calls"
+if [[ "\$1 \$2 \$3" == "-n get 172.27.1.2" ]]; then
+  [[ -f "$STUB_DIR/route-added" ]] && echo 'interface: bridge100' || echo 'interface: utun4'
+elif [[ "\$1 \$2" == "-n get" && "\$3" == "default" ]]; then
+  echo 'interface: utun4'
+elif [[ "\$1 \$2" == "add -host" ]]; then
+  touch "$STUB_DIR/route-added"
+fi
+exit 0
+STUB
+  cat > "$STUB_DIR/anylinuxfs" <<STUB
+#!/bin/bash
+echo "\$@" >> "$CALL_LOG"
+if [[ "\$1" == "mount" ]]; then
+  printf 'bridge100|172.27.1.2|172.27.1.0/30\n' > "$NTFSMAC_SECURITY_BRIDGE_CANDIDATES_FILE"
+  for _ in {1..100}; do
+    if [[ -f "$STUB_DIR/route-added" ]]; then
+      echo '/dev/disk2s1 was mounted as /Volumes/Test'
+      exit 0
+    fi
+    sleep 0.02
+  done
+  echo 'backend reached NFS check before transport preparation' >&2
+  exit 55
+fi
+exit 0
+STUB
+  chmod +x "$NTFSMAC_PFCTL_BIN" "$NTFSMAC_ROUTE_BIN" "$STUB_DIR/anylinuxfs"
+
+  run "$SCRIPT" --preserve-private-relay --fs-driver ntfs-3g disk2s1
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"security_prepare=enforced reason=PREMOUNT_TRANSPORT_MEASURED"* ]]
+  [[ "$output" == *"security_pf_policy=notRequired reason=PF_PRESERVED_PRIVATE_RELAY"* ]]
+  [[ "$output" == *"security_overall=enforced reason=SECURITY_ENFORCED"* ]]
+  run cat "$STUB_DIR/route.calls"
+  [[ "$output" == *"add -host 172.27.1.2 -interface bridge100"* ]]
+  [ ! -f "$PFCTL_LOG" ]
+  run grep -F 'route_owned=1' "$NTFSMAC_SECURITY_STATE_DIR/disk2s1.state"
+  [ "$status" -eq 0 ]
+  run grep -F 'pf_token=' "$NTFSMAC_SECURITY_STATE_DIR/disk2s1.state"
+  [ "$output" = "pf_token=" ]
+}
+
+@test "mount retries and succeeds when anylinuxfs encounters initial lock contention" {
+  export NTFSMAC_SKIP_MOUNT_VERIFY="1"
+  local attempts_file="$STUB_DIR/mount_attempts"
+  echo "0" > "$attempts_file"
+
+  cat > "$STUB_DIR/anylinuxfs" <<STUB
+#!/bin/bash
+if [[ "\$1" == "mount" ]]; then
+  count=\$(cat "$attempts_file")
+  count=\$((count + 1))
+  echo "\$count" > "$attempts_file"
+  if [[ "\$count" -eq 1 ]]; then
+    echo "Error: another instance is already running" >&2
+    exit 1
+  fi
+  echo '/dev/disk2s1 was mounted as /Volumes/Test'
+  exit 0
+fi
+exit 0
+STUB
+  chmod +x "$STUB_DIR/anylinuxfs"
+
+  run "$SCRIPT" --fs-driver ntfs-3g disk2s1
+  [ "$status" -eq 0 ]
+  run cat "$attempts_file"
+  [ "$output" -eq 2 ]
+}
+
+

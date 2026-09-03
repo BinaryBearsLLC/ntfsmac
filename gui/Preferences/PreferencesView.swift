@@ -143,6 +143,18 @@ public struct PreferencesView: View {
 
             Divider()
 
+            row("Preserve iCloud Private Relay", "Keep Private Relay and VPNs connected during mounts") {
+                Toggle(
+                    "Preserve iCloud Private Relay",
+                    isOn: $settings.preservePrivateRelay
+                )
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .accessibilityLabel("Preserve iCloud Private Relay")
+            }
+
+            Divider()
+
             row("Reinstall privileged helper", "Repair the SMJobBless XPC helper") {
                 HStack(spacing: 6) {
                     if installer.state == .installing {

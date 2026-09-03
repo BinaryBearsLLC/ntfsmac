@@ -28,6 +28,22 @@ STUB
   chmod +x "$STUB_DIR/anylinuxfs"
 
   export NTFSMAC_ANYLINUXFS_BIN="$STUB_DIR/anylinuxfs"
+  export HOME="$STUB_DIR/home"
+  # shellcheck source=../../build/lib/lock.sh
+  source "$REPO_ROOT/build/lib/lock.sh"
+  # shellcheck source=../../cli/lib/runtime-alpine.sh
+  source "$REPO_ROOT/cli/lib/runtime-alpine.sh"
+  runtime_alpine_load
+  local default_base
+  default_base="$(runtime_alpine_cache_path "$HOME")"
+  mkdir -p "$default_base/rootfs/bin" "$default_base/rootfs/usr/sbin" "$default_base/rootfs/usr/local/bin" "$default_base/rootfs/etc"
+  printf '%s' "$ALPINE_RUNTIME_VERSION" > "$default_base/rootfs.ver"
+  : > "$default_base/rootfs/bin/bash"
+  : > "$default_base/rootfs/usr/sbin/rpc.nfsd"
+  : > "$default_base/rootfs/usr/local/bin/entrypoint.sh"
+  : > "$default_base/rootfs/vmproxy"
+  printf 'rpc_pipefs\nnfsd\n' > "$default_base/rootfs/etc/fstab"
+
   # shellcheck source=../../cli/lib/list-drives.sh
   source "$REPO_ROOT/cli/lib/list-drives.sh"
 }
@@ -206,4 +222,89 @@ STUB
   [[ "$output" == *"disk2s1"* ]]   # NTFS still present
   [[ "$output" != *"disk2s2"* ]]   # exfat partition excluded
   ! grep -q $'\texfat$' <<<"$output"
+}
+
+@test "first run: list_mountable_drives prints setup notice and prepares cache when no Alpine cache exists" {
+  local test_home
+  test_home="$(mktemp -d)"
+  export HOME="$test_home"
+  export NTFSMAC_RUNTIME_HOME_OVERRIDE="$test_home"
+
+  cat > "$STUB_DIR/anylinuxfs" <<STUB
+#!/bin/bash
+printf '%s\n' '   1:                        ntfs MyDrive                  100.0 GB   disk2s1'
+exit 0
+STUB
+  chmod +x "$STUB_DIR/anylinuxfs"
+
+  run list_mountable_drives
+  rm -rf "$test_home"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"disk2s1"* ]]
+  [[ "$output" == *"first run"* ]]
+}
+
+@test "interrupted cache: list_mountable_drives preserves incomplete cache before listing" {
+  local test_home base
+  test_home="$(mktemp -d)"
+  export HOME="$test_home"
+  export NTFSMAC_RUNTIME_HOME_OVERRIDE="$test_home"
+
+  # shellcheck source=../../build/lib/lock.sh
+  source "$REPO_ROOT/build/lib/lock.sh"
+  # shellcheck source=../../cli/lib/runtime-alpine.sh
+  source "$REPO_ROOT/cli/lib/runtime-alpine.sh"
+  runtime_alpine_load
+  base="$(runtime_alpine_cache_path "$test_home")"
+  mkdir -p "$base/oci/blobs"
+  printf 'partial' > "$base/oci/blobs/download"
+
+  cat > "$STUB_DIR/anylinuxfs" <<STUB
+#!/bin/bash
+printf '%s\n' '   1:                        ntfs MyDrive                  100.0 GB   disk2s1'
+exit 0
+STUB
+  chmod +x "$STUB_DIR/anylinuxfs"
+
+  run list_mountable_drives
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"disk2s1"* ]]
+  [[ "$output" == *"interrupted runs can be retried"* ]]
+  [ ! -e "$base" ]
+  compgen -G "${base}.preserved-*" >/dev/null
+  rm -rf "$test_home"
+}
+
+@test "initialized cache: list_mountable_drives skips first-run notice" {
+  local test_home base
+  test_home="$(mktemp -d)"
+  export HOME="$test_home"
+  export NTFSMAC_RUNTIME_HOME_OVERRIDE="$test_home"
+
+  # shellcheck source=../../build/lib/lock.sh
+  source "$REPO_ROOT/build/lib/lock.sh"
+  # shellcheck source=../../cli/lib/runtime-alpine.sh
+  source "$REPO_ROOT/cli/lib/runtime-alpine.sh"
+  runtime_alpine_load
+  base="$(runtime_alpine_cache_path "$test_home")"
+  mkdir -p "$base/rootfs/bin" "$base/rootfs/usr/sbin" "$base/rootfs/usr/local/bin" "$base/rootfs/etc"
+  printf '%s' "$ALPINE_RUNTIME_VERSION" > "$base/rootfs.ver"
+  : > "$base/rootfs/bin/bash"
+  : > "$base/rootfs/usr/sbin/rpc.nfsd"
+  : > "$base/rootfs/usr/local/bin/entrypoint.sh"
+  : > "$base/rootfs/vmproxy"
+  printf 'rpc_pipefs\nnfsd\n' > "$base/rootfs/etc/fstab"
+
+  cat > "$STUB_DIR/anylinuxfs" <<STUB
+#!/bin/bash
+printf '%s\n' '   1:                        ntfs MyDrive                  100.0 GB   disk2s1'
+exit 0
+STUB
+  chmod +x "$STUB_DIR/anylinuxfs"
+
+  run list_mountable_drives
+  rm -rf "$test_home"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"disk2s1"* ]]
+  [[ "$output" != *"first run"* ]]
 }

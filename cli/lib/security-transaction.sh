@@ -305,7 +305,8 @@ security_prepare_mount_transport() {
         SECURITY_PREPARED_ROUTE_REASON="$VPN_ROUTE_REASON"
         SECURITY_PREPARED_ROUTE_OWNED="$VPN_ROUTE_OWNED"
         printf 'security_prepare=%s reason=%s\n' \
-          "$([[ "$SECURITY_PREPARED_PF_STATE" == "enforced" \
+          "$([[ ( "$SECURITY_PREPARED_PF_STATE" == "enforced" \
+                || "$SECURITY_PREPARED_PF_STATE" == "notRequired" ) \
               && ( "$SECURITY_PREPARED_ROUTE_STATE" == "enforced" \
                 || "$SECURITY_PREPARED_ROUTE_STATE" == "notRequired" ) ]] \
               && printf enforced || printf notEnforced)" \
@@ -447,6 +448,12 @@ security_apply_pf() {
   SECURITY_PF_STATE="notEnforced"
   SECURITY_PF_REASON="PF_UNAVAILABLE"
   SECURITY_PF_TOKEN=""
+
+  if [[ "${NTFSMAC_PRESERVE_PRIVATE_RELAY:-0}" == "1" ]]; then
+    SECURITY_PF_STATE="notRequired"
+    SECURITY_PF_REASON="PF_PRESERVED_PRIVATE_RELAY"
+    return 0
+  fi
 
   root_rules="$("$SECURITY_PFCTL_BIN" -sr 2>/dev/null)" || {
     SECURITY_PF_REASON="PF_ROOT_INSPECTION_FAILED"

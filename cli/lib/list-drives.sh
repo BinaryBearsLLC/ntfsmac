@@ -33,16 +33,33 @@ source "$LIST_DRIVES_LIB_DIR/resolve-vendor-bin.sh"
 # See nfs-mount.sh's identical line for why this isn't a bare "anylinuxfs" PATH lookup.
 ANYLINUXFS_BIN="${NTFSMAC_ANYLINUXFS_BIN:-$(resolve_vendor_bin anylinuxfs || true)}"
 
+load_runtime_alpine_contract_for_list() {
+  local lock_lib=""
+  if [[ -r "$LIST_DRIVES_LIB_DIR/lock.sh" ]]; then
+    lock_lib="$LIST_DRIVES_LIB_DIR/lock.sh"
+  elif [[ -r "$LIST_DRIVES_LIB_DIR/../../build/lib/lock.sh" ]]; then
+    lock_lib="$LIST_DRIVES_LIB_DIR/../../build/lib/lock.sh"
+  fi
+  if [[ -z "$lock_lib" || ! -r "$LIST_DRIVES_LIB_DIR/runtime-alpine.sh" ]]; then
+    return 1
+  fi
+  # shellcheck disable=SC1090
+  source "$lock_lib"
+  # shellcheck source=runtime-alpine.sh
+  source "$LIST_DRIVES_LIB_DIR/runtime-alpine.sh"
+  runtime_alpine_load || return 1
+}
+
 # list_mountable_drives — prints one tab-separated "ident<TAB>label<TAB>size<TAB>fstype" line
 # per compatible partition. Whole-disk/header rows never end in a diskNsM token so they're
 # naturally excluded by the trailing-identifier match, same reasoning as the Swift parser.
 #
-# Bounded by run_with_progress (NTFSMAC_LIST_TIMEOUT, default 20s — this is a local metadata
-# probe, never a first-run download, so it should always be fast): a wedged backend (degraded
-# vmnet bridge, missing vendor binaries) used to hang this indefinitely with zero output and
-# no way out. Returns 1 with its own clear message on timeout; callers must not also print
-# their generic "no compatible drives found" message in that case — check the exit status,
-# don't just look at whether any lines came back.
+# Bounded by run_with_progress (NTFSMAC_LIST_TIMEOUT, default 20s when runtime is initialized;
+# adapts to NTFSMAC_MOUNT_TIMEOUT, default 240s, on first run or interrupted cache setup):
+# a wedged backend (degraded vmnet bridge, missing vendor binaries) used to hang this
+# indefinitely with zero output and no way out. Returns 1 with its own clear message on timeout;
+# callers must not also print their generic "no compatible drives found" message in that case —
+# check the exit status, don't just look at whether any lines came back.
 list_mountable_drives() {
   if [[ -z "$ANYLINUXFS_BIN" ]]; then
     echo "mount: FATAL — anylinuxfs binary not found at any known install path (try reinstalling: sudo bash install.sh, or 'ntfsmac diagnose')" >&2
@@ -50,6 +67,24 @@ list_mountable_drives() {
   fi
 
   local line tmp
+  local runtime_home="${NTFSMAC_RUNTIME_HOME_OVERRIDE-${HOME:-}}"
+  if [[ -z "$runtime_home" ]]; then
+    runtime_home="$(cd ~ 2>/dev/null && pwd)"
+  fi
+
+  local timeout="${NTFSMAC_LIST_TIMEOUT:-20}"
+  local label="mount: listing drives"
+
+  if load_runtime_alpine_contract_for_list; then
+    local cache_state
+    cache_state="$(runtime_alpine_cache_state "$runtime_home" 2>/dev/null || echo "unknown")"
+    if [[ "$cache_state" != "initialized" ]]; then
+      runtime_alpine_prepare_cache "$runtime_home" || return 1
+      timeout="${NTFSMAC_MOUNT_TIMEOUT:-240}"
+      label="mount: setting up runtime & listing drives"
+    fi
+  fi
+
   # macOS ships bash 3.2 (GPLv2-only cutoff) — its `[[ =~ ]]` parser trips over some literal
   # parens/brackets when the pattern is written inline, so the regex is assigned to a
   # variable first (a well-known 3.2 workaround) rather than embedded directly.
@@ -62,7 +97,7 @@ list_mountable_drives() {
   local drive_re='^[[:space:]]*[0-9]+:[[:space:]]+(.+[^[:space:]])[[:space:]]+([*]?[0-9.]+[[:space:]]+[A-Za-z]+)[[:space:]]+([A-Za-z0-9]+)[[:space:]]*$'
 
   tmp="$(mktemp)"
-  if ! run_with_progress "${NTFSMAC_LIST_TIMEOUT:-20}" 5 "mount: listing drives" "$tmp" "$ANYLINUXFS_BIN" list; then
+  if ! run_with_progress "$timeout" 5 "$label" "$tmp" "$ANYLINUXFS_BIN" list; then
     rm -f "$tmp"
     return 1
   fi

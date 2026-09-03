@@ -149,6 +149,7 @@ small secondary text; it is informative and never competes visually with the `Se
 | Control | Type | Default |
 |---------|------|---------|
 | Launch at login | Toggle | Off |
+| Preserve iCloud Private Relay | Toggle | Off |
 | Default mount mode | Segmented: Read-only / Read-write | Read-write |
 | Default mount point | Path picker | `/Volumes/<label>` |
 | Show speed in menu bar | Toggle | Off |

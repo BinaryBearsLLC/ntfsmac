@@ -288,6 +288,161 @@ private let sampleExtOutput = """
     #expect(scanner.lastError?.contains("timed out") == true)
 }
 
+@MainActor
+@Test func driveScannerDetectsUninitializedCacheAndAvoidsParallelRace() async {
+    let runner = FakeListRunner()
+    var preservedCalled = false
+    let scanner = DriveScanner(
+        runner: runner,
+        anylinuxfsPath: "/stub/anylinuxfs",
+        scanTimeout: 10,
+        firstRunTimeout: 240,
+        cacheStateProvider: { .notInitialized },
+        cachePreserver: { preservedCalled = true; return true }
+    )
+    #expect(!scanner.isInitializingRuntime)
+    await scanner.refresh()
+    #expect(!scanner.isInitializingRuntime)
+    #expect(!preservedCalled)
+    // On first run, it must NOT run parallel probes; it must run a single probe to avoid concurrent rootfs writes.
+    #expect(runner.calls.count == 1)
+    #expect(runner.calls[0].path == "/stub/anylinuxfs")
+    #expect(runner.calls[0].args == ["list"])
+    #expect(!scanner.drives.isEmpty)
+}
+
+@MainActor
+@Test func driveScannerPreservesIncompleteCacheBeforeScanning() async {
+    let runner = FakeListRunner()
+    var preservedCalled = false
+    var reportedState: AlpineRuntimeCacheState = .incomplete
+    let scanner = DriveScanner(
+        runner: runner,
+        anylinuxfsPath: "/stub/anylinuxfs",
+        scanTimeout: 10,
+        firstRunTimeout: 240,
+        cacheStateProvider: { reportedState },
+        cachePreserver: {
+            preservedCalled = true
+            reportedState = .notInitialized
+            return true
+        }
+    )
+    await scanner.refresh()
+    #expect(preservedCalled, "DriveScanner should preserve an incomplete cache before attempting to list")
+    #expect(runner.calls.count == 1)
+    #expect(runner.calls[0].args == ["list"])
+}
+
+@MainActor
+@Test func driveScannerUsesFastDualProbesWhenCacheIsInitialized() async {
+    let runner = FakeListRunner()
+    var preservedCalled = false
+    let scanner = DriveScanner(
+        runner: runner,
+        anylinuxfsPath: "/stub/anylinuxfs",
+        scanTimeout: 10,
+        firstRunTimeout: 240,
+        cacheStateProvider: { .initialized },
+        cachePreserver: { preservedCalled = true; return true }
+    )
+    await scanner.refresh()
+    #expect(!preservedCalled)
+    // Initialized cache uses fast dual probes for Microsoft and Linux families
+    #expect(runner.calls.count == 2)
+    #expect(runner.calls[0].args == ["list", "--microsoft"])
+    #expect(runner.calls[1].args == ["list", "--linux"])
+}
+
+@MainActor
+@Test func driveScannerDeduplicatesConcurrentRefreshCalls() async {
+    let runner = FakeSlowRunner(delay: 0.05)
+    let scanner = DriveScanner(
+        runner: runner,
+        anylinuxfsPath: "/stub/anylinuxfs",
+        scanTimeout: 10,
+        cacheStateProvider: { .initialized }
+    )
+    async let call1: Void = scanner.refresh()
+    async let call2: Void = scanner.refresh()
+    async let call3: Void = scanner.refresh()
+    _ = await (call1, call2, call3)
+
+    // With single-flight deduplication, only 1 scan pass (2 probes: microsoft & linux) occurred, not 3 duplicate passes (6 probes)
+    #expect(runner.calls.count == 2)
+}
+
+@MainActor
+@Test func driveScannerRetainsSetupTaskAcrossCallerCancellation() async throws {
+    let tempDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(
+        at: tempDirectory,
+        withIntermediateDirectories: true
+    )
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    let probeStarted = tempDirectory.appendingPathComponent("probe-started")
+    let releaseProbe = tempDirectory.appendingPathComponent("release-probe")
+    let slowList = tempDirectory.appendingPathComponent("slow-list")
+    try """
+    #!/bin/sh
+    : > "\(probeStarted.path)"
+    while [ ! -e "\(releaseProbe.path)" ]; do
+      sleep 0.01
+    done
+    echo "\(sampleExtOutput)"
+    exit 0
+    """.write(
+        to: slowList,
+        atomically: true,
+        encoding: .utf8
+    )
+    try FileManager.default.setAttributes(
+        [.posixPermissions: 0o755],
+        ofItemAtPath: slowList.path
+    )
+
+    let scanner = DriveScanner(
+        anylinuxfsPath: slowList.path,
+        scanTimeout: 10,
+        firstRunTimeout: 240,
+        cacheStateProvider: { .notInitialized }
+    )
+
+    let callerTask = Task {
+        await scanner.refresh()
+    }
+
+    // Wait until the detached probe has actually started
+    let clock = ContinuousClock()
+    let waitStart = clock.now
+    while !FileManager.default.fileExists(atPath: probeStarted.path) {
+        if clock.now - waitStart > .seconds(2) {
+            Issue.record("Probe failed to start within 2s")
+            return
+        }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+
+    #expect(scanner.isInitializingRuntime)
+
+    // Cancel the caller task (simulating the popover closing)
+    callerTask.cancel()
+    _ = await callerTask.result
+
+    // The background setup task must still be running and isInitializingRuntime must remain true!
+    #expect(scanner.isInitializingRuntime)
+
+    // Release the probe to finish
+    FileManager.default.createFile(atPath: releaseProbe.path, contents: nil)
+
+    // Await the scanner's completion
+    await scanner.waitForCurrentSetup()
+    #expect(!scanner.isInitializingRuntime)
+    #expect(!scanner.drives.isEmpty)
+}
+
 private struct ListCall: Equatable {
     let path: String
     let args: [String]
@@ -303,3 +458,22 @@ private final class FakeListRunner: PrivilegedCommandRunning {
         CommandResult(output: "", exitCode: 0)
     }
 }
+
+private final class FakeSlowRunner: PrivilegedCommandRunning {
+    private(set) var calls: [ListCall] = []
+    let delay: TimeInterval
+    init(delay: TimeInterval = 0.05) {
+        self.delay = delay
+    }
+    func run(_ executablePath: String, _ arguments: [String]) -> CommandResult {
+        calls.append(ListCall(path: executablePath, args: arguments))
+        if delay > 0 {
+            Thread.sleep(forTimeInterval: delay)
+        }
+        return CommandResult(output: sampleExtOutput, exitCode: 0)
+    }
+    func runPipingStdin(_ input: String, to executablePath: String, _ arguments: [String]) -> CommandResult {
+        CommandResult(output: "", exitCode: 0)
+    }
+}
+

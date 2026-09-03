@@ -290,6 +290,27 @@ private func renderPopover(
     #expect(size != nil, "mounted + available-unmounted popover (mounted row + 'Other available devices' section) must render a non-empty image")
 }
 
+@MainActor @Test func microVMSetupStateRendersWithoutCollapsing() async throws {
+    let (helperInstaller, cliInstallChecker, cleanup) = try await makeInstalledDependencies()
+    defer { cleanup() }
+    let appState = AppState()
+    let controller = MountController(helper: FakeHelper(), appState: appState)
+    let scanner = DriveScanner()
+    scanner.simulateInitializingRuntime(true)
+    #expect(scanner.isInitializingRuntime)
+
+    let size = renderPopover(
+        appState: appState,
+        mountController: controller,
+        helperInstaller: helperInstaller,
+        cliInstallChecker: cliInstallChecker,
+        driveScanner: scanner
+    )
+    #expect(size != nil, "microVM setup popover must render a non-empty image")
+    #expect((size?.width ?? 0) > 200)
+    #expect((size?.height ?? 0) > 100)
+}
+
 // Minimal fake runner for render tests: returns a fixed `anylinuxfs list` output so DriveScanner
 // has real parsed drives without spawning a process. Same shape as DriveScannerTests' FakeListRunner.
 private final class SeededListRunner: PrivilegedCommandRunning {

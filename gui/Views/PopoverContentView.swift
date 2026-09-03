@@ -232,52 +232,27 @@ public struct PopoverContentView: View {
                 }
             }
 
-            // Before anything is mounted: the detected drives are the primary list, not "other" —
-            // nothing is primary yet, so no "Other available" section header. Each row is a
-            // mountable DriveRow, with a Refresh pill (icon + "Refresh" text, same shape as the
-            // no-drives empty-state Refresh) above the list so the user can re-scan before mounting.
-            if mountController.mountedDrives.isEmpty && !driveScanner.drives.isEmpty {
-                HStack(spacing: 6) {
-                    Spacer()
-                    Button {
-                        Task { await refreshAll() }
-                    } label: {
-                        HStack(spacing: 6) {
-                            RefreshGlyph()
-                            Text("Refresh")
+            if driveScanner.isInitializingRuntime {
+                microVMSetupView
+            } else {
+                // Before anything is mounted: the detected drives are the primary list, not "other" —
+                // nothing is primary yet, so no "Other available" section header. Each row is a
+                // mountable DriveRow, with a Refresh pill (icon + "Refresh" text, same shape as the
+                // no-drives empty-state Refresh) above the list so the user can re-scan before mounting.
+                if mountController.mountedDrives.isEmpty && !driveScanner.drives.isEmpty {
+                    HStack(spacing: 6) {
+                        Spacer()
+                        Button {
+                            Task { await refreshAll() }
+                        } label: {
+                            HStack(spacing: 6) {
+                                RefreshGlyph()
+                                Text("Refresh")
+                            }
                         }
+                        .buttonStyle(.glassNeutral(colorScheme: colorScheme))
                     }
-                    .buttonStyle(.glassNeutral(colorScheme: colorScheme))
-                }
-                ForEach(driveScanner.drives) { drive in
-                    DriveRow(
-                        drive: drive,
-                        isMounted: false,
-                        onMount: { mountDrive(drive) }
-                    )
-                }
-            }
-
-            // Mounted: the "Other available devices" header + small Refresh button render below the
-            // mounted list, above SecurityIndicators — and STAY rendered even when no unmounted
-            // drive is currently listed, so the Refresh button stays available to re-scan for newly
-            // connected drives. The per-drive rows render only when an unmounted drive is detected.
-            if OtherAvailableSection.shouldRender(isMounted: !mountController.mountedDrives.isEmpty) {
-                Divider()
-                HStack(spacing: 6) {
-                    Text(OtherAvailableCopy.label)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button {
-                        Task { await refreshAll() }
-                    } label: {
-                        RefreshGlyph()
-                    }
-                    .buttonStyle(.glassIcon(colorScheme: colorScheme))
-                }
-                if OtherAvailableSection.rowsRender(availableCount: otherAvailableDrives.count) {
-                    ForEach(otherAvailableDrives) { drive in
+                    ForEach(driveScanner.drives) { drive in
                         DriveRow(
                             drive: drive,
                             isMounted: false,
@@ -285,10 +260,39 @@ public struct PopoverContentView: View {
                         )
                     }
                 }
-            }
 
-            if mountController.mountedDrives.isEmpty && driveScanner.drives.isEmpty {
-                emptyState
+                // Mounted: the "Other available devices" header + small Refresh button render below the
+                // mounted list, above SecurityIndicators — and STAY rendered even when no unmounted
+                // drive is currently listed, so the Refresh button stays available to re-scan for newly
+                // connected drives. The per-drive rows render only when an unmounted drive is detected.
+                if OtherAvailableSection.shouldRender(isMounted: !mountController.mountedDrives.isEmpty) {
+                    Divider()
+                    HStack(spacing: 6) {
+                        Text(OtherAvailableCopy.label)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button {
+                            Task { await refreshAll() }
+                        } label: {
+                            RefreshGlyph()
+                        }
+                        .buttonStyle(.glassIcon(colorScheme: colorScheme))
+                    }
+                    if OtherAvailableSection.rowsRender(availableCount: otherAvailableDrives.count) {
+                        ForEach(otherAvailableDrives) { drive in
+                            DriveRow(
+                                drive: drive,
+                                isMounted: false,
+                                onMount: { mountDrive(drive) }
+                            )
+                        }
+                    }
+                }
+
+                if mountController.mountedDrives.isEmpty && driveScanner.drives.isEmpty {
+                    emptyState
+                }
             }
 
             if !mountController.mountedDrives.isEmpty {
@@ -368,7 +372,12 @@ public struct PopoverContentView: View {
     /// Mount an unmounted drive r/w at its default mount point. Shared by the idle primary list
     /// and the mounted "Other available devices" section — both offer the same per-row Mount action.
     private func mountDrive(_ drive: Drive) {
-        Task { await mountController.mount(drive, mountPoint: nil, readOnly: false) }
+        guard !driveScanner.isInitializingRuntime else { return }
+        Task {
+            driveScanner.stopPolling()
+            await mountController.mount(drive, mountPoint: nil, readOnly: false)
+            driveScanner.startPolling()
+        }
     }
 
     private func refreshAll() async {
@@ -386,6 +395,24 @@ public struct PopoverContentView: View {
         case .mountedUnknown: "Mount state needs verification"
         case .error: "Error"
         }
+    }
+
+    private var microVMSetupView: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .controlSize(.regular)
+            VStack(spacing: 4) {
+                Text("Setting up microVM environment…")
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text("First-time setup takes 1–2 minutes to prepare Alpine Linux.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary.opacity(0.7))
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
     }
 
     /// `ui/prototype.html`'s idle empty-state block (comp lines 481-499) — icon + copy + Refresh

@@ -37,6 +37,7 @@ are already built into the vendored kernel image.
 - **Per-session network security** — each mount owns its evaluated PF child anchor, PF enable
   reference, and only the exact VPN-bypass host route it needs; teardown never flushes global PF
   state or removes another session's route.
+- **iCloud Private Relay & VPN compatibility** — `--preserve-private-relay` (CLI) and Settings toggle (GUI) prevent macOS PF firewall activation from interrupting iCloud Private Relay while preserving the exact microVM host route.
 
 ## Requirements
 
@@ -59,12 +60,25 @@ distributed as a Homebrew cask (see [Signing & distribution](#signing--distribut
 ## Usage
 
 ```sh
-ntfsmac mount <disk identifier>      # e.g. disk4s1 — mounts read/write by default
-ntfsmac unmount <disk identifier>
+ntfsmac mount [disk identifier]      # mounts read/write (omit to pick from connected drives)
+ntfsmac mount disk4s1 --preserve-private-relay  # keep iCloud Private Relay / VPNs uninterrupted
+ntfsmac mount disk4s1 --read-only               # mount read-only
+ntfsmac mount disk4s1 --fs-driver ntfs3         # opt into kernel ntfs3 driver (default: ntfs-3g)
+ntfsmac unmount [disk identifier]    # unmounts a drive (omit to pick from active mounts)
 ntfsmac diagnose                     # environment + bridge + helper health check
+ntfsmac diagnose --json              # structured JSON health check for bug reports
 ntfsmac uninstall                    # removes CLI, runtime state, and the GUI's privileged helper
 ntfsmac help
 ```
+
+### Mount Options
+
+- `[device]` — Partition identifier (`diskNsM`, e.g. `disk4s1`). Omit to interactively select from detected drives.
+- `[mount_point]` — Custom mount path (default: `/Volumes/<label>`).
+- `--preserve-private-relay` — Bypasses host `pfctl -E` to keep iCloud Private Relay active while still installing the `/32` endpoint host route to prevent VPN tunnel capture.
+- `--read-only` — Client-side read-only NFS mount (`ro`).
+- `--fs-driver ntfs-3g|ntfs3` — NTFS driver choice (default: `ntfs-3g`). Ext2/3/4 drives automatically use the kernel ext4 driver.
+- `--ignore-permissions` — Maps ownership to local user (`all_squash`). Passed automatically for ext drives.
 
 Device identifiers are validated against `^disk[0-9]+s[0-9]+$` before any command touches
 them — see [SECURITY.md](SECURITY.md).

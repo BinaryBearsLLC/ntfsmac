@@ -136,7 +136,7 @@ usage: ntfsmac <command> [args...]
 
 commands:
   mount [device] [mount_point]       Mount an NTFS / ext drive (omit device to pick from a list).
-                                      Flags: --fs-driver ntfs-3g|ntfs3, --read-only
+                                      Flags: --preserve-private-relay, --fs-driver ntfs-3g|ntfs3, --read-only
   unmount [device|mount_point]       Unmount a drive (omit to pick from active mounts)
   diagnose [--json]                  Read-only health check
   uninstall [--force] [--keep-cache] Remove the CLI, vendored deps, and the GUI helper
