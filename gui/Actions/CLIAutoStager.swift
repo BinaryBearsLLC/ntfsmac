@@ -18,10 +18,15 @@ extension HelperClient: CLIStaging {}
 /// the deliberate exception, an explicit user tap on `CLIMissingView`'s button, never called on a
 /// timer or from `stageIfNeeded()` itself. `lastFailureReason` is `ObservableObject`-published
 /// so that button can show *why* setup didn't complete instead of a generic dead end.
+/// `hasVerifiedCurrentCLI` becomes true only after the current helper has accepted the bundled
+/// tree and the expected executables exist. Drive discovery must not run before that point: an
+/// older staged CLI may otherwise initialize the runtime while the replacement helper is still
+/// being installed.
 @MainActor
 public final class CLIAutoStager: ObservableObject {
     @Published public private(set) var lastFailureReason: String?
     @Published public private(set) var isStaging = false
+    @Published public private(set) var hasVerifiedCurrentCLI = false
 
     private let helper: any CLIStaging
     private let checker: CLIInstallChecker
@@ -45,7 +50,6 @@ public final class CLIAutoStager: ObservableObject {
 
     public func stageIfNeeded() async {
         guard !didAttempt else { return }
-        guard bundleResourcesURL != nil else { return }
         // Don't skip when the CLI is "installed" — it may be stale. stageCLI is idempotent: it
         // no-ops (returns exitCode 0) when the installed CLI tree hash already matches the
         // helper's pinned hash, and re-runs install.sh only when stale/missing. Without calling
@@ -66,6 +70,7 @@ public final class CLIAutoStager: ObservableObject {
         didAttempt = false
         lastFailureReason = nil
         isStaging = false
+        hasVerifiedCurrentCLI = false
     }
 
     /// Bounded retry for the *connection*, not the install: right after fresh helper registration,
@@ -81,6 +86,7 @@ public final class CLIAutoStager: ObservableObject {
 
     private func attemptStage() async {
         guard !isStaging else { return }
+        hasVerifiedCurrentCLI = false
         isStaging = true
         defer { isStaging = false }
         checker.check()
@@ -103,8 +109,13 @@ public final class CLIAutoStager: ObservableObject {
                     checker.check()
                     return
                 }
-                lastFailureReason = nil
                 checker.check()
+                guard checker.isInstalled else {
+                    lastFailureReason = "The bundled command-line components are still unavailable after setup. Try again."
+                    return
+                }
+                lastFailureReason = nil
+                hasVerifiedCurrentCLI = true
                 return
             } catch {
                 guard attempt < Self.connectionRetryAttempts else {
@@ -115,5 +126,17 @@ public final class CLIAutoStager: ObservableObject {
                 try? await Task.sleep(nanoseconds: connectionRetryDelayNanoseconds)
             }
         }
+    }
+}
+
+/// One source of truth for starting any automatic backend command. Merely finding an executable
+/// on disk is insufficient during an update because it may belong to the previous app build.
+public enum BackendActivationPolicy {
+    public static func canScan(
+        helperState: HelperInstallState,
+        cliInstalled: Bool,
+        cliVerifiedForCurrentHelper: Bool
+    ) -> Bool {
+        helperState == .installed && cliInstalled && cliVerifiedForCurrentHelper
     }
 }

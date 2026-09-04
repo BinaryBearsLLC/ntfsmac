@@ -216,9 +216,9 @@ accepted by this checkpoint. No VM boot, real-drive, notarization, or remote act
 - The init-rootfs patch preserves the full digest reference for the registry pull while using a
   deterministic digest-derived local OCI tag. `build/init-rootfs.sh` still independently checks
   Docker Hub's arm64 manifest digest before building or pulling.
-- The same patch gives containers/image an application-owned empty `registries.d` path. The pinned
-  public pull therefore cannot be blocked by unreadable optional signature-storage metadata under
-  the user's `~/.config/containers/` directory, and ntfsmac never changes that user configuration.
+- The same patch gives containers/image application-owned registry, registry-drop-in, short-name,
+  and empty authentication inputs. The pinned public pull therefore never reads the user's
+  containers or Docker configuration, and ntfsmac never changes those files.
 - Runtime caches migrate side-by-side. Legacy, mismatched, invalid, and interrupted directories are
   retained; no install, Diagnose, or Settings action downloads or removes a rootfs. A mount either
   reuses a complete matching cache or initializes the pinned cache after preserving incompatible

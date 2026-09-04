@@ -31,18 +31,6 @@ enum DemoScaffold {
         )
     }
 
-    static func remountController(
-        appState: AppState,
-        notifier: any MountEventNotifying = NullMountEventNotifier()
-    ) -> RemountController {
-        RemountController(
-            helper: DemoHelperMounting(),
-            readOnlyChecker: DemoReadOnlyChecker(stillReadOnly: false),
-            notifier: notifier,
-            appState: appState
-        )
-    }
-
     static func driveScanner() -> DriveScanner {
         DriveScanner(runner: DemoCommandRunner())
     }
@@ -117,7 +105,8 @@ private final class DemoHelperMounting: HelperMounting, MountSnapshotProviding {
             isReadOnly: readOnly || stillReadOnly
         )
         return CommandResult(
-            output: "/dev/\(device) was mounted as \(resolvedMountPoint)",
+            output: "/dev/\(device) was mounted as \(resolvedMountPoint)"
+                + (stillReadOnly ? "\nThe volume is dirty and was mounted read-only." : ""),
             exitCode: 0
         )
     }

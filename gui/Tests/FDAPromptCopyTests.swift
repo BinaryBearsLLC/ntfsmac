@@ -18,7 +18,15 @@ import HelperShared
         #expect(DriveDiscoveryFailureCopy.title == "Unable to check connected drives")
         #expect(DriveDiscoveryFailureCopy.message.contains("Try again"))
         #expect(DriveDiscoveryFailureCopy.message.contains("Settings"))
+        #expect(!DriveDiscoveryFailureCopy.message.contains("Full Disk Access"))
         #expect(!DriveDiscoveryFailureCopy.message.contains(rawError))
         #expect(!DriveDiscoveryFailureCopy.message.contains("/Users/"))
+        #expect(!DriveDiscoveryFailureCopy.isVisible(for: rawError, detectedDriveCount: 1))
+    }
+
+    @Test func noDriveFallbackDoesNotClaimSetupIsIncomplete() {
+        #expect(NoDriveAccessCopy.title == "No drives found")
+        #expect(NoDriveAccessCopy.message.contains("verify access before mounting"))
+        #expect(!NoDriveAccessCopy.message.lowercased().contains("finish setup"))
     }
 }

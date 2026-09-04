@@ -29,6 +29,57 @@ private final class FakeDiskAccessChecker: FullDiskAccessChecking, Sendable {
     #expect(checker.devices.isEmpty)
 }
 
+@Test func noDriveIsNormalIdleInsteadOfIncompleteSetup() {
+    let unverifiedStates: [FullDiskAccessState] = [
+        .notChecked,
+        .checking,
+        .waitingForDrive,
+        .needsAuthorization,
+        .waitingForAuthorization,
+        .failed("helper unavailable"),
+    ]
+
+    for state in unverifiedStates {
+        #expect(!FullDiskAccessPresentationPolicy.shouldPresentSetup(
+            state: state,
+            deviceID: nil
+        ))
+    }
+}
+
+@Test func detectedDriveStillRequiresARealAccessProbe() {
+    #expect(FullDiskAccessPresentationPolicy.shouldPresentSetup(
+        state: .notChecked,
+        deviceID: "disk6s1"
+    ))
+    #expect(FullDiskAccessPresentationPolicy.shouldPresentSetup(
+        state: .needsAuthorization,
+        deviceID: "disk6s1"
+    ))
+    #expect(!FullDiskAccessPresentationPolicy.shouldPresentSetup(
+        state: .granted,
+        deviceID: "disk6s1"
+    ))
+}
+
+@Test func discoveryFailureNeverMasqueradesAsFullDiskAccessSetup() {
+    #expect(!FullDiskAccessPresentationPolicy.shouldPresentSetup(
+        state: .waitingForDrive,
+        deviceID: nil
+    ))
+    #expect(!FullDiskAccessPresentationPolicy.shouldPresentSetup(
+        state: .granted,
+        deviceID: nil
+    ))
+}
+
+@Test func diagnosticsDistinguishUnprobedAccessFromDenial() {
+    #expect(FullDiskAccessPresentationPolicy.diagnosticGrantEvidence(for: .notChecked) == nil)
+    #expect(FullDiskAccessPresentationPolicy.diagnosticGrantEvidence(for: .waitingForDrive) == nil)
+    #expect(FullDiskAccessPresentationPolicy.diagnosticGrantEvidence(for: .needsAuthorization) == false)
+    #expect(FullDiskAccessPresentationPolicy.diagnosticGrantEvidence(for: .granted) == true)
+}
+
 @MainActor
 @Test func fullDiskAccessProbeUnlocksTheMainInterfaceOnSuccess() async {
     let checker = FakeDiskAccessChecker([.success(CommandResult(output: "", exitCode: 0))])

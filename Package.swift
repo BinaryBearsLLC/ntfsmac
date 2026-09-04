@@ -86,7 +86,7 @@ let package = Package(
                 "State/SingleInstanceGuard.swift", "State/PopoverNavigation.swift",
                 "Drives/DriveScanner.swift", "Views/DriveRow.swift", "Actions/MountSnapshot.swift",
                 "Actions/MountController.swift", "Actions/MountNotifications.swift",
-                "Actions/RemountController.swift", "Views/DirtyBanner.swift",
+                "Views/DirtyBanner.swift",
                 "Actions/FinderOpener.swift", "Views/SecurityIndicators.swift",
                 "Actions/MenuBarPopoverController.swift",
                 "Actions/SecurityStatusReader.swift",

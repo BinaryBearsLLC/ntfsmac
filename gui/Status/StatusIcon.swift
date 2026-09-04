@@ -25,7 +25,7 @@ public enum StatusIcon {
             // (this is a config choice, not a warning); GUI-PLAN.md's icon table predates
             // this case and only documents the dirty-journal yellow, not this one.
             return StatusIconStyle(color: .ntfsGreen, isIdle: false, isPulsing: false)
-        case .mountedReadOnlyDirty:
+        case .mountedReadOnlyUnexpected, .mountedReadOnlyDirty:
             return StatusIconStyle(color: .ntfsYellow, isIdle: false, isPulsing: false)
         case .mountedUnknown:
             return StatusIconStyle(color: .ntfsYellow, isIdle: false, isPulsing: false)

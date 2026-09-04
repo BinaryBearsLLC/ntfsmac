@@ -93,16 +93,6 @@ public struct EjectGlyph: View {
     }
 }
 
-/// "Mount read/write anyway…" button icon.
-public struct MountAnywayGlyph: View {
-    public init() {}
-
-    public var body: some View {
-        Image(systemName: "lock.open.fill")
-            .font(.system(size: 10))
-    }
-}
-
 /// "Install Helper…" button icon.
 public struct InstallHelperGlyph: View {
     public init() {}

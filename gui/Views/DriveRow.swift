@@ -9,6 +9,10 @@ public enum NTFS3PreflightCopy {
     }
 }
 
+public enum DriveRowCopy {
+    public static let openInFinder = "Open in Finder"
+}
+
 /// One row per detected drive — `ui/prototype.html`'s "Drive row" comp (mounted/light/dirty
 /// variants, lines 134-161/313-339/583-613): icon-box + label/fsType·device + size, then a
 /// button row. Not-yet-mounted rows have no comp reference (the comp only shows mounted/idle-
@@ -18,41 +22,38 @@ public struct DriveRow: View {
     @Environment(\.colorScheme) private var colorScheme
     public let drive: Drive
     public let isMounted: Bool
-    public let isDirty: Bool
+    public let hasReadOnlyWarning: Bool
     public let actionsDisabled: Bool
     public let onMount: () -> Void
     public let onOpenInFinder: (() -> Void)?
     public let onVerifiedCopy: (() -> Void)?
     public let onUnmount: () -> Void
-    public let onMountAnyway: (() -> Void)?
     public let onMountExperimental: (() -> Void)?
     @State private var showsNTFS3Preflight = false
 
     public init(
         drive: Drive,
         isMounted: Bool = false,
-        isDirty: Bool = false,
+        hasReadOnlyWarning: Bool = false,
         actionsDisabled: Bool = false,
         onMount: @escaping () -> Void = {},
         onOpenInFinder: (() -> Void)? = nil,
         onVerifiedCopy: (() -> Void)? = nil,
         onUnmount: @escaping () -> Void = {},
-        onMountAnyway: (() -> Void)? = nil,
         onMountExperimental: (() -> Void)? = nil
     ) {
         self.drive = drive
         self.isMounted = isMounted
-        self.isDirty = isDirty
+        self.hasReadOnlyWarning = hasReadOnlyWarning
         self.actionsDisabled = actionsDisabled
         self.onMount = onMount
         self.onOpenInFinder = onOpenInFinder
         self.onVerifiedCopy = onVerifiedCopy
         self.onUnmount = onUnmount
-        self.onMountAnyway = onMountAnyway
         self.onMountExperimental = onMountExperimental
     }
 
-    private var accentColor: Color { isDirty ? .ntfsYellow : .ntfsBlue }
+    private var accentColor: Color { hasReadOnlyWarning ? .ntfsYellow : .ntfsBlue }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -61,11 +62,11 @@ public struct DriveRow: View {
                     .padding(8.5)
                     .background(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(accentColor.opacity(isDirty ? 0.1 : 0.12))
+                            .fill(accentColor.opacity(hasReadOnlyWarning ? 0.1 : 0.12))
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(accentColor.opacity(isDirty ? 0.2 : 0.22))
+                            .strokeBorder(accentColor.opacity(hasReadOnlyWarning ? 0.2 : 0.22))
                     )
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -89,7 +90,8 @@ public struct DriveRow: View {
                         HStack(spacing: 5) {
                             Image(systemName: "folder")
                                 .font(.system(size: 10.5))
-                            Text("Open")
+                            Text(DriveRowCopy.openInFinder)
+                                .lineLimit(1)
                         }
                         .frame(maxWidth: .infinity)
                     }
@@ -127,22 +129,6 @@ public struct DriveRow: View {
                         .accessibilityLabel("More drive actions")
                         .help(TooltipCopy.text(for: .verifiedCopy))
                     }
-                }
-
-                if isDirty, let onMountAnyway {
-                    Button {
-                        onMountAnyway()
-                    } label: {
-                        HStack(spacing: 5) {
-                            MountAnywayGlyph()
-                            Text("Mount read/write anyway…")
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.glassWarning())
-                    .ntfsmacKeyboardFocus()
-                    .disabled(actionsDisabled)
-                    .help(TooltipCopy.text(for: .mountReadWriteAnyway))
                 }
             } else {
                 if showsNTFS3Preflight, let onMountExperimental {
@@ -211,25 +197,22 @@ public struct DriveRow: View {
 public struct DriveListView: View {
     public let drives: [Drive]
     public let mountedDriveID: String?
-    public let isDirty: Bool
+    public let hasReadOnlyWarning: Bool
     public let onMount: (Drive) -> Void
     public let onUnmount: (Drive) -> Void
-    public let onMountAnyway: (() -> Void)?
 
     public init(
         drives: [Drive],
         mountedDriveID: String? = nil,
-        isDirty: Bool = false,
+        hasReadOnlyWarning: Bool = false,
         onMount: @escaping (Drive) -> Void = { _ in },
-        onUnmount: @escaping (Drive) -> Void = { _ in },
-        onMountAnyway: (() -> Void)? = nil
+        onUnmount: @escaping (Drive) -> Void = { _ in }
     ) {
         self.drives = drives
         self.mountedDriveID = mountedDriveID
-        self.isDirty = isDirty
+        self.hasReadOnlyWarning = hasReadOnlyWarning
         self.onMount = onMount
         self.onUnmount = onUnmount
-        self.onMountAnyway = onMountAnyway
     }
 
     public var body: some View {
@@ -237,11 +220,10 @@ public struct DriveListView: View {
             DriveRow(
                 drive: drive,
                 isMounted: drive.id == mountedDriveID,
-                isDirty: isDirty && drive.id == mountedDriveID,
+                hasReadOnlyWarning: hasReadOnlyWarning && drive.id == mountedDriveID,
                 onMount: { onMount(drive) },
                 onOpenInFinder: nil,
-                onUnmount: { onUnmount(drive) },
-                onMountAnyway: onMountAnyway
+                onUnmount: { onUnmount(drive) }
             )
         }
     }

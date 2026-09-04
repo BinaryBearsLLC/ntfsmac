@@ -78,14 +78,73 @@ markers = [
     ("\t\tImageName:         imageName,\n", "\t\tImageName:         imageName,\n\t\tSourceReference:   dockerRef,\n"),
     ('docker.ParseReference(fmt.Sprintf("//%s:%s", cfg.ImageName, cfg.Tag))', 'docker.ParseReference("//" + cfg.SourceReference)'),
     (
+        "\nfunc downloadImage(cfg *Config) error {",
+        '''
+// isolatedRegistryContext keeps ntfsmac's digest-pinned public runtime pull independent from
+// container tools installed by the user. containers/image otherwise reads several files under
+// ~/.config/containers and ~/.docker; any one of them can be unreadable, malformed, or configured
+// for a private registry that has nothing to do with ntfsmac.
+func isolatedRegistryContext(imageBasePath string) (*types.SystemContext, error) {
+\tconfigDir := filepath.Join(imageBasePath, ".ntfsmac-oci-config")
+\tregistriesDir := filepath.Join(configDir, "registries.d")
+\tregistriesConfDir := filepath.Join(configDir, "registries.conf.d")
+\tfor _, path := range []string{configDir, registriesDir, registriesConfDir} {
+\t\tif err := os.MkdirAll(path, 0700); err != nil {
+\t\t\treturn nil, fmt.Errorf("create isolated registry configuration: %w", err)
+\t\t}
+\t\tif err := os.Chmod(path, 0700); err != nil {
+\t\t\treturn nil, fmt.Errorf("protect isolated registry configuration: %w", err)
+\t\t}
+\t}
+
+\tregistriesConfPath := filepath.Join(configDir, "registries.conf")
+\tshortNameAliasPath := filepath.Join(configDir, "short-name-aliases.conf")
+\tfor _, path := range []string{registriesConfPath, shortNameAliasPath} {
+\t\tif err := os.WriteFile(path, nil, 0600); err != nil {
+\t\t\treturn nil, fmt.Errorf("write isolated registry configuration: %w", err)
+\t\t}
+\t\tif err := os.Chmod(path, 0600); err != nil {
+\t\t\treturn nil, fmt.Errorf("protect isolated registry configuration: %w", err)
+\t\t}
+\t}
+
+\treturn &types.SystemContext{
+\t\tOSChoice:                     "linux",
+\t\tRegistriesDirPath:            registriesDir,
+\t\tSystemRegistriesConfPath:     registriesConfPath,
+\t\tSystemRegistriesConfDirPath:  registriesConfDir,
+\t\tUserShortNameAliasConfPath:   shortNameAliasPath,
+\t\tDockerAuthConfig:             &types.DockerAuthConfig{},
+\t}, nil
+}
+
+func downloadImage(cfg *Config) error {''',
+    ),
+    (
+        '''\terr = os.MkdirAll(cfg.ImageBasePath, 0755)
+\tif err != nil {
+\t\tfmt.Println("Error creating bundle directory:", err)
+\t\treturn err
+\t}
+
+\tdestRef, err := layout.ParseReference''',
+        '''\terr = os.MkdirAll(cfg.ImageBasePath, 0755)
+\tif err != nil {
+\t\tfmt.Println("Error creating bundle directory:", err)
+\t\treturn err
+\t}
+
+\tsourceCtx, err := isolatedRegistryContext(cfg.ImageBasePath)
+\tif err != nil {
+\t\tfmt.Println("Error preparing isolated registry configuration:", err)
+\t\treturn err
+\t}
+
+\tdestRef, err := layout.ParseReference''',
+    ),
+    (
         '\t\tSourceCtx: &types.SystemContext{\n\t\t\tOSChoice: "linux",\n\t\t},',
-        '\t\tSourceCtx: &types.SystemContext{\n'
-        '\t\t\tOSChoice: "linux",\n'
-        '\t\t\t// The pinned public runtime must not inherit optional signature-storage\n'
-        '\t\t\t// metadata from ~/.config/containers/registries.d. An unreadable user\n'
-        '\t\t\t// directory must not block ntfsmac before drive discovery starts.\n'
-        '\t\t\tRegistriesDirPath: filepath.Join(cfg.ImageBasePath, ".ntfsmac-empty-registries.d"),\n'
-        '\t\t},',
+        '\t\tSourceCtx: sourceCtx,',
     ),
     ('flag.StringVar(&dockerRef, "docker-ref", "alpine:latest", "Docker/OCI image reference (e.g. alpine:latest, alpine:edge)")', f'flag.StringVar(&dockerRef, "docker-ref", "{ref}", "Digest-pinned Docker/OCI image reference")'),
 ]
@@ -167,6 +226,6 @@ text = text.replace(setup_marker, locked_setup, 1)
 if "alpine:latest" in text:
     raise SystemExit(f"init-rootfs: HARD-STOP — floating Alpine reference remains in {path}")
 path.write_text(text)
-print(f"init-rootfs: patched Docker reference parsing, isolated registry metadata, and default to {ref}")
+print(f"init-rootfs: patched Docker reference parsing, isolated OCI configuration, and default to {ref}")
 PYEOF
 }

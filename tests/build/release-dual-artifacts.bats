@@ -50,5 +50,5 @@ setup() {
   modern_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$REPO_ROOT/helper/Info-Modern.plist")"
   [ "$app_version" = "$legacy_version" ]
   [ "$app_version" = "$modern_version" ]
-  [ "$app_version" = "3.1.1" ]
+  [ "$app_version" = "3.1.2" ]
 }

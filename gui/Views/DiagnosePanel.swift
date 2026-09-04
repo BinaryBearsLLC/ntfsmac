@@ -19,9 +19,15 @@ public struct DiagnosePanelPresentation: Equatable, Sendable {
     public mutating func show() { isVisible = true }
     public mutating func hide() { isVisible = false }
 
-    public func phase(report: DiagnoseReport?, errorMessage: String?, isRunning: Bool) -> DiagnosePanelPhase {
+    public func phase(
+        report: DiagnoseReport?,
+        errorMessage: String?,
+        isRunning: Bool,
+        isStale: Bool = false,
+        contextIsCurrent: Bool = true
+    ) -> DiagnosePanelPhase {
         guard isVisible else { return .hidden }
-        if isRunning { return .running }
+        if isRunning || isStale || !contextIsCurrent { return .running }
         if report != nil { return .result }
         if errorMessage != nil { return .error }
         return .empty
@@ -115,7 +121,12 @@ public enum DiagnoseMacroSummary {
             appReadiness(report),
             driveStatus(report, mountState: mountState, detectedDriveCount: detectedDriveCount),
             connectionProtection(report, mountState: mountState),
-            permissions(report, fullDiskAccessGranted: fullDiskAccessGranted),
+            permissions(
+                report,
+                mountState: mountState,
+                detectedDriveCount: detectedDriveCount,
+                fullDiskAccessGranted: fullDiskAccessGranted
+            ),
         ]
     }
 
@@ -212,6 +223,8 @@ public enum DiagnoseMacroSummary {
             return .init(id: "drive", title: "Drive status", state: .ok, summary: "Mounted read/write", explanation: "The drive is mounted and ready for normal use.", nextAction: nil)
         case .mountedReadOnly:
             return .init(id: "drive", title: "Drive status", state: .attention, summary: "Mounted read-only", explanation: "The drive is available, but changes are currently disabled.", nextAction: "Unmount it safely before checking or repairing it on the system that created it.")
+        case .mountedReadOnlyUnexpected:
+            return .init(id: "drive", title: "Drive status", state: .unavailable, summary: "Read-only cause unconfirmed", explanation: "The drive is available, but ntfsmac cannot confirm why writing is unavailable.", nextAction: "Unmount it safely and run Diagnose before retrying.")
         case .mountedReadOnlyDirty:
             return .init(id: "drive", title: "Drive status", state: .attention, summary: "Windows recovery needed", explanation: "The drive is protected in read-only mode because Windows did not leave it in a safe state.", nextAction: "Unmount it, fully shut down Windows, run its disk check, then reconnect it.")
         case .mountedUnknown:
@@ -256,7 +269,7 @@ public enum DiagnoseMacroSummary {
             return .init(id: "protection", title: "Connection protection", state: .unavailable, summary: "Could not confirm", explanation: "The protection state is not available, so ntfsmac will not report it as safe.", nextAction: "Run Diagnose again before relying on this mount.")
         case .error where (report.securityActiveSessions ?? 0) == 0:
             return .init(id: "protection", title: "Connection protection", state: .unavailable, summary: "Could not confirm", explanation: "The last drive operation ended before protection could be verified.", nextAction: "Resolve the drive error, then run Diagnose again.")
-        case .mountedReadWrite, .mountedReadOnly, .mountedReadOnlyDirty, .error:
+        case .mountedReadWrite, .mountedReadOnly, .mountedReadOnlyUnexpected, .mountedReadOnlyDirty, .error:
             guard let activeSessions = report.securityActiveSessions else {
                 return .init(id: "protection", title: "Connection protection", state: .unavailable, summary: "Could not confirm", explanation: "The protection evidence is incomplete, so ntfsmac will not report it as safe.", nextAction: "Run Diagnose again. If this persists, unmount the drive safely.")
             }
@@ -276,6 +289,8 @@ public enum DiagnoseMacroSummary {
 
     private static func permissions(
         _ report: DiagnoseReport,
+        mountState: MountState?,
+        detectedDriveCount: Int?,
         fullDiskAccessGranted: Bool?
     ) -> DiagnoseMacroRow {
         if fullDiskAccessGranted == false {
@@ -283,6 +298,16 @@ public enum DiagnoseMacroSummary {
         }
         if report.helperInstalled == false {
             return .init(id: "permissions", title: "Permissions", state: .attention, summary: "Approval needed", explanation: "macOS has not yet approved ntfsmac's drive-access component.", nextAction: "Open System Settings > General > Login Items and allow ntfsmac.")
+        }
+        if fullDiskAccessGranted == nil, mountState == .idle, detectedDriveCount == 0 {
+            return .init(
+                id: "permissions",
+                title: "Permissions",
+                state: .idle,
+                summary: "Checked when needed",
+                explanation: "Connect a supported drive and ntfsmac will verify Full Disk Access before mounting.",
+                nextAction: nil
+            )
         }
         guard fullDiskAccessGranted == true, report.helperInstalled == true else {
             return .init(id: "permissions", title: "Permissions", state: .unavailable, summary: "Could not confirm", explanation: "ntfsmac could not confirm every macOS permission it needs.", nextAction: "Review ntfsmac in System Settings, then run Diagnose again.")
@@ -624,7 +649,7 @@ public enum DiagnoseSummary {
             return .init(id: "bridge", label: "vmnet bridge", value: "Idle — starts when a drive is mounted", status: .informational, explanation: explanation)
         case .mounting:
             return .init(id: "bridge", label: "vmnet bridge", value: "Starting with the mount", status: .informational, explanation: explanation)
-        case .mountedReadWrite, .mountedReadOnly, .mountedReadOnlyDirty, .mountedUnknown:
+        case .mountedReadWrite, .mountedReadOnly, .mountedReadOnlyUnexpected, .mountedReadOnlyDirty, .mountedUnknown:
             return .init(id: "bridge", label: "vmnet bridge", value: "Inactive while a drive is mounted", status: .warning, explanation: explanation)
         case .error, .none:
             return .init(id: "bridge", label: "vmnet bridge", value: "Inactive — mount context unavailable", status: .unavailable, explanation: explanation)
@@ -773,6 +798,7 @@ public struct DiagnosePanel: View {
     public let mountState: MountState?
     public let detectedDriveCount: Int?
     public let fullDiskAccessGranted: Bool?
+    public let contextIsCurrent: Bool
     public let onHide: (() -> Void)?
 
     public init(runner: DiagnoseRunner) {
@@ -780,6 +806,7 @@ public struct DiagnosePanel: View {
         self.mountState = nil
         self.detectedDriveCount = nil
         self.fullDiskAccessGranted = nil
+        self.contextIsCurrent = true
         self.onHide = nil
     }
 
@@ -788,6 +815,7 @@ public struct DiagnosePanel: View {
         self.mountState = nil
         self.detectedDriveCount = nil
         self.fullDiskAccessGranted = nil
+        self.contextIsCurrent = true
         self.onHide = onHide
     }
 
@@ -796,12 +824,14 @@ public struct DiagnosePanel: View {
         mountState: MountState?,
         detectedDriveCount: Int? = nil,
         fullDiskAccessGranted: Bool? = nil,
+        contextIsCurrent: Bool = true,
         onHide: (() -> Void)? = nil
     ) {
         self.runner = runner
         self.mountState = mountState
         self.detectedDriveCount = detectedDriveCount
         self.fullDiskAccessGranted = fullDiskAccessGranted
+        self.contextIsCurrent = contextIsCurrent
         self.onHide = onHide
     }
 
@@ -823,7 +853,7 @@ public struct DiagnosePanel: View {
             }
 
             Group {
-                if runner.isRunning {
+                if runner.isRunning || runner.isStale || !contextIsCurrent {
                     macroRows(DiagnoseMacroSummary.checkingRows)
                 } else if let report = runner.report {
                     macroRows(DiagnoseMacroSummary.rows(

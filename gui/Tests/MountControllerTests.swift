@@ -140,6 +140,7 @@ private final class RecordingMountNotifier: MountEventNotifying {
     // Real bug caught by review: this used to report .mountedReadWrite unconditionally,
     // even for a successful read-only-by-request mount.
     #expect(appState.state == .mountedReadOnly)
+    #expect(controller.mountedDrives.first?.readOnlyReason == .requested)
 }
 
 @MainActor
@@ -311,11 +312,7 @@ private final class RecordingMountNotifier: MountEventNotifying {
 }
 
 @MainActor
-@Test func mountRequestingReadWriteButLandingReadOnlyTransitionsToMountedReadOnlyDirty() async {
-    // Root-cause fix: `exitCode == 0` on a `readOnly: false` request doesn't guarantee the
-    // mount actually landed read-write — ntfs-3g silently falls back to read-only on a dirty
-    // journal. Without checking the real mount options, this was reported as a healthy
-    // `.mountedReadWrite` and `.mountedReadOnlyDirty` was unreachable from any real mount.
+@Test func readWriteRequestLandingReadOnlyWithoutCauseStaysUnclassified() async {
     let fake = FakeHelper()
     fake.snapshotReadOnlyOverride = true
     let appState = AppState()
@@ -323,8 +320,59 @@ private final class RecordingMountNotifier: MountEventNotifying {
 
     await controller.mount(sampleDrive, readOnly: false)
 
-    #expect(appState.state == .mountedReadOnlyDirty)
+    #expect(appState.state == .mountedReadOnlyUnexpected)
     #expect(controller.mountedDrive == sampleDrive)
+    #expect(controller.mountedDrives.first?.readOnlyReason == .unknown)
+}
+
+@MainActor
+@Test func explicitDirtyVolumeEvidenceProducesWindowsRepairState() async {
+    let fake = FakeHelper()
+    fake.snapshotReadOnlyOverride = true
+    fake.mountResult = .success(CommandResult(
+        output: "The disk contains an unclean file system. It was mounted read-only.",
+        exitCode: 0
+    ))
+    let appState = AppState()
+    let controller = MountController(helper: fake, appState: appState)
+
+    await controller.mount(sampleDrive, readOnly: false)
+
+    #expect(appState.state == .mountedReadOnlyDirty)
+    #expect(controller.mountedDrives.first?.readOnlyReason == .windowsDirty)
+
+    await controller.reconcile(knownDrives: [sampleDrive])
+    #expect(appState.state == .mountedReadOnlyDirty)
+    #expect(controller.mountedDrives.first?.readOnlyReason == .windowsDirty)
+}
+
+@Test(arguments: [
+    ("Windows is hibernated", ReadOnlyReason.windowsHibernated),
+    ("dirty bit is set", .windowsDirty),
+    ("NTFSMAC_NTFS3_RW_UNSAFE", .unsafeWindowsState),
+])
+func classifierUsesOnlyExplicitWindowsEvidence(argument: (String, ReadOnlyReason)) {
+    #expect(ReadOnlyReasonClassifier.classify(
+        requestedReadOnly: false,
+        landedReadOnly: true,
+        fsType: "ntfs",
+        output: argument.0
+    ) == argument.1)
+}
+
+@Test func classifierNeverCallsAnUnexplainedReadOnlyLandingDirty() {
+    #expect(ReadOnlyReasonClassifier.classify(
+        requestedReadOnly: false,
+        landedReadOnly: true,
+        fsType: "ntfs",
+        output: "mounted"
+    ) == .unknown)
+}
+
+@Test func genericNTFS3GuidanceDoesNotInventHibernation() {
+    let output = "mount: NTFS3 read/write refused — Windows left this volume in an unsafe state. Run chkdsk, disable Fast Startup, then fully shut down Windows."
+
+    #expect(MountFailureCopy.unsafeWindowsReason(for: output) == .unsafeWindowsState)
 }
 
 @MainActor
