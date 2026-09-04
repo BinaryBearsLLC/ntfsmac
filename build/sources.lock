@@ -89,10 +89,10 @@ ALPINE_DIGEST=sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68f
 # The immutable OCI digest owns the 16-package base manifest. The second lock owns the complete
 # 54-package add-on closure installed for ntfsmac; all lock hashes are part of the runtime marker.
 ALPINE_BASE_PACKAGES_SHA256=00afb49158f9a22de9da83c5ecac44d29e50c9460f24d21d952bd4af1f43d370
-ALPINE_PACKAGES_SHA256=99fc0338f8c2768c3c9dc5416fe26adf5195b572a96c49eb7d0ce426e920c1fe
+ALPINE_PACKAGES_SHA256=08456aa1550bff36b4e6d5a0e26e231a7af97db567aa5170fa0df569e6675f16
 # Every add-on APK is also pinned to an Alpine channel and byte-level SHA-256. The guest downloads
 # only these artifacts and installs them locally with network access disabled for apk itself.
-ALPINE_APKS_SHA256=6c06f60d19d0b03aca323613838f4cc76bdf3c22a370aa38739d5a5f7087496e
+ALPINE_APKS_SHA256=06a3d02506a7467a17403ac327076b38c04711959af86039fb50722551a261f3
 
 # util-linux — Homebrew BUILD-toolchain dep (not a runtime dep, not built from source here).
 # anylinuxfs depends on libblkid-rs/libblkid-rs-sys for host-side FS probing; the submodule's
