@@ -150,9 +150,9 @@ offers to open that release in the browser. Automatic network failures remain si
 
 ## Project status
 
-`v3.1.0` introduced the standard SMAppService build while retaining a labelled Legacy DMG.
-`v3.1.1` isolated one optional container-registry metadata path; follow-up hardening for the full
-OCI configuration and first runtime check is in development. [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases/latest)
+`v3.1.2` completes the [issue #24](https://github.com/BinaryBearsLLC/ntfsmac/issues/24)
+runtime fix, keeps no-drive launches in the normal idle state, refreshes Diagnostics after mount
+changes, and makes Finder and read-only behavior explicit. [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases/latest)
 is the authoritative source for signed and notarized builds.
 
 - [Roadmap](docs/BINARYBEARS_ROADMAP.md)

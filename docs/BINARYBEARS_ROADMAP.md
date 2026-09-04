@@ -35,21 +35,22 @@ Patch release for [issue #24](https://github.com/BinaryBearsLLC/ntfsmac/issues/2
 - report drive-discovery/runtime failures truthfully in setup and normal UI, with a retry action;
 - preserve identical behavior in Standard and Legacy because they share the runtime path.
 
-### Current maintenance (unreleased)
+### v3.1.2
 
-Follow-up issue evidence showed that `registries.conf` and other OCI inputs could still block the
-same public runtime pull. Current work isolates all registry and authentication inputs, serializes
-the longer first runtime check, prevents stale CLI scans during helper updates, and separates
-runtime, no-drive, and Full Disk Access states. The next patch also refreshes Diagnostics after
-mount changes, reports read-only causes without guessing, removes the unsafe RW override path, and
-labels **Open in Finder** explicitly.
+Follow-up patch for [issue #24](https://github.com/BinaryBearsLLC/ntfsmac/issues/24):
+
+- isolate every registry and authentication input used by the pinned public runtime pull;
+- serialize the longer first runtime check and prevent stale scans during helper updates;
+- keep no-drive launches, Full Disk Access, mount state, and Diagnostics truthful;
+- report explicit read-only causes, remove the unsafe RW override, and label **Open in Finder**;
+- clear disconnected drives consistently from rows, Diagnostics, and the header.
 
 Thanks to [@VixenSugo](https://github.com/VixenSugo) for reporting the issue, retesting both
 Standard and Legacy builds, and providing the diagnostics and video that exposed the remaining
 failure paths.
 
-Local validation covers the full automated suite, both signed package variants, repeated no-drive
-launches, and a write/reread/remove/unmount cycle on the NTFS `MobileData` volume.
+Release-candidate evidence is recorded in
+[the concise v3.1.2 validation note](testing/BINARYBEARS_V3_1_2_LOCAL_RC_2026-09-04.md).
 
 ## Next work
 
@@ -63,6 +64,7 @@ launches, and a write/reread/remove/unmount cycle on the NTFS `MobileData` volum
 - [Release process](RELEASE.md)
 - [Current GUI contract](dev/GUI-PLAN.md)
 - [Testing guide](dev/TESTING.md)
+- [v3.1.2 local release evidence](testing/BINARYBEARS_V3_1_2_LOCAL_RC_2026-09-04.md)
 - [v3.1.0 local release evidence](testing/BINARYBEARS_V3_1_LOCAL_RC_2026-08-27.md)
 - [Validation ledger](testing/BINARYBEARS_VALIDATION_RESULTS_2026-08-12.md)
 - [Mount and transport audit](audits/LIVE_MOUNT_STATE_AND_NFS_TRANSPORT_AUDIT_2026-08-06.md)
