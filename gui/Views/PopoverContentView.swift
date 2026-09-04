@@ -22,6 +22,20 @@ enum PreparingStateCopy {
     static let subtitle = "Setting up the disk runtime for its first check."
 }
 
+enum HeaderDriveSummary {
+    static func idleSubtitle(
+        hasCompletedInitialScan: Bool,
+        driveDiscoveryFailed: Bool,
+        visibleDriveCount: Int
+    ) -> String {
+        if !hasCompletedInitialScan { return "Preparing ntfsmac…" }
+        if driveDiscoveryFailed { return "Drive check failed" }
+        return visibleDriveCount == 0
+            ? "No drives found"
+            : "\(visibleDriveCount) drive(s) detected"
+    }
+}
+
 /// "Other available devices" section copy — the unmounted-drives list shown below the mounted
 /// list when one or more drives are already mounted. Says "devices" (not "drives") and only
 /// renders once something is primary: before mounting, the detected drives are just "the drives",
@@ -563,7 +577,7 @@ public struct PopoverContentView: View {
     private var driveDiscoveryFailed: Bool {
         DriveDiscoveryFailureCopy.isVisible(
             for: driveScanner.lastError,
-            detectedDriveCount: driveScanner.drives.count
+            detectedDriveCount: visibleDrives.count
         )
     }
 
@@ -636,13 +650,11 @@ public struct PopoverContentView: View {
     private var headerSubtitle: String {
         switch appState.state {
         case .idle:
-            if !driveScanner.hasCompletedInitialScan {
-                "Preparing ntfsmac…"
-            } else if driveDiscoveryFailed {
-                "Drive check failed"
-            } else {
-                driveScanner.drives.isEmpty ? "No drives found" : "\(driveScanner.drives.count) drive(s) detected"
-            }
+            HeaderDriveSummary.idleSubtitle(
+                hasCompletedInitialScan: driveScanner.hasCompletedInitialScan,
+                driveDiscoveryFailed: driveDiscoveryFailed,
+                visibleDriveCount: visibleDrives.count
+            )
         case .mounting: "Mounting…"
         case .mountedReadWrite: "Mounted read/write"
         case .mountedReadOnly: "Mounted read-only"

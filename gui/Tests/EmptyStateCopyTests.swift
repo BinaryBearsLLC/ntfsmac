@@ -29,4 +29,17 @@ import Testing
     @Test func mountedDriveActionNamesFinderExplicitly() {
         #expect(DriveRowCopy.openInFinder == "Open in Finder")
     }
+
+    @Test func headerDoesNotCountAReconciledMissingDrive() {
+        #expect(HeaderDriveSummary.idleSubtitle(
+            hasCompletedInitialScan: true,
+            driveDiscoveryFailed: false,
+            visibleDriveCount: 0
+        ) == "No drives found")
+        #expect(HeaderDriveSummary.idleSubtitle(
+            hasCompletedInitialScan: true,
+            driveDiscoveryFailed: false,
+            visibleDriveCount: 1
+        ) == "1 drive(s) detected")
+    }
 }
