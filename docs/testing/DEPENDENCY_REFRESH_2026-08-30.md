@@ -2,7 +2,9 @@
 
 This ledger records the controlled dependency refresh on
 `maintenance/dependency-refresh-2026-08`. Each dependency is changed and validated in its own
-checkpoint. GitHub issue #24 remains isolated in its original task and is not included here.
+checkpoint. No GitHub issue #24 implementation is developed here; the already-landed `dev` fix is
+imported later as an explicit integration checkpoint so the final dependency branch includes the
+current application baseline.
 
 ## Repository boundary
 
@@ -10,6 +12,9 @@ checkpoint. GitHub issue #24 remains isolated in its original task and is not in
 - Starting commit: `416cb2e1281270e3b7cb67fa1ecf4ca4db3dbf82` (`dev`, `origin/dev`, `v3.1.1`)
 - Starting state: clean detached worktree; the dedicated branch was created before edits
 - anylinuxfs baseline submodule: clean at `8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3`
+- Integration base refreshed on 2026-09-04: local `dev` and `origin/dev` both at
+  `b0ff6cd0ad96743b70d7a3e33b86f8ff8f99b58e` (`v3.1.2`); merged into this branch as
+  `ccb671b` without moving or editing `dev`
 - Publication boundary: no push, release, deployment, or remote mutation is authorized
 
 ## Baseline before dependency work
@@ -773,7 +778,102 @@ The most recent native libkrun attempt still stopped before guest execution with
 hardware or real-drive claim is made. No real disk was accessed or mounted, Docker was used only
 for the isolated package closure and stopped afterward, and no installation was performed.
 Notarization was not run. No hosted workflow, push, release, publication, or other remote mutation
-was performed. The GitHub issue #24 work remains outside this branch and worktree.
+was performed. At this historical checkpoint, the GitHub issue #24 work still remained outside
+this branch and worktree.
+
+## Checkpoint Z — integrate the current `dev` 3.1.2 fixes
+
+Status: source integration and local validation complete.
+
+The dependency branch was rebased in substance, but not rewritten: current `dev`/`origin/dev` at
+`b0ff6cd0ad96743b70d7a3e33b86f8ff8f99b58e` (`v3.1.2`) was merged with `--no-ff` as
+`ccb671b`. This imports the already-completed issue #24 follow-up from `dev`; no new issue #24
+implementation was developed in this task, and the original issue task remains the owner of that
+work. The `dev` branch and its checkout were not changed.
+
+The imported application/runtime improvements include:
+
+- isolated OCI registry, drop-in, short-name, and authentication paths, so runtime discovery does
+  not read user Docker or containers configuration;
+- a sequential, single-flight first runtime scan with a longer bounded timeout, plus staging waits
+  that avoid racing an in-progress helper/runtime update;
+- truthful no-drive and disconnected-drive states, with Full Disk Access evaluated only when a
+  supported partition is present;
+- mount-state reconciliation from observed host/guest rows, evidence-based read-only causes, and
+  removal of the unsafe read/write override;
+- an explicit drive-runtime retry state, explicit **Open in Finder**, and automatic invalidation
+  and refresh of stale Diagnose results after mount-state changes;
+- version and release documentation for 3.1.2.
+
+The only textual merge conflict was the OCI-isolation Bats fixture. Its resolution preserves the
+dependency branch's explicit `alpine-apks.lock` argument while retaining the complete new `dev`
+isolation coverage. The focused conflict gate passed 2/2.
+
+The first full post-merge gate then failed closed in exactly four Alpine artifact/rootfs tests:
+the stable v3.24 mirror no longer served the locked `libexpat-2.8.3-r0.apk`. This was not hidden or
+accepted as a transient pass; it became the next isolated dependency checkpoint.
+
+## Checkpoint AA — Alpine 3.24 closure relock, libexpat only
+
+Status: implementation, offline package proof, and local validation complete.
+
+Only `libexpat` changed, from `2.8.3-r0` to `2.8.4-r0`. The replacement is the official
+`v3.24/main/aarch64/libexpat-2.8.4-r0.apk`, byte-locked to SHA-256
+`ca1be5be36985a8370f4a8e9e33a25788ac95260295718e1b0b721a16bb2aa61`. It reports Alpine
+origin `expat`, commit `08d1eb8641965d3807628f6a4ff15914be5b79ae`, aarch64 architecture,
+and an Alpine RSA signature envelope. No other base or add-on package changed; in particular the
+three security-critical ntfs-3g packages remain exactly `2026.7.7-r0` and remain the only
+`edge/main` exception.
+
+The resulting aggregate locks are:
+
+- base package manifest, unchanged:
+  `00afb49158f9a22de9da83c5ecac44d29e50c9460f24d21d952bd4af1f43d370`;
+- 54-package add-on manifest:
+  `08456aa1550bff36b4e6d5a0e26e231a7af97db567aa5170fa0df569e6675f16`;
+- 54-APK channel/artifact manifest:
+  `06a3d02506a7467a17403ac327076b38c04711959af86039fb50722551a261f3`.
+
+An ARM64 container pinned to the unchanged Alpine 3.24.1 OCI digest installed all 54 verified APK
+artifacts with networking disabled and the cache mounted read-only. Its final database matched the
+exact 70-package base-plus-add-on closure, and reported ntfs-3g 2026.7.7 with
+`libntfs-3g.so.90`. Focused lock/security tests passed 12/12; rootfs plus OCI-isolation tests
+passed 9/9; the complete branch gate then passed 380/380. Docker was stopped afterward.
+
+## Checkpoint AB — final 3.1.2 integration and non-destructive USB gate
+
+Status: local build/package validation complete; bounded hardware detection passed; read/write
+media acceptance, notarization, and remote execution remain separate.
+
+Final integrated branch-tip evidence:
+
+- preflight: PASS with exact Rust 1.98.0 and Go 1.27.0 toolchains;
+- complete Bats gate: PASS, 380/380;
+- upstream Rust suites during the real runtime build: PASS, 58/58;
+- Standard Swift suite: PASS, 323/323;
+- Legacy Swift suite: PASS, 323/323, with only the expected deprecated SMJob API warnings;
+- `PopoverStateRenderTests` compiled but remained skipped by the documented macOS 26.6.2 guard;
+- both version 3.1.2 Apple Silicon DMGs passed container integrity, read-only attachment, Finder
+  layout, SHA-256, architecture, nested entitlement/signature, deep/strict Developer ID, Team
+  `SQY8T23X8N`, and Hardened Runtime checks;
+- both packaged runtimes contain the exact Alpine 3.24.1 digest and three package-lock hashes,
+  libkrunfw module hash, anylinuxfs 0.19.0, vmnet-helper v0.13.0, Go 1.27.0, gRPC 1.82.1, and
+  gvproxy's x/crypto v0.55.0 overlay; anylinuxfs has no dynamic libblkid/libmount/libuuid link.
+
+The user-provided external USB partition was identified non-destructively as NTFS and already
+mounted read-only by macOS. The exact branch runtime was installed only into a disposable `/tmp`
+prefix, not into the system. A real `anylinuxfs list` booted the native libkrun guest, initialized
+the new versioned Alpine cache from all 54 byte-verified APKs, and detected the external NTFS
+partition. A second invocation reused that exact completed cache. The matching diagnostic reported
+schema 6, ntfsmac 3.1.2, Alpine 3.24.1, ntfs-3g 2026.7.7-r0, nfs-utils 2.6.4-r6,
+anylinuxfs 0.19.0, gvproxy v0.8.9, vmnet-helper v0.13.0, the expected kernel pin, and zero NFS
+mounts/security sessions.
+
+This closes the former pre-guest `EINVAL` limitation for runtime boot and physical-device
+detection on this machine. It does not claim an ntfsmac mount or media write: no file was created,
+changed, deleted, repaired, or corruption-tested, and no system helper/app was replaced. A bounded
+write/flush/unmount/remount/reread/hash test remains a separate hardware gate requiring explicit
+confirmation that the selected volume is backed up or expendable.
 
 ## Validation categories
 
@@ -782,12 +882,15 @@ was performed. The GitHub issue #24 work remains outside this branch and worktre
   E, H, J, K, O, P, Q, R, S, and T also passed 307/307 in each Swift variant and mounted-DMG
   verification for both outputs. Checkpoint K passed 367/367 Bats; checkpoints O and P passed
   372/372; checkpoints Q through T passed 375/375. The final consolidated branch-tip gate passed
-  379/379 Bats, 58/58 upstream Rust tests, and 307/307 Swift tests in each app variant.
+  379/379 Bats, 58/58 upstream Rust tests, and 307/307 Swift tests in each app variant. After the
+  3.1.2 `dev` integration and one-package Alpine relock, the new branch-tip gate passed 380/380
+  Bats, 58/58 Rust tests, and 323/323 Swift tests in each app variant.
   `PopoverStateRenderTests` compiled but remained skipped by the documented macOS 26.6.2 guard.
-- Hardware: no real-drive test; local VM guest setup blocked as documented above.
+- Hardware: exact native VM boot, complete guest package initialization, cache reuse, and physical
+  external-NTFS detection passed. No ntfsmac mount or media write was performed.
 - Signing: standalone runtime gates used ad-hoc signatures; checkpoints C through E, H, and J
   packaging also verified the locally available BinaryBears Developer ID on both app variants;
-  checkpoints O through T repeated that gate. Required hypervisor/virtualization entitlements
-  passed.
+  checkpoints O through T and the final 3.1.2 integrated artifacts repeated that gate. Required
+  hypervisor/virtualization entitlements passed.
 - Notarization: not run.
 - Remote/public state: untouched; no push or release.

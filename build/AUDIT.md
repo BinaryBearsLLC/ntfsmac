@@ -851,5 +851,41 @@ libblkid/libmount/libuuid dependency.
 Hardware acceptance is not claimed: the most recent native libkrun attempt stopped before guest
 execution with `EINVAL`, and no real drive was accessed or mounted. Docker was stopped after the
 isolated Alpine package test. Notarization and hosted workflows were not run. No installation,
-push, release, publication, or other remote mutation was performed, and the separate GitHub issue
-#24 work is absent from this branch.
+push, release, publication, or other remote mutation was performed. At this historical checkpoint,
+the separate GitHub issue #24 work was still absent from this branch.
+
+## `dev` 3.1.2 integration, Alpine relock, and USB detection (2026-09-04)
+
+The dedicated dependency branch now contains current `dev`/`origin/dev` at
+`b0ff6cd0ad96743b70d7a3e33b86f8ff8f99b58e` (`v3.1.2`) through merge commit `ccb671b`.
+This imports the already-reviewed issue #24 follow-up without developing or amending that issue in
+the dependency task. The `dev` branch/worktree was not modified. The imported behavior includes
+full OCI configuration isolation, serialized first runtime discovery and staging waits, truthful
+no-drive/disconnected/mount/read-only state, dedicated runtime retry, removal of the unsafe
+read/write override, explicit Finder opening, and automatic Diagnose refresh after mount changes.
+
+The first complete post-merge gate failed closed because Alpine v3.24 had removed the exact
+`libexpat-2.8.3-r0.apk` artifact. The next isolated commit changes only libexpat to `2.8.4-r0`,
+pins the official aarch64 APK SHA-256 to
+`ca1be5be36985a8370f4a8e9e33a25788ac95260295718e1b0b721a16bb2aa61`, and updates the
+add-on/APK aggregate hashes to
+`08456aa1550bff36b4e6d5a0e26e231a7af97db567aa5170fa0df569e6675f16` and
+`06a3d02506a7467a17403ac327076b38c04711959af86039fb50722551a261f3`. All other 69
+packages are unchanged; ntfs-3g remains exactly 2026.7.7-r0. An offline, network-disabled ARM64
+install matched the exact 70-package closure.
+
+The final source/build gate passed 380/380 Bats tests, 58/58 upstream Rust tests, and 323/323 Swift
+tests in both Standard and Legacy variants. Both version 3.1.2 DMGs passed SHA-256, read-only mount,
+layout, architecture, embedded-runtime contract, nested entitlements, deep/strict Developer ID
+(Team `SQY8T23X8N`), and Hardened Runtime verification. Standard SHA-256 is
+`20232cd80098433d0de450fcabf2ad628e833b4593c2a416f5ec4f43c4c3a1fb`; Legacy SHA-256 is
+`14913f980af314aff507c7f97ed294b2ea0ea70ab3504d4e85ea09948d4c2c26`.
+
+On the user-provided external NTFS USB device, the exact disposable branch runtime booted the
+native libkrun guest, installed the 54 verified Alpine APK artifacts, matched the 70-package
+database, detected the partition, and reused the completed cache on a second scan. Diagnostics
+matched all current pins and reported zero NFS mounts and security sessions. The volume remained
+on its pre-existing read-only macOS mount; ntfsmac did not mount or write it, no test file was
+created, and no system app/helper was replaced. This is native runtime/device-detection evidence,
+not read/write media acceptance. Notarization, hosted CI, push, release, and publication were not
+run.
