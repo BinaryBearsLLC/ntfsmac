@@ -201,6 +201,77 @@ private let sampleExtOutput = """
     #expect(runner.calls[1].path == "/stub/anylinuxfs")
     #expect(runner.calls[1].args == ["list", "--linux"])
     #expect(scanner.drives.map(\.identifier) == ["disk4s2", "disk4s3"])
+    #expect(scanner.hasCompletedInitialScan)
+    #expect(!scanner.isRefreshing)
+}
+
+@MainActor
+@Test func coldRuntimeScanIsSequentialAndConcurrentRefreshesJoinIt() async throws {
+    let tempDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(
+        at: tempDirectory,
+        withIntermediateDirectories: true
+    )
+    defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+    let microsoftStarted = tempDirectory.appendingPathComponent("microsoft-started")
+    let linuxStarted = tempDirectory.appendingPathComponent("linux-started")
+    let releaseMicrosoft = tempDirectory.appendingPathComponent("release-microsoft")
+    let calls = tempDirectory.appendingPathComponent("calls")
+    let controlledList = tempDirectory.appendingPathComponent("controlled-list")
+    try """
+    #!/bin/sh
+    printf '%s\\n' "$*" >> "\(calls.path)"
+    if [ "$2" = "--microsoft" ]; then
+      : > "\(microsoftStarted.path)"
+      while [ ! -e "\(releaseMicrosoft.path)" ]; do
+        sleep 0.01
+      done
+    else
+      : > "\(linuxStarted.path)"
+    fi
+    exit 0
+    """.write(
+        to: controlledList,
+        atomically: true,
+        encoding: .utf8
+    )
+    try FileManager.default.setAttributes(
+        [.posixPermissions: 0o755],
+        ofItemAtPath: controlledList.path
+    )
+
+    let scanner = DriveScanner(
+        anylinuxfsPath: controlledList.path,
+        scanTimeout: 1,
+        initialScanTimeout: 2
+    )
+    let firstRefresh = Task { await scanner.refresh() }
+    let microsoftBegan = await Task.detached {
+        for _ in 0..<200 {
+            if FileManager.default.fileExists(atPath: microsoftStarted.path) { return true }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return false
+    }.value
+    #expect(microsoftBegan)
+    #expect(scanner.isRefreshing)
+    #expect(!FileManager.default.fileExists(atPath: linuxStarted.path))
+
+    let joinedRefresh = Task { await scanner.refresh() }
+    try await Task.sleep(for: .milliseconds(20))
+    try Data().write(to: releaseMicrosoft)
+    await firstRefresh.value
+    await joinedRefresh.value
+
+    let recordedCalls = try String(contentsOf: calls, encoding: .utf8)
+        .split(separator: "\n")
+        .map(String.init)
+    #expect(recordedCalls == ["list --microsoft", "list --linux"])
+    #expect(scanner.hasCompletedInitialScan)
+    #expect(!scanner.isRefreshing)
+    #expect(scanner.lastError == nil)
 }
 
 @MainActor
@@ -277,16 +348,20 @@ private let sampleExtOutput = """
         ofItemAtPath: stalledList.path
     )
 
-    let scanner = DriveScanner(anylinuxfsPath: stalledList.path, scanTimeout: 0.05)
+    let scanner = DriveScanner(
+        anylinuxfsPath: stalledList.path,
+        scanTimeout: 0.05,
+        initialScanTimeout: 0.05
+    )
     let clock = ContinuousClock()
     let startedAt = clock.now
 
     await scanner.refresh()
 
     let elapsed = startedAt.duration(to: clock.now)
-    // This is a bounded-completion guard, not a latency benchmark. The runner has two concurrent
-    // probes plus bounded TERM/SIGKILL grace waits; a busy hosted CI machine can delay their task
-    // scheduling beyond one second even though both timeout paths complete correctly. Three
+    // This is a bounded-completion guard, not a latency benchmark. The runner has bounded
+    // TERM/SIGKILL grace waits; a busy hosted CI machine can delay task scheduling beyond one
+    // second even though the timeout path completes correctly. Three
     // seconds still fails decisively if the production scan loses its bounded-return contract.
     #expect(elapsed < .seconds(3), "stalled production probes did not return within the safety bound")
     #expect(scanner.drives.isEmpty)

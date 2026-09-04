@@ -105,6 +105,21 @@ private final class FakeRunner: PrivilegedCommandRunning {
     #expect(rows.first { $0.id == "permissions" }?.nextAction?.contains("Full Disk Access") == true)
 }
 
+@Test func noDriveDiagnosticsDoNotInventAPermissionProblem() throws {
+    let report = try JSONDecoder().decode(DiagnoseReport.self, from: Data(expandedJSON.utf8))
+    let permissions = DiagnoseMacroSummary.rows(
+        for: report,
+        mountState: .idle,
+        detectedDriveCount: 0,
+        fullDiskAccessGranted: nil
+    ).first { $0.id == "permissions" }
+
+    #expect(permissions?.state == .idle)
+    #expect(permissions?.summary == "Checked when needed")
+    #expect(permissions?.nextAction == nil)
+    #expect(permissions?.userFacingText.contains("System Settings") == false)
+}
+
 @Test func guiDiagnosticsShowEveryCategoryWhileChecking() {
     #expect(DiagnoseMacroSummary.checkingRows.map(\.title) == DiagnoseMacroSummary.categoryTitles)
     #expect(DiagnoseMacroSummary.checkingRows.allSatisfy { $0.state == .checking })
@@ -220,6 +235,7 @@ func kernelPinRawValuesAreRepresentedHonestly(rawValue: String) {
     (.mounting, .informational, "Starting with the mount"),
     (.mountedReadWrite, .warning, "Inactive while a drive is mounted"),
     (.mountedReadOnly, .warning, "Inactive while a drive is mounted"),
+    (.mountedReadOnlyUnexpected, .warning, "Inactive while a drive is mounted"),
     (.mountedReadOnlyDirty, .warning, "Inactive while a drive is mounted"),
     (.error, .unavailable, "Inactive — mount context unavailable"),
 ])
@@ -323,10 +339,40 @@ func bridgeDownUsesMountContext(argument: (MountState, DiagnoseStatus, String)) 
     #expect(presentation.phase(report: report, errorMessage: "failure", isRunning: true) == .hidden)
     presentation.show()
     #expect(presentation.phase(report: nil, errorMessage: nil, isRunning: true) == .running)
+    #expect(presentation.phase(report: nil, errorMessage: nil, isRunning: false, isStale: true) == .running)
+    #expect(presentation.phase(report: report, errorMessage: nil, isRunning: false, contextIsCurrent: false) == .running)
     #expect(presentation.phase(report: report, errorMessage: nil, isRunning: false) == .result)
     #expect(presentation.phase(report: nil, errorMessage: "failure", isRunning: false) == .error)
     presentation.hide()
     #expect(presentation.phase(report: report, errorMessage: nil, isRunning: false) == .hidden)
+}
+
+@MainActor
+@Test func storageStateChangeInvalidatesAnIdleReportBeforeMountedCopyCanUseIt() async {
+    let fake = FakeRunner()
+    fake.result = CommandResult(output: developerExportJSON, exitCode: 0)
+    let runner = DiagnoseRunner(runner: fake, ntfsmacPath: "/fake/ntfsmac", fileExists: { _ in true })
+
+    await runner.run()
+    #expect(runner.report?.securityActiveSessions == 0)
+
+    runner.invalidateForStorageStateChange()
+
+    #expect(runner.report == nil)
+    #expect(runner.errorMessage == nil)
+    #expect(runner.isStale)
+
+    await runner.run()
+    #expect(!runner.isStale)
+    #expect(runner.report?.securityActiveSessions == 0)
+    #expect(fake.calls.count == 2)
+}
+
+@Test func visibleDiagnosticsRefreshOnlyAfterMountingSettles() {
+    #expect(!DiagnoseRefreshPolicy.shouldRunAutomatically(panelIsVisible: false, mountState: .mountedReadWrite))
+    #expect(!DiagnoseRefreshPolicy.shouldRunAutomatically(panelIsVisible: true, mountState: .mounting))
+    #expect(DiagnoseRefreshPolicy.shouldRunAutomatically(panelIsVisible: true, mountState: .mountedReadWrite))
+    #expect(DiagnoseRefreshPolicy.shouldRunAutomatically(panelIsVisible: true, mountState: .idle))
 }
 
 @MainActor

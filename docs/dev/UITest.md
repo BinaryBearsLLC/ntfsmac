@@ -133,7 +133,7 @@ is installed"), built a real, tested pipeline:
 | 2 | First run — install denied/failed | Yes | Renders correctly, via `DemoScaffold.helperInstaller(outcome:)` |
 | 3 | CLI missing / "Setup incomplete" | Yes | Live-verified for real this session (triggered naturally after a real `removeDependencies()` uninstall) — red warning icon, plain-language copy, "Check Again" button. Correct fallback. |
 | 4 | Idle, no drives / with drive | Yes | Icons, Mount, Diagnose, gear, Quit all confirmed real and working |
-| 5–9 | Mounting / mounted (rw/ro/dirty) / error | Yes | Unblocked this session via the `DemoScaffold` mock-`MountState` harness (`NTFSMAC_UI_DEMO=clean\|dirty\|error`). All 5 states walked live: mounting (blue pulsing), mounted read-write (green), mounted read-only-dirty (yellow, unclean-journal banner, "Mount read/write anyway…"), error (red, plain-language message). Menu-bar icon color confirmed correct for every state (see bug fix below). |
+| 5–9 | Mounting / mounted (rw/ro/unsafe Windows) / error | Yes | Unblocked via the `DemoScaffold` mock-`MountState` harness (`NTFSMAC_UI_DEMO=clean\|dirty\|error`). The unsafe Windows state is yellow, gives repair guidance, and offers no forced read/write override. Menu-bar icon colour was confirmed for each state. |
 | 10 | In-popover Settings page | Yes | Packaged app verified live on 2026-08-03: gear replaced the popover content with Settings; Back restored the drive list; Launch at login, Reinstall…, and Uninstall… controls were visible; no separate window opened. |
 | 11 | Diagnose panel | Yes | Single button, styled output card |
 

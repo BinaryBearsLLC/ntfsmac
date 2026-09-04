@@ -40,7 +40,11 @@ Intel Macs are not supported.
    [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases/latest).
 2. Open the DMG and drag `ntfsmac.app` to Applications.
 3. Launch **ntfsmac** and approve the guided helper setup.
-4. In Full Disk Access, enable the entry identified in the app's instructions.
+4. Connect a supported drive and, when prompted, enable the Full Disk Access entry identified by
+   the app.
+
+With no supported drive connected, ntfsmac shows **No drives found**. It verifies Full Disk Access
+when a supported partition is detected.
 
 Official BinaryBears DMGs are Developer ID signed, notarized by Apple, stapled, and published with
 a SHA-256 checksum. Draft releases are not final downloads.
@@ -66,7 +70,9 @@ forces that credential-free fallback. See
 
 Open `ntfsmac.app`, select a detected drive, and choose **Mount**. The normal Mount action always
 uses `ntfs-3g`. The adjacent menu offers **NTFS3 (Experimental)** for controlled testing after
-Windows Fast Startup, dirty-volume, and `chkdsk` guidance.
+Windows Fast Startup, dirty-volume, and `chkdsk` guidance. Once mounted, **Open in Finder** opens
+the network-backed volume; Finder provides normal file browsing and writing when the mount is
+confirmed read/write.
 
 The CLI remains available for scripted and diagnostic use:
 
@@ -104,12 +110,15 @@ addresses, DNS servers, route tables, and VPN provider details.
 ### Current behavior
 
 - Diagnose presents four plain-language categories; technical evidence remains available through
-  the CLI and Command-click JSON export.
+  the CLI and Command-click JSON export. A mount-state change invalidates the visible result and
+  refreshes it automatically while the panel is open.
+- An unexpected read-only mount is attributed to Windows only when the backend provides matching
+  evidence. ntfsmac never offers a forced read/write override for an unsafe volume.
 - Quit protects mounted drives with **Unmount and Quit**, **Quit Anyway**, and **Cancel**. Only the
   safe unmount action can be remembered.
 - Standard and Legacy builds share the same reviewed mount/runtime path. The standard helper is
   verified before any working Legacy helper is removed.
-- Drive-discovery failures are shown as errors with a retry action instead of being reported as
+- Drive-runtime failures have their own retry state and are never presented as Full Disk Access or
   “no drive connected”.
 - Both DMGs use the approved BinaryBears artwork and preserve the visible app name **ntfsmac**.
 
@@ -141,10 +150,10 @@ offers to open that release in the browser. Automatic network failures remain si
 
 ## Project status
 
-`v3.1.0` introduced the standard SMAppService build while retaining a labelled Legacy DMG. The
-`v3.1.1` patch fixes first-run runtime initialization when optional user container-registry
-metadata is unreadable. [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases/latest)
-is the authoritative source for the latest signed and notarized build.
+`v3.1.2` completes the [issue #24](https://github.com/BinaryBearsLLC/ntfsmac/issues/24)
+runtime fix, keeps no-drive launches in the normal idle state, refreshes Diagnostics after mount
+changes, and makes Finder and read-only behavior explicit. [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases/latest)
+is the authoritative source for signed and notarized builds.
 
 - [Roadmap](docs/BINARYBEARS_ROADMAP.md)
 - [Validation ledger](docs/testing/BINARYBEARS_VALIDATION_RESULTS_2026-08-12.md)

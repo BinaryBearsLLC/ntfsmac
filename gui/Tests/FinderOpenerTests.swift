@@ -56,6 +56,16 @@ private final class FakeRunner: PrivilegedCommandRunning {
 }
 
 @MainActor
+@Test func opensMountPointWhenReadOnlyCauseIsUnconfirmed() {
+    let fake = FakeWorkspace()
+    let opener = FinderOpener(workspace: fake, runner: FakeRunner())
+
+    opener.open(sampleDrive, state: .mountedReadOnlyUnexpected)
+
+    #expect(fake.openedPaths.count == 1)
+}
+
+@MainActor
 @Test func usesRealMountPointWhenProvidedInsteadOfGuessing() {
     let fake = FakeWorkspace()
     let runner = FakeRunner()

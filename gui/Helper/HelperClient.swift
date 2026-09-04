@@ -15,7 +15,7 @@ public enum HelperClientError: Error {
 /// Every privileged action the GUI takes routes through here — never a raw `sudo` shell-out
 /// (L5). Validates locally first (fast UX feedback) but the helper is the real gate: it
 /// re-validates independently and this client never assumes its own check was sufficient.
-/// `@MainActor`: every real caller (`MountController`/`RemountController` via the `@MainActor`
+/// `@MainActor`: every real caller (`MountController` via the `@MainActor`
 /// `HelperMounting` protocol, `PopoverContentView`'s Quit-time `teardown()`) already only ever
 /// calls this from the main actor — making that explicit satisfies Swift 6 strict concurrency
 /// without an `@unchecked Sendable` escape hatch.

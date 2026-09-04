@@ -21,6 +21,7 @@ private let sampleDrive = Drive(identifier: "disk4s2", fsType: "ntfs", label: "M
 private final class FakeHelper: HelperMounting, MountSnapshotProviding {
     var mountResult: Result<CommandResult, Error> = .success(CommandResult(output: "mounted", exitCode: 0))
     var unmountFailureDevices: Set<String> = []
+    var snapshotReadOnlyOverride: Bool?
     private var mounted: [String: ObservedMount] = [:]
     func mount(device: String, driver: FsDriver, mountPoint: String?, readOnly: Bool) async throws -> CommandResult {
         let result = try mountResult.get()
@@ -29,7 +30,7 @@ private final class FakeHelper: HelperMounting, MountSnapshotProviding {
                 deviceIdentifier: device,
                 mountPoint: mountPoint ?? "/Volumes/\(device)",
                 fsDriver: driver.rawValue,
-                isReadOnly: readOnly
+                isReadOnly: snapshotReadOnlyOverride ?? readOnly
             )
         }
         return result
@@ -83,7 +84,6 @@ private func renderPopover(
         appState: appState,
         driveScanner: driveScanner,
         mountController: mountController,
-        remountController: RemountController(appState: appState),
         diagnoseRunner: DiagnoseRunner(),
         helperInstaller: helperInstaller,
         helperUninstaller: HelperUninstaller(),
@@ -190,7 +190,7 @@ private func renderPopover(
     #expect(appState.state == .mountedReadWrite)
 
     let size = renderPopover(appState: appState, mountController: controller, helperInstaller: helperInstaller, cliInstallChecker: cliInstallChecker)
-    #expect(size != nil, "multi-mount popover (two Open/Unmount rows plus Eject All) must render a non-empty image")
+    #expect(size != nil, "multi-mount popover (two Open in Finder/Unmount rows plus Eject All) must render a non-empty image")
 }
 
 @MainActor @Test func ejectAllPartialResultRendersWithoutHidingFailedDrive() async throws {
@@ -233,17 +233,20 @@ private func renderPopover(
     let (helperInstaller, cliInstallChecker, cleanup) = try await makeInstalledDependencies()
     defer { cleanup() }
     let appState = AppState()
-    let controller = MountController(helper: FakeHelper(), appState: appState)
+    let helper = FakeHelper()
+    helper.snapshotReadOnlyOverride = true
+    helper.mountResult = .success(CommandResult(
+        output: "The volume is dirty and was mounted read-only.",
+        exitCode: 0
+    ))
+    let controller = MountController(helper: helper, appState: appState)
     await controller.mount(sampleDrive)
-    // Matches `DirtyStateTests`' own precedent: dirty detection happens post-mount (real code
-    // path in `RemountController`'s remount-completion check), so tests drive to it the same
-    // way that code does — `mountedDrive` stays set from the real `mount()` call above.
-    appState.state = .mountedReadOnlyDirty
+    #expect(appState.state == .mountedReadOnlyDirty)
     #expect(controller.mountedDrive == sampleDrive)
-    #expect(DirtyBanner.isVisible(for: appState.state))
+    #expect(DirtyBanner.copy(for: controller.mountedDrives.first?.readOnlyReason) != nil)
 
     let size = renderPopover(appState: appState, mountController: controller, helperInstaller: helperInstaller, cliInstallChecker: cliInstallChecker)
-    #expect(size != nil, "dirty-state popover (warning banner + Mount read/write anyway) must render a non-empty image")
+    #expect(size != nil, "unsafe Windows state must render guidance without a read/write override")
 }
 
 @MainActor @Test func errorStateRendersWithoutCollapsing() async throws {
@@ -272,11 +275,17 @@ private func renderPopover(
     #expect(size != nil)
 }
 
-@MainActor @Test func fdaPromptStateRendersWithoutCollapsing() async throws {
+@MainActor @Test func fdaPromptWithDetectedDriveRendersWithoutCollapsing() async throws {
     let (helperInstaller, cliInstallChecker, cleanup) = try await makeInstalledDependencies()
     defer { cleanup() }
     let appState = AppState()
     let controller = MountController(helper: FakeHelper(), appState: appState)
+    let scanner = DriveScanner(
+        runner: SeededListRunner(output: sampleListOutput),
+        anylinuxfsPath: "/stub/anylinuxfs"
+    )
+    await scanner.refresh()
+    #expect(scanner.drives.count == 1)
     let fullDiskAccessController = FullDiskAccessController(initialState: .waitingForDrive)
     #expect(!fullDiskAccessController.isGranted)
 
@@ -285,12 +294,45 @@ private func renderPopover(
         mountController: controller,
         helperInstaller: helperInstaller,
         cliInstallChecker: cliInstallChecker,
+        driveScanner: scanner,
         fullDiskAccessController: fullDiskAccessController
     )
+    #expect(size?.width == 300, "a detected drive with unverified access must use the FDA setup route")
     #expect(size != nil, "Full Disk Access setup (including Settings and Quit) must render without trapping the user")
 }
 
-@MainActor @Test func driveDiscoveryFailureRendersInSetupAndMainContent() async throws {
+@MainActor @Test func noDriveWithUnprobedFDAStateRendersNormalIdleContent() async throws {
+    let (helperInstaller, cliInstallChecker, cleanup) = try await makeInstalledDependencies()
+    defer { cleanup() }
+    let appState = AppState()
+    let controller = MountController(helper: FakeHelper(), appState: appState)
+    let fullDiskAccessController = FullDiskAccessController(initialState: .notChecked)
+    let scanner = DriveScanner(
+        runner: SeededListRunner(output: ""),
+        anylinuxfsPath: "/stub/anylinuxfs"
+    )
+    await scanner.refresh()
+
+    #expect(!FullDiskAccessPresentationPolicy.shouldPresentSetup(
+        state: fullDiskAccessController.state,
+        deviceID: nil
+    ))
+    #expect(scanner.hasCompletedInitialScan)
+    #expect(scanner.lastError == nil)
+    let size = renderPopover(
+        appState: appState,
+        mountController: controller,
+        helperInstaller: helperInstaller,
+        cliInstallChecker: cliInstallChecker,
+        driveScanner: scanner,
+        fullDiskAccessController: fullDiskAccessController
+    )
+
+    #expect(size?.width == 320, "no drive must use the normal idle route, not the 300-point setup card")
+    #expect(size != nil, "no-drive relaunch must render the normal idle popover")
+}
+
+@MainActor @Test func driveDiscoveryFailureUsesDedicatedRuntimeState() async throws {
     let (helperInstaller, cliInstallChecker, cleanup) = try await makeInstalledDependencies()
     defer { cleanup() }
     let appState = AppState()
@@ -304,7 +346,11 @@ private func renderPopover(
     #expect(scanner.drives.isEmpty)
     #expect(DriveDiscoveryFailureCopy.isVisible(for: scanner.lastError))
 
-    let setupSize = renderPopover(
+    #expect(!FullDiskAccessPresentationPolicy.shouldPresentSetup(
+        state: .waitingForDrive,
+        deviceID: nil
+    ))
+    let size = renderPopover(
         appState: appState,
         mountController: controller,
         helperInstaller: helperInstaller,
@@ -312,16 +358,9 @@ private func renderPopover(
         driveScanner: scanner,
         fullDiskAccessController: FullDiskAccessController(initialState: .waitingForDrive)
     )
-    let mainSize = renderPopover(
-        appState: appState,
-        mountController: controller,
-        helperInstaller: helperInstaller,
-        cliInstallChecker: cliInstallChecker,
-        driveScanner: scanner
-    )
 
-    #expect(setupSize != nil, "drive-discovery failure must render in the setup gate")
-    #expect(mainSize != nil, "drive-discovery failure must render after setup is complete")
+    #expect(size?.width == 300, "drive-discovery failure must use its dedicated runtime card")
+    #expect(size != nil, "drive-discovery failure must render without falling into the permission flow")
 }
 
 // "Other available" section split: idle-with-drives renders the detected drives as the primary

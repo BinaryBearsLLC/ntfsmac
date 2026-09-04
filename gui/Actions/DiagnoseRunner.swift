@@ -284,6 +284,7 @@ public final class DiagnoseRunner: ObservableObject {
     @Published public private(set) var report: DiagnoseReport?
     @Published public private(set) var errorMessage: String?
     @Published public private(set) var isRunning = false
+    @Published public private(set) var isStale = false
 
     private let runner: any PrivilegedCommandRunning
     private let ntfsmacPath: String
@@ -303,6 +304,14 @@ public final class DiagnoseRunner: ObservableObject {
         _ = execute()
     }
 
+    /// A diagnostic report describes one storage state. Once mount state changes, clear it before
+    /// the view can combine old session counts with the new mounted/idle state.
+    public func invalidateForStorageStateChange() {
+        report = nil
+        errorMessage = nil
+        isStale = true
+    }
+
     /// Runs the exact same read-only CLI diagnostic as the visible summary, then returns a
     /// validated, formatted attachment. A degraded diagnosis still produces a useful document:
     /// `diagnose.sh` deliberately uses its exit code for health while keeping stdout valid JSON.
@@ -320,6 +329,7 @@ public final class DiagnoseRunner: ObservableObject {
     private func execute() -> String? {
         guard !isRunning else { return nil }
         isRunning = true
+        isStale = false
         // Clear the previous result up front — otherwise a stale report/error stays on screen
         // for the entire re-diagnose run, and `DiagnosePanel`'s `ProgressView` branch (checked
         // after `report`/`errorMessage`) never becomes reachable past the first run.
@@ -350,5 +360,13 @@ public final class DiagnoseRunner: ObservableObject {
         report = parsed
         errorMessage = nil
         return result.output
+    }
+}
+
+/// Refresh automatically only while the panel is visible and after the transient mount phase has
+/// settled. Hidden diagnostics stay invalidated and the next explicit Diagnose action runs fresh.
+public enum DiagnoseRefreshPolicy {
+    public static func shouldRunAutomatically(panelIsVisible: Bool, mountState: MountState) -> Bool {
+        panelIsVisible && mountState != .mounting
     }
 }

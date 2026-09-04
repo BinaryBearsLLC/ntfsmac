@@ -30,10 +30,27 @@ dual-artifact release pipeline.
 
 Patch release for [issue #24](https://github.com/BinaryBearsLLC/ntfsmac/issues/24):
 
-- isolate the pinned runtime pull from unreadable optional `registries.d` metadata in the user's
-  container configuration without changing those files;
+- isolated the pinned runtime pull from unreadable optional `registries.d` metadata without
+  changing user files;
 - report drive-discovery/runtime failures truthfully in setup and normal UI, with a retry action;
 - preserve identical behavior in Standard and Legacy because they share the runtime path.
+
+### v3.1.2
+
+Follow-up patch for [issue #24](https://github.com/BinaryBearsLLC/ntfsmac/issues/24):
+
+- isolate every registry and authentication input used by the pinned public runtime pull;
+- serialize the longer first runtime check and prevent stale scans during helper updates;
+- keep no-drive launches, Full Disk Access, mount state, and Diagnostics truthful;
+- report explicit read-only causes, remove the unsafe RW override, and label **Open in Finder**;
+- clear disconnected drives consistently from rows, Diagnostics, and the header.
+
+Thanks to [@VixenSugo](https://github.com/VixenSugo) for reporting the issue, retesting both
+Standard and Legacy builds, and providing the diagnostics and video that exposed the remaining
+failure paths.
+
+Release-candidate evidence is recorded in
+[the concise v3.1.2 validation note](testing/BINARYBEARS_V3_1_2_LOCAL_RC_2026-09-04.md).
 
 ## Next work
 
@@ -47,6 +64,7 @@ Patch release for [issue #24](https://github.com/BinaryBearsLLC/ntfsmac/issues/2
 - [Release process](RELEASE.md)
 - [Current GUI contract](dev/GUI-PLAN.md)
 - [Testing guide](dev/TESTING.md)
+- [v3.1.2 local release evidence](testing/BINARYBEARS_V3_1_2_LOCAL_RC_2026-09-04.md)
 - [v3.1.0 local release evidence](testing/BINARYBEARS_V3_1_LOCAL_RC_2026-08-27.md)
 - [Validation ledger](testing/BINARYBEARS_VALIDATION_RESULTS_2026-08-12.md)
 - [Mount and transport audit](audits/LIVE_MOUNT_STATE_AND_NFS_TRANSPORT_AUDIT_2026-08-06.md)

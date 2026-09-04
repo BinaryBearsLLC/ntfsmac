@@ -70,7 +70,10 @@ public final class FinderOpener {
     /// GUI-PLAN.md "Popover — mounted" table: "Open in Finder | ... | Mounted". Read-only-dirty
     /// still counts as mounted (the volume is browsable even if writes are blocked).
     public func isEnabled(for state: MountState) -> Bool {
-        state == .mountedReadWrite || state == .mountedReadOnly || state == .mountedReadOnlyDirty
+        state == .mountedReadWrite
+            || state == .mountedReadOnly
+            || state == .mountedReadOnlyUnexpected
+            || state == .mountedReadOnlyDirty
     }
 
     /// `mountPoint`: the real, actually-requested path when the caller has one

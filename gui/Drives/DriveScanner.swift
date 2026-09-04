@@ -134,6 +134,8 @@ public enum DriveListParser {
 public final class DriveScanner: ObservableObject {
     @Published public private(set) var drives: [Drive] = []
     @Published public private(set) var lastError: String?
+    @Published public private(set) var isRefreshing = false
+    @Published public private(set) var hasCompletedInitialScan = false
 
     // An explicit runner is the deterministic test/demo seam and remains actor-bound because the
     // shared protocol is intentionally not Sendable. Production leaves this nil and creates the
@@ -141,16 +143,21 @@ public final class DriveScanner: ObservableObject {
     private let runner: (any PrivilegedCommandRunning)?
     private let anylinuxfsPath: String
     private let scanTimeout: TimeInterval
+    private let initialScanTimeout: TimeInterval
     private var pollTask: Task<Void, Never>?
+    private var refreshWaiters: [CheckedContinuation<Void, Never>] = []
+    private var hasCompletedSuccessfulScan = false
 
     public init(
         runner: (any PrivilegedCommandRunning)? = nil,
         anylinuxfsPath: String = "\(installPrefix)/bin/anylinuxfs",
-        scanTimeout: TimeInterval = 10
+        scanTimeout: TimeInterval = 10,
+        initialScanTimeout: TimeInterval = 120
     ) {
         self.runner = runner
         self.anylinuxfsPath = anylinuxfsPath
         self.scanTimeout = scanTimeout
+        self.initialScanTimeout = initialScanTimeout
     }
 
     deinit {
@@ -176,26 +183,69 @@ public final class DriveScanner: ObservableObject {
     }
 
     public func refresh() async {
-        let microsoft: CommandResult
-        let linux: CommandResult
+        // The popover task and visibility-aware poller can both request the first refresh. The
+        // cold anylinuxfs call initializes the pinned runtime, so overlapping probes contend for
+        // the same cache and can make a healthy install look broken. Join the in-flight scan and
+        // let every caller continue only after the shared result has been published.
+        if isRefreshing {
+            await withCheckedContinuation { continuation in
+                refreshWaiters.append(continuation)
+            }
+            return
+        }
+
+        isRefreshing = true
+        defer {
+            hasCompletedInitialScan = true
+            isRefreshing = false
+            let waiters = refreshWaiters
+            refreshWaiters.removeAll()
+            waiters.forEach { $0.resume() }
+        }
+
+        let results: [CommandResult]
         if let runner {
-            microsoft = runner.run(anylinuxfsPath, ["list", "--microsoft"])
-            linux = runner.run(anylinuxfsPath, ["list", "--linux"])
-        } else {
-            async let microsoftProbe = Self.runOffMain(
+            results = [
+                runner.run(anylinuxfsPath, ["list", "--microsoft"]),
+                runner.run(anylinuxfsPath, ["list", "--linux"]),
+            ]
+        } else if hasCompletedSuccessfulScan {
+            // Once initialization has succeeded, the independent inventory probes can run in
+            // parallel under the shorter recurring-scan bound.
+            async let microsoft = Self.runOffMain(
                 anylinuxfsPath,
                 ["list", "--microsoft"],
                 timeout: scanTimeout
             )
-            async let linuxProbe = Self.runOffMain(
+            async let linux = Self.runOffMain(
                 anylinuxfsPath,
                 ["list", "--linux"],
                 timeout: scanTimeout
             )
-            (microsoft, linux) = await (microsoftProbe, linuxProbe)
+            results = await [microsoft, linux]
+        } else {
+            // A clean installation may need to download and unpack the pinned Alpine runtime.
+            // Initialize it with one probe and a realistic bound; only then ask for the second
+            // filesystem family. If initialization fails, a parallel duplicate would add noise
+            // without producing useful inventory data.
+            let microsoft = await Self.runOffMain(
+                anylinuxfsPath,
+                ["list", "--microsoft"],
+                timeout: initialScanTimeout
+            )
+            if microsoft.exitCode == 0 {
+                let linux = await Self.runOffMain(
+                    anylinuxfsPath,
+                    ["list", "--linux"],
+                    timeout: initialScanTimeout
+                )
+                results = [microsoft, linux]
+            } else {
+                results = [microsoft]
+            }
         }
 
-        let successfulResults = [microsoft, linux].filter { $0.exitCode == 0 }
+        let successfulResults = results.filter { $0.exitCode == 0 }
         if !successfulResults.isEmpty {
             // A future anylinuxfs version may report a partition in both families. Preserve the
             // Microsoft-then-Linux display order while ensuring a stable one-row-per-device list.
@@ -205,9 +255,10 @@ public final class DriveScanner: ObservableObject {
                 .filter { seenIdentifiers.insert($0.identifier).inserted }
         }
 
-        let failedResults = [microsoft, linux].filter { $0.exitCode != 0 }
+        let failedResults = results.filter { $0.exitCode != 0 }
         if failedResults.isEmpty {
             lastError = nil
+            hasCompletedSuccessfulScan = true
         } else {
             lastError = failedResults
                 .map(\.output)

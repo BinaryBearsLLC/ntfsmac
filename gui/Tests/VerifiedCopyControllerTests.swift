@@ -73,22 +73,20 @@ private func makeUncheckedSelection(suffix: String = "one") -> VerifiedCopySelec
 }
 
 @Test(arguments: [
-    (true, false, false, Optional("/Volumes/MEDIA"), true),
-    (false, false, false, Optional("/Volumes/MEDIA"), false),
-    (true, true, false, Optional("/Volumes/MEDIA"), false),
-    (true, false, true, Optional("/Volumes/MEDIA"), false),
-    (true, false, false, Optional<String>.none, false),
-    (true, false, false, Optional(""), false),
+    (true, false, Optional("/Volumes/MEDIA"), true),
+    (false, false, Optional("/Volumes/MEDIA"), false),
+    (true, true, Optional("/Volumes/MEDIA"), false),
+    (true, false, Optional<String>.none, false),
+    (true, false, Optional(""), false),
 ])
 func availabilityRequiresOneVerifiedWritableMountedRow(
-    argument: (Bool, Bool, Bool, String?, Bool)
+    argument: (Bool, Bool, String?, Bool)
 ) {
     #expect(VerifiedCopyAvailability.isAvailable(
         isVerified: argument.0,
         isReadOnly: argument.1,
-        isDirty: argument.2,
-        mountPoint: argument.3
-    ) == argument.4)
+        mountPoint: argument.2
+    ) == argument.3)
 }
 
 @MainActor
