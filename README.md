@@ -42,8 +42,8 @@ The minimum build target is not a claim that every Mac or macOS release has been
 
 | System | Confirmed locally | Still unverified |
 | --- | --- | --- |
-| macOS 26.6.2, Apple M5 (physical Mac) | Candidate 31302: app/helper execution, pinned Linux runtime, NTFS write/flush/remount/SHA-256 checks; mixed NTFS/ExFAT detection | Final beta package acceptance, other M-series models and longer-term workloads |
-| macOS 14.6.1 Sonoma (local VM on M5) | Build 31303: app launch, Settings/error-view rendering and diagnostics; earlier helper installation recovery documented separately | This VM lacks nested Hypervisor access for filesystem mounting/read/write |
+| macOS 26.6.2, Apple M5 (physical Mac) | Official notarized Beta 2 (31304): app/helper update, NTFS write/flush/remount/SHA-256 checks; mixed NTFS/ExFAT detection previously checked on 31302 | Beta 2 ext2/ext3/ext4 acceptance, other M-series models and longer-term workloads |
+| macOS 14.6.1 Sonoma (local VM on M5) | Official notarized Beta 2 (31304): Gatekeeper, app/helper update, Settings/error-view rendering and diagnostics; earlier helper installation recovery documented separately | This VM lacks nested Hypervisor access for filesystem mounting/read/write |
 | Other macOS 14.x, macOS 15, other macOS 26 versions and newer | Deployment target and guarded API paths only | Native end-to-end testing |
 
 Intel and macOS 13 or earlier are outside the 3.1.3 target. The preserved 3.1.2 line

@@ -230,3 +230,32 @@ Legacy polling fixture: the scheduler resumed its 25 ms check after the simulate
 unchanged signed candidate is being retried with every gate enabled; a test-only
 follow-up replaces that timer race with explicit start/completion synchronization
 and passes both complete 332-test Swift suites. No application code or tag changes.
+
+### Official Beta 2 artifact
+
+Release run 34239853420 attempt 2 passed all enabled source gates, signing,
+notarization and draft creation. The downloaded DMG SHA-256 is
+`6cec27ae925269e6c734024c5993e6eb082a7baec5f11020427f2669169ae174`.
+Local checksum verification, DMG integrity, deep/strict app signatures, app and DMG
+stapling validation, and Gatekeeper acceptance all pass. The signer is BinaryBears
+LLC (SQY8T23X8N). All six bundled host Mach-O executables pass the arm64/macOS 14
+minimum-version check. The image contains one Standard app, version 3.1.3 Beta 2,
+build 31304, and the Applications link; no Legacy app.
+
+That exact app replaced 31302 on the M5 and 31303 in the Sonoma VM, with both old
+apps preserved. Both installed CLIs report 31304 after the UI helper update. On the
+M5, the GUI mounted MobileData using ntfs-3g; a 16 MiB file passed write/flush,
+unmount/remount and SHA-256 reread, then was removed only after verification. The
+final GUI unmount leaves no NFS mount. No MobileData formatting was performed.
+
+Sonoma Gatekeeper accepts the installed app. Settings shows Beta 2 (31304), the
+company link is centered, and Diagnose retains the 320-point error-panel width
+and normal Quit button. Preparation and unavailable inventory remain accurately
+qualified. The previously acknowledged compatibility notice does not repeat on
+update. Guest JSON reports schema 7, build 31304, Sonoma 14.6.1 and VM true; this
+is not guest filesystem acceptance. The original Command-click export flow was
+already checked on 31303 and is unchanged in this artifact.
+
+Beta 2 ext2/ext3/ext4 tests on the authorized TEST_USB await the owner's admin
+authentication. Publication remains blocked on those available native checks;
+the signed/notarized assets are still an unpublished draft.
