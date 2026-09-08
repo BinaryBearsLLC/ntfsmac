@@ -7,11 +7,6 @@ on:
         description: Semantic version to release, for example 3.0.0
         required: true
         type: string
-      include_legacy:
-        description: Also build and publish the Legacy SMJobBless compatibility DMG
-        required: true
-        default: true
-        type: boolean
 
 permissions:
   contents: read
@@ -30,7 +25,6 @@ jobs:
     env:
       NOTARY_PROFILE: ntfsmac-notary-${{ github.run_id }}
       RELEASE_VERSION: ${{ inputs.version }}
-      INCLUDE_LEGACY: ${{ inputs.include_legacy }}
 
     steps:
       - name: Check out the repository
@@ -210,10 +204,6 @@ jobs:
           set -euo pipefail
           dmg_path="dist/ntfsmac-${RELEASE_VERSION}-Apple-Silicon.dmg"
           assets=("$dmg_path" "${dmg_path}.sha256")
-          if [[ "$INCLUDE_LEGACY" == "true" ]]; then
-            legacy_dmg_path="dist/ntfsmac-${RELEASE_VERSION}-Legacy-Apple-Silicon.dmg"
-            assets+=("$legacy_dmg_path" "${legacy_dmg_path}.sha256")
-          fi
           gh release create "$RELEASE_TAG" \
             "${assets[@]}" \
             --draft \

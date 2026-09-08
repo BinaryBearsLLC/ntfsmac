@@ -2,21 +2,21 @@
 # Build, Developer ID sign, notarize, staple, and verify an official release candidate.
 set -euo pipefail
 
+# Reject obsolete automation before reading credentials or starting any build.
+case "${INCLUDE_LEGACY:-0}" in
+  0 | false | FALSE | no | NO) ;;
+  *)
+    echo "notarize-release: HARD-STOP — 3.1.3 is Standard only; Legacy releases are deprecated" >&2
+    exit 1
+    ;;
+esac
+
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:?Set SIGNING_IDENTITY to the BinaryBears Developer ID Application identity}"
 SIGNING_KEYCHAIN="${SIGNING_KEYCHAIN:-}"
 NOTARY_PROFILE="${NOTARY_PROFILE:?Set NOTARY_PROFILE to a notarytool Keychain profile}"
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$REPO_ROOT/gui/Info.plist")"
-INCLUDE_LEGACY_RAW="${INCLUDE_LEGACY:-1}"
-case "$INCLUDE_LEGACY_RAW" in
-  1 | true | TRUE | yes | YES) INCLUDE_LEGACY_BUILD=1 ;;
-  0 | false | FALSE | no | NO) INCLUDE_LEGACY_BUILD=0 ;;
-  *)
-    echo "notarize-release: HARD-STOP — INCLUDE_LEGACY must be true/false or 1/0" >&2
-    exit 1
-    ;;
-esac
 
 [[ "$SIGNING_IDENTITY" == "Developer ID Application: BinaryBears LLC (SQY8T23X8N)" ]] || {
   echo "notarize-release: HARD-STOP — unexpected signing identity: $SIGNING_IDENTITY" >&2
@@ -73,15 +73,6 @@ trap 'rm -rf "$NOTARY_TEMP_DIR"' EXIT
 
 MODERN_APP="$REPO_ROOT/dist/ntfsmac.app"
 MODERN_DMG="$REPO_ROOT/dist/ntfsmac-${VERSION}-Apple-Silicon.dmg"
-LEGACY_APP="$REPO_ROOT/dist/ntfsmac-legacy.app"
-LEGACY_DMG="$REPO_ROOT/dist/ntfsmac-${VERSION}-Legacy-Apple-Silicon.dmg"
 build_notarized_variant modern "$MODERN_APP" "$MODERN_DMG" "ntfsmac Installer"
-
-if [[ "$INCLUDE_LEGACY_BUILD" -eq 1 ]]; then
-  build_notarized_variant legacy "$LEGACY_APP" "$LEGACY_DMG" "ntfsmac Legacy Installer"
-  echo "notarize-release: complete — $MODERN_DMG and $LEGACY_DMG"
-else
-  rm -rf -- "$LEGACY_APP"
-  rm -f -- "$LEGACY_DMG" "${LEGACY_DMG}.sha256"
-  echo "notarize-release: complete — $MODERN_DMG (Legacy disabled)"
-fi
+# Historical local artifacts are preserved, but never selected for publication.
+echo "notarize-release: complete — $MODERN_DMG (Standard only)"

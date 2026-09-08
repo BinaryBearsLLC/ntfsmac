@@ -50,6 +50,39 @@ Private logs: `/tmp/ntfsmac-sonoma-rootfs-build.log`,
 `/tmp/ntfsmac-sonoma-swift.log`, `/tmp/ntfsmac-sonoma-bats.log`.
 The signed-run retest is `/tmp/ntfsmac-sonoma-rootfs-signed.log`.
 
+## Standard-only packaging follow-up
+
+The local builder and official release orchestration now select only Standard.
+Obsolete `INCLUDE_LEGACY=true` requests fail before credential access; old local
+Legacy artifacts are preserved but excluded from release assets. Legacy source
+and helper-migration tests remain. README, contributor, release, and testing
+instructions describe this distinction.
+
+Twelve focused builder/release tests pass, including a mocked orchestration run
+that verifies one Standard packaging call, app/DMG notarization call selection,
+and preservation of historical artifacts. This is **not** a real notarization run.
+Repository shell scripts pass ShellCheck at warning severity; `git diff --check`
+passes.
+
+The real ad-hoc candidate was wrapped in
+`dist/ntfsmac-3.1.3-sonoma-local-Apple-Silicon.dmg`. `verify-release.sh` passes:
+app/helper identity, arm64 architecture, nested signatures and entitlements,
+DMG mount/content/layout metadata, and checksum sidecar. Gatekeeper/notarization
+were deliberately not claimed (`REQUIRE_NOTARIZATION=0`). No physical-host app
+replacement or USB write occurred in this packaging follow-up.
+
+The release verifier additionally checks the macOS 14 manifest and Mach-O floor
+for GUI, helper, and host runtime, both in the input app and the actual app mounted
+from the DMG. Two negative tests reject a 26.0 manifest and a real GUI fixture
+compiled for 26.0 before signing checks. The real local DMG passes this strengthened
+verification; this still proves packaging metadata, not execution on Sonoma.
+
+Private packaging logs: `/tmp/ntfsmac-313-standard-only-dmg.log` and
+`/tmp/ntfsmac-313-standard-only-verify.log`. A new complete shell run was started
+in `/tmp/ntfsmac-313-standard-only-bats.log`; its result is pending. One focused
+test was added while that run was active, so a final stable-tree run remains
+required before calling the complete source gate clean.
+
 ## Newer-system behavior retained
 
 The pinned anylinuxfs source still selects privileged vmnet below macOS 26,

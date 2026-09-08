@@ -54,6 +54,19 @@ Release-candidate evidence is recorded in
 
 ## Next work
 
+### v3.1.3 candidate — `Update/3.1.3`
+
+- Target macOS 14+ on Apple Silicon, with newer-OS runtime optimizations retained.
+- Ship Standard only; deprecate the Legacy installer while testing migration from it.
+- Preserve the `dev` fixes and the separate `3.1.2` rollback branch.
+- Validate and lock dependency updates individually, including ntfs-3g 2026.7.7
+  and the Alpine package graph.
+- Reject filesystem guesses based only on partition type when multiple drives are connected.
+
+This candidate is not yet qualified for release. Build-target checks, current-host tests,
+Sonoma guest execution, physical-drive acceptance, and notarization are separate gates;
+see the [Sonoma validation record](testing/SONOMA_LOCAL_VALIDATION_2026-09-08.md).
+
 - Extend hardware/OS coverage when the required devices and controlled playback fixtures exist.
 - Review new `anylinuxfs` versions through the pinned-source audit; never bulk-merge upstream.
 - Add convenience features only when they preserve privacy, truthful state, and the compact

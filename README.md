@@ -61,9 +61,9 @@ cd ntfsmac
 ./build.command
 ```
 
-GUI builds automatically create the standard `ntfsmac-X.Y.Z-Apple-Silicon.dmg` and the
-`ntfsmac-X.Y.Z-Legacy-Apple-Silicon.dmg` compatibility alternative. Pass `--no-legacy` after
-`gui` or `both` only when the Legacy artifact is deliberately not needed. When the exact
+The 3.1.3 source line creates only `ntfsmac-X.Y.Z-Apple-Silicon.dmg` (Standard).
+The Legacy installer is deprecated; `3.1.2` preserves the earlier source line.
+`--no-legacy` remains accepted as a compatibility no-op. When the exact
 BinaryBears Developer ID Application identity is installed, the builder selects it automatically
 and produces a locally installable standard helper; otherwise it clearly marks the result as an
 ad-hoc UI/structure build whose helper macOS cannot register. `SIGNING_IDENTITY=-` deliberately
@@ -120,11 +120,11 @@ addresses, DNS servers, route tables, and VPN provider details.
   evidence. ntfsmac never offers a forced read/write override for an unsafe volume.
 - Quit protects mounted drives with **Unmount and Quit**, **Quit Anyway**, and **Cancel**. Only the
   safe unmount action can be remembered.
-- Standard and Legacy builds share the same reviewed mount/runtime path. The standard helper is
-  verified before any working Legacy helper is removed.
+- During migration, the Standard helper is verified before any working Legacy helper
+  is removed. Legacy installation is no longer offered by the 3.1.3 distribution.
 - Drive-runtime failures have their own retry state and are never presented as Full Disk Access or
   “no drive connected”.
-- Both DMGs use the approved BinaryBears artwork and preserve the visible app name **ntfsmac**.
+- The Standard DMG uses the approved BinaryBears artwork and preserves the visible app name **ntfsmac**.
 
 ## How it works
 

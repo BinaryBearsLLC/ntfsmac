@@ -16,7 +16,8 @@ git diff --check
 
 The shell suite builds and verifies the vendored runtime, helper packaging, security transaction,
 CLI behavior, release wiring, and regression tests. Both Swift variants must compile and complete a
-non-empty test run.
+non-empty test run. Legacy source tests protect migration and historical behavior;
+they do not produce a supported 3.1.3 Legacy installer.
 
 On macOS 26.6.2 the wrapper skips only `PopoverStateRenderTests` because of a known AppKit runner
 hang. Run any changed render path directly with `swift test --filter <test-name>` and record it
@@ -34,20 +35,21 @@ The release must prove all related layers:
    verified and staged the bundled CLI, even when an older executable is already installed.
 4. Runtime failure has a dedicated retry view, while no media shows normal idle UI and neutral
    permission diagnostics.
-5. A clean app copied to `/Applications` passes the same flow in both Standard and Legacy builds.
+5. A clean Standard app copied to `/Applications` passes the same flow, including when
+   replacing an older Legacy installation.
 
 Coverage lives in `runtime-config-isolation.bats`, `DriveScannerTests`, `FDAPromptCopyTests`,
 `DiagnoseRunnerTests`, and `PopoverStateRenderTests`.
 
 ## Local package gate
 
-`./build.command gui` builds Standard and Legacy DMGs. For a release candidate, use the official
+`./build.command gui` builds only the Standard DMG. For a release candidate, use the official
 BinaryBears Developer ID identity and verify:
 
 - app and both helper versions match;
 - host binaries are arm64 and the guest runtime is aarch64 Linux;
 - nested signatures and helper identities match the selected variant;
-- both DMGs contain `ntfsmac.app`, the Applications symlink, and approved artwork;
+- the DMG contains `ntfsmac.app`, the Applications symlink, and approved artwork;
 - checksums verify and the mounted Finder layout is visually correct.
 
 Official notarization uses `build/notarize-release.sh` through the release workflow. The downloaded
@@ -67,8 +69,13 @@ For Standard, test:
 4. Diagnose, safe Quit, update check, and complete uninstall;
 5. migration from an installed Legacy helper when applicable.
 
-For Legacy, repeat clean install, Full Disk Access, mount/write/reread/unmount, and uninstall.
+Repeat the Standard matrix after migration from an installed 3.1.2 Legacy helper.
 Confirm no mount, helper process, security session, or test file remains afterward.
+
+The 3.1.3 target is macOS 14+, Apple Silicon only. Run the driver matrix separately on
+Sonoma and a current OS. Check every bundled host executable's minimum OS and then
+execute the actual packaged runtime: a cross-build or VM desktop alone is not enough.
+Newer-OS optimizations must remain gated and be exercised on their eligible OS.
 
 ## Safety-specific checks
 

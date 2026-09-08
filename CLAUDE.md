@@ -25,8 +25,8 @@ recipe. Match what's already built; don't re-design.
   releases are Developer ID signed and Apple-notarized by the dedicated release path; credentials
   stay in Keychain or GitHub encrypted secrets and never enter Git.
 - **Every control that mounts/unmounts/touches pf/route goes through a reviewed XPC helper** — the
-  standard macOS 13+ artifact uses SMAppService and the explicitly labelled Legacy artifact uses
-  SMJobBless. Both compile the same reviewed XPC implementation. Never add a raw `sudo` shell-out
+  3.1.3 Standard macOS 14+ artifact uses SMAppService. Legacy SMJobBless source is retained for
+  migration/regression testing, not 3.1.3 distribution. Both compile the same reviewed XPC implementation. Never add a raw `sudo` shell-out
   from Swift UI code.
 - **Device names validated against `^disk[0-9]+s[0-9]+$`** before any shell invocation, in both CLI and GUI/helper.
 - **Platform:** Apple Silicon only. Don't add Intel fallback paths.
@@ -65,7 +65,7 @@ Branch roles in the BinaryBears fork:
 - `main` mirrors `upstream/main`; do not land BinaryBears-only roadmap or branding there.
 - `dev` is the long-lived BinaryBears integration branch: current upstream plus the fork roadmap
   and fork-only product work. After blocker validation it is also the canonical source for the
-  BinaryBears GitHub release, rebranding, site, and dual compatibility/P2 artifact pipeline.
+  BinaryBears GitHub release, rebranding, site, and Standard-only artifact pipeline.
 - BinaryBears feature/fix branches start from `dev` and target `dev` through focused PRs.
 - A candidate intended for the original project starts independently from current
   `upstream/main`, contains no BinaryBears-only documentation, and is submitted upstream only

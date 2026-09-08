@@ -4,6 +4,8 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
+# shellcheck source=build/lib/macos-target.sh
+source "$SCRIPT_DIR/lib/macos-target.sh"
 APP="${NTFSMAC_APP_BUNDLE:-$REPO_ROOT/dist/ntfsmac.app}"
 VERSION="${RELEASE_VERSION:-$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$REPO_ROOT/gui/Info.plist")}"
 DMG="${NTFSMAC_DMG_OUT:-$REPO_ROOT/dist/ntfsmac-${VERSION}-Apple-Silicon.dmg}"
@@ -40,6 +42,8 @@ verify_app() {
     fail "visible app name is not ntfsmac"
   [[ "$(plist_value "$APP/Contents/Info.plist" CFBundleShortVersionString)" == "$VERSION" ]] ||
     fail "app version does not match $VERSION"
+  [[ "$(plist_value "$APP/Contents/Info.plist" LSMinimumSystemVersion)" == "14.0" ]] ||
+    fail "app must declare the macOS 14.0 floor"
 
   [[ "$(plist_value "$APP/Contents/Info.plist" NTFSMACHelperVariant)" == "$HELPER_VARIANT" ]] ||
     fail "app helper variant does not match $HELPER_VARIANT"
@@ -65,6 +69,10 @@ verify_app() {
   [[ -f "$helper" ]] || fail "BinaryBears helper is missing"
   require_arm64_only "$app_bin"
   require_arm64_only "$helper"
+  macos_target_verify_binary "$app_bin" || fail "GUI exceeds the macOS 14 floor"
+  macos_target_verify_binary "$helper" || fail "helper exceeds the macOS 14 floor"
+  macos_target_verify_runtime "$APP/Contents/Resources/cli-src/vendor/bin" ||
+    fail "bundled runtime exceeds the macOS 14 floor"
 
   codesign --verify --deep --strict --verbose=2 "$APP" || fail "app signature verification failed"
   local app_info helper_info
@@ -128,6 +136,10 @@ verify_dmg() {
     fail "DMG contains the wrong app bundle"
   [[ "$(plist_value "$mount_dir/ntfsmac.app/Contents/Info.plist" NTFSMACHelperVariant)" == "$HELPER_VARIANT" ]] ||
     fail "DMG contains the wrong helper variant"
+  # Validate the delivered copy, not only the separate app used as packaging input.
+  # Bash dynamic scope keeps this path confined to the mounted-image check.
+  local APP="$mount_dir/ntfsmac.app"
+  verify_app
   hdiutil detach "$mount_dir" -quiet
   rmdir "$mount_dir"
   trap - EXIT

@@ -5,12 +5,12 @@ setup() {
   SCRIPT="$REPO_ROOT/build.command"
 }
 
-@test "builder documents automatic standard and Legacy GUI outputs" {
+@test "builder documents Standard-only macOS 14 GUI output" {
   run "$SCRIPT" --help
   [ "$status" -eq 0 ]
-  [[ "$output" == *"standard and Legacy"* ]]
+  [[ "$output" == *"macOS 14+"* ]]
   [[ "$output" == *"--no-legacy"* ]]
-  [[ "$output" == *"automatically produces both"* ]]
+  [[ "$output" == *"Standard only"* ]]
 }
 
 @test "builder rejects an unknown second option before running build tools" {
@@ -25,15 +25,13 @@ setup() {
   [[ "$output" == *"Too many arguments"* ]]
 }
 
-@test "builder wires isolated modern and Legacy variants and the opt-out gate" {
+@test "builder wires only the modern production variant" {
   run grep -F 'NTFSMAC_HELPER_VARIANT=modern' "$SCRIPT"
   [ "$status" -eq 0 ]
   run grep -F 'NTFSMAC_HELPER_VARIANT=legacy' "$SCRIPT"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
   run grep -F 'LEGACY_ENABLED' "$SCRIPT"
-  [ "$status" -eq 0 ]
-  run grep -F 'An explicit opt-out must not leave a prior Legacy build' "$SCRIPT"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
   run grep -F 'helperSwiftSettings' "$REPO_ROOT/Package.swift"
   [ "$status" -eq 0 ]
 }
@@ -42,11 +40,11 @@ setup() {
   run grep -F 'write-sha256.sh" "$modern_dmg"' "$SCRIPT"
   [ "$status" -eq 0 ]
   run grep -F 'write-sha256.sh" "$legacy_dmg"' "$SCRIPT"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
   run grep -F 'ntfsmac-${version}-Apple-Silicon.dmg.sha256' "$SCRIPT"
   [ "$status" -eq 0 ]
   run grep -F 'ntfsmac-${version}-Legacy-Apple-Silicon.dmg.sha256' "$SCRIPT"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
 }
 
 @test "builder auto-selects only the official BinaryBears identity for a usable local standard DMG" {
