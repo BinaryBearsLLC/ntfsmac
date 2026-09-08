@@ -2,7 +2,7 @@
 
 ## Scope and provenance
 
-Local branch `codex/fix-mixed-filesystem-detection` starts at dependency-refresh checkpoint
+Local branch `Update/3.1.3` starts at dependency-refresh checkpoint
 `a7066b8`, in the existing isolated worktree. It includes `dev` commit `b0ff6cd` (3.1.2,
 including the separately developed issue #24 fixes). `dev` itself is unchanged. The product
 version remains 3.1.2; local test build **31208** identifies the new app and both helpers.
@@ -95,7 +95,10 @@ The new GUI shows **one** NTFS drive (MobileData) with both exFAT controls still
 | TEST_USB / HFS+ GPT | Correctly excluded | PASS, 16 MiB through macOS native mount |
 | TEST_USB / APFS GPT | Correctly excluded | PASS, 16 MiB through macOS native mount |
 | Retroid_SD / exFAT MBR | Correctly excluded | Not written; observation-only control |
-| TEST_USB / NTFS, ext2, ext3, ext4 | Pending privileged format matrix | Pending |
+| TEST_USB / new NTFS format | Guest formatter failed at device sync | Not passed |
+| TEST_USB / ext2 | PASS | PASS, 16 MiB through updated CLI/NFS, remount/hash/cleanup |
+| TEST_USB / ext3 | PASS | PASS, 16 MiB through updated CLI/NFS, remount/hash/cleanup |
+| TEST_USB / ext4 | PASS | PASS, 16 MiB through updated CLI/NFS, remount/hash/cleanup |
 | Legacy app hardware mount/write | Pending | Pending |
 
 The MobileData test used the actual newly installed Standard app and reviewed XPC helper, not the
@@ -110,7 +113,18 @@ custom mount directory. The harness was corrected to use automatic mount-point s
 failed attempt is not counted as a hardware pass; the subsequent GUI test above completed.
 The first TEST_USB privileged matrix attempt stopped after unmount because macOS `gpt` has no
 `change` subcommand. No format occurred in that attempt. The harness now uses the existing
-Microsoft partition type for NTFS and guarded exact-range `remove`/`add` for the Linux type.
+Microsoft partition type for NTFS. Its next NTFS attempt reached `mkntfs` but failed with
+`Failed to sync device /dev/vda: I/O error`; no success is claimed for that new filesystem.
+The following `gpt remove` Linux preparation was rejected by macOS before formatting. The normal
+`diskutil partitionDisk` service then successfully created the Linux partition on the authorized
+TEST_USB (and its system-generated Apple_Boot companion). Fresh geometry/identity guards were
+updated before using native mke2fs. No protection or sync guarantee was disabled to force a pass.
+All three ext matrix modes subsequently completed successfully, with healthy diagnostics and
+zero NFS mounts/security sessions at completion. A separate 1 GiB NTFS image was then created
+successfully with the pinned guest `mkntfs`, including sync; `ntfsinfo` reported clean volume
+flags. TEST_USB was repartitioned for a 1 GiB image-copy/physical-mount test, with the remainder
+left free. Physical copy and acceptance remain pending. This does not erase the direct-raw
+formatting failure from the evidence.
 
 Raw temporary logs remain local (`/tmp/ntfsmac-mixed-*`, `/tmp/ntfsmac-test-usb-*`, and
 `/tmp/ntfsmac-hardware-*`). Do not publish them without privacy review. The temporary e2fsprogs
@@ -126,3 +140,44 @@ tests are not covered by the 16 MiB acceptance above. No push, hosted CI run, re
 comment or other remote publication was performed by this work.
 The first local commit attempt was blocked by the locked SSH signing key; signing was not
 disabled and Git configuration was not changed.
+After the owner unlocked the key, commit `50e192e` was created with a verified SSH signature.
+
+## 3.1.3 preparation and compatibility blocker
+
+The owner subsequently requested a single Standard artifact for 3.1.3, with Legacy deprecated.
+The local working branch was renamed `Update/3.1.3`; local branch `3.1.2` preserves the exact
+current `dev` commit `b0ff6cd`. Neither branch has been published and `dev` has not moved.
+Legacy hardware qualification is no longer a gate for a new Legacy artifact, since no such
+artifact is planned. Migration from an existing Legacy installation still needs qualification.
+
+Before claiming macOS 13 compatibility, the deployment targets of every shipped host executable
+must be checked. `vtool -show-build` on the installed build 31208 exposed:
+
+| Executable | Encoded minimum macOS |
+| --- | --- |
+| GUI / privileged helper | 13.0 |
+| anylinuxfs | 11.0 |
+| gvproxy | 13.0 |
+| init-rootfs | **26.0 — blocks the advertised 13+ floor** |
+| vmnet-helper arm64 prebuilt | **14.0 — blocks the advertised 13+ floor** |
+
+These are load-command findings, not execution tests on those older systems. Go 1.27 itself
+supports macOS 13+ ([official requirements](https://go.dev/wiki/MinimumRequirements)); the local
+CGO build and the selected vmnet prebuilt require further compatibility work. Do not patch the
+finished binary's minimum-version metadata to hide the problem. Rebuild with supported targets
+and verify actual API/runtime behavior. Apple Silicon remains the supported architecture; Intel,
+macOS 12 and earlier, and future untested macOS releases are not newly promised.
+
+Publication and integration into `dev` remain gated on tests. Final preparation must update the
+version, Standard-only packaging/release pipeline, README, release/site documentation and the
+small Settings link labelled “Binary Bears LLC” to `https://www.binarybears.com`.
+The small plain Settings link is now implemented in source and the Standard Swift suite passes
+324/324; packaged visual verification is still pending. The installed runtime was not replaced
+during the USB matrix.
+
+Local cleanup must follow verified remote publication, not precede it. At this checkpoint there
+are unpublished source commits, generated apps, raw hardware evidence and build caches. A fresh
+GitHub clone does not yet recover this candidate. Signing private keys, Keychain credentials,
+unpublished logs and generated artifacts are not covered by Git source backup. Remove obsolete
+local branch references only after proving their commits are retained in the intended published
+version branches; never delete the active worktree or signing material as routine cleanup.

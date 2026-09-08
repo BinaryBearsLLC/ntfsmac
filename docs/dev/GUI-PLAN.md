@@ -95,6 +95,7 @@ Settings contains:
 - notification opt-in;
 - helper repair/reinstall;
 - complete uninstall with in-popover confirmation.
+- a small, plain “Binary Bears LLC” website link below Uninstall, matching the version text style.
 
 Back and the update action use balanced header geometry. Pointer interaction must not leave a stale
 keyboard-focus halo; deliberate keyboard traversal remains visible and accessible.

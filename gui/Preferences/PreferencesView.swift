@@ -313,6 +313,13 @@ public struct PreferencesView: View {
             if uninstallConfirmation.isVisible {
                 inlineUninstallConfirmation
             }
+
+            Link("Binary Bears LLC", destination: URL(string: "https://www.binarybears.com")!)
+                .font(.system(size: 9, weight: .regular))
+                .foregroundStyle(.secondary.opacity(0.72))
+                .buttonStyle(.plain)
+                .padding(.top, 4)
+                .help("Visit www.binarybears.com")
         }
         .padding(16)
         .frame(width: 320)
