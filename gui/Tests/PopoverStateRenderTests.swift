@@ -359,7 +359,7 @@ private func renderPopover(
         fullDiskAccessController: FullDiskAccessController(initialState: .waitingForDrive)
     )
 
-    #expect(size?.width == 300, "drive-discovery failure must use its dedicated runtime card")
+    #expect(size?.width == 320, "runtime errors must retain the normal popover width when Diagnose opens")
     #expect(size != nil, "drive-discovery failure must render without falling into the permission flow")
 }
 

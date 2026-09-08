@@ -321,6 +321,8 @@ public struct PopoverContentView: View {
                         diagnosticPanel.padding(12)
                     }
                 }
+                .frame(width: 320)
+                .fixedSize(horizontal: false, vertical: true)
             } else if FullDiskAccessPresentationPolicy.shouldPresentSetup(
                 state: fullDiskAccessController.state,
                 deviceID: driveScanner.drives.first?.identifier
