@@ -3,6 +3,27 @@
 Candidate: 3.1.3 (31302), Standard, `Update/3.1.3`. This is local qualification, not a
 published release or a claim of complete macOS 14+ coverage.
 
+## Beta 1 source checkpoint (build 31303)
+
+The beta preparation adds explicit channel metadata, stable/beta download routing,
+same-version beta-to-stable update detection, and the normal Diagnose footer in
+the runtime-error view. The numeric Apple version remains 3.1.3; public tag metadata
+is `3.1.3-beta.1` and Settings displays `Beta 1`.
+
+- Full Bats suite: 400/400, exit 0. Final local-builder/channel follow-up: 15/15.
+- Standard and Legacy Swift runs: 331 executed tests each, exit 0. The named
+  macOS 26.6.2 rendering exclusion remains; it is not a rendering pass.
+- Website channel tests, JavaScript syntax, shell lint, Markdown file links and
+  whitespace checks pass. Browser inspection confirms stable v3.1.2 and no beta
+  download while no public prerelease exists.
+- One helper test containing only a constant-true assertion was removed; behavioral
+  exit-sink tests remain. No mount/security regression test was removed.
+
+These are source checks, not final beta installer or physical-filesystem acceptance.
+The 31302 installed results below must not be relabelled as build 31303 results.
+Local logs: `/tmp/ntfsmac-beta1-all-bats.log`, `/tmp/ntfsmac-beta1-channel-final.log`,
+`/tmp/ntfsmac-beta1-modern-final.log`, `/tmp/ntfsmac-beta1-legacy-final.log`.
+
 ## Automated and packaging checks
 
 - Complete shell suite: **397/397**, exit 0, across 49 Bats files.
