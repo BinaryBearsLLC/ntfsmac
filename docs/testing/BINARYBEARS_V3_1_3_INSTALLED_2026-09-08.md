@@ -256,6 +256,13 @@ update. Guest JSON reports schema 7, build 31304, Sonoma 14.6.1 and VM true; thi
 is not guest filesystem acceptance. The original Command-click export flow was
 already checked on 31303 and is unchanged in this artifact.
 
-Beta 2 ext2/ext3/ext4 tests on the authorized TEST_USB await the owner's admin
-authentication. Publication remains blocked on those available native checks;
-the signed/notarized assets are still an unpublished draft.
+The owner executed the guarded Beta 2 ext2/ext3/ext4 matrix on TEST_USB. Each
+filesystem separately passes 16 MiB write/flush, unmount/remount, SHA-256 reread
+and cleanup with installed runtime 31304. Diagnostics during each mount report
+the locked packages, ext driver and enforced private-link/PF protection. Final
+diagnostics report zero NFS mounts, zero active security sessions and bridge down;
+the host mount table independently confirms no NFS mounts remain. TEST_USB is
+left as a 1 GiB ext4 partition with the remaining space free. MobileData was not
+formatted. The GUI simultaneously identifies MobileData as NTFS and the Linux
+partition as EXT, not NTFS. These checks satisfy the available native beta gate;
+Sonoma native read/write and other hardware remain outside this evidence.
