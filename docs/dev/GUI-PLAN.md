@@ -110,6 +110,9 @@ keyboard-focus halo; deliberate keyboard traversal remains visible and accessibl
 ## Truth and safety rules
 
 - Accept only partition identifiers matching `diskNsN`.
+- `Windows_NTFS` and `Microsoft Basic Data` describe partition families, not proof of NTFS.
+  Require a filesystem probe or macOS `FilesystemType` for the same device identifier. If that
+  evidence is unavailable, keep the filesystem unknown; never borrow another drive's type.
 - Default to `ntfs-3g`; NTFS3 remains explicit and experimental.
 - Refuse unsafe writable NTFS when Windows Fast Startup, hibernation, or dirty state is indicated.
 - Attribute a read-only mount to Windows only from explicit backend evidence; otherwise show its

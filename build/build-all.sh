@@ -26,6 +26,8 @@ source "$SCRIPT_DIR/lib/cargo-lock-overlay.sh"
 source "$REPO_ROOT/cli/lib/runtime-alpine.sh"
 # shellcheck source=lib/patch-runtime-alpine.sh
 source "$SCRIPT_DIR/lib/patch-runtime-alpine.sh"
+# shellcheck source=lib/patch-filesystem-detection.sh
+source "$SCRIPT_DIR/lib/patch-filesystem-detection.sh"
 
 # Same space-free-outside-repo fix as init-rootfs.sh — see build/AUDIT.md.
 CACHE_DIR="${NTFSMAC_ANYLINUXFS_CACHE_DIR:-${TMPDIR:-/tmp}/ntfsmac-build/anylinuxfs-build}"
@@ -66,6 +68,7 @@ prepare_build_copy() {
 
   runtime_alpine_load || return 1
   patch_anylinuxfs_runtime_alpine "$CACHE_DIR" || return 1
+  patch_anylinuxfs_filesystem_detection "$CACHE_DIR" || return 1
   patch_vmproxy_mount_tmpfs
   patch_vmproxy_ntfs3_read_write_preflight
   patch_anylinuxfs_vmproxy_cache_ownership

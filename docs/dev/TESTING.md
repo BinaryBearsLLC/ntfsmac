@@ -72,6 +72,12 @@ Confirm no mount, helper process, security session, or test file remains afterwa
 
 ## Safety-specific checks
 
+- Connect NTFS and exFAT simultaneously, including MBR `Windows_NTFS` and GPT Microsoft Basic
+  Data partitions. Only confirmed NTFS belongs in the NTFS list. Repeat after reformatting the
+  explicitly authorized disposable device; never infer a filesystem from a partition type or
+  reuse a different device's metadata. Unknown metadata must not enable an NTFS mount action.
+- Formatting tests require an explicitly named expendable device and a fresh physical-device
+  identity check before each erase. Keep other attached disks outside the write/format targets.
 - Dirty, hibernated, or Fast-Startup NTFS must refuse unsafe writable mounting and direct recovery
   to Windows; never offer a silent override.
 - Hot-unplug, external unmount, and unavailable backend state must converge without a false green

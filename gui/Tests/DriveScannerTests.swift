@@ -101,13 +101,8 @@ private let sampleExtOutput = """
     #expect(drives.allSatisfy { $0.fsType != "btrfs" })
 }
 
-@Test func parsesNtfsWithRealMultiWordMicrosoftBasicDataTypeColumn() {
-    // Real anylinuxfs list output for NTFS: blkid fs_type is empty in this build, so
-    // darwin::augment_line falls back to the raw GPT type name "Microsoft Basic Data" for the
-    // TYPE column (vendor/.../diskutil/darwin.rs: fs_type.unwrap_or(part_type)). A single-token
-    // fstype capture grabs only "Microsoft" and the allow-set rejects the row — the regression
-    // that dropped NTFS after commit 1be5bf2 removed --microsoft. The filter must match the
-    // "Microsoft Basic Data" prefix, exactly what the server's --microsoft filter keys on.
+@Test func rejectsUnresolvedMicrosoftBasicDataPartitionType() {
+    // GPT basic data also hosts exFAT: partition metadata alone cannot establish NTFS.
     let realNtfsOutput = """
     /dev/disk4 (external, physical):
        #:                       TYPE NAME                    SIZE       IDENTIFIER
@@ -115,14 +110,11 @@ private let sampleExtOutput = """
        4:       Microsoft Basic Data Media                   224.2 GB   disk4s4
     """
     let drives = DriveListParser.parse(realNtfsOutput)
-    #expect(drives.count == 1)
-    #expect(drives[0].identifier == "disk4s4")
+    #expect(drives.isEmpty)
 }
 
-@Test func parsesUnlabeledNtfsWithRealMbrWindowsNtfsTypeColumn() {
-    // Captured from a real 248 GB external MBR disk. With no blkid fstype/volume label,
-    // anylinuxfs preserves diskutil's "Windows_NTFS" partition type. Treating the first token
-    // as an allow-listed fstype used to drop this row entirely from the GUI.
+@Test func rejectsUnresolvedUnlabeledWindowsNtfsPartitionType() {
+    // MBR 0x07 is shared by NTFS and exFAT even though diskutil calls it Windows_NTFS.
     let realMbrNtfsOutput = """
     /dev/disk4 (external, physical):
        #:                       TYPE NAME                    SIZE       IDENTIFIER
@@ -130,12 +122,11 @@ private let sampleExtOutput = """
        1:               Windows_NTFS                         248.0 GB   disk4s1
     """
     let drives = DriveListParser.parse(realMbrNtfsOutput)
-    #expect(drives == [Drive(identifier: "disk4s1", fsType: "ntfs", label: "", size: "248.0 GB")])
+    #expect(drives.isEmpty)
 }
 
-@Test func parsesLabeledNtfsWithRealMbrWindowsNtfsTypeColumn() {
-    // Captured from a second real MBR USB stick. Text after the partition-type prefix is the
-    // volume label and must remain visible to the picker.
+@Test func rejectsUnresolvedLabeledWindowsNtfsPartitionType() {
+    // A label does not turn an ambiguous partition type into filesystem evidence.
     let realMbrNtfsOutput = """
     /dev/disk5 (external, physical):
        #:                       TYPE NAME                    SIZE       IDENTIFIER
@@ -143,7 +134,22 @@ private let sampleExtOutput = """
        1:               Windows_NTFS USB_8GB                 8.1 GB     disk5s1
     """
     let drives = DriveListParser.parse(realMbrNtfsOutput)
-    #expect(drives == [Drive(identifier: "disk5s1", fsType: "ntfs", label: "USB_8GB", size: "8.1 GB")])
+    #expect(drives.isEmpty)
+}
+
+@Test func mixedDevicesUseOnlyTheirOwnConfirmedFilesystem() {
+    let output = """
+       1:                        ntfs MobileData             123.0 GB   disk4s1
+       1:                       exfat Retroid_SD              62.5 GB   disk5s1
+       1:               Windows_NTFS TEST_USB               123.0 GB   disk6s1
+       1:                     Unknown UnknownVolume           32.0 GB   disk7s1
+    """
+    #expect(DriveListParser.parse(output) == [
+        Drive(identifier: "disk4s1", fsType: "ntfs", label: "MobileData", size: "123.0 GB")
+    ])
+    let reformatted = output.replacingOccurrences(of: "exfat Retroid_SD", with: "ntfs Retroid_SD")
+    #expect(DriveListParser.parse(reformatted).map(\.identifier) == ["disk4s1", "disk5s1"])
+    #expect(DriveListParser.parse(output).map(\.identifier) == ["disk4s1"])
 }
 
 @Test func parsesExtWithRealLinuxFilesystemTypeColumn() {

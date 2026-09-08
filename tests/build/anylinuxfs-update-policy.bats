@@ -11,6 +11,8 @@ setup() {
     "$FIXTURE/etc" "$FIXTURE/share/alpine"
   cp "$REPO_ROOT/vendor/src/anylinuxfs/anylinuxfs/src/settings.rs" "$FIXTURE/anylinuxfs/src/settings.rs"
   cp "$REPO_ROOT/vendor/src/anylinuxfs/anylinuxfs/src/vm_image.rs" "$FIXTURE/anylinuxfs/src/vm_image.rs"
+  mkdir -p "$FIXTURE/anylinuxfs/src/diskutil"
+  cp "$REPO_ROOT/vendor/src/anylinuxfs/anylinuxfs/src/diskutil/darwin.rs" "$FIXTURE/anylinuxfs/src/diskutil/darwin.rs"
   cp "$REPO_ROOT/vendor/src/anylinuxfs/anylinuxfs/Cargo.toml" "$FIXTURE/anylinuxfs/Cargo.toml"
   cp "$REPO_ROOT/vendor/src/anylinuxfs/vmproxy/Cargo.toml" "$FIXTURE/vmproxy/Cargo.toml"
   cp "$REPO_ROOT/vendor/src/anylinuxfs/init-rootfs/main.go" "$FIXTURE/init-rootfs/main.go"
@@ -58,6 +60,23 @@ setup() {
 
   [ "$status" -ne 0 ]
   [[ "$output" == *"fetch origin explicitly"* ]]
+}
+
+@test "candidate audit rejects filesystem fallback drift without modifying the pin" {
+  git -C "$FIXTURE" checkout -q --detach "$CANDIDATE_COMMIT"
+  sed -i.bak 's/None => line.to_owned(),/None => String::new(),/' "$FIXTURE/anylinuxfs/src/diskutil/darwin.rs"
+  rm "$FIXTURE/anylinuxfs/src/diskutil/darwin.rs.bak"
+  git -C "$FIXTURE" add anylinuxfs/src/diskutil/darwin.rs
+  git -C "$FIXTURE" commit -qm "change filesystem fallback"
+  local drifted
+  drifted="$(git -C "$FIXTURE" rev-parse HEAD)"
+  git -C "$FIXTURE" checkout -q --detach "$PINNED_COMMIT"
+  NTFSMAC_ANYLINUXFS_SOURCE="$FIXTURE" NTFSMAC_SOURCES_LOCK="$LOCK_FIXTURE" \
+    run "$SCRIPT" "$drifted"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"filesystem detection patch no longer applies"* ]]
+  [ "$(git -C "$FIXTURE" rev-parse HEAD)" = "$PINNED_COMMIT" ]
+  [ -z "$(git -C "$FIXTURE" status --porcelain)" ]
 }
 
 @test "policy requires manual dependency build hardware and rollback evidence" {

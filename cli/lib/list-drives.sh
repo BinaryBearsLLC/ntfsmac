@@ -12,16 +12,10 @@
 set -u
 
 # Filesystems ntfsmac mounts: NTFS + BitLocker + ext2/3/4 (kernel auto-detect, no --fs-driver).
-# The real anylinuxfs TYPE column is NOT always a single blkid fstype token: for NTFS, blkid's
-# fs_type can be empty, so darwin::augment_line falls back to the raw partition type name:
-# "Microsoft Basic Data" on GPT and "Windows_NTFS" on MBR. The parser captures the whole
-# TYPE+NAME blob and derives fstype from it — both prefixes are in the server's own
-# WINDOWS_FS_TYPES set, so matching them client-side replicates --microsoft's reliability
-# without a second anylinuxfs call. Note: "Microsoft Basic Data" is the GPT type
-# for ntfs AND exfat; when blkid resolves exfat it surfaces as "exfat" and is dropped by the
-# allow-set, but the rare GPT-fallback case can't distinguish the two (same limitation as the
-# server's --microsoft filter). Keep this array and DriveListParser's allowedFsTypes in sync
-# (same comment in DriveScanner.swift).
+# Windows_NTFS and Microsoft Basic Data are partition types shared by NTFS and exFAT.
+# The patched backend obtains the actual per-device filesystem from blkid or macOS
+# FilesystemType. Unresolved Windows partition-type rows must never be guessed as NTFS.
+# Keep this array and DriveListParser's allowedFsTypes in sync.
 NTFSMAC_ALLOWED_FS_TYPES=(ntfs BitLocker ext ext2 ext3 ext4)
 
 LIST_DRIVES_LIB_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
@@ -71,20 +65,14 @@ list_mountable_drives() {
     if [[ "$line" =~ $drive_re ]]; then
       local blob="${BASH_REMATCH[1]}" size="${BASH_REMATCH[2]}" ident="${BASH_REMATCH[3]}"
       [[ "$ident" =~ ^disk[0-9]+s[0-9]+$ ]] || continue
-      # Derive fstype + label from the TYPE+NAME blob. The GPT type name "Microsoft Basic
-      # Data" covers ntfs AND exfat (both use that GPT type), while "Windows_NTFS" is emitted
-      # for MBR NTFS partitions. exfat is out of scope — when
-      # blkid resolves it, it surfaces as "exfat" and is dropped by NTFSMAC_ALLOWED_FS_TYPES;
-      # the rare GPT-fallback case can't distinguish ntfs from exfat (same limitation as the
-      # server's --microsoft filter). Match it as a prefix — same key the server filter uses,
-      # so NTFS survives even when blkid's fs_type is empty. "BitLocker" is its own GPT type.
-      # Everything else is a blkid single-token fstype (ext2/3/4, sometimes ntfs) + label.
+      # Partition-family names are not filesystem evidence. Reject unresolved Windows
+      # rows even if a stale backend emits them; the exact patched backend reports ntfs/exfat.
       local fstype label
       if [[ "$blob" == "Microsoft Basic Data"* ]]; then
-        fstype="ntfs"
+        fstype="Unknown"
         label="${blob#Microsoft Basic Data}"
       elif [[ "$blob" == "Windows_NTFS"* ]]; then
-        fstype="ntfs"
+        fstype="Unknown"
         label="${blob#Windows_NTFS}"
       elif [[ "$blob" == "BitLocker"* ]]; then
         fstype="BitLocker"

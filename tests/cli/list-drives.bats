@@ -51,13 +51,8 @@ teardown() {
   ! grep -q $'\tbtrfs$' <<<"$output"
 }
 
-@test "list_mountable_drives surfaces NTFS with real multi-word 'Microsoft Basic Data' TYPE column" {
-  # Real anylinuxfs list output for NTFS: blkid fs_type is empty in this build, so
-  # darwin::augment_line falls back to the raw GPT type name "Microsoft Basic Data" for the
-  # TYPE column (vendor/.../diskutil/darwin.rs: fs_type.unwrap_or(part_type)). A single-token
-  # fstype capture grabs only "Microsoft" and the allow-set rejects the row — the regression
-  # that dropped NTFS drives after commit 1be5bf2 removed --microsoft. The filter must match
-  # the "Microsoft Basic Data" prefix, exactly what the server's --microsoft filter keys on.
+@test "list_mountable_drives rejects unresolved Microsoft Basic Data partition type" {
+  # GPT basic data is shared by NTFS and exFAT.
   cat > "$STUB_DIR/anylinuxfs" <<STUB
 #!/bin/bash
 printf '%s\n' '   4:       Microsoft Basic Data Media                   224.2 GB   disk4s4'
@@ -66,12 +61,11 @@ STUB
   chmod +x "$STUB_DIR/anylinuxfs"
   run list_mountable_drives
   [ "$status" -eq 0 ]
-  [[ "$output" == *"disk4s4"* ]]
+  [ -z "$output" ]
 }
 
-@test "list_mountable_drives surfaces unlabeled MBR NTFS with real Windows_NTFS TYPE column" {
-  # Captured from a real 248 GB external MBR disk. Windows_NTFS is the partition type, not an
-  # allow-listed blkid token; it must be normalized to ntfs rather than dropped.
+@test "list_mountable_drives rejects unresolved unlabeled Windows_NTFS partition type" {
+  # MBR 0x07 also hosts exFAT.
   cat > "$STUB_DIR/anylinuxfs" <<STUB
 #!/bin/bash
 printf '%s\n' '   1:               Windows_NTFS                         248.0 GB   disk4s1'
@@ -80,10 +74,10 @@ STUB
   chmod +x "$STUB_DIR/anylinuxfs"
   run list_mountable_drives
   [ "$status" -eq 0 ]
-  [ "$output" = $'disk4s1\t\t248.0 GB\tntfs' ]
+  [ -z "$output" ]
 }
 
-@test "list_mountable_drives preserves label from real MBR Windows_NTFS TYPE column" {
+@test "list_mountable_drives rejects unresolved labeled Windows_NTFS partition type" {
   # Captured from a second real 8.1 GB USB stick.
   cat > "$STUB_DIR/anylinuxfs" <<STUB
 #!/bin/bash
@@ -93,7 +87,21 @@ STUB
   chmod +x "$STUB_DIR/anylinuxfs"
   run list_mountable_drives
   [ "$status" -eq 0 ]
-  [ "$output" = $'disk5s1\tUSB_8GB\t8.1 GB\tntfs' ]
+  [ -z "$output" ]
+}
+
+@test "mixed devices retain only independently confirmed NTFS and exclude exFAT and unknown" {
+  cat > "$STUB_DIR/anylinuxfs" <<'STUB'
+#!/bin/bash
+printf '%s\n' \
+ '   1:                        ntfs MobileData              123.0 GB   disk4s1' \
+ '   1:                       exfat Retroid_SD               62.5 GB   disk5s1' \
+ '   1:               Windows_NTFS TEST_USB                123.0 GB   disk6s1' \
+ '   1:                     Unknown UnknownVolume            32.0 GB   disk7s1'
+STUB
+  run list_mountable_drives
+  [ "$status" -eq 0 ]
+  [ "$output" = $'disk4s1\tMobileData\t123.0 GB\tntfs' ]
 }
 
 @test "list_mountable_drives calls anylinuxfs list without --microsoft" {

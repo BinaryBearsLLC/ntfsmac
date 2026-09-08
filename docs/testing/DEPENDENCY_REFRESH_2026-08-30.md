@@ -877,6 +877,10 @@ confirmation that the selected volume is backed up or expendable.
 
 ## Validation categories
 
+Follow-up: [mixed-filesystem fix and authorized hardware tests, build 31208](MIXED_FILESYSTEM_VALIDATION_2026-09-08.md).
+The dated results below remain the historical checkpoint; later media-write and app-install
+evidence is recorded separately in that follow-up.
+
 - Local source/build/tests: checkpoint A passed 350/350 Bats; checkpoints B, C, and D passed
   355/355; checkpoints E and H passed 360/360; checkpoint J passed 362/362. Checkpoints C through
   E, H, J, K, O, P, Q, R, S, and T also passed 307/307 in each Swift variant and mounted-DMG

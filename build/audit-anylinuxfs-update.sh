@@ -43,6 +43,8 @@ source "$REPO_ROOT/build/lib/lock.sh"
 source "$REPO_ROOT/cli/lib/runtime-alpine.sh"
 # shellcheck disable=SC1091
 source "$REPO_ROOT/build/lib/patch-runtime-alpine.sh"
+# shellcheck disable=SC1091
+source "$REPO_ROOT/build/lib/patch-filesystem-detection.sh"
 
 current_pin=$(lock_get ANYLINUXFS_COMMIT) || exit 1
 locked_version=$(lock_get ANYLINUXFS_VERSION) || exit 1
@@ -108,6 +110,8 @@ audit_tmp=$(mktemp -d "${TMPDIR:-/tmp}/ntfsmac-anylinuxfs-audit.XXXXXX")
 trap 'rm -rf "$audit_tmp"' EXIT
 git -C "$SOURCE_DIR" archive "$candidate_commit" | tar -x -C "$audit_tmp"
 runtime_alpine_load || fail "could not derive the locked Alpine runtime contract"
+patch_anylinuxfs_filesystem_detection "$audit_tmp" >/dev/null \
+  || fail "filesystem detection patch no longer applies to the candidate"
 patch_anylinuxfs_runtime_alpine "$audit_tmp" >/dev/null \
   || fail "runtime Alpine patch no longer applies to the candidate"
 patch_init_rootfs_runtime_alpine "$audit_tmp/init-rootfs" "$REPO_ROOT/build/alpine-apks.lock" >/dev/null \
