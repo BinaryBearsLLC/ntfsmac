@@ -266,3 +266,10 @@ left as a 1 GiB ext4 partition with the remaining space free. MobileData was not
 formatted. The GUI simultaneously identifies MobileData as NTFS and the Linux
 partition as EXT, not NTFS. These checks satisfy the available native beta gate;
 Sonoma native read/write and other hardware remain outside this evidence.
+
+The tested draft is now published as `v3.1.3-beta.2`, a prerelease, with the same
+DMG digest and unchanged signed tag. GitHub's latest stable endpoint remains
+`v3.1.2`. The live site shows separate Stable 3.1.2 and Beta 3.1.3-beta.2 links.
+`dev` and the rollback branch `3.1.2` remain at `b0ff6cd`; no stable promotion or
+integration was performed. Sources and reviewed evidence are pushed; local VM
+media, private test logs, caches and installation backups remain local-only.
