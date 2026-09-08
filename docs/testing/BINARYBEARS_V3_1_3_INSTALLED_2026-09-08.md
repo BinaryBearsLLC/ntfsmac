@@ -69,15 +69,15 @@ framework probe still reports `VZVirtualMachine.isSupported=false` and
 `hv_vm_create=-85377009` (`HV_UNSUPPORTED`). `healthy` in the CLI diagnostic is not a VM
 boot/read-write acceptance result.
 
-The guest retains an SMAppService/Background Task Management registration pointing at a
+Before the authorized reset described below, the guest retained an SMAppService/Background Task Management registration pointing at a
 previous test-app location, despite the current 31302 app being in Applications. The previous
 app was archived before replacement. Normal repair, targeted approval and a guest reboot did
 not complete helper setup. The final launchd log reports `Launch Constraint Violation` at the
 cached retired test-app path, with exit 78 (`EX_CONFIG`). No signing constraints were disabled
 and no global background-item reset was performed.
 
-Consequently the guest's installed CLI still reports schema 6/build 31301: **updating the app
-bundle did not complete the guest helper/CLI upgrade**. Schema 7 evidence above comes from
+At that checkpoint the guest's installed CLI still reported schema 6/build 31301: **updating the app
+bundle alone did not complete the guest helper/CLI upgrade**. Initial schema 7 evidence above came from
 the bundled read-only diagnostic, not that stale installed CLI. This installation blocker and
 the independently measured lack of guest Hypervisor access are separate failures. Build 31302
 does not by itself fix registration. Details are retained locally in
@@ -91,6 +91,29 @@ the renamed bundle. The copy was returned to its original location. This rules o
 extension-only recovery; the persisted registration URL needs separate cleanup. The framework
 probe was rerun afterward and still returned `virtualizationSupported=false` and
 `hypervisorCreateResult=-85377009`. No native-host state was changed by this check.
+
+### Authorized guest-only reset — helper installation recovered
+
+The owner then explicitly authorized resetting background-item registrations only in this VM.
+The initial noninteractive attempt was refused by Authorization Services. Running `sfltool
+resetbtm` in the guest user's graphical session and approving its password dialog returned
+`Database reset.` at 14:33 guest time. After reboot, `dumpbtm` contained no ntfsmac records;
+Parallels Tools remained available. No corresponding host reset was performed.
+
+The current app was opened explicitly from `/Applications/ntfsmac.app`, Install Helper was
+selected, and only ntfsmac was approved in Login Items. The normal installation then completed:
+
+- the helper ran as root (observed PID 656), and `lsof` resolved its executable to
+  `/Applications/ntfsmac.app/Contents/Resources/ntfsmac-helper`;
+- its SHA-256 matches the 31302 package recorded above; deep/strict app signature checks pass;
+- the **installed** CLI now emits schema 7, app version 3.1.3, build 31302;
+- the GUI progressed from helper setup to the separate drive-runtime failure screen.
+
+The installed JSON is retained at `/tmp/ntfsmac-31302-sonoma-after-btm-reset.json` on the host.
+The framework probe still reports `virtualizationSupported=false` and `HV_UNSUPPORTED`.
+Thus the registration blocker is resolved in this test VM; filesystem boot/mount/write is not.
+This is recovery evidence, not proof that upgrades with arbitrary stale registrations work
+without intervention. A global BTM reset is not implemented or recommended as an automatic app action.
 
 No physical disk was attached to or formatted by this VM. Native Sonoma filesystem testing,
 macOS 15 and other chips/OS patch releases remain unverified. See the
