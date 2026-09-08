@@ -320,7 +320,7 @@ public final class DiagnoseRunner: ObservableObject {
     /// Runs the exact same read-only CLI diagnostic as the visible summary, then returns a
     /// validated, formatted attachment. A degraded diagnosis still produces a useful document:
     /// `diagnose.sh` deliberately uses its exit code for health while keeping stdout valid JSON.
-    public func runForDeveloperExport() async -> DeveloperDiagnoseDocument? {
+    public func runForDeveloperExport(driveDiscoveryFailed: Bool = false) async -> DeveloperDiagnoseDocument? {
         guard !isRunning else { return nil }
         let rawJSON: String
         let source: String
@@ -338,7 +338,7 @@ public final class DiagnoseRunner: ObservableObject {
         do {
             let document = try DeveloperDiagnoseDocument(rawJSON: rawJSON).addingGUIContext(
                 product: ProductVersion.current(), virtualizationSupported: VZVirtualMachine.isSupported,
-                source: source)
+                source: source, driveDiscoveryFailed: driveDiscoveryFailed)
             errorMessage = nil
             return document
         } catch {

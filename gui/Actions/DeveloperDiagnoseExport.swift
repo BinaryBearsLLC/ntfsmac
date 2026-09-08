@@ -56,7 +56,7 @@ public struct DeveloperDiagnoseDocument: Equatable, Sendable {
 
     /// Distinguish the running GUI from an older installed CLI, without device/user identity.
     public func addingGUIContext(product: ProductVersion, virtualizationSupported: Bool,
-                                 source: String) throws -> Self {
+                                 source: String, driveDiscoveryFailed: Bool = false) throws -> Self {
         guard var object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw DeveloperDiagnoseExportError.invalidJSON
         }
@@ -66,6 +66,7 @@ public struct DeveloperDiagnoseDocument: Equatable, Sendable {
             "release_label": product.releaseLabel ?? "Stable",
             "virtualization_framework_supported": virtualizationSupported,
             "diagnostic_source": source,
+            "drive_discovery_failed": driveDiscoveryFailed,
             "helper_distribution": HelperDistributionVariant.current.rawValue,
         ] as [String: Any]
         let encoded = try JSONSerialization.data(withJSONObject: object)

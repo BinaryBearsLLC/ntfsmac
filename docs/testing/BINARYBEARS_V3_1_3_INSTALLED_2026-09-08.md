@@ -178,3 +178,30 @@ Retained: `main`, `dev`, `3.1.2`, `Update/3.1.3`. Both active worktrees are pres
 GitHub is **not** yet a complete backup. Local-only commits, ignored build artifacts, caches,
 installation backups, VM media and private test logs are not restored by cloning the remote.
 Keep the checkout and VM until the version branch has been published and backups are checked.
+
+### Authorized beta publication follow-up
+
+The owner subsequently authorized publication. `3.1.2` and `Update/3.1.3` are now
+published; `dev` remains unchanged. Pages deployment 34232662628 passed and the
+public site resolves Stable to 3.1.2, with a separate beta channel hidden until a
+public prerelease exists. Historical notes removed during cleanup remain in Git
+at `90388df`; executable regression coverage was retained except for one no-op test.
+
+The first beta release workflow (34232658667) stopped at source gates, before
+notarization or release creation. CI 34232369051 also failed: four rootfs/build
+checks and a 30 ms timing assumption in an update-check test. Commit `5250b24`
+replaces that fixed wait with a bounded observable-state check and retains Bats
+failure output. No failed gate is being waived and the signed beta tag is unchanged.
+
+The local Developer ID-signed 31303 app was copied into the Sonoma VM with the
+previous app preserved. Nested signatures passed. Settings visibly shows
+`Version 3.1.3 Beta 1 (31303)` and the centered company link. The runtime-error
+screen has a normal-height Quit button and a working Diagnose summary. Its JSON
+reports schema 7, build 31303, Sonoma 14.6.1, virtual-machine true and uninitialized
+Alpine. These are UI/diagnostic checks, not filesystem acceptance or notarization.
+
+That check exposed misleading readiness/inventory wording. The follow-up now
+labels uninitialized preparation as incomplete and leaves failed discovery's
+inventory unknown. GUI JSON records `drive_discovery_failed`. Both local Swift
+variants pass 332 tests each; the render-suite exclusion still applies. This source
+follow-up is not yet the installed VM artifact or a public beta download.

@@ -719,7 +719,7 @@ public struct PopoverContentView: View {
         DiagnosePanel(
             runner: diagnoseRunner,
             mountState: appState.state,
-            detectedDriveCount: visibleDrives.count,
+            detectedDriveCount: driveDiscoveryFailed ? nil : visibleDrives.count,
             fullDiskAccessGranted: FullDiskAccessPresentationPolicy.diagnosticGrantEvidence(
                 for: fullDiskAccessController.state
             ),
@@ -756,7 +756,7 @@ public struct PopoverContentView: View {
                             ? diagnosedContext
                             : nil
                     case .developerJSONExport:
-                        if let document = await diagnoseRunner.runForDeveloperExport() {
+                        if let document = await diagnoseRunner.runForDeveloperExport(driveDiscoveryFailed: driveDiscoveryFailed) {
                             diagnoseReportContext = diagnoseStorageContext == diagnosedContext
                                 ? diagnosedContext
                                 : nil

@@ -10,6 +10,9 @@ vendor/rootfs/
 # macOS
 .DS_Store
 
+# Windows thumbnail cache from shared folders
+Thumbs.db
+
 # Rust
 target/
 Cargo.lock.bak

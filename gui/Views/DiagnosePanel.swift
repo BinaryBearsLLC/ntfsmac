@@ -201,12 +201,21 @@ public enum DiagnoseMacroSummary {
               ["initialized", "not_initialized", "migration_available"].contains(appState)
         else { return unavailable }
 
+        if appState != "initialized" {
+            return .init(
+                id: "app", title: "App readiness", state: .attention,
+                summary: "Preparation incomplete",
+                explanation: "The app components are present, but drive access has not finished preparing.",
+                nextAction: "Try the drive check again. If it still fails, Command-click Diagnose and include the report in a GitHub issue."
+            )
+        }
+
         return .init(
             id: "app",
             title: "App readiness",
             state: .ok,
-            summary: "Ready",
-            explanation: "Everything ntfsmac needs is present and compatible.",
+            summary: "Components checked",
+            explanation: "Required app components are present. Drive access is checked separately.",
             nextAction: nil
         )
     }

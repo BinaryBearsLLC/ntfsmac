@@ -100,6 +100,9 @@ unknown (or JSON null), never a fabricated pass. GUI exports add the running app
 helper distribution, Virtualization.framework support and whether evidence came from the installed
 CLI or the bundled read-only fallback. Preserve the CLI's own version to expose an older install.
 `healthy` summarizes the diagnostic checks; it is not a successful microVM boot or read/write test.
+An uninitialized filesystem environment reports **Preparation incomplete**, not Ready.
+Failed discovery leaves the drive inventory unknown, not empty. JSON exports also record
+`gui_context.drive_discovery_failed` without exposing raw command output or device paths.
 
 ## Settings
 

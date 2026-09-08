@@ -68,6 +68,17 @@ private final class FakeRunner: PrivilegedCommandRunning {
     #expect(rows.first { $0.id == "protection" }?.summary == "Protected")
 }
 
+@Test func uninitializedRuntimeAndUnknownInventoryNeverReportReady() throws {
+    let json = expandedJSON.replacingOccurrences(of: "\"alpine_runtime_state\":\"initialized\"",
+                                                 with: "\"alpine_runtime_state\":\"not_initialized\"")
+    let report = try JSONDecoder().decode(DiagnoseReport.self, from: Data(json.utf8))
+    let rows = DiagnoseMacroSummary.rows(for: report, mountState: .idle,
+                                         detectedDriveCount: nil, fullDiskAccessGranted: nil)
+    #expect(rows.first { $0.id == "app" }?.state == .attention)
+    #expect(rows.first { $0.id == "app" }?.summary == "Preparation incomplete")
+    #expect(rows.first { $0.id == "drive" }?.state == .unavailable)
+}
+
 @Test func guiDiagnosticCopyDoesNotExposeImplementationDetails() throws {
     let report = try JSONDecoder().decode(DiagnoseReport.self, from: Data(expandedJSON.utf8))
     let visible = DiagnoseMacroSummary.rows(
