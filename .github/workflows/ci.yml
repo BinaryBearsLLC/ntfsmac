@@ -8,8 +8,11 @@ on:
 
 jobs:
   shell-tests:
-    name: shellcheck + bats
+    name: Source checks (native VM acceptance separate)
     runs-on: macos-26 # arm64 (Apple Silicon) runner — required, no Intel fallback (L7)
+    timeout-minutes: 45
+    env:
+      NTFSMAC_ROOTFS_BUILD_MODE: compile-only
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

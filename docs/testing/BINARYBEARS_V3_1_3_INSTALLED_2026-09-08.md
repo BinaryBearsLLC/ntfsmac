@@ -204,4 +204,20 @@ That check exposed misleading readiness/inventory wording. The follow-up now
 labels uninitialized preparation as incomplete and leaves failed discovery's
 inventory unknown. GUI JSON records `drive_discovery_failed`. Both local Swift
 variants pass 332 tests each; the render-suite exclusion still applies. This source
-follow-up is not yet the installed VM artifact or a public beta download.
+follow-up was then installed in the VM with its predecessor preserved. The runtime-error
+popover retains its 320-point width before and after Diagnose; the changed real-render
+test passes independently of the excluded suite. The owner's actual Command-click
+export was retrieved and parsed: schema 7, build 31303, Sonoma 14.6.1, VM true and
+installed-CLI provenance. This remains local candidate evidence, not a public artifact.
+
+The hosted build failure was traced to unavailable Hypervisor VM startup on the runner
+(`Invalid argument`, errno 22), before notarization. The release pipeline now explicitly
+compiles and verifies locked inputs without claiming native VM/package-install acceptance.
+The default physical-Mac build retains that acceptance; fresh local assembly verified all
+70 locked packages. GitHub still builds every distributed binary and performs signing,
+notarization and stapling. Beta 2 uses build 31304 and a new tag; Beta 1 is not retagged.
+
+Beta 2's local source gate passes 402/402 shell tests in full native mode and 332
+Swift tests for each helper variant, with the documented render-suite exclusion.
+ShellCheck and stable/beta website selection tests also pass. Acceptance of the
+downloaded, notarized draft remains a separate publication gate.

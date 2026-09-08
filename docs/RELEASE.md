@@ -12,6 +12,12 @@ target alone does not prove Sonoma compatibility; consult the
 
 GitHub Actions creates a draft. Publish only that tested draft; never rebuild or replace its files.
 
+GitHub compiles, signs and notarizes the complete distribution. Its virtualized
+runner uses the explicit `compile-only` rootfs build mode; native VM/package-install
+acceptance is not reported as a remote pass. The default local build still performs
+that acceptance. The generated test rootfs is not shipped in the application.
+Final native media checks must use the downloaded draft DMG before publication.
+
 ## Beta channel
 
 The owner has approved a separate 3.1.3 beta channel. It does not promote 3.1.3 to

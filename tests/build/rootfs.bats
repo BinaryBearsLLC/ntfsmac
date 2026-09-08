@@ -23,6 +23,37 @@ setup() {
   [ -x "$SCRIPT" ]
 }
 
+@test "compile-only rootfs mode builds without claiming VM acceptance" {
+  NTFSMAC_ROOTFS_BUILD_MODE=compile-only run bash -c '
+    source build/init-rootfs.sh
+    rust_activate_locked_toolchain() { :; }
+    runtime_alpine_load() {
+      ALPINE_RUNTIME_TAG=fixture; ALPINE_RUNTIME_DIGEST=fixture
+      ALPINE_BASE_PACKAGES_SHA256=fixture; ALPINE_PACKAGES_SHA256=fixture
+    }
+    verify_package_lock() { :; }
+    verify_apk_lock() { :; }
+    verify_alpine_digest() { :; }
+    prepare_build_copy() { :; }
+    verify_apk_artifacts() { :; }
+    build_vmrunner_sys() { echo built-rust; }
+    build_init_rootfs_bin() { echo built-go; }
+    vendor_init_rootfs_bin() { echo signed-binary; }
+    run_init_rootfs() { echo unexpected-vm-boot; return 1; }
+    main
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *built-rust* && "$output" == *built-go* && "$output" == *signed-binary* ]]
+  [[ "$output" == *"acceptance NOT RUN"* ]]
+  [[ "$output" != *unexpected-vm-boot* ]]
+}
+
+@test "unknown rootfs build mode fails closed" {
+  NTFSMAC_ROOTFS_BUILD_MODE=skip-all run "$SCRIPT"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"unknown rootfs build mode"* ]]
+}
+
 @test "init-rootfs.sh HARD-STOPs on an unresolved TODO-UNRESOLVED pin" {
   local lock
   lock="$(mktemp)"
@@ -34,6 +65,9 @@ setup() {
 }
 
 @test "generated vm-setup.sh package manifest matches the exact add-on lock" {
+  if [[ "${NTFSMAC_ROOTFS_BUILD_MODE:-full}" == compile-only ]]; then
+    skip "Native Hypervisor/package-install acceptance runs separately on a physical Mac"
+  fi
   run "$SCRIPT"
   [ "$status" -eq 0 ]
   local rootfs_home

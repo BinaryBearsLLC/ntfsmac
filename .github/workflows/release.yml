@@ -25,6 +25,8 @@ jobs:
     env:
       NOTARY_PROFILE: ntfsmac-notary-${{ github.run_id }}
       RELEASE_VERSION: ${{ inputs.version }}
+      # Native VM/media acceptance is a local gate before publishing the draft.
+      NTFSMAC_ROOTFS_BUILD_MODE: compile-only
 
     steps:
       - name: Check out the repository

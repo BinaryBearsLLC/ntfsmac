@@ -78,7 +78,7 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
-@test "full build: anylinuxfs + vmproxy compile, cargo test passes for all three crates" {
+@test "source build: anylinuxfs + vmproxy compile, cargo test passes for all three crates" {
   run "$SCRIPT"
   [ "$status" -eq 0 ]
   [[ "$output" == *"cargo test — common-utils"* ]]

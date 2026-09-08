@@ -340,6 +340,11 @@ run_init_rootfs() {
 
 main() {
   local tag digest rootfs
+  local build_mode="${NTFSMAC_ROOTFS_BUILD_MODE:-full}"
+  case "$build_mode" in
+    full|compile-only) ;;
+    *) echo "init-rootfs: HARD-STOP — unknown rootfs build mode" >&2; exit 1 ;;
+  esac
   rust_activate_locked_toolchain || exit 1
   runtime_alpine_load || exit 1
   tag="$ALPINE_RUNTIME_TAG"
@@ -355,6 +360,10 @@ main() {
   build_vmrunner_sys || exit 1
   build_init_rootfs_bin || exit 1
   vendor_init_rootfs_bin || exit 1
+  if [[ "$build_mode" == compile-only ]]; then
+    echo "init-rootfs: compiled and signed; native VM/package-install acceptance NOT RUN"
+    return 0
+  fi
   run_init_rootfs "$ALPINE_RUNTIME_REF" "$ALPINE_RUNTIME_BASE_DIR" || exit 1
 
   rootfs="$ROOTFS_HOME/.anylinuxfs/$ALPINE_RUNTIME_BASE_DIR/rootfs"

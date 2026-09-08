@@ -19,6 +19,13 @@ CLI behavior, release wiring, and regression tests. Both Swift variants must com
 non-empty test run. Legacy source tests protect migration and historical behavior;
 they do not produce a supported 3.1.3 Legacy installer.
 
+Hosted macOS runners use `NTFSMAC_ROOTFS_BUILD_MODE=compile-only`: every shipped
+binary and its source tests are built, but the native VM/package-install test is
+explicitly skipped. The build verifies the locked APK downloads without claiming
+they were installed. Run the default full mode on a physical Mac and test the
+downloaded release artifact before publishing. This build-only option is not
+included in the app and does not change runtime safety checks.
+
 Run these commands sequentially. Packaging tests and real packaging both generate
 `helper/GeneratedCLIManifest.swift`; overlapping them can put the wrong tree hash
 in a bundle. The checked-in file must return to its placeholder afterward.

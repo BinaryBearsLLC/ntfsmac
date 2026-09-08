@@ -25,7 +25,7 @@ experimental choice.
 
 ## Requirements
 
-This branch prepares **3.1.3 Beta 1**, separate from the stable 3.1.2 line.
+This branch prepares **3.1.3 Beta 2**, separate from the stable 3.1.2 line.
 The beta targets macOS 14+; native Sonoma filesystem qualification remains open.
 The compatibility table below distinguishes verified operations from the build target.
 
