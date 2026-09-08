@@ -113,6 +113,7 @@ public final class UpdateChecker: ObservableObject {
     private let now: @Sendable () -> Date
     private let openURL: (URL) -> Bool
     private let successAcknowledgementDuration: Duration
+    private let isPrerelease: Bool
     private var transientResetTask: Task<Void, Never>?
 
     public init(
@@ -120,13 +121,15 @@ public final class UpdateChecker: ObservableObject {
         defaults: UserDefaults = .standard,
         now: @escaping @Sendable () -> Date = Date.init,
         openURL: @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) },
-        successAcknowledgementDuration: Duration = .seconds(2)
+        successAcknowledgementDuration: Duration = .seconds(2),
+        isPrerelease: Bool = ProductVersion.current().releaseLabel != nil
     ) {
         self.client = client
         self.defaults = defaults
         self.now = now
         self.openURL = openURL
         self.successAcknowledgementDuration = successAcknowledgementDuration
+        self.isPrerelease = isPrerelease
     }
 
     public func checkAutomaticallyIfNeeded(currentVersion: String) async {
@@ -161,7 +164,7 @@ public final class UpdateChecker: ObservableObject {
         defaults.set(date, forKey: Keys.lastCheckDate)
         do {
             let latest = try await client.fetchLatestRelease()
-            if latest.version > installed {
+            if latest.version > installed || (isPrerelease && latest.version == installed) {
                 state = .updateAvailable(latest)
             } else {
                 state = manual ? .upToDate : .idle

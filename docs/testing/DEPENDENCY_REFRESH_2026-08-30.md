@@ -8,7 +8,7 @@ current application baseline.
 
 ## Repository boundary
 
-- Worktree: `/Users/andrea/.codex/worktrees/7409/ntfsmac`
+- Worktree: isolated ntfsmac dependency-update checkout (local path omitted).
 - Starting commit: `416cb2e1281270e3b7cb67fa1ecf4ca4db3dbf82` (`dev`, `origin/dev`, `v3.1.1`)
 - Starting state: clean detached worktree; the dedicated branch was created before edits
 - anylinuxfs baseline submodule: clean at `8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3`

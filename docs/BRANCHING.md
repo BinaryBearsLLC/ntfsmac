@@ -48,18 +48,22 @@ branding or roadmap material, and is submitted only after explicit maintainer ap
 ## Release refs
 
 For the 3.1.3 qualification cycle, `3.1.2` preserves `dev` at `b0ff6cd` and
-`Update/3.1.3` contains the dependency and compatibility work. Both version pointers are local
-until explicitly published. `dev` remains unchanged until the maintainer approves integration.
+`Update/3.1.3` contains the dependency and compatibility work. The beta publication publishes
+both version branches; `dev` remains unchanged until the maintainer approves stable integration.
 Do not remove either version pointer during cleanup. The old
 `maintenance/dependency-refresh-2026-08` local branch was removed only after confirming that its
 tip (`a7066b8`) is an ancestor of `Update/3.1.3`; its commits remain recoverable there.
 
-GitHub is not yet a complete backup of the 3.1.3 worktree. Unpushed commits, uncommitted changes,
-ignored build/runtime caches, installation backups, VM disks and private test logs are local.
-Do not delete the local checkout or VM on the assumption that cloning GitHub will restore them.
+GitHub can restore pushed source commits, not uncommitted work, ignored build/runtime caches,
+installation backups, VM disks or private test logs. Before removing a checkout, compare its
+refs with the remote and back up any local-only artifacts you need. A release DMG and its
+checksum are downloadable only after they have actually been uploaded and published.
 
-- Official BinaryBears releases are built only from signed `vX.Y.Z` tags reachable from `dev`.
-- The plist version must exactly equal the workflow input and tag without the `v` prefix.
+- Stable BinaryBears releases use signed `vX.Y.Z` tags at the exact `origin/dev` commit.
+- Approved betas use signed `v3.1.3-beta.N` tags at the exact `origin/Update/3.1.3` commit;
+  they do not change `dev` or the latest stable release.
+- Numeric app/helper versions and builds must match. Beta labels/tags are validated separately
+  by `build/lib/release-version.sh`; its result must match the workflow input.
 - A workflow creates a draft Release. The downloaded draft artifact is tested before the same
   Release is published; rebuilding between those steps is forbidden.
 - Never force-push `main`, `dev`, an archive ref, or a published release tag.

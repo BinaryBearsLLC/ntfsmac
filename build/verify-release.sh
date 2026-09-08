@@ -6,8 +6,10 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 # shellcheck source=build/lib/macos-target.sh
 source "$SCRIPT_DIR/lib/macos-target.sh"
+# shellcheck source=build/lib/release-version.sh
+source "$SCRIPT_DIR/lib/release-version.sh"
 APP="${NTFSMAC_APP_BUNDLE:-$REPO_ROOT/dist/ntfsmac.app}"
-VERSION="${RELEASE_VERSION:-$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$REPO_ROOT/gui/Info.plist")}"
+VERSION="${RELEASE_VERSION:-$(release_version "$REPO_ROOT/gui/Info.plist")}"
 DMG="${NTFSMAC_DMG_OUT:-$REPO_ROOT/dist/ntfsmac-${VERSION}-Apple-Silicon.dmg}"
 HELPER_VARIANT="${NTFSMAC_HELPER_VARIANT:-modern}"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"
@@ -40,7 +42,7 @@ verify_app() {
     fail "unexpected app bundle identifier"
   [[ "$(plist_value "$APP/Contents/Info.plist" CFBundleName)" == "ntfsmac" ]] ||
     fail "visible app name is not ntfsmac"
-  [[ "$(plist_value "$APP/Contents/Info.plist" CFBundleShortVersionString)" == "$VERSION" ]] ||
+  [[ "$(release_version "$APP/Contents/Info.plist")" == "$VERSION" ]] ||
     fail "app version does not match $VERSION"
   [[ "$(plist_value "$APP/Contents/Info.plist" LSMinimumSystemVersion)" == "14.0" ]] ||
     fail "app must declare the macOS 14.0 floor"

@@ -25,9 +25,9 @@ experimental choice.
 
 ## Requirements
 
-This development branch targets 3.1.3. macOS 14 runtime qualification is still in
-progress; see the [local validation record](docs/testing/SONOMA_LOCAL_VALIDATION_2026-09-08.md).
-This is not an announcement of a published or fully qualified 3.1.3 release.
+This branch prepares **3.1.3 Beta 1**, separate from the stable 3.1.2 line.
+The beta targets macOS 14+; native Sonoma filesystem qualification remains open.
+The compatibility table below distinguishes verified operations from the build target.
 
 - Apple Silicon Mac.
 - macOS 14 Sonoma or newer (3.1.3 build target).
@@ -63,6 +63,11 @@ for build numbers, scope and limitations.
 ## Install
 
 ### Official BinaryBears release
+
+Choose **Stable** for the current supported release. **Beta** is an optional preview,
+listed separately on [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases)
+when available. Beta builds identify themselves in Settings and are not offered by
+the stable update checker. Read the beta notes and use backed-up test media.
 
 1. Download the standard `ntfsmac-X.Y.Z-Apple-Silicon.dmg` from
    [GitHub Releases](https://github.com/BinaryBearsLLC/ntfsmac/releases/latest).
@@ -188,6 +193,7 @@ changes, and makes Finder and read-only behavior explicit. [GitHub Releases](htt
 is the authoritative source for signed and notarized builds.
 
 - [Roadmap](docs/BINARYBEARS_ROADMAP.md)
+- [Documentation index](docs/README.md)
 - [Validation ledger](docs/testing/BINARYBEARS_VALIDATION_RESULTS_2026-08-12.md)
 - [Branch policy](docs/BRANCHING.md)
 - [Release process](docs/RELEASE.md)

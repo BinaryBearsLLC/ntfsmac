@@ -311,6 +311,7 @@ public struct DriveDiscoveryFailureView: View {
     public let onRetry: () -> Void
     public let onOpenSettings: () -> Void
     public let onQuit: () -> Void
+    public let footer: AnyView?
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -318,12 +319,14 @@ public struct DriveDiscoveryFailureView: View {
         isRetrying: Bool = false,
         onRetry: @escaping () -> Void,
         onOpenSettings: @escaping () -> Void,
-        onQuit: @escaping () -> Void
+        onQuit: @escaping () -> Void,
+        footer: AnyView? = nil
     ) {
         self.isRetrying = isRetrying
         self.onRetry = onRetry
         self.onOpenSettings = onOpenSettings
         self.onQuit = onQuit
+        self.footer = footer
     }
 
     public var body: some View {
@@ -370,19 +373,23 @@ public struct DriveDiscoveryFailureView: View {
             .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.secondary.opacity(0.08)))
 
             Divider()
-            HStack {
-                Button(action: onOpenSettings) {
-                    SettingsGearGlyph(color: .secondary)
-                }
-                .buttonStyle(.glassIcon(colorScheme: colorScheme))
-                .ntfsmacKeyboardFocus()
-                .accessibilityLabel("Open Settings")
-                .help(TooltipCopy.text(for: .settings))
-                Spacer()
-                Button("Quit", action: onQuit)
-                    .buttonStyle(.glassFooter(colorScheme: colorScheme))
+            if let footer {
+                footer
+            } else {
+                HStack {
+                    Button(action: onOpenSettings) {
+                        SettingsGearGlyph(color: .secondary)
+                    }
+                    .buttonStyle(.glassIcon(colorScheme: colorScheme))
                     .ntfsmacKeyboardFocus()
-                    .accessibilityLabel("Quit ntfsmac")
+                    .accessibilityLabel("Open Settings")
+                    .help(TooltipCopy.text(for: .settings))
+                    Spacer()
+                    Button("Quit", action: onQuit)
+                        .buttonStyle(.glassFooter(colorScheme: colorScheme))
+                        .ntfsmacKeyboardFocus()
+                        .accessibilityLabel("Quit ntfsmac")
+                }
             }
         }
         .padding(12)

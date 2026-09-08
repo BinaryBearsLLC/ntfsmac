@@ -20,7 +20,9 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 
 APP="${NTFSMAC_APP_BUNDLE:-$REPO_ROOT/dist/ntfsmac.app}"
-PRODUCT_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$REPO_ROOT/gui/Info.plist")"
+# shellcheck source=build/lib/release-version.sh
+source "$SCRIPT_DIR/lib/release-version.sh"
+PRODUCT_VERSION="$(release_version "$REPO_ROOT/gui/Info.plist")" || exit 1
 DMG_OUT="${NTFSMAC_DMG_OUT:-$REPO_ROOT/dist/ntfsmac-${PRODUCT_VERSION}-Apple-Silicon.dmg}"
 VOLUME_NAME="${NTFSMAC_DMG_VOLUME_NAME:-ntfsmac Installer}"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:--}"

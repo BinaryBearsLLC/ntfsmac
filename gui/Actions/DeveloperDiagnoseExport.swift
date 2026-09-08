@@ -63,6 +63,7 @@ public struct DeveloperDiagnoseDocument: Equatable, Sendable {
         object["gui_context"] = [
             "app_version": product.release,
             "app_build": product.build,
+            "release_label": product.releaseLabel ?? "Stable",
             "virtualization_framework_supported": virtualizationSupported,
             "diagnostic_source": source,
             "helper_distribution": HelperDistributionVariant.current.rawValue,

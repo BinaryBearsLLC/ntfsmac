@@ -12,9 +12,31 @@ target alone does not prove Sonoma compatibility; consult the
 
 GitHub Actions creates a draft. Publish only that tested draft; never rebuild or replace its files.
 
+## Beta channel
+
+The owner has approved a separate 3.1.3 beta channel. It does not promote 3.1.3 to
+stable or move `dev`. Use a signed `v3.1.3-beta.N` tag at the exact published
+`Update/3.1.3` commit and dispatch the release workflow from that branch.
+
+Keep Apple's version keys numeric and equal across app/helpers. The app's
+`NTFSMACReleaseTag` identifies the public version; `NTFSMACReleaseLabel` displays
+`Beta N`. `build/lib/release-version.sh` rejects mismatched versions and labels.
+The workflow marks beta drafts as prereleases and explicitly not latest.
+
+Beta packaging still requires source tests, Developer ID signing, notarization,
+stapling and validation of the actual distributed files. Record incomplete hardware
+coverage in the beta notes; it is not a stable compatibility claim. Before publishing,
+complete the available current-host driver checks and verify diagnostic export and
+the changed UI. Native Sonoma qualification remains a stable-release gate.
+
+The site keeps the stable download on GitHub's latest-release endpoint and discovers
+public beta releases separately. Drafts never produce download buttons. The app's
+normal updater remains stable-only; a beta may offer the stable version with the same
+numeric version once available. Never publish a beta as the latest stable release.
+
 ## 1. Local release gate
 
-Before tagging:
+Before tagging a stable release (beta-specific scope is above):
 
 1. Keep `CFBundleShortVersionString` and `CFBundleVersion` identical in the app and both helper
    plists.

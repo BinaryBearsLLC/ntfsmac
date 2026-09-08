@@ -32,7 +32,8 @@ setup() {
 
 @test "release orchestration selects Standard only and preserves historical artifacts (mocked tools)" {
   local fixture="$BATS_TEST_TMPDIR/release" mock_bin="$BATS_TEST_TMPDIR/bin" step
-  mkdir -p "$fixture/build" "$fixture/gui" "$fixture/dist/ntfsmac-legacy.app" "$mock_bin"
+  mkdir -p "$fixture/build/lib" "$fixture/gui" "$fixture/dist/ntfsmac-legacy.app" "$mock_bin"
+  cp "$REPO_ROOT/build/lib/release-version.sh" "$fixture/build/lib/"
   cp "$NOTARIZE_SCRIPT" "$fixture/build/notarize-release.sh"
   cp "$REPO_ROOT/gui/Info.plist" "$fixture/gui/Info.plist"
   printf 'historical artifact\n' > "$fixture/dist/ntfsmac-3.1.3-Legacy-Apple-Silicon.dmg"
@@ -52,7 +53,7 @@ SH
   done
   run env PATH="$mock_bin:$PATH" TEST_RELEASE_TRACE="$BATS_TEST_TMPDIR/trace" \
     SIGNING_IDENTITY='Developer ID Application: BinaryBears LLC (SQY8T23X8N)' \
-    NOTARY_PROFILE=mock-only INCLUDE_LEGACY=0 RELEASE_VERSION=3.1.3 \
+    NOTARY_PROFILE=mock-only INCLUDE_LEGACY=0 \
     "$fixture/build/notarize-release.sh"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Standard only"* ]]

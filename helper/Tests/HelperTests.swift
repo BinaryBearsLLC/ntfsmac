@@ -851,12 +851,3 @@ private final class ExitSinkProbe: @unchecked Sendable {
     #expect(result?.exitCode == 0, "exitHelper must send a decodable success payload before terminating")
     #expect(probe.invoked, "exitHelper must invoke the exit sink (exit(0) in production) so the launchd on-demand helper actually stops")
 }
-
-@Test func exitHelperDefaultsToRealProcessExitWhenNoSinkInjected() async {
-    // The default sink is exit(0) — verified structurally by not crashing the test host on
-    // construction. We only assert the default exists; actually invoking it would terminate
-    // the test process, which is the production behavior and intentionally not exercised here.
-    let service = HelperService(runner: FakeRunner())
-    _ = service
-    #expect(Bool(true))
-}

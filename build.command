@@ -441,7 +441,7 @@ package_cli() {
 
 package_gui() {
   local version modern_app modern_dmg signature_description
-  version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$REPO_ROOT/gui/Info.plist")"
+  version="$(bash "$REPO_ROOT/build/lib/release-version.sh" "$REPO_ROOT/gui/Info.plist")" || fail "Invalid release metadata."
   modern_app="$DIST_DIR/ntfsmac.app"
   modern_dmg="$DIST_DIR/ntfsmac-${version}-Apple-Silicon.dmg"
   signature_description="ad-hoc"
@@ -478,7 +478,7 @@ package_gui() {
 
 print_summary() {
   local version
-  version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$REPO_ROOT/gui/Info.plist")"
+  version="$(bash "$REPO_ROOT/build/lib/release-version.sh" "$REPO_ROOT/gui/Info.plist")" || fail "Invalid release metadata."
   section "Build complete"
   case "$TARGET" in
     cli)

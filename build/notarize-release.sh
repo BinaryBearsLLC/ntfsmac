@@ -16,13 +16,15 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:?Set SIGNING_IDENTITY to the BinaryBears Developer ID Application identity}"
 SIGNING_KEYCHAIN="${SIGNING_KEYCHAIN:-}"
 NOTARY_PROFILE="${NOTARY_PROFILE:?Set NOTARY_PROFILE to a notarytool Keychain profile}"
-VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$REPO_ROOT/gui/Info.plist")"
+# shellcheck source=build/lib/release-version.sh
+source "$SCRIPT_DIR/lib/release-version.sh"
+VERSION="$(release_version "$REPO_ROOT/gui/Info.plist")"
 
 [[ "$SIGNING_IDENTITY" == "Developer ID Application: BinaryBears LLC (SQY8T23X8N)" ]] || {
   echo "notarize-release: HARD-STOP — unexpected signing identity: $SIGNING_IDENTITY" >&2
   exit 1
 }
-[[ "$VERSION" =~ ^3\.[0-9]+\.[0-9]+$ ]] || {
+[[ "$VERSION" =~ ^3\.[0-9]+\.[0-9]+(-beta\.[1-9][0-9]*)?$ ]] || {
   echo "notarize-release: HARD-STOP — v3 release version must use 3.x.y SemVer" >&2
   exit 1
 }

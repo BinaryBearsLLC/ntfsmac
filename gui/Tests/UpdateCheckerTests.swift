@@ -28,6 +28,17 @@ private func updateDefaults() -> UserDefaults {
     return defaults
 }
 
+@MainActor
+@Test(arguments: [true, false])
+func sameVersionStableReleaseReplacesOnlyAPrerelease(isBeta: Bool) async {
+    let release = PublishedRelease(version: SemanticVersion(tag: "3.1.3")!,
+        pageURL: URL(string: "https://github.com/BinaryBearsLLC/ntfsmac/releases/tag/v3.1.3")!)
+    let checker = UpdateChecker(client: CountingReleaseClient(.success(release)),
+        defaults: updateDefaults(), isPrerelease: isBeta)
+    await checker.checkManually(currentVersion: "3.1.3")
+    #expect(checker.state == (isBeta ? .updateAvailable(release) : .upToDate))
+}
+
 @Test func semanticVersionsAreStrictAndComparable() {
     #expect(SemanticVersion(tag: "v3.0.1")! > SemanticVersion(tag: "3.0.0")!)
     #expect(SemanticVersion(tag: "3.1.0")! > SemanticVersion(tag: "3.0.99")!)

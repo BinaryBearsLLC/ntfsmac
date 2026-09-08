@@ -307,14 +307,20 @@ public struct PopoverContentView: View {
                     onQuit: { requestQuit(commandPressed: false) }
                 )
             } else if driveDiscoveryFailed {
-                DriveDiscoveryFailureView(
-                    isRetrying: driveScanner.isRefreshing,
-                    onRetry: {
-                        Task { await refreshAll() }
-                    },
-                    onOpenSettings: navigation.showSettings,
-                    onQuit: { requestQuit(commandPressed: false) }
-                )
+                VStack(spacing: 0) {
+                    DriveDiscoveryFailureView(
+                        isRetrying: driveScanner.isRefreshing,
+                        onRetry: {
+                            Task { await refreshAll() }
+                        },
+                        onOpenSettings: navigation.showSettings,
+                        onQuit: { requestQuit(commandPressed: false) },
+                        footer: AnyView(footer)
+                    )
+                    if diagnosePresentation.isVisible {
+                        diagnosticPanel.padding(12)
+                    }
+                }
             } else if FullDiskAccessPresentationPolicy.shouldPresentSetup(
                 state: fullDiskAccessController.state,
                 deviceID: driveScanner.drives.first?.identifier
@@ -517,16 +523,7 @@ public struct PopoverContentView: View {
             }
 
             if diagnosePresentation.isVisible {
-                DiagnosePanel(
-                    runner: diagnoseRunner,
-                    mountState: appState.state,
-                    detectedDriveCount: visibleDrives.count,
-                    fullDiskAccessGranted: FullDiskAccessPresentationPolicy.diagnosticGrantEvidence(
-                        for: fullDiskAccessController.state
-                    ),
-                    contextIsCurrent: diagnoseReportContext == diagnoseStorageContext,
-                    onHide: { diagnosePresentation.hide() }
-                )
+                diagnosticPanel
             }
 
             Divider()
@@ -718,6 +715,19 @@ public struct PopoverContentView: View {
     /// pill lives in `emptyState` only, per GUI-PLAN.md's "Popover — idle" table). Previously this
     /// had a 4th SF-Symbol
     /// refresh button in the wrong position, plus SF Symbols instead of the comp's literal glyphs.
+    private var diagnosticPanel: some View {
+        DiagnosePanel(
+            runner: diagnoseRunner,
+            mountState: appState.state,
+            detectedDriveCount: visibleDrives.count,
+            fullDiskAccessGranted: FullDiskAccessPresentationPolicy.diagnosticGrantEvidence(
+                for: fullDiskAccessController.state
+            ),
+            contextIsCurrent: diagnoseReportContext == diagnoseStorageContext,
+            onHide: { diagnosePresentation.hide() }
+        )
+    }
+
     private var footer: some View {
         HStack(spacing: 5) {
             Button {

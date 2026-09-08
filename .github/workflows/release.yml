@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Semantic version to release, for example 3.0.0
+        description: Release tag version, for example 3.1.3-beta.1 or 3.1.3
         required: true
         type: string
 
@@ -38,12 +38,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_REF" != "refs/heads/dev" ]]; then
-            echo "::error::Run this workflow from dev."
+          if [[ "$GITHUB_REF" != "refs/heads/dev" && "$GITHUB_REF" != "refs/heads/Update/3.1.3" ]]; then
+            echo "::error::Run from dev (stable) or Update/3.1.3 (beta)."
             exit 1
           fi
-          if [[ ! "$RELEASE_VERSION" =~ ^3\.[0-9]+\.[0-9]+$ ]]; then
+          if [[ ! "$RELEASE_VERSION" =~ ^3\.[0-9]+\.[0-9]+(-beta\.[1-9][0-9]*)?$ ]]; then
             echo "::error::Version must be a v3 X.Y.Z version without the v prefix."
+            exit 1
+          fi
+
+          if [[ "$GITHUB_REF" == "refs/heads/Update/3.1.3" && "$RELEASE_VERSION" != *-beta.* ]]; then
+            echo "::error::The candidate branch can publish only beta releases."
             exit 1
           fi
 
@@ -57,9 +62,9 @@ jobs:
           git verify-tag "$release_tag"
 
           tag_commit="$(git rev-list -n 1 "$release_tag")"
-          dev_commit="$(git rev-parse origin/dev)"
+          dev_commit="$(git rev-parse "origin/${GITHUB_REF#refs/heads/}")"
           if [[ "$tag_commit" != "$dev_commit" ]]; then
-            echo "::error::Tag ${release_tag} must point to the exact validated origin/dev commit."
+            echo "::error::Tag ${release_tag} must match the selected remote branch exactly."
             exit 1
           fi
 
@@ -70,7 +75,8 @@ jobs:
           helper_build="$(plutil -extract CFBundleVersion raw -o - helper/Info.plist)"
           modern_helper_version="$(plutil -extract CFBundleShortVersionString raw -o - helper/Info-Modern.plist)"
           modern_helper_build="$(plutil -extract CFBundleVersion raw -o - helper/Info-Modern.plist)"
-          if [[ "$RELEASE_VERSION" != "$app_version" || "$app_version" != "$helper_version" ||
+          public_version="$(bash build/lib/release-version.sh gui/Info.plist)"
+          if [[ "$RELEASE_VERSION" != "$public_version" || "$app_version" != "$helper_version" ||
                 "$app_version" != "$modern_helper_version" || "$app_build" != "$helper_build" ||
                 "$app_build" != "$modern_helper_build" ]]; then
             echo "::error::Requested, app, and both helper versions/builds do not match."
@@ -137,6 +143,7 @@ jobs:
           ./build/sync-brand-assets.sh
           git diff --exit-code -- gui/Resources/AppIcon-source.png gui/Resources/AppIcon.icns gui/Resources/HelperIcon.png
           ./tests/run-all.sh
+          node tests/site-releases.cjs
           ./build/run-swift-tests.sh modern \
             "$RUNNER_TEMP/ntfsmac-modern-tests" --disable-sandbox
           ./build/run-swift-tests.sh legacy \
@@ -204,11 +211,20 @@ jobs:
           set -euo pipefail
           dmg_path="dist/ntfsmac-${RELEASE_VERSION}-Apple-Silicon.dmg"
           assets=("$dmg_path" "${dmg_path}.sha256")
+          channel_args=()
+          if [[ "$RELEASE_VERSION" == *-beta.* ]]; then
+            channel_args=(--prerelease --latest=false)
+          fi
+          notes_args=(--generate-notes)
+          if [[ -f "docs/releases/${RELEASE_VERSION}.md" ]]; then
+            notes_args=(--notes-file "docs/releases/${RELEASE_VERSION}.md")
+          fi
           gh release create "$RELEASE_TAG" \
             "${assets[@]}" \
+            "${channel_args[@]}" \
             --draft \
             --verify-tag \
-            --generate-notes \
+            "${notes_args[@]}" \
             --title "ntfsmac ${RELEASE_VERSION}"
 
       - name: Remove temporary credentials

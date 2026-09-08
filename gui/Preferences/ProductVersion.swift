@@ -5,10 +5,12 @@ import Foundation
 public struct ProductVersion: Equatable, Sendable {
     public let release: String
     public let build: String
+    public let releaseLabel: String?
 
-    public init(release: String, build: String) {
+    public init(release: String, build: String, releaseLabel: String? = nil) {
         self.release = release
         self.build = build
+        self.releaseLabel = releaseLabel
     }
 
     public static func current(bundle: Bundle = .main) -> Self {
@@ -18,12 +20,14 @@ public struct ProductVersion: Equatable, Sendable {
     public static func resolve(infoDictionary: [String: Any]) -> Self {
         let release = normalized(infoDictionary["CFBundleShortVersionString"]) ?? "Unknown"
         let build = normalized(infoDictionary["CFBundleVersion"]) ?? "Unknown"
-        return .init(release: release, build: build)
+        return .init(release: release, build: build,
+                     releaseLabel: normalized(infoDictionary["NTFSMACReleaseLabel"]))
     }
 
     public var settingsText: String {
-        guard build != "Unknown", build != release else { return "Version \(release)" }
-        return "Version \(release) (\(build))"
+        let display = releaseLabel.map { "\(release) \($0)" } ?? release
+        guard build != "Unknown", build != release else { return "Version \(display)" }
+        return "Version \(display) (\(build))"
     }
 
     private static func normalized(_ value: Any?) -> String? {

@@ -92,13 +92,38 @@ fetch("https://api.github.com/repos/BinaryBearsLLC/ntfsmac/releases/latest", {
     return response.json();
   })
   .then((release) => {
-    if (!release || release.draft || release.prerelease || !release.html_url) return;
-    releaseLink.href = release.html_url;
-    releaseLink.textContent = `Get ${release.tag_name}`;
-    releaseStatus.textContent = `Latest published release: ${release.tag_name}`;
+    const stable = NtfsmacReleases.select([release], false);
+    if (!stable) return;
+    releaseLink.href = stable.html_url;
+    releaseLink.textContent = `Stable · ${stable.tag_name}`;
+    releaseStatus.textContent = `Stable release: ${stable.tag_name}`;
   })
   .catch(() => {
     // The static latest-release link and status remain useful offline or under API limits.
+  });
+
+const betaLink = document.querySelector('#beta-link');
+const betaStatus = document.querySelector('#beta-status');
+fetch('https://api.github.com/repos/BinaryBearsLLC/ntfsmac/releases?per_page=100', {
+  headers: { Accept: 'application/vnd.github+json' }
+})
+  .then((response) => {
+    if (!response.ok) throw new Error('Release list unavailable');
+    return response.json();
+  })
+  .then((releases) => {
+    const beta = NtfsmacReleases.select(releases, true);
+    if (!beta) {
+      betaStatus.textContent = 'No public beta is currently available.';
+      return;
+    }
+    betaLink.href = beta.html_url;
+    betaLink.textContent = `Beta · ${beta.tag_name}`;
+    betaLink.hidden = false;
+    betaStatus.textContent = 'Beta: optional preview, separate from the stable release. Read its release notes before installing.';
+  })
+  .catch(() => {
+    betaStatus.textContent = 'See GitHub Releases for beta availability.';
   });
 
 if (!reducedMotion.matches && "IntersectionObserver" in window) {

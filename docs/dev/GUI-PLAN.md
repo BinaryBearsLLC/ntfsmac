@@ -43,7 +43,8 @@ during helper replacement.
 
 If discovery fails, a dedicated **Drive runtime** state shows **Unable to check connected drives**
 with **Try Again**. It never uses the Full Disk Access header. Raw output remains in the developer
-diagnostic only because it can contain personal paths. Settings and Quit stay reachable.
+diagnostic only because it can contain personal paths. The normal Diagnose footer is available
+here too, including Command-click JSON export; Settings and Quit stay reachable.
 
 ## Idle controls
 

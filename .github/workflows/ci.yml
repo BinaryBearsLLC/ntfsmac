@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main, dev, Update/3.1.3]
   pull_request:
     branches: [main, dev]
 
@@ -45,6 +45,8 @@ jobs:
           targets: aarch64-unknown-linux-musl
       - name: bats
         run: tests/run-all.sh
+      - name: Website release channels
+        run: node tests/site-releases.cjs
 
   rust-tests:
     name: cargo test (vendored crates)
