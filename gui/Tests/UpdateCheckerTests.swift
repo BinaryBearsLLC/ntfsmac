@@ -111,6 +111,11 @@ func sameVersionStableReleaseReplacesOnlyAPrerelease(isBeta: Bool) async {
 
     await checker.checkManually(currentVersion: "3.1.0")
     #expect(checker.state == .upToDate)
-    try? await Task.sleep(for: .milliseconds(30))
+    // A loaded CI runner may not schedule the reset task within 30 ms.
+    // Wait for the observable transition, with a bounded failure deadline.
+    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+    while checker.state == .upToDate && ContinuousClock.now < deadline {
+        try? await Task.sleep(for: .milliseconds(10))
+    }
     #expect(checker.state == .idle)
 }

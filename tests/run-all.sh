@@ -20,4 +20,4 @@ if [[ ${#BATS_FILES[@]} -eq 0 ]]; then
 fi
 
 echo "run-all.sh: running ${#BATS_FILES[@]} bats file(s)"
-bats "${BATS_FILES[@]}"
+bats --print-output-on-failure "${BATS_FILES[@]}"
