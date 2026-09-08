@@ -127,7 +127,7 @@ Automatic volume/camera sharing is disabled. Only the dedicated
 `Parallels/NTFSMac-Guest-Tests` folder is configured for read-only sharing, but
 Parallels still reports folder sharing inactive. After the user installed Tools
 27.0.0-58625 and restarted the guest, default `prlctl exec` works as guest root;
-the `--current-user` mode was not usable. The 119 MiB test kit was transferred over
+the first `--current-user` call completed only after a long delay. The 119 MiB test kit was transferred over
 the guest command channel into a newly created guest-only temporary directory,
 without exposing other host folders or attaching physical USB drives.
 
