@@ -84,6 +84,14 @@ does not by itself fix registration. Details are retained locally in
 `/tmp/ntfsmac-31302-sonoma-registration-detail.log` and
 `/tmp/ntfsmac-31302-sonoma-final.json`.
 
+A subsequent bounded recovery check renamed only the current test copy from `.retired` to
+`.app` and retried the normal Install Helper action. The service was removed and resubmitted,
+but launchd still resolved the old `.retired` URL and reported `ENOENT` rather than following
+the renamed bundle. The copy was returned to its original location. This rules out a simple
+extension-only recovery; the persisted registration URL needs separate cleanup. The framework
+probe was rerun afterward and still returned `virtualizationSupported=false` and
+`hypervisorCreateResult=-85377009`. No native-host state was changed by this check.
+
 No physical disk was attached to or formatted by this VM. Native Sonoma filesystem testing,
 macOS 15 and other chips/OS patch releases remain unverified. See the
 [Sonoma investigation](SONOMA_LOCAL_VALIDATION_2026-09-08.md) for earlier native view-rendering
