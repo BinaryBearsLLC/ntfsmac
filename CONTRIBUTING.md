@@ -6,7 +6,7 @@ Focused fixes and improvements are welcome. No contributor license agreement is 
 
 Read the short [roadmap](docs/BINARYBEARS_ROADMAP.md), [branch policy](docs/BRANCHING.md), and the
 non-negotiables in [CLAUDE.md](CLAUDE.md). The current GUI contract is
-[docs/dev/GUI-PLAN.md](docs/dev/GUI-PLAN.md); `docs/dev/PLAN.md` is the historical build plan.
+[docs/dev/GUI-PLAN.md](docs/dev/GUI-PLAN.md); [architecture](docs/dev/PLAN.md) explains the runtime.
 
 Important invariants:
 

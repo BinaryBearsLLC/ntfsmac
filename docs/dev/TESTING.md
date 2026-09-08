@@ -19,6 +19,10 @@ CLI behavior, release wiring, and regression tests. Both Swift variants must com
 non-empty test run. Legacy source tests protect migration and historical behavior;
 they do not produce a supported 3.1.3 Legacy installer.
 
+Run these commands sequentially. Packaging tests and real packaging both generate
+`helper/GeneratedCLIManifest.swift`; overlapping them can put the wrong tree hash
+in a bundle. The checked-in file must return to its placeholder afterward.
+
 On macOS 26.6.2 the wrapper skips only `PopoverStateRenderTests` because of a known AppKit runner
 hang. Run any changed render path directly with `swift test --filter <test-name>` and record it
 separately; do not count a skipped render suite as executed.

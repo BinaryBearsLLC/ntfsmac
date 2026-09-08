@@ -1,110 +1,53 @@
-# ntfsmac
+# Development instructions
 
-> New here? [README.md](README.md) has install/usage; [CONTRIBUTING.md](CONTRIBUTING.md) has
-> human setup steps. This file (mirrored at [AGENTS.md](AGENTS.md)) is AI-agent instructions —
-> read it before generating code in this repo, human or agent.
+AGENTS.md points here so there is only one set of agent instructions.
+Start with [CONTRIBUTING.md](CONTRIBUTING.md). Read the relevant guide before editing:
+[architecture](docs/dev/PLAN.md), [GUI behavior](docs/dev/GUI-PLAN.md),
+[tests](docs/dev/TESTING.md), [dependencies](docs/dev/ANYLINUXFS_UPDATE_POLICY.md),
+or [releases](docs/RELEASE.md).
 
-NTFS read/write on Apple Silicon macOS, no kernel extension, no SIP modification. Wraps `anylinuxfs` (libkrun microVM running ntfs-3g, exported to macOS over NFS on a dedicated private `/30` vmnet link). CLI first, GUI second — build order is fixed, don't jump ahead.
+## Preserve these boundaries
 
-Current priorities: **`docs/BINARYBEARS_ROADMAP.md`**. Historical architecture/build plan:
-**`docs/dev/PLAN.md`**. Current GUI behavior contract: **`docs/dev/GUI-PLAN.md`**. Read the relevant
-document before writing code; do not infer product status from old execution notes. `ui/prototype.html`
-(the original static HTML/SVG design comp) was removed 2026-07-13 — the already-built SwiftUI
-screens are now the visual source of truth for colors, radii, spacing, and the vibrancy/blur
-recipe. Match what's already built; don't re-design.
+- Apple Silicon only; the 3.1.3 target is macOS 14+. Guard newer APIs and check every
+  shipped host executable's minimum OS. Compilation is not older-OS runtime validation.
+- App-initiated privileged operations use the reviewed XPC helper. Never add raw
+  `sudo`, mount, PF or route mutations to SwiftUI code.
+- Validate partition identifiers against `^disk[0-9]+s[0-9]+$` before execution,
+  independently in the client and helper. Never infer NTFS from partition-map type.
+- Keep ntfs-3g as default, NTFS3 explicitly experimental, NFS `soft`, and the current
+  vmnet transport. Do not introduce SMB, loopback transport or unsafe RW overrides.
+- Missing evidence stays unknown. A healthy diagnostic is not proof of runtime boot,
+  data integrity, effective isolation, or hardware compatibility.
+- Standard uses SMAppService. Retain Legacy source for migration tests, not distribution.
+- Preserve existing UI design, one-time notices, and Command-click Diagnose export.
+  Do not add duplicate Settings controls or automatic diagnostic uploads.
 
-## Non-negotiables (do not re-litigate)
+## Dependencies and signing
 
-- **Driver:** ntfs-3g default. ntfs3 is opt-in only via `--fs-driver ntfs3`, never via an `-o` token (it's inert there).
-- **Transport:** NFS only, over a dedicated private vmnet-helper `/30` link. No SMB. No
-  loopback/`127.94.0.1` design — that's dead, don't resurrect it. The pinned anylinuxfs source
-  launches vmnet-helper with `--operation-mode=shared`; do not call that strict network isolation
-  unless effective PF/route evidence proves the narrower claim.
-- **NFS mount mode stays `soft`** — never switch to `hard`, it's what prevents a kernel panic on hot-unplug.
-- **Signing:** local and contributor builds stay ad-hoc (`codesign -s -`). Official BinaryBears
-  releases are Developer ID signed and Apple-notarized by the dedicated release path; credentials
-  stay in Keychain or GitHub encrypted secrets and never enter Git.
-- **Every control that mounts/unmounts/touches pf/route goes through a reviewed XPC helper** — the
-  3.1.3 Standard macOS 14+ artifact uses SMAppService. Legacy SMJobBless source is retained for
-  migration/regression testing, not 3.1.3 distribution. Both compile the same reviewed XPC implementation. Never add a raw `sudo` shell-out
-  from Swift UI code.
-- **Device names validated against `^disk[0-9]+s[0-9]+$`** before any shell invocation, in both CLI and GUI/helper.
-- **Platform:** Apple Silicon only. Don't add Intel fallback paths.
-- Security and connection stability outrank speed. Speed tuning (rsize/wsize/async export) is opt-in and documented as risk, never silently defaulted on.
+Use only the sources, exact commits and hashes in `build/sources.lock` and the
+associated manifests. Audit one dependency change at a time; verify transitive
+requirements before trimming. Do not fetch init-freebsd or build FreeBSD guest binaries.
+Retained feature decisions and package justifications are in `build/AUDIT.md`.
 
-## Build order
+Local/contributor builds may be ad-hoc. Official builds use the dedicated BinaryBears
+Developer ID/notarization path. Never weaken signature requirements or change
+entitlements to make a test pass. Credentials stay outside Git and logs.
 
-CLI (Phase 0 → V → 1 → 2) fully working and installable before any Phase 3 GUI code. Phase 1 (pf hardening) is defense-in-depth, not blocking — CLI can ship without it and gain it later, but don't skip it silently; call it out if deferring.
+## Working safely
 
-## Stack & environment
+- Preserve unrelated local changes. Use small, reviewable commits and update the
+  relevant existing guide instead of creating another session diary.
+- Run CLI/runtime checks before packaging the GUI. Do not run packaging tests and
+  real packaging concurrently: both generate the embedded CLI manifest.
+- Report automated, native hardware, VM, signing/notarization and remote results separately.
+- Real-disk formatting/corruption tests require explicit device-specific authorization
+  and fresh identity checks. Do not touch other attached media.
+- Ask before destructive Git operations, unapproved privilege/signing changes, or
+  publication not explicitly requested by the owner. Never rewrite published history.
 
-- CLI: zsh scripts + vendored Rust/Go binaries (built via Phase V, not hand-written by us).
-- GUI: Swift + SwiftUI, menu-bar agent (`LSUIElement`, no Dock icon). The 3.1.3 candidate targets macOS 14.0+; every bundled host executable must pass `build/lib/macos-target.sh`. A successful build is not older-OS runtime qualification.
-- Dev machine: Apple Silicon Mac. Local macOS VM qualification is allowed. Record guest boot, GUI/API tests, nested virtualization, and physical USB acceptance separately; do not equate them.
-- The maintainer's language background: Python/Java, newer to Rust/Swift/shell and to CI/CD, licensing, security-policy infra. Explain non-boilerplate Rust/Swift/shell decisions briefly when introducing them; don't over-explain repeated patterns.
+## Repository roles
 
-## Working style
-
-- The maintainer reviews and decides; doesn't want to hand-write boilerplate. Generate full files/scripts, flag the specific lines that need a decision.
-- Deliver complete, consolidated output per unit of work — not incremental step-by-step prompting. A "unit" = one phase's deliverables, or one component build script, not the whole project at once.
-- Don't pause mid-task for confirmation on mechanical steps. Do stop and ask before: destructive git operations, anything touching signing/entitlements in a way that deviates from PLAN.md, or scope decisions PLAN.md leaves open (e.g. version pins not yet filled in `sources.lock`).
-- Errors get reported after the maintainer runs something, not pre-emptively hedged against. Don't pre-apologize for code that hasn't been tested yet.
-- Direct, casual, no filler, no encouragement padding. Flag scope creep against PLAN.md explicitly if a request drifts from it.
-
-## Repo identity
-
-Development fork: `github.com/BinaryBearsLLC/ntfsmac` (`origin`). Original upstream:
-`github.com/khr898/ntfsmac` (`upstream`). Existing Homebrew/release references under `khr898`
-describe the upstream distribution unless the BinaryBears fork creates and documents its own
-channel. Never leave `YOURUSERNAME` literals, never silently rewrite upstream distribution links
-as fork links, and never open or modify an upstream pull request unless the maintainer explicitly
-requests that action.
-
-Branch roles in the BinaryBears fork:
-
-- `main` mirrors `upstream/main`; do not land BinaryBears-only roadmap or branding there.
-- `dev` is the long-lived BinaryBears integration branch: current upstream plus the fork roadmap
-  and fork-only product work. After blocker validation it is also the canonical source for the
-  BinaryBears GitHub release, rebranding, site, and Standard-only artifact pipeline.
-- BinaryBears feature/fix branches start from `dev` and target `dev` through focused PRs.
-- A candidate intended for the original project starts independently from current
-  `upstream/main`, contains no BinaryBears-only documentation, and is submitted upstream only
-  after the maintainer explicitly requests it.
-
-
-
-Everything vendored/built comes from these. Use these exact repos — don't substitute forks or mirrors without flagging it.
-
-| Component | Source | Pin method |
-|---|---|---|
-| anylinuxfs (submodule, Rust CLI + build scripts) | `https://github.com/nohajc/anylinuxfs` | git submodule, pinned commit in `build/sources.lock` |
-| libkrun (Cargo dep of anylinuxfs + vmrunner-sys) | `https://github.com/containers/libkrun`, branch `stable-1.19.x` | `Cargo.lock` exact commit — not hand-edited |
-| libkrunfw (kernel image + modules, vendored prebuilt) | `https://github.com/nohajc/libkrunfw/releases` — this is nohajc's fork, NOT `containers/libkrunfw` upstream | version + sha256 in `build/sources.lock` |
-| vmnet-helper (upstream ad-hoc-signed vendored prebuilt; re-signed locally) | `https://github.com/nirs/vmnet-helper/releases` | version + commit + sha256 in `build/sources.lock` |
-| gvproxy (built from source, pure Go) | `https://github.com/containers/gvisor-tap-vsock`, tag `v0.8.9` (verify against anylinuxfs's `download-dependencies.sh` for drift before building) | commit + Go security-overlay graph hash in `build/sources.lock` |
-| Alpine rootfs base (pulled by init-rootfs via umoci) | Docker Hub `alpine` image | exact tag + linux/arm64 digest in `build/sources.lock`; the tag is verified to resolve to that digest, scratch-build patches embed the immutable digest-only pull reference in both runtime binaries, and packaging rejects a floating default |
-
-Don't fetch: `init-freebsd` (containers/libkrun releases) — FreeBSD guest init, not needed for NTFS, do not add to `sources.lock` or `fetch-prebuilt.sh`.
-
-## Dependency trimming — build only what NTFS/CLI/macOS-arm64 needs
-
-We are not copying anylinuxfs's already-compiled binaries or its full default build — we build from source ourselves specifically so unnecessary parts can be cut. Every vendored/built artifact should be justified by: does the CLI (and later GUI) need this for NTFS mount/unmount on Apple Silicon? If not, cut it.
-
-**First Phase V task, before any build script is written: audit the real source.** Claude Code has `git clone` access this chat didn't — use it. Clone the `nohajc/anylinuxfs` submodule per V.2, then actually read (don't guess from memory or search snippets):
-- `init-rootfs/default-alpine-packages.txt` — the real current package list. One confirmed data point from a public error log: it's 13 packages including `bash`, `blkid`, `btrfs-progs` — the rest were not verified and should not be assumed. Read the actual file and cut anything not required for {ntfs-3g mount, rpc.nfsd export, blkid-based device detection}. Filesystem tools for fs types ntfsmac doesn't support (btrfs-progs, xfsprogs, zfs userspace, mdadm/lvm2 if not needed for the target use case) are the likely cut candidates — but confirm against the real file and against what ntfs-3g/rpc.nfsd actually depend on before removing anything, since some "unrelated-looking" packages may be transitive requirements.
-- `anylinuxfs/Cargo.toml`, `vmproxy/Cargo.toml`, `vmrunner-sys/Cargo.toml` — the actual current feature flags, not just the `freebsd` one PLAN.md already names.
-- `init-rootfs/main.go` and its go.mod — confirm which OCI/umoci pull options and embedded config are or aren't needed.
-
-Known cuts already decided in PLAN.md — treat these as settled, not open questions:
-
-- **Drop `freebsd-bootstrap` entirely and the FreeBSD `vmproxy-bsd` cross-build.** Optional guest support for FreeBSD filesystems, irrelevant to NTFS, pulls in a separate nightly toolchain + `-Z build-std` cross-build for zero feature value.
-- **Test dropping the `freebsd` feature flag** (`-F freebsd`) from the `anylinuxfs` and `vmproxy` Cargo builds. Confirm it still compiles clean without the flag before committing to it — don't drop blind.
-- **Never fetch `init-freebsd`** from libkrun releases (see table above).
-
-Beyond this settled list: if a build step, Cargo feature, Alpine package, or fetched artifact isn't clearly required for {NTFS mount, ntfs-3g default / ntfs3 opt-in, NFS export over vmnet, Apple Silicon}, don't silently include it — call it out and confirm with the maintainer before adding it to `sources.lock`, `build-all.sh`, or the Alpine package list. This is an ongoing decision, not a one-time pass — re-check it any time a new upstream component gets pulled in. Never remove a package/feature without confirming it isn't a transitive dependency of something that is needed (e.g. `blkid` looks droppable but is almost certainly required for disk identification — verify before cutting, don't cut on name alone).
-
-
-
-- After Phase V: `vendor/bin/anylinuxfs list` works with zero brew taps beyond build-toolchain ones; runtime kernel image matches the `sources.lock` pin, not whatever libkrun's build-time libkrunfw dragged in.
-- Before any Homebrew formula work: confirm ad-hoc signed binaries carry no quarantine xattr from the install path used.
-- Before Phase 3 starts: Phase 2 CLI deliverables in PLAN.md are all checked off.
+`origin` is BinaryBearsLLC/ntfsmac; `upstream` is khr898/ntfsmac. Keep `main` as the
+upstream mirror and BinaryBears integration on `dev`. Preserve `3.1.2` as rollback;
+3.1.3 work belongs on `Update/3.1.3` until approved integration. Upstream proposals
+are separate and must not include fork-only branding or product policy.
