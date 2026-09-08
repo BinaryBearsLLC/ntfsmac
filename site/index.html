@@ -44,7 +44,7 @@
             <a class="button secondary" href="https://github.com/BinaryBearsLLC/ntfsmac">Source code</a>
           </div>
           <p class="release-status" id="release-status">Latest published release on GitHub</p>
-          <p class="note">3.1.3 is undergoing local validation and is not yet published.
+          <p class="note">3.1.3 is the next release and is not yet published.
             The download button always opens the latest published release.</p>
         </div>
         <div class="hero-art" data-parallax aria-hidden="true">
@@ -61,36 +61,35 @@
 
       <section class="requirements" data-reveal aria-label="System requirements">
         <div><strong>Apple Silicon</strong><span>M-series Mac</span></div>
-        <div><strong>macOS 14+</strong><span>3.1.3 build target; coverage below</span></div>
+        <div><strong>macOS 14+</strong><span>3.1.3 system requirements</span></div>
         <div><strong>Standard only</strong><span>Legacy deprecated in 3.1.3</span></div>
       </section>
 
       <section class="section" id="compatibility">
         <div class="section-heading" data-reveal>
-          <div><p class="eyebrow">Compatibility evidence</p><h2>What we have tested.</h2></div>
-          <p>A minimum system requirement is not a claim that every supported Mac has been tested.
-            These are local results, not a completed release qualification.</p>
+          <div><p class="eyebrow">Compatibility</p><h2>Built for Apple Silicon.</h2></div>
+          <p>One Standard installer for the 3.1.3 line, with system-specific behavior and
+            clear diagnostics when you need help.</p>
         </div>
         <div class="steps">
-          <article data-reveal><h3>macOS 26.6.2 · M5</h3><p>Native app, helper and pinned runtime checks.
-            NTFS write, flush, remount and SHA-256 verification; mixed NTFS/ExFAT detection.
-            Other chips and longer workloads still need coverage.</p></article>
-          <article data-reveal><h3>Sonoma 14.6.1 · VM</h3><p>App launch, native Settings/error-view rendering
-            and bundled executable loading. Helper/CLI 31302 installation passed after cleaning stale
-            test registrations. Read/write is not confirmed: the local VM cannot expose
-            the nested Hypervisor access required by the filesystem runtime.</p></article>
-          <article data-reveal><h3>Other macOS 14+ systems</h3><p>Native end-to-end results are still needed,
-            including macOS 15 and other M-series chips. Intel and macOS 13 or earlier are outside
-            the 3.1.3 target. Earlier 3.1.2 builds declared macOS 13+ on Apple Silicon.</p></article>
+          <article data-reveal><h3>Apple Silicon · macOS 14+</h3><p>The 3.1.3 line targets M-series Macs
+            running Sonoma or newer. Intel Macs and macOS 13 or earlier are outside this release's
+            system requirements.</p></article>
+          <article data-reveal><h3>System-aware features</h3><p>Newer macOS features are enabled where
+            available, with compatible paths for earlier systems. The filesystem runtime requires
+            access to Apple's hardware virtualization.</p></article>
+          <article data-reveal><h3>Compatibility details</h3><p>The README records exact macOS versions,
+            hardware and verified operations, distinguishing native Macs from virtual machines.
+            Consult it for the coverage relevant to your configuration.</p></article>
         </div>
-        <p class="note" data-reveal>Help extend this coverage: report the app version/build, macOS version,
+        <p class="note" data-reveal>Share your experience: report the app version/build, macOS version,
           chip family, filesystem and operations completed. Successful tests are welcome alongside bug
           reports. Use backed-up or disposable media. Hold Command (⌘) while clicking Diagnose to export
           JSON, review it, then attach it to your report. Nothing is uploaded automatically.
           Community reports are tracked separately from maintainer verification.</p>
         <div class="doc-links" data-reveal>
           <a href="https://github.com/BinaryBearsLLC/ntfsmac/issues/new/choose">Submit a compatibility report</a>
-          <a href="https://github.com/BinaryBearsLLC/ntfsmac">Source and validation records</a>
+          <a href="https://github.com/BinaryBearsLLC/ntfsmac#requirements">Requirements and compatibility details</a>
         </div>
       </section>
 

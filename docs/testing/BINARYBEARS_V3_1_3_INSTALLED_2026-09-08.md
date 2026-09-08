@@ -122,8 +122,25 @@ and executable-load evidence.
 
 ## Documentation, site and repository state
 
-README and the project website distinguish native M5 results, limited Sonoma guest evidence,
-and untested combinations. Compatibility reports are invited with version/build, OS, chip
+### Manual-install DMG 31302
+
+For the owner's manual VM installation, `dist/ntfsmac-3.1.3-31302-Apple-Silicon.dmg`
+was assembled locally by retaining the previous local DMG's Finder artwork/layout and replacing
+only its app with the verified 31302 bundle. The previous DMG was preserved. `hdiutil verify`
+passes; the mounted app reports build 31302, its GUI SHA-256 matches the package above, and
+deep/strict code-signature verification passes. Finder inspection confirms the app,
+Applications link and BinaryBears artwork. This is a local test image, not a notarized release.
+
+DMG SHA-256: `10fe1d9be3c9466783c6539fc9f5fffc73d5055a49d457b0b069593ab91d9822`.
+An identical copy is available inside the VM at
+`/Users/Shared/ntfsmac-3.1.3-31302-Apple-Silicon.dmg` (transfer hash verified).
+Only the guest user's one-time-notice acknowledgement was cleared, with the app not running,
+to let the owner see the notice on next launch. Normal reinstall/update does not clear it.
+
+README and the validation records distinguish native M5 results, limited Sonoma guest evidence,
+and untested combinations. At the owner's request, the website presents requirements and features
+without an internal test-backlog narrative, linking to the README for exact compatibility coverage.
+Compatibility reports are invited with version/build, OS, chip
 family, filesystem and completed operations; success reports and failures are both useful.
 Reports must be reviewed for privacy. Community evidence is not labelled maintainer testing.
 
