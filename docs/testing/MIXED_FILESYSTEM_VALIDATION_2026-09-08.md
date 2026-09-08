@@ -96,6 +96,7 @@ The new GUI shows **one** NTFS drive (MobileData) with both exFAT controls still
 | TEST_USB / APFS GPT | Correctly excluded | PASS, 16 MiB through macOS native mount |
 | Retroid_SD / exFAT MBR | Correctly excluded | Not written; observation-only control |
 | TEST_USB / new NTFS format | Guest formatter failed at device sync | Not passed |
+| TEST_USB / NTFS from verified 1 GiB image | PASS | PASS, 16 MiB through updated CLI/NFS, remount/hash/cleanup |
 | TEST_USB / ext2 | PASS | PASS, 16 MiB through updated CLI/NFS, remount/hash/cleanup |
 | TEST_USB / ext3 | PASS | PASS, 16 MiB through updated CLI/NFS, remount/hash/cleanup |
 | TEST_USB / ext4 | PASS | PASS, 16 MiB through updated CLI/NFS, remount/hash/cleanup |
@@ -123,8 +124,13 @@ All three ext matrix modes subsequently completed successfully, with healthy dia
 zero NFS mounts/security sessions at completion. A separate 1 GiB NTFS image was then created
 successfully with the pinned guest `mkntfs`, including sync; `ntfsinfo` reported clean volume
 flags. TEST_USB was repartitioned for a 1 GiB image-copy/physical-mount test, with the remainder
-left free. Physical copy and acceptance remain pending. This does not erase the direct-raw
-formatting failure from the evidence.
+left free. Physical copy subsequently completed: all 1,073,741,824 bytes were reread and matched
+image SHA-256 `e8fcb0b26c04cc991948f6d13ce71f9ed70ebaf48cee8b858e5c1a8b4336a09e`.
+The updated installed CLI then completed NTFS mount, 16 MiB write, unmount, remount, reread
+SHA-256 and exact test-file cleanup. Final diagnostics were healthy with zero NFS mounts and
+zero security sessions. TEST_USB remains unmounted, with a 1 GiB NTFS partition and the rest
+free. This does not erase the direct-raw formatting failure from the evidence. Raw evidence:
+`/tmp/ntfsmac-testusb-ntfs-image.log`.
 
 Raw temporary logs remain local (`/tmp/ntfsmac-mixed-*`, `/tmp/ntfsmac-test-usb-*`, and
 `/tmp/ntfsmac-hardware-*`). Do not publish them without privacy review. The temporary e2fsprogs
@@ -133,8 +139,9 @@ the app's dependencies or installed globally.
 
 ## Remaining release gates
 
-Complete the explicitly authorized TEST_USB NTFS/ext matrix and Legacy hardware acceptance,
-then perform release-artifact, DMG/Finder, notarization/stapling and downloaded-artifact checks
+The bounded TEST_USB NTFS/ext mount/write matrix is complete. Resolve the minimum-macOS blockers
+below and qualify migration from an existing Legacy installation, then perform release-artifact,
+DMG/Finder, notarization/stapling and downloaded-artifact checks
 once the release strategy is approved. Longer transfers, hot-unplug and dirty/hibernated-media
 tests are not covered by the 16 MiB acceptance above. No push, hosted CI run, release, issue
 comment or other remote publication was performed by this work.
