@@ -25,8 +25,12 @@ experimental choice.
 
 ## Requirements
 
+This development branch targets 3.1.3. macOS 14 runtime qualification is still in
+progress; see the [local validation record](docs/testing/SONOMA_LOCAL_VALIDATION_2026-09-08.md).
+This is not an announcement of a published or fully qualified 3.1.3 release.
+
 - Apple Silicon Mac.
-- macOS 13 Ventura or newer.
+- macOS 14 Sonoma or newer (3.1.3 build target).
 - An external partition in a supported filesystem.
 - Administrator approval for the privileged helper and Full Disk Access for that helper.
 

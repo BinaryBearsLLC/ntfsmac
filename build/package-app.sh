@@ -19,6 +19,8 @@ set -uo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
+source "$SCRIPT_DIR/lib/macos-target.sh"
+macos_target_activate
 
 HELPER_VARIANT="${NTFSMAC_HELPER_VARIANT:-modern}"
 case "$HELPER_VARIANT" in
@@ -178,6 +180,7 @@ main() {
   fi
 
   echo "package-app: computing cli-src content hash (pass-1 helper binary as a hashing tool)"
+  macos_target_verify_runtime "$cli_stage/vendor/bin" || exit 1
   local tree_hash
   tree_hash="$("$helper_bin" --print-tree-hash "$cli_stage")" || {
     echo "package-app: HARD-STOP — failed to compute cli-src tree hash" >&2
@@ -292,6 +295,8 @@ SWIFT
   rm -rf "$cli_stage"
 
   local -a helper_sign_args=(-s "$SIGNING_IDENTITY" --force --timestamp=none --identifier "$helper_label")
+  macos_target_verify_binary "$APP/Contents/MacOS/$GUI_BIN_NAME" || exit 1
+  macos_target_verify_binary "$helper_destination" || exit 1
   local -a app_sign_args=(-s "$SIGNING_IDENTITY" --force --timestamp=none)
   if [[ "$SIGNING_IDENTITY" != "-" ]]; then
     helper_sign_args=(-s "$SIGNING_IDENTITY" --force --options runtime --timestamp --identifier "$helper_label")

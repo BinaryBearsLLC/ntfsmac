@@ -18,6 +18,8 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 # shellcheck source=lib/lock.sh
 source "$SCRIPT_DIR/lib/lock.sh"
+source "$SCRIPT_DIR/lib/macos-target.sh"
+macos_target_activate
 # shellcheck source=lib/rust-toolchain.sh
 source "$SCRIPT_DIR/lib/rust-toolchain.sh"
 # shellcheck source=lib/cargo-lock-overlay.sh
@@ -418,7 +420,7 @@ main() {
   echo "build-all: orchestrating fetch-prebuilt, build-gvproxy, init-rootfs first"
   "$REPO_ROOT/build/fetch-prebuilt.sh" || { echo "build-all: HARD-STOP — fetch-prebuilt.sh failed" >&2; exit 1; }
   "$REPO_ROOT/build/build-gvproxy.sh" || { echo "build-all: HARD-STOP — build-gvproxy.sh failed" >&2; exit 1; }
-  "$REPO_ROOT/build/init-rootfs.sh" || true  # non-fatal: see build/AUDIT.md — vmproxy-embed gap resolves after this unit builds vmproxy
+  "$REPO_ROOT/build/init-rootfs.sh" || { echo "build-all: HARD-STOP — init-rootfs build/setup failed" >&2; exit 1; }
 
   prepare_build_copy || exit 1
 
@@ -433,7 +435,7 @@ main() {
   run_tests || exit 1
 
   echo "build-all: re-running init-rootfs.sh now that vendor/bin/vmproxy exists, to complete rootfs assembly"
-  "$REPO_ROOT/build/init-rootfs.sh" || echo "build-all: WARN — init-rootfs.sh re-run (with vmproxy staged) did not complete cleanly; inspect its output" >&2
+  "$REPO_ROOT/build/init-rootfs.sh" || { echo "build-all: HARD-STOP — final rootfs assembly failed" >&2; exit 1; }
 
   echo "build-all: done — $BIN_DIR/anylinuxfs, $BIN_DIR/vmproxy"
 }

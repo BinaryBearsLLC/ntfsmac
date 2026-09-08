@@ -1,5 +1,10 @@
 # Mixed-filesystem fix and hardware qualification — 2026-09-08
 
+This report records hardware testing of build 31208. Subsequent macOS 14 targeting,
+candidate 3.1.3 (31301), and the local Sonoma VM are tracked separately in
+[Sonoma local validation](SONOMA_LOCAL_VALIDATION_2026-09-08.md). Those later build
+changes do not retroactively qualify 31301 on the physical USB matrix below.
+
 ## Scope and provenance
 
 Local branch `Update/3.1.3` starts at dependency-refresh checkpoint

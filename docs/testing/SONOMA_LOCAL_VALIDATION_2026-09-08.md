@@ -1,0 +1,99 @@
+# macOS 14 compatibility — local qualification in progress
+
+Branch: `Update/3.1.3`, candidate version 3.1.3 (31301). The `3.1.2` rollback branch and `dev` are unchanged.
+No remote service, paid resource, push, release, or notarization is part of this run.
+
+## Build change
+
+The candidate now sets Swift and the app manifest to macOS 14.0. Host Rust builds
+receive an explicit deployment target; the Go/CGO `init-rootfs` build also sets the
+C compiler and external-linker minimum explicitly. The SDK may remain newer.
+
+`build/lib/macos-target.sh` verifies arm64 Mach-O minimum-version metadata for all
+four host runtime executables. Vendor verification and app packaging fail if a
+binary requires a version above 14.0 or has unrecognized metadata. Packaging also
+checks the compiled GUI and helper. Guest Linux binaries are not macOS executables
+and are intentionally outside this load-command check.
+
+The gate reproduced the existing `init-rootfs` minimum of 26.0 before rebuilding.
+A full Rust static-library plus Go rebuild now passes with minimum 14.0. No
+dependency version, filesystem driver, entitlement, or newer-OS feature was removed.
+
+## Local results so far
+
+- Host: Apple M5, macOS 26.6.2. These are **not** Sonoma execution results.
+- Seven minimum-version regression tests pass, including real Mach-O fixtures
+  compiled for 14.0 and 26.0 (the latter must be rejected).
+- Standard Swift suite: 324 tests passed with deployment target 14.0. The existing
+  macOS 26.6.2 render-suite exclusion remains; skipped rendering is not a pass.
+- All four existing/rebuilt host runtime binaries pass the new minimum-version gate.
+- The initial isolated Alpine preparation reported `start vm error: Invalid
+  argument (errno 22)`. Inspection found that the setup runner copied the unsigned
+  compiler output instead of the signed vendor artifact. The runner now copies
+  the signed artifact without changing any entitlements. A regression test verifies
+  that selection. Retesting completed actual guest package installation, and the
+  resulting database matches all 70 locked base/add-on package versions exactly.
+- Full shell run: 391 tests, 389 passed and two failed (full build and an obsolete
+  assertion requiring version 3.1.2). The version assertion is corrected and its
+  four-test suite passes. A full build in a separate directory passes, including
+  all 61 Rust tests and exact guest package verification. The full-build Bats case
+  also passes when rerun in the original build location with failure output enabled
+  (`/tmp/ntfsmac-sonoma-build-bats-recheck.log`). Both failed cases therefore pass
+  on retest. The original build failure did not retain detailed output, so its
+  cause is not established. Do not describe that initial full-suite run as green.
+- The real Standard 3.1.3 (31301) app was built at
+  `dist/ntfsmac-3.1.3-sonoma-local.app`; deep/strict ad-hoc signature verification and
+  minimum-version checks for the GUI, helper, and four runtime executables pass.
+  It has not replaced the installed physical-host app and is not notarized.
+
+Private logs: `/tmp/ntfsmac-sonoma-rootfs-build.log`,
+`/tmp/ntfsmac-sonoma-swift.log`, `/tmp/ntfsmac-sonoma-bats.log`.
+The signed-run retest is `/tmp/ntfsmac-sonoma-rootfs-signed.log`.
+
+## Newer-system behavior retained
+
+The pinned anylinuxfs source still selects privileged vmnet below macOS 26,
+rootless vmnet from 26, and automatic TSO/checksum offload from 26.2. Targeting 14
+does not remove these runtime checks. The reviewed privileged helper remains the
+app's control path on all versions. Native newer-OS regression testing and Sonoma
+runtime qualification must both complete before a support claim is finalized.
+
+Local binary/SDK inspection also confirms that the new vmnet network APIs are
+weak imports in the bundled helper. The strongly imported TSO and checksum keys
+are declared available since macOS 11 and 12 respectively; `hv_vm_config_create`
+is available since 13. libkrun resolves its optional EL2 APIs dynamically only
+when nested mode is requested. These checks support the fallback design but do
+not replace execution on Sonoma.
+
+## Local virtual machine attempt
+
+Parallels Desktop 27 is already installed. Sonoma 14.6.1 (23G93) was downloaded
+directly from Apple's CDN into `Parallels/NTFSMac-Test-Media`. Apple's
+`VZMacOSRestoreImage` reports `isSupported=true` and a supported hardware model on
+this M5. This disproves the assumption that the M5 necessarily prevents local
+Sonoma VM installation.
+
+`prlctl create` successfully created `NTFSMac Sonoma 14 Test`, UUID
+`92317191-3d42-4a5e-b408-163db90e7a61`, configured with 2 CPUs and 4 GiB RAM. The
+installation completed and a Sonoma desktop was observed through the VM's own
+screenshot command. The existing Windows 11 VM remains stopped and unchanged.
+
+Automatic volume/camera sharing is disabled. Only the dedicated
+`Parallels/NTFSMac-Guest-Tests` folder is shared read-only. Parallels accepts
+`--nested-virt on` and reports it enabled; **actual guest Hypervisor access has not
+yet been tested**, and this configuration flag alone proves no nested capability.
+The app and a signed capability probe are staged in that test folder. Parallels
+Tools installation is pending; guest command execution currently reports that no
+session can be opened. No app-runtime result on Sonoma is claimed yet.
+
+A Sonoma guest can provide GUI/API evidence if supported by the host. Full driver
+acceptance additionally requires the guest to expose Hypervisor.framework to
+libkrun. This must be checked explicitly, not inferred from a booted desktop.
+Neither a simulated OS-version decision nor USB tests on macOS 26 replace it.
+
+A locally compiled and ad-hoc-signed diagnostic using Apple's Virtualization and
+Hypervisor frameworks reports `VZVirtualMachine.isSupported=true` and successful
+`hv_vm_create`/`hv_vm_destroy` (both return 0) on the native host. Probe output:
+`/tmp/ntfsmac-sonoma-restore-check.log`; creation/start logs:
+`/tmp/ntfsmac-sonoma-parallels-create.log` and
+`/tmp/ntfsmac-sonoma-parallels-start.log`.

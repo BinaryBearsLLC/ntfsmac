@@ -39,8 +39,8 @@ CLI (Phase 0 → V → 1 → 2) fully working and installable before any Phase 3
 ## Stack & environment
 
 - CLI: zsh scripts + vendored Rust/Go binaries (built via Phase V, not hand-written by us).
-- GUI: Swift + SwiftUI, menu-bar agent (`LSUIElement`, no Dock icon), macOS 13.0+ target unless a specific API forces higher — verify, don't assume.
-- Dev machine: Apple Silicon Mac. (VM-based testing isn't part of this build — no Linux VM step exists.)
+- GUI: Swift + SwiftUI, menu-bar agent (`LSUIElement`, no Dock icon). The 3.1.3 candidate targets macOS 14.0+; every bundled host executable must pass `build/lib/macos-target.sh`. A successful build is not older-OS runtime qualification.
+- Dev machine: Apple Silicon Mac. Local macOS VM qualification is allowed. Record guest boot, GUI/API tests, nested virtualization, and physical USB acceptance separately; do not equate them.
 - The maintainer's language background: Python/Java, newer to Rust/Swift/shell and to CI/CD, licensing, security-policy infra. Explain non-boilerplate Rust/Swift/shell decisions briefly when introducing them; don't over-explain repeated patterns.
 
 ## Working style

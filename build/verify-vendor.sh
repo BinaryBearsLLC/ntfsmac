@@ -6,19 +6,17 @@
 # no freebsd-bootstrap/vmproxy-bsd artifacts, and that the anylinuxfs binary actually
 # runs (dyld/libkrun link check via --version, no config/VM needed).
 #
-# Deliberately DOES NOT run `vendor/bin/anylinuxfs list` end-to-end: that calls
-# vm_image::init() unconditionally (main.rs:918-922), which needs the guest rootfs's
-# apk packages installed — real anylinuxfs Go tool does that by booting a VM at first
-# use, and VM boot on an ad-hoc-signed binary needs the com.apple.security.hypervisor
-# entitlement. Adding that entitlement is a signing change — PLAN.md §0.3 HARD-STOPs
-# any unit that touches signing/entitlements outside §3's plan; that's `2-signing`'s
-# job, not this one. See build/AUDIT.md for the full real finding.
+# This gate does not initialize a guest, enumerate media, or mount/write a disk.
+# The normal build signs the virtualization tools with their reviewed entitlements;
+# live guest and physical-media qualification remain separate tests. Passing this
+# gate on a newer host does not prove execution on the minimum macOS version.
 set -uo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 # shellcheck source=lib/lock.sh
 source "$SCRIPT_DIR/lib/lock.sh"
+source "$SCRIPT_DIR/lib/macos-target.sh"
 
 BIN_DIR="${NTFSMAC_VENDOR_BIN_DIR:-$REPO_ROOT/vendor/bin}"
 KERNEL_DIR="${NTFSMAC_VENDOR_KERNEL_DIR:-$REPO_ROOT/vendor/kernel}"
@@ -171,6 +169,7 @@ main() {
   local failed=0
   check_binaries_present || failed=1
   check_host_binaries_arm64 || failed=1
+  macos_target_verify_runtime "$BIN_DIR" || failed=1
   check_guest_vmproxy_aarch64_linux || failed=1
   check_no_freebsd_artifacts || failed=1
   check_no_quarantine_xattr || failed=1
@@ -185,9 +184,7 @@ main() {
   fi
 
   echo "verify-vendor: all checks passed."
-  echo "verify-vendor: NOTE — live 'anylinuxfs list' (VM boot / real apk install) deferred to"
-  echo "verify-vendor: 2-signing (needs com.apple.security.hypervisor entitlement). Not run here"
-  echo "verify-vendor: by design — see this script's header and build/AUDIT.md."
+  echo "verify-vendor: NOTE — guest boot, physical mount/write, and minimum-OS execution are separate gates; not run here."
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

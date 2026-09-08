@@ -35,6 +35,7 @@ setup() {
 
 @test "generated vm-setup.sh package manifest matches the exact add-on lock" {
   run "$SCRIPT"
+  [ "$status" -eq 0 ]
   local rootfs_home
   rootfs_home="$(echo "$output" | sed -n 's/^init-rootfs: NTFSMAC_ROOTFS_HOME=//p' | tail -1)"
   [ -n "$rootfs_home" ]
@@ -103,6 +104,7 @@ setup() {
 
 @test "vendors the built init-rootfs binary to vendor/bin/init-rootfs" {
   run "$SCRIPT"
+  [ "$status" -eq 0 ]
   [ -x "$REPO_ROOT/vendor/bin/init-rootfs" ]
   run file "$REPO_ROOT/vendor/bin/init-rootfs"
   [[ "$output" == *"arm64"* ]]
@@ -110,6 +112,7 @@ setup() {
 
 @test "vendor/bin/init-rootfs carries the hypervisor entitlement (build/sign.sh actually ran)" {
   run "$SCRIPT"
+  [ "$status" -eq 0 ]
   run codesign -d --entitlements - --xml "$REPO_ROOT/vendor/bin/init-rootfs"
   [[ "$output" == *"com.apple.security.hypervisor"* ]]
 }

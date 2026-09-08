@@ -30,6 +30,8 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." &>/dev/null && pwd)"
 source "$SCRIPT_DIR/lib/lock.sh"
 # shellcheck source=lib/go-toolchain.sh
 source "$SCRIPT_DIR/lib/go-toolchain.sh"
+source "$SCRIPT_DIR/lib/macos-target.sh"
+macos_target_activate
 # shellcheck source=lib/rust-toolchain.sh
 source "$SCRIPT_DIR/lib/rust-toolchain.sh"
 # shellcheck source=lib/cargo-lock-overlay.sh
@@ -258,7 +260,12 @@ build_vmrunner_sys() {
 }
 
 build_init_rootfs_bin() {
-  (cd "$CACHE_DIR/init-rootfs" && CGO_ENABLED=1 go_with_locked_toolchain build -tags 'containers_image_openpgp osusergo' -ldflags="-w -s" -o bin/init-rootfs .)
+  (cd "$CACHE_DIR/init-rootfs" && CGO_ENABLED=1 \
+    CGO_CFLAGS="${CGO_CFLAGS:-} -mmacosx-version-min=14.0" \
+    CGO_LDFLAGS="${CGO_LDFLAGS:-} -mmacosx-version-min=14.0" \
+    go_with_locked_toolchain build -tags 'containers_image_openpgp osusergo' \
+    -ldflags="-w -s -extldflags=-mmacosx-version-min=14.0" -o bin/init-rootfs .) || return 1
+  macos_target_verify_binary "$CACHE_DIR/init-rootfs/bin/init-rootfs"
 }
 
 # vendor_init_rootfs_bin — copies the built binary out of the ephemeral cache into
@@ -291,7 +298,9 @@ run_init_rootfs() {
   local reference="$1" base_dir="$2"
   local run_dir="$CACHE_DIR/run"
   mkdir -p "$run_dir/libexec" "$ROOTFS_HOME"
-  cp "$CACHE_DIR/init-rootfs/bin/init-rootfs" "$run_dir/libexec/init-rootfs"
+  # vendor_init_rootfs_bin signs the vendored copy, not the compiler output.
+  # Launching the latter loses the Hypervisor entitlement and fails before boot.
+  cp "$BIN_DIR/init-rootfs" "$run_dir/libexec/init-rootfs" || return 1
   cp "$REPO_ROOT/vendor/kernel/Image" "$run_dir/libexec/Image"
   chmod +x "$run_dir/libexec/init-rootfs"
 
@@ -341,12 +350,12 @@ main() {
   verify_apk_lock || exit 1
   verify_alpine_digest "$tag" "$digest" || exit 1
 
-  prepare_build_copy
+  prepare_build_copy || exit 1
   verify_apk_artifacts || exit 1
   build_vmrunner_sys || exit 1
-  build_init_rootfs_bin
-  vendor_init_rootfs_bin
-  run_init_rootfs "$ALPINE_RUNTIME_REF" "$ALPINE_RUNTIME_BASE_DIR"
+  build_init_rootfs_bin || exit 1
+  vendor_init_rootfs_bin || exit 1
+  run_init_rootfs "$ALPINE_RUNTIME_REF" "$ALPINE_RUNTIME_BASE_DIR" || exit 1
 
   rootfs="$ROOTFS_HOME/.anylinuxfs/$ALPINE_RUNTIME_BASE_DIR/rootfs"
   if [[ -f "$rootfs/etc/ntfsmac-alpine-base-packages.sha256" &&
@@ -356,6 +365,10 @@ main() {
       "$BASE_PACKAGE_LOCK" "$PACKAGE_LOCK" || exit 1
   else
     verify_rootfs_package_versions "$rootfs" "Alpine base" "$BASE_PACKAGE_LOCK" || exit 1
+    if [[ -x "$BIN_DIR/vmproxy" ]]; then
+      echo "init-rootfs: HARD-STOP — VM setup did not install the locked add-on packages" >&2
+      exit 1
+    fi
     echo "init-rootfs: NOTE — VM setup did not complete; the exact add-on manifest was generated but not installed"
   fi
 

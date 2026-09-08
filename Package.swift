@@ -30,7 +30,7 @@ let helperLaunchdPlistPath = packageDir.appendingPathComponent("helper/\(helperL
 
 let package = Package(
     name: "ntfsmac-gui",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS(.v14)],
     products: [
         .library(name: "HelperShared", targets: ["HelperShared"]),
         .executable(name: "ntfsmac-helper", targets: ["ntfsmac-helper"]),
