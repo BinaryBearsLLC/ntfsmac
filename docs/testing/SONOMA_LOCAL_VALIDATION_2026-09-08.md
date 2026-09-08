@@ -78,10 +78,22 @@ compiled for 26.0 before signing checks. The real local DMG passes this strength
 verification; this still proves packaging metadata, not execution on Sonoma.
 
 Private packaging logs: `/tmp/ntfsmac-313-standard-only-dmg.log` and
-`/tmp/ntfsmac-313-standard-only-verify.log`. A new complete shell run was started
-in `/tmp/ntfsmac-313-standard-only-bats.log`; its result is pending. One focused
-test was added while that run was active, so a final stable-tree run remains
-required before calling the complete source gate clean.
+`/tmp/ntfsmac-313-standard-only-verify.log`. The first follow-up complete shell
+run passed 392 tests with exit 0 (`/tmp/ntfsmac-313-standard-only-bats.log`). Tests
+were added during that execution, so it was followed by a fresh stable-source run.
+
+On source commit `1f3a134`, the complete shell suite passed **395/395 tests across
+49 files**, exit 0, with no source edits during the run. Log:
+`/tmp/ntfsmac-313-stable-all-bats.log`. Both Swift variants also passed **324 tests
+each**, exit 0, on that commit. Logs:
+`/tmp/ntfsmac-313-stable-modern-swift.log` and
+`/tmp/ntfsmac-313-stable-legacy-swift.log`. The existing macOS 26.6.2
+`PopoverStateRenderTests` exclusion remains and is not counted as execution.
+
+These runs close the automated local source gate for this commit. They do not
+close actual Sonoma guest execution, GUI/rendering QA, final candidate physical
+USB acceptance, or official signing/notarization. `dev` and `3.1.2` remain at
+`b0ff6cd`; no branch push or publication was performed.
 
 ## Newer-system behavior retained
 
