@@ -221,3 +221,12 @@ Beta 2's local source gate passes 402/402 shell tests in full native mode and 33
 Swift tests for each helper variant, with the documented render-suite exclusion.
 ShellCheck and stable/beta website selection tests also pass. Acceptance of the
 downloaded, notarized draft remains a separate publication gate.
+
+Hosted CI 34239847455 passes: 401 shell tests and one explicitly skipped native
+acceptance case, plus 332 Swift tests per variant and the Rust tests. Release run
+34239853420's first attempt passed its shell and Standard suites but failed the
+Legacy polling fixture: the scheduler resumed its 25 ms check after the simulated
+150 ms mount had already ended. The isolated original test passes locally. The
+unchanged signed candidate is being retried with every gate enabled; a test-only
+follow-up replaces that timer race with explicit start/completion synchronization
+and passes both complete 332-test Swift suites. No application code or tag changes.

@@ -52,14 +52,32 @@ private final class SuccessfulHelper: HelperMounting {
 
 @MainActor
 private final class DelayedMountHelper: HelperMounting {
+    private var started = false
+    private var startWaiter: CheckedContinuation<Void, Never>?
+    private var completion: CheckedContinuation<CommandResult, Never>?
+
+    func waitUntilStarted() async {
+        if started { return }
+        await withCheckedContinuation { startWaiter = $0 }
+    }
+
+    func finishMount() {
+        completion?.resume(returning: CommandResult(output: "mount failed after delay", exitCode: 1))
+        completion = nil
+    }
+
     func mount(
         device: String,
         driver: FsDriver,
         mountPoint: String?,
         readOnly: Bool
     ) async throws -> CommandResult {
-        try await Task.sleep(for: .milliseconds(150))
-        return CommandResult(output: "mount failed after delay", exitCode: 1)
+        await withCheckedContinuation {
+            completion = $0
+            started = true
+            startWaiter?.resume()
+            startWaiter = nil
+        }
     }
 
     func unmount(target: String) async throws -> CommandResult {
@@ -371,20 +389,22 @@ private struct SnapshotCommandRunner: PrivilegedCommandRunning {
     let drive = Drive(identifier: "disk6s1", fsType: "ntfs", label: "Media", size: "120 GB")
     let provider = MutableSnapshotProvider(MountSnapshot(mounts: []))
     let appState = AppState()
+    let helper = DelayedMountHelper()
     let controller = MountController(
-        helper: DelayedMountHelper(),
+        helper: helper,
         readOnlyChecker: AlwaysReadWrite(),
         snapshotProvider: provider,
         appState: appState
     )
 
     let mountTask = Task { await controller.mount(drive) }
-    try await Task.sleep(for: .milliseconds(25))
+    await helper.waitUntilStarted()
     #expect(appState.state == .mounting)
 
     await controller.reconcile(knownDrives: [drive])
     #expect(appState.state == .mounting)
 
+    helper.finishMount()
     await mountTask.value
     #expect(appState.state == .error)
     #expect(controller.errorMessage == "mount failed after delay")
