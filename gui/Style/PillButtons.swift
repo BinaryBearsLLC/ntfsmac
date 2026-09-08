@@ -14,11 +14,13 @@ public struct GlassPillButtonStyle: ButtonStyle {
     public var verticalPadding: CGFloat = 7
     public var fontSize: CGFloat = 12
     public var fontWeight: Font.Weight = .medium
+    public var minimumHeight: CGFloat? = nil
 
     public init(
         fill: Color, border: Color, foreground: Color,
         cornerRadius: CGFloat = 8, horizontalPadding: CGFloat = 8, verticalPadding: CGFloat = 7,
-        fontSize: CGFloat = 12, fontWeight: Font.Weight = .medium
+        fontSize: CGFloat = 12, fontWeight: Font.Weight = .medium,
+        minimumHeight: CGFloat? = nil
     ) {
         self.fill = fill
         self.border = border
@@ -28,6 +30,7 @@ public struct GlassPillButtonStyle: ButtonStyle {
         self.verticalPadding = verticalPadding
         self.fontSize = fontSize
         self.fontWeight = fontWeight
+        self.minimumHeight = minimumHeight
     }
 
     public func makeBody(configuration: Configuration) -> some View {
@@ -36,6 +39,7 @@ public struct GlassPillButtonStyle: ButtonStyle {
             .foregroundStyle(foreground)
             .padding(.horizontal, horizontalPadding)
             .padding(.vertical, verticalPadding)
+            .frame(minHeight: minimumHeight)
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(fill)
@@ -60,8 +64,8 @@ public extension ButtonStyle where Self == GlassPillButtonStyle {
     /// Footer pill — "Diagnose"/"Quit". Comp: `0.07`/`0.09` dark, `0.05`/`0.08` light.
     static func glassFooter(colorScheme: ColorScheme, foregroundOpacity: Double = 0.58) -> GlassPillButtonStyle {
         colorScheme == .dark
-            ? GlassPillButtonStyle(fill: Color.white.opacity(0.07), border: Color.white.opacity(0.09), foreground: Color.white.opacity(foregroundOpacity), cornerRadius: 7, verticalPadding: 0)
-            : GlassPillButtonStyle(fill: Color.black.opacity(0.05), border: Color.black.opacity(0.08), foreground: Color.black.opacity(foregroundOpacity), cornerRadius: 7, verticalPadding: 0)
+            ? GlassPillButtonStyle(fill: Color.white.opacity(0.07), border: Color.white.opacity(0.09), foreground: Color.white.opacity(foregroundOpacity), cornerRadius: 7, verticalPadding: 0, minimumHeight: 28)
+            : GlassPillButtonStyle(fill: Color.black.opacity(0.05), border: Color.black.opacity(0.08), foreground: Color.black.opacity(foregroundOpacity), cornerRadius: 7, verticalPadding: 0, minimumHeight: 28)
     }
 
     /// Destructive pill — "Unmount". Comp: `rgba(255,80,80,0.1)` / `0.22` border dark

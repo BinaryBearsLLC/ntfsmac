@@ -1,6 +1,16 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import NtfsmacGUI
+
+@Test func footerButtonsKeepTheirHeightWithoutAnExplicitLabelFrame() {
+    for scheme in [ColorScheme.light, .dark] {
+        let style = GlassPillButtonStyle.glassFooter(colorScheme: scheme)
+        #expect(style.minimumHeight == 28)
+        #expect(style.verticalPadding == 0)
+        #expect(GlassPillButtonStyle.glassNeutral(colorScheme: scheme).minimumHeight == nil)
+    }
+}
 
 private func quitDefaults() -> UserDefaults {
     let suite = "com.binarybears.ntfsmac.tests.quit.\(UUID().uuidString)"

@@ -133,6 +133,30 @@ without exposing other host folders or attaching physical USB drives.
 
 ## Actual Sonoma guest results
 
+### UI corrections following guest screenshots
+
+The Settings company link is now centered across the content width. Footer pill
+styling owns a 28-point minimum height, correcting the compressed Quit button in
+runtime-error/setup views whose labels did not supply their own explicit height.
+The normal footer's existing 28-point geometry is unchanged.
+
+Standard and Legacy Swift suites each pass **325 tests**, including a new light/dark
+footer-style regression. A standalone diagnostic linked against the updated GUI
+module rendered the actual Preferences and DriveDiscoveryFailure views through
+`NSHostingView` inside Sonoma 14.6.1. All four light/dark images were visually checked:
+centered company text and correctly sized Quit. Native AppKit controls are present
+in these captures; earlier ImageRenderer captures with unsupported-control placeholders
+were not used for full Settings visual acceptance. This is view-layout evidence, not
+helper installation or filesystem acceptance.
+
+Private evidence: `/tmp/ntfsmac-sonoma-footer-native-render.log`,
+`/tmp/ntfsmac-footer-qa.ufXTD6/ntfsmac-footer-native-render/`,
+`/tmp/ntfsmac-313-footer-swift.log`, `/tmp/ntfsmac-313-footer-legacy-swift.log`.
+The updated app is `dist/ntfsmac-3.1.3-ui-local.app`, ad-hoc signed and checked against
+the macOS 14 binary floor. It has not replaced the physical-host installation.
+
+### Runtime preflight before the UI corrections
+
 Guest `sw_vers` confirms macOS **14.6.1 (23G93), arm64**. After the transfer finished:
 
 - The actual 3.1.3 (31301) app passes deep/strict signature verification in Sonoma.

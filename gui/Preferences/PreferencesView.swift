@@ -318,6 +318,7 @@ public struct PreferencesView: View {
                 .font(.system(size: 9, weight: .regular))
                 .foregroundStyle(.secondary.opacity(0.72))
                 .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.top, 4)
                 .help("Visit www.binarybears.com")
         }

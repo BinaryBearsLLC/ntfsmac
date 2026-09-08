@@ -6,8 +6,10 @@ detail lives in Git history and dated evidence files.
 ## Product shape
 
 - Visible name: **ntfsmac**.
-- Apple Silicon, macOS 13+, `MenuBarExtra`/popover, no Dock icon or main window.
-- Standard builds use `SMAppService`; the labelled Legacy build uses `SMJobBless`.
+- The 3.1.3 candidate targets Apple Silicon, macOS 14+, with a menu-bar popover,
+  no Dock icon or main window. Sonoma runtime qualification is tracked separately.
+- Standard uses `SMAppService`; Legacy source remains for migration/regression tests,
+  not as a second 3.1.3 installer.
 - App-initiated privileged operations go through the reviewed XPC helper. The UI never invokes
   `sudo` or mutates PF/routes directly.
 - Settings stays inside the popover. macOS authorization and Full Disk Access are the only external
@@ -95,12 +97,17 @@ Settings contains:
 - notification opt-in;
 - helper repair/reinstall;
 - complete uninstall with in-popover confirmation.
-- a small, plain “Binary Bears LLC” website link below Uninstall, matching the version text style.
+- a small, plain, horizontally centered “Binary Bears LLC” website link below Uninstall,
+  matching the version text style without a surrounding card.
 
 Back and the update action use balanced header geometry. Pointer interaction must not leave a stale
 keyboard-focus halo; deliberate keyboard traversal remains visible and accessible.
 
 ## Quit policy
+
+Footer pill styling guarantees at least 28 points of height, including runtime errors,
+missing-CLI and permission setup screens. Callers must not need an extra label frame
+to prevent a compressed Quit button.
 
 - No mounted drive: quit immediately.
 - Mounted drive: offer **Unmount and Quit**, **Quit Anyway**, and **Cancel**.
