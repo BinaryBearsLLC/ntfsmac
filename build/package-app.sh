@@ -149,6 +149,7 @@ main() {
     echo "package-app: HARD-STOP — failed to stage cli/lib/*.sh" >&2
     exit 1
   fi
+  cp "$REPO_ROOT/cli/lib/macos-validated-builds.txt" "$cli_stage/cli/lib/" || exit 1
   if ! cp "$REPO_ROOT"/cli/pf/*.tmpl "$cli_stage/cli/pf/"; then
     echo "package-app: HARD-STOP — failed to stage cli/pf/*.tmpl" >&2
     exit 1

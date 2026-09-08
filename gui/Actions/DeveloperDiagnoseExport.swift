@@ -1,6 +1,8 @@
 import AppKit
 import Foundation
 import UniformTypeIdentifiers
+import Virtualization
+import HelperShared
 
 /// Diagnose keeps its normal one-click behavior. Holding Command selects the support-oriented
 /// path without adding another visible control to the compact menu-bar UI.
@@ -50,6 +52,26 @@ public struct DeveloperDiagnoseDocument: Equatable, Sendable {
 
     public func write(to url: URL) throws {
         try data.write(to: url, options: .atomic)
+    }
+
+    /// Distinguish the running GUI from an older installed CLI, without device/user identity.
+    public func addingGUIContext(product: ProductVersion, virtualizationSupported: Bool,
+                                 source: String) throws -> Self {
+        guard var object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw DeveloperDiagnoseExportError.invalidJSON
+        }
+        object["gui_context"] = [
+            "app_version": product.release,
+            "app_build": product.build,
+            "virtualization_framework_supported": virtualizationSupported,
+            "diagnostic_source": source,
+            "helper_distribution": HelperDistributionVariant.current.rawValue,
+        ] as [String: Any]
+        let encoded = try JSONSerialization.data(withJSONObject: object)
+        guard let json = String(data: encoded, encoding: .utf8) else {
+            throw DeveloperDiagnoseExportError.invalidJSON
+        }
+        return try Self(rawJSON: json)
     }
 
     public static func suggestedFilename(

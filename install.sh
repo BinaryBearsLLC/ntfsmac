@@ -90,6 +90,7 @@ install_cli() {
   mkdir -p "$PREFIX/libexec/ntfsmac/commands" "$PREFIX/libexec/ntfsmac/lib" "$PREFIX/libexec/ntfsmac/pf"
   cp "$REPO_ROOT"/cli/commands/*.sh "$PREFIX/libexec/ntfsmac/commands/" || return 1
   cp "$REPO_ROOT"/cli/lib/*.sh "$PREFIX/libexec/ntfsmac/lib/" || return 1
+  cp "$REPO_ROOT/cli/lib/macos-validated-builds.txt" "$PREFIX/libexec/ntfsmac/lib/" || return 1
   cp "$REPO_ROOT"/cli/pf/*.tmpl "$PREFIX/libexec/ntfsmac/pf/" || return 1
 
   # gui/Info.plist is the single product-version source. Keep an exact snapshot beside the

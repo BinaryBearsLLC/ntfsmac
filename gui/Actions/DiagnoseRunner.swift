@@ -1,5 +1,6 @@
 import Foundation
 import HelperShared
+import Virtualization
 
 /// Summary fields decoded from `ntfsmac diagnose --json` (`cli/commands/diagnose.sh`'s `main()`,
 /// `json_mode` branch). Fixed runtime identifiers are privacy-safe; paths and cache contents are
@@ -289,15 +290,19 @@ public final class DiagnoseRunner: ObservableObject {
     private let runner: any PrivilegedCommandRunning
     private let ntfsmacPath: String
     private let fileExists: (String) -> Bool
+    private let bundledDiagnosticPath: String?
 
     public init(
         runner: any PrivilegedCommandRunning = RealCommandRunner(),
         ntfsmacPath: String = "\(installPrefix)/bin/ntfsmac",
-        fileExists: @escaping (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
+        fileExists: @escaping (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) },
+        bundledDiagnosticPath: String? = Bundle.main.resourceURL?
+            .appendingPathComponent("cli-src/cli/commands/diagnose.sh").path
     ) {
         self.runner = runner
         self.ntfsmacPath = ntfsmacPath
         self.fileExists = fileExists
+        self.bundledDiagnosticPath = bundledDiagnosticPath
     }
 
     public func run() async {
@@ -316,9 +321,26 @@ public final class DiagnoseRunner: ObservableObject {
     /// validated, formatted attachment. A degraded diagnosis still produces a useful document:
     /// `diagnose.sh` deliberately uses its exit code for health while keeping stdout valid JSON.
     public func runForDeveloperExport() async -> DeveloperDiagnoseDocument? {
-        guard let rawJSON = execute() else { return nil }
+        guard !isRunning else { return nil }
+        let rawJSON: String
+        let source: String
+        if let result = execute() {
+            rawJSON = result
+            source = "installed_cli"
+        } else if let path = bundledDiagnosticPath, fileExists(path) {
+            // Support must remain available when helper/CLI setup failed. This script is
+            // bundled, read-only, and never starts the runtime or asks for elevation.
+            rawJSON = runner.run("/bin/bash", [path, "--json"]).output
+            source = "bundled_fallback"
+        } else {
+            return nil
+        }
         do {
-            return try DeveloperDiagnoseDocument(rawJSON: rawJSON)
+            let document = try DeveloperDiagnoseDocument(rawJSON: rawJSON).addingGUIContext(
+                product: ProductVersion.current(), virtualizationSupported: VZVirtualMachine.isSupported,
+                source: source)
+            errorMessage = nil
+            return document
         } catch {
             report = nil
             errorMessage = error.localizedDescription

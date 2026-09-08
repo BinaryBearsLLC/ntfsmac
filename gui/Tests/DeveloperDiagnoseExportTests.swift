@@ -56,6 +56,19 @@ private let developerJSON = """
     }
 }
 
+@Test func guiContextKeepsCLIIdentityDistinctAndRecordsVirtualizationCapability() throws {
+    let document = try DeveloperDiagnoseDocument(rawJSON: developerJSON).addingGUIContext(
+        product: .init(release: "3.1.3", build: "31301"), virtualizationSupported: false,
+        source: "installed_cli")
+    let object = try JSONSerialization.jsonObject(with: document.data) as? [String: Any]
+    #expect(object?["ntfsmac_version"] as? String == "1.0")
+    let context = object?["gui_context"] as? [String: Any]
+    #expect(context?["app_version"] as? String == "3.1.3")
+    #expect(context?["app_build"] as? String == "31301")
+    #expect(context?["virtualization_framework_supported"] as? Bool == false)
+    #expect(context?["diagnostic_source"] as? String == "installed_cli")
+}
+
 @Test func suggestedFilenameIsStableAndJsonSpecific() {
     let utc = TimeZone(secondsFromGMT: 0)!
     #expect(

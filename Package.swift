@@ -96,7 +96,7 @@ let package = Package(
                 "FirstRun/HelperInstaller.swift", "FirstRun/FullDiskAccessSetup.swift", "Views/FirstRunView.swift",
                 "FirstRun/HelperUninstaller.swift", "FirstRun/CLIInstallChecker.swift", "Views/CLIMissingView.swift",
                 "Preferences/ProductVersion.swift", "Preferences/LegacyPreferenceMigration.swift",
-                "Preferences/Settings.swift", "Preferences/PreferencesView.swift", "Updates/UpdateChecker.swift",
+                "Preferences/Settings.swift", "Preferences/PreferencesView.swift", "Preferences/MacOSValidationNotice.swift", "Updates/UpdateChecker.swift",
                 "Style/Colors.swift", "Style/GlassTheme.swift", "Style/Icons.swift", "Style/KeyboardFocus.swift", "Style/PillButtons.swift",
                 "Style/TooltipCopy.swift",
                 "Views/PopoverContentView.swift",

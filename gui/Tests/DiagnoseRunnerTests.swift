@@ -37,6 +37,22 @@ private final class FakeRunner: PrivilegedCommandRunning {
     }
 }
 
+@MainActor @Test func supportExportWorksBeforeCLIInstallationAndLabelsFallback() async throws {
+    let fake = FakeRunner()
+    fake.result = CommandResult(output: developerExportJSON, exitCode: 1)
+    let runner = DiagnoseRunner(runner: fake, ntfsmacPath: "/missing/ntfsmac",
+        fileExists: { $0 == "/bundle/diagnose.sh" }, bundledDiagnosticPath: "/bundle/diagnose.sh")
+    let document = try #require(await runner.runForDeveloperExport())
+    #expect(fake.calls.count == 1)
+    #expect(fake.calls[0].0 == "/bin/bash")
+    #expect(fake.calls[0].1 == ["/bundle/diagnose.sh", "--json"])
+    let object = try JSONSerialization.jsonObject(with: document.data) as? [String: Any]
+    let context = object?["gui_context"] as? [String: Any]
+    #expect(context?["diagnostic_source"] as? String == "bundled_fallback")
+    #expect(context?["virtualization_framework_supported"] is Bool)
+    #expect(runner.errorMessage == nil)
+}
+
 @Test func guiDiagnosticsCollapseTechnicalEvidenceIntoFourMacroCategories() throws {
     let report = try JSONDecoder().decode(DiagnoseReport.self, from: Data(expandedJSON.utf8))
     let rows = DiagnoseMacroSummary.rows(

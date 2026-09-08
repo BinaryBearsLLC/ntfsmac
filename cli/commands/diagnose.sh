@@ -18,8 +18,10 @@ if [[ -r "$VERSION_LIB" ]]; then
 else
   NTFSMAC_VERSION="unknown"
   NTFSMAC_BUILD_VERSION="unknown"
-  NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION="6"
+  NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION="7"
 fi
+# shellcheck source=../lib/platform-diagnostics.sh
+source "$SCRIPT_DIR/../lib/platform-diagnostics.sh"
 MOUNT_DIAGNOSTICS_LIB="$SCRIPT_DIR/../lib/mount-diagnostics.sh"
 if [[ -r "$MOUNT_DIAGNOSTICS_LIB" ]]; then
   # shellcheck disable=SC1090
@@ -623,7 +625,7 @@ component_json_array() {
 # check_macos_version — reports the macOS product version. Two reasons diagnose grew this:
 # (1) triage reports (see README "Troubleshooting" / the issue tracker) kept omitting the OS
 # version, so the first ask on every "installed but not working" report was "which macOS?";
-# (2) ntfsmac requires macOS 13.0+, so an older host is a real cause of that symptom, worth
+# (2) ntfsmac requires macOS 14.0+, so an older host is a real cause of that symptom, worth
 # flagging directly. Overridable for tests via NTFSMAC_MACOS_VERSION_OVERRIDE — note the `-`
 # (not `:-`) default: an explicitly-set empty value simulates sw_vers returning nothing
 # (reported as "unknown"), while leaving it unset runs sw_vers normally. bash-3.2 + set -u
@@ -651,8 +653,10 @@ main() {
   MISSING_COMPONENTS=""
   QUARANTINED_COMPONENTS=""
 
-  macos_version="$(check_macos_version)"
-  architecture="$(check_architecture)"
+  macos_version="$(safe_version_token "$(check_macos_version)")"
+  architecture="$(safe_version_token "$(check_architecture)")"
+  platform_diagnostics_collect "$NTFSMAC_VERSION" "$NTFSMAC_BUILD_VERSION" "$architecture" \
+    "$macos_version" "$SCRIPT_DIR/../lib/macos-validated-builds.txt"
   check_vendor_binaries
   kernel_pin="$(check_kernel_pin)"
   bridge="$(check_bridge_up)"
@@ -674,14 +678,14 @@ main() {
   vmnet_helper_version_status="$(version_status "$vmnet_helper_version" "$VMNET_HELPER_EXPECTED_VERSION")"
   vmnet_helper_source_commit="$(vmnet_helper_commit)"
 
-  # ntfsmac requires macOS 13.0+ on Apple Silicon. Only a real, parseable major version
-  # below 13 flips health; an unknown/undetected version is reported but left non-fatal.
+  # ntfsmac requires macOS 14.0+ on Apple Silicon. Only a real, parseable major version
+  # below 14 flips health; an unknown/undetected version is reported but left non-fatal.
   # Portable "is it all digits" test (case glob) instead of a regex — bash-3.2 safe.
   macos_major="${macos_version%%.*}"
   case "$macos_major" in
     ''|*[!0-9]*) macos_major="" ;;
   esac
-  if [[ -n "$macos_major" && "$macos_major" -lt 13 ]]; then
+  if [[ -n "$macos_major" && "$macos_major" -lt 14 ]]; then
     healthy=0
     macos_supported=0
   fi
@@ -725,8 +729,9 @@ main() {
       ''|*[!0-9]*) security_active_json=null ;;
       *) security_active_json="$SECURITY_ACTIVE_SESSIONS" ;;
     esac
-    printf '{"diagnostic_schema":%s,"healthy":%s,"ntfsmac_version":"%s","build_version":"%s","macos_version":"%s","architecture":"%s","helper_installed":%s,"missing_binaries":%s,"missing_components":%s,"quarantined_binaries":%s,"quarantined_components":%s,"kernel_pin":"%s","anylinuxfs_version":"%s","anylinuxfs_expected_version":"%s","anylinuxfs_version_status":"%s","anylinuxfs_source_commit":"%s","vmproxy_source_version":"%s","libkrun_version":"%s","libkrunfw_version":"%s","gvproxy_version":"%s","gvproxy_expected_version":"%s","gvproxy_version_status":"%s","gvproxy_source_commit":"%s","vmnet_helper_version":"%s","vmnet_helper_expected_version":"%s","vmnet_helper_version_status":"%s","vmnet_helper_source_commit":"%s","alpine_runtime_tag":"%s","alpine_runtime_digest":"%s","alpine_runtime_state":"%s","alpine_installed_cache":"%s","alpine_installed_version":"%s","ntfs_3g_version":"%s","nfs_utils_version":"%s","bridge":"%s","network_helper":"%s","nfs_transport_contract":"%s","vpn_default_route":%s,"nfs_mount_count":%s,"selected_fs_driver":"%s","mount_failure_category":"%s","security_active_sessions":%s,"security_private_link":"%s","security_private_reason":"%s","security_vpn_route":"%s","security_vpn_route_reason":"%s","security_pf_policy":"%s","security_pf_reason":"%s","security_overall":"%s","security_overall_reason":"%s"}\n' \
-      "$NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION" "$healthy_json" "$NTFSMAC_VERSION" \
+    printf '{"diagnostic_schema":%s,"healthy":%s,"macos_minimum_version":"14.0","macos_validation":"%s","macos_build":"%s","hardware_family":"%s","virtual_machine":%s,"hypervisor_sysctl_support":"%s","ntfsmac_version":"%s","build_version":"%s","macos_version":"%s","architecture":"%s","helper_installed":%s,"missing_binaries":%s,"missing_components":%s,"quarantined_binaries":%s,"quarantined_components":%s,"kernel_pin":"%s","anylinuxfs_version":"%s","anylinuxfs_expected_version":"%s","anylinuxfs_version_status":"%s","anylinuxfs_source_commit":"%s","vmproxy_source_version":"%s","libkrun_version":"%s","libkrunfw_version":"%s","gvproxy_version":"%s","gvproxy_expected_version":"%s","gvproxy_version_status":"%s","gvproxy_source_commit":"%s","vmnet_helper_version":"%s","vmnet_helper_expected_version":"%s","vmnet_helper_version_status":"%s","vmnet_helper_source_commit":"%s","alpine_runtime_tag":"%s","alpine_runtime_digest":"%s","alpine_runtime_state":"%s","alpine_installed_cache":"%s","alpine_installed_version":"%s","ntfs_3g_version":"%s","nfs_utils_version":"%s","bridge":"%s","network_helper":"%s","nfs_transport_contract":"%s","vpn_default_route":%s,"nfs_mount_count":%s,"selected_fs_driver":"%s","mount_failure_category":"%s","security_active_sessions":%s,"security_private_link":"%s","security_private_reason":"%s","security_vpn_route":"%s","security_vpn_route_reason":"%s","security_pf_policy":"%s","security_pf_reason":"%s","security_overall":"%s","security_overall_reason":"%s"}\n' \
+      "$NTFSMAC_DIAGNOSTIC_SCHEMA_VERSION" "$healthy_json" "$MACOS_VALIDATION_STATE" \
+      "$MACOS_BUILD_VERSION" "$HARDWARE_FAMILY" "$VIRTUAL_MACHINE_JSON" "$HYPERVISOR_SYSCTL_SUPPORT" "$NTFSMAC_VERSION" \
       "$NTFSMAC_BUILD_VERSION" "$macos_version" "$architecture" "$helper_json" \
       "$MISSING_BINS" "$missing_json" "$QUARANTINED_BINS" "$quarantined_json" \
       "$kernel_pin" "$anylinuxfs_version" "$ANYLINUXFS_EXPECTED_VERSION" \
@@ -746,7 +751,12 @@ main() {
   else
     echo "diagnose: ntfsmac version: $NTFSMAC_VERSION ($NTFSMAC_BUILD_VERSION)"
     echo "diagnose: macOS version: $macos_version"
-    [[ "$macos_supported" -eq 0 ]] && echo "diagnose:   unsupported — ntfsmac requires macOS 13.0+"
+    [[ "$macos_supported" -eq 0 ]] && echo "diagnose:   unsupported — ntfsmac requires macOS 14.0+"
+    echo "diagnose: macOS build: $MACOS_BUILD_VERSION"
+    echo "diagnose: macOS validation: $MACOS_VALIDATION_STATE"
+    echo "diagnose: chip family: $HARDWARE_FAMILY"
+    echo "diagnose: virtual machine: $VIRTUAL_MACHINE_JSON"
+    echo "diagnose: hypervisor sysctl support: $HYPERVISOR_SYSCTL_SUPPORT (not a VM boot test)"
     echo "diagnose: architecture: $architecture"
     [[ "$architecture" != "arm64" ]] && echo "diagnose:   unsupported — ntfsmac requires Apple Silicon"
     echo "diagnose: privileged helper: $([[ "$helper_installed" -eq 1 ]] && echo installed || echo not installed)"

@@ -200,6 +200,9 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
         // reaching this LSUIElement app even though it has no visible Settings scene.
         DispatchQueue.main.async { [weak self] in
             self?.installOpenGUIEventHandler()
+            if uiDemoMode == nil {
+                MacOSValidationNotice.presentIfNeeded()
+            }
         }
     }
 

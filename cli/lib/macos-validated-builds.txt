@@ -1,0 +1,4 @@
+# Fully qualified combinations only: app-version app-build architecture macOS-version
+# Exact patch versions; no ranges or wildcards. Add a row only with native filesystem,
+# helper lifecycle, GUI and package acceptance evidence for that app build.
+# No completed final-candidate matrix yet. Automated/VM-only checks are not qualification.

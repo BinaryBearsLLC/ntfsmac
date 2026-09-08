@@ -88,6 +88,18 @@ Technical identifiers, paths, IP details, runtime pins, PF/routes, and raw keys 
 normal UI. **Hide** changes presentation only. A mount-state change invalidates the old result;
 while the panel is visible, a fresh check runs automatically after the operation settles.
 
+On an unvalidated macOS/app build combination, show a notice once per user preferences profile.
+Explain Command-click on **Diagnose** for JSON export and link to the BinaryBears issue tracker.
+Keep acknowledgement independent of app and OS versions; updates must not repeat the notice.
+Do not add a duplicate diagnostic export control in Settings or upload reports automatically.
+
+Schema 7 adds the macOS build, minimum target, exact-build validation state, coarse Apple chip
+family, virtual-machine detection and Hypervisor sysctl availability. Unknown measurements stay
+unknown (or JSON null), never a fabricated pass. GUI exports add the running app version/build,
+helper distribution, Virtualization.framework support and whether evidence came from the installed
+CLI or the bundled read-only fallback. Preserve the CLI's own version to expose an older install.
+`healthy` summarizes the diagnostic checks; it is not a successful microVM boot or read/write test.
+
 ## Settings
 
 Settings contains:

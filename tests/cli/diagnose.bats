@@ -57,6 +57,35 @@ setup() {
   export NTFSMAC_RUNTIME_HOME_OVERRIDE="$FIXTURE_DIR/runtime-home"
 }
 
+@test "platform JSON identifies virtualized Apple Silicon without hardware identifiers" {
+  export NTFSMAC_MACOS_BUILD_OVERRIDE=23G93
+  export NTFSMAC_CPU_BRAND_OVERRIDE='Apple M5 (Virtual)'
+  export NTFSMAC_VIRTUAL_MACHINE_OVERRIDE=1
+  export NTFSMAC_HV_SUPPORT_OVERRIDE=''
+  run "$SCRIPT" --json
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"macos_minimum_version":"14.0"'* ]]
+  [[ "$output" == *'"macos_validation":"not_validated"'* ]]
+  [[ "$output" == *'"macos_build":"23G93"'* ]]
+  [[ "$output" == *'"hardware_family":"Apple_M5"'* ]]
+  [[ "$output" == *'"virtual_machine":true'* ]]
+  [[ "$output" == *'"hypervisor_sysctl_support":"unknown"'* ]]
+  printf '%s' "$output" | /usr/bin/ruby -rjson -e 'JSON.parse(STDIN.read)'
+}
+
+@test "unexpected platform metadata is redacted and cannot inject JSON" {
+  export NTFSMAC_MACOS_BUILD_OVERRIDE='private"/Users/somebody'
+  export NTFSMAC_CPU_BRAND_OVERRIDE='private"/Users/somebody'
+  export NTFSMAC_VIRTUAL_MACHINE_OVERRIDE='private'
+  export NTFSMAC_HV_SUPPORT_OVERRIDE='private'
+  run "$SCRIPT" --json
+  [ "$status" -eq 0 ]
+  [[ "$output" != *'/Users/'* && "$output" != *somebody* ]]
+  [[ "$output" == *'"hardware_family":"unknown"'* ]]
+  [[ "$output" == *'"virtual_machine":null'* ]]
+  printf '%s' "$output" | /usr/bin/ruby -rjson -e 'JSON.parse(STDIN.read)'
+}
+
 write_security_status() {
   local active="$1" private="$2" private_reason="$3" route="$4" route_reason="$5"
   local pf="$6" pf_reason="$7" overall="$8" overall_reason="$9"
@@ -121,7 +150,7 @@ write_guest_versions() {
   run "$SCRIPT" --json
   [ "$status" -eq 0 ]
   [[ "$output" == \{*\} ]]
-  [[ "$output" == *'"diagnostic_schema":6'* ]]
+  [[ "$output" == *'"diagnostic_schema":7'* ]]
   [[ "$output" == *'"healthy":true'* ]]
   [[ "$output" == *'"ntfsmac_version":"1.0"'* ]]
   [[ "$output" == *'"build_version":"1"'* ]]
@@ -520,11 +549,11 @@ nas.example:/share on /Volumes/Share (nfs, nodev, nosuid)"
   [[ "$output" == *'"helper_installed":false'* ]]
 }
 
-@test "degraded: macOS older than 13.0 is unsupported" {
-  export NTFSMAC_MACOS_VERSION_OVERRIDE="12.6"
+@test "degraded: macOS older than 14.0 is unsupported" {
+  export NTFSMAC_MACOS_VERSION_OVERRIDE="13.6"
   run "$SCRIPT"
   [ "$status" -ne 0 ]
-  [[ "$output" == *"macOS version: 12.6"* ]]
+  [[ "$output" == *"macOS version: 13.6"* ]]
   [[ "$output" == *"unsupported"* ]]
   [[ "$output" == *"overall: degraded"* ]]
 }
