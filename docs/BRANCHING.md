@@ -47,6 +47,17 @@ branding or roadmap material, and is submitted only after explicit maintainer ap
 
 ## Release refs
 
+For the 3.1.3 qualification cycle, `3.1.2` preserves `dev` at `b0ff6cd` and
+`Update/3.1.3` contains the dependency and compatibility work. Both version pointers are local
+until explicitly published. `dev` remains unchanged until the maintainer approves integration.
+Do not remove either version pointer during cleanup. The old
+`maintenance/dependency-refresh-2026-08` local branch was removed only after confirming that its
+tip (`a7066b8`) is an ancestor of `Update/3.1.3`; its commits remain recoverable there.
+
+GitHub is not yet a complete backup of the 3.1.3 worktree. Unpushed commits, uncommitted changes,
+ignored build/runtime caches, installation backups, VM disks and private test logs are local.
+Do not delete the local checkout or VM on the assumption that cloning GitHub will restore them.
+
 - Official BinaryBears releases are built only from signed `vX.Y.Z` tags reachable from `dev`.
 - The plist version must exactly equal the workflow input and tag without the `v` prefix.
 - A workflow creates a draft Release. The downloaded draft artifact is tested before the same

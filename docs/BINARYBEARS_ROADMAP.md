@@ -3,7 +3,7 @@
 This is the current product roadmap for `dev`. Detailed implementation history and measurements
 remain in the dated files under `docs/testing/` and `docs/audits/`.
 
-## Current product
+## Published 3.1.2 line
 
 - Apple Silicon and macOS 13+.
 - Menu-bar app plus CLI; no kernel extension or SIP change.
@@ -62,6 +62,10 @@ Release-candidate evidence is recorded in
 - Validate and lock dependency updates individually, including ntfs-3g 2026.7.7
   and the Alpine package graph.
 - Reject filesystem guesses based only on partition type when multiple drives are connected.
+- Show a single unvalidated-OS notice, with the issue tracker and the existing Command-click
+  Diagnose export. Keep acknowledgement across app and OS updates.
+- Record exact OS/build evidence; invite successful and unsuccessful community compatibility
+  reports without presenting untested systems as verified.
 
 This candidate is not yet qualified for release. Build-target checks, current-host tests,
 Sonoma guest execution, physical-drive acceptance, and notarization are separate gates;

@@ -3,6 +3,11 @@
 Branch: `Update/3.1.3`, candidate version 3.1.3 (31301). The `3.1.2` rollback branch and `dev` are unchanged.
 No remote service, paid resource, push, release, or notarization is part of this run.
 
+**Latest installed-package follow-up:** see
+[3.1.3 installed-app checks](BINARYBEARS_V3_1_3_INSTALLED_2026-09-08.md).
+The chronology below retains earlier uninstalled/ad-hoc results; the follow-up distinguishes
+the later signed host/guest replacement and native NTFS acceptance from those earlier stages.
+
 ## Build change
 
 The candidate now sets Swift and the app manifest to macOS 14.0. Host Rust builds

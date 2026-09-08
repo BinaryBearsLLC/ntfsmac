@@ -36,6 +36,30 @@ This is not an announcement of a published or fully qualified 3.1.3 release.
 
 Intel Macs are not supported.
 
+### Compatibility evidence for 3.1.3
+
+The minimum build target is not a claim that every Mac or macOS release has been tested.
+
+| System | Confirmed locally | Still unverified |
+| --- | --- | --- |
+| macOS 26.6.2, Apple M5 (physical Mac) | App/helper execution, pinned Linux runtime, NTFS write/flush/remount/SHA-256 checks; mixed NTFS/ExFAT detection | Other M-series models and longer-term workloads |
+| macOS 14.6.1 Sonoma (local VM on M5) | App launch, native Settings/error-view rendering, bundled executable loading | Final helper upgrade is blocked by a stale test-app registration; independently, this VM lacks nested Hypervisor access for filesystem mounting/read/write |
+| Other macOS 14.x, macOS 15, other macOS 26 versions and newer | Deployment target and guarded API paths only | Native end-to-end testing |
+
+Intel and macOS 13 or earlier are outside the 3.1.3 target. The preserved 3.1.2 line
+declared macOS 13+ on Apple Silicon; that declaration is not retrospective proof of testing
+on every supported OS. Legacy distribution is deprecated in 3.1.3.
+
+**Help confirm compatibility.** If you test 3.1.3 on a native Apple Silicon Mac, please
+[submit a compatibility report](https://github.com/BinaryBearsLLC/ntfsmac/issues/new/choose)
+with the app version/build, macOS version, chip family, filesystem and the operations you
+completed (mount, copy, eject and reconnect). Successful results are welcome as well as failures.
+Attach the Command-click **Diagnose** JSON after reviewing it. Use a backed-up or disposable
+test volume; do not publish personal files or hardware serial numbers. Community reports will
+be recorded separately from maintainer verification. See the
+[installed-build validation record](docs/testing/BINARYBEARS_V3_1_3_INSTALLED_2026-09-08.md)
+for build numbers, scope and limitations.
+
 ## Install
 
 ### Official BinaryBears release
@@ -107,6 +131,10 @@ read at that time; it cannot guarantee against later media failure.
 - Click **Diagnose** for a plain-language summary.
 - Command-click **Diagnose** to export the privacy-safe JSON report.
 - Review the report before attaching it to an issue. ntfsmac never uploads it automatically.
+
+On a macOS version not fully validated for this build, a one-time notice links to the issue
+tracker and explains Command-click on **Diagnose**. Once dismissed, it stays dismissed across
+app and macOS updates. There is no separate export button in Settings.
 
 Reports omit usernames, volume labels, device identifiers, serial numbers, mount paths, IP
 addresses, DNS servers, route tables, and VPN provider details.
