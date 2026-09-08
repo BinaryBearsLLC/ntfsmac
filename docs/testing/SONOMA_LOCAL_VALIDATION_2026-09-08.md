@@ -124,12 +124,36 @@ installation completed and a Sonoma desktop was observed through the VM's own
 screenshot command. The existing Windows 11 VM remains stopped and unchanged.
 
 Automatic volume/camera sharing is disabled. Only the dedicated
-`Parallels/NTFSMac-Guest-Tests` folder is shared read-only. Parallels accepts
-`--nested-virt on` and reports it enabled; **actual guest Hypervisor access has not
-yet been tested**, and this configuration flag alone proves no nested capability.
-The app and a signed capability probe are staged in that test folder. Parallels
-Tools installation is pending; guest command execution currently reports that no
-session can be opened. No app-runtime result on Sonoma is claimed yet.
+`Parallels/NTFSMac-Guest-Tests` folder is configured for read-only sharing, but
+Parallels still reports folder sharing inactive. After the user installed Tools
+27.0.0-58625 and restarted the guest, default `prlctl exec` works as guest root;
+the `--current-user` mode was not usable. The 119 MiB test kit was transferred over
+the guest command channel into a newly created guest-only temporary directory,
+without exposing other host folders or attaching physical USB drives.
+
+## Actual Sonoma guest results
+
+Guest `sw_vers` confirms macOS **14.6.1 (23G93), arm64**. After the transfer finished:
+
+- The actual 3.1.3 (31301) app passes deep/strict signature verification in Sonoma.
+- All four bundled host executables load and execute their help/version paths:
+  anylinuxfs 0.19.0, init-rootfs, gvproxy, and vmnet-helper. These are real Sonoma
+  execution results, not simulated OS checks or build metadata alone.
+- The GUI launches as the guest's standard account, remains running, and displays
+  its menu-bar icon. Popover contents, setup, helper registration, and full UI QA
+  are not yet validated. The physical-host app was not replaced.
+- The signed Hypervisor/Virtualization probe executes in Sonoma but returns
+  `virtualizationSupported=false` and `hypervisorCreateResult=-85377009`.
+  This is **0xfae9400f / HV_UNSUPPORTED**, confirmed against Apple's SDK header.
+  Parallels still reports nested virtualization enabled after the reboot; that
+  setting does not provide working guest Hypervisor access in this configuration.
+- No rootfs boot or filesystem read/write result is claimed inside this guest.
+  The preflight exits 2 for unavailable nested virtualization, not for binary-load
+  failure. This VM limitation does not establish a failure on a native Sonoma Mac.
+
+Private log: `/tmp/ntfsmac-sonoma-guest-preflight.log`; initial GUI capture:
+`/tmp/ntfsmac-sonoma-app-first-launch.png`. An earlier preflight during incomplete
+copy was discarded and rerun only after the transfer exited successfully.
 
 A Sonoma guest can provide GUI/API evidence if supported by the host. Full driver
 acceptance additionally requires the guest to expose Hypervisor.framework to
