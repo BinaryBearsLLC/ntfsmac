@@ -1,7 +1,8 @@
 #!/bin/bash
 # install.sh — 2-install-sh (PLAN.md §6, L4, L7, L10).
 #
-# Installs the CLI + vendored binaries from this repo tree into a stable prefix.
+# Installs the CLI, verified offline guest payload, and vendored binaries from
+# this repo tree into a stable prefix.
 # Refuses non-arm64 (L7). Runtime files are staged to a fresh inode, checked when Mach-O, and
 # atomically renamed into place. This avoids executing a partially overwritten binary and avoids
 # macOS retaining stale code-signature state on an in-place update. It does not change Gatekeeper,
@@ -57,6 +58,95 @@ install_runtime_file() {
     verify_signature "$staged" || { rm -f "$staged"; return 1; }
   fi
   /bin/mv -f "$staged" "$destination" || { rm -f "$staged"; return 1; }
+}
+
+# install_offline_runtime [source-root]
+# Builds and verifies a complete replacement beside the installed destination.
+# Only after validation succeeds is the prior directory moved aside and the new
+# directory renamed into place, so releases can never retain stale APKs or OCI blobs.
+install_offline_runtime() {
+  local source_root="${1:-$REPO_ROOT}"
+  local source_runtime="$source_root/vendor/runtime"
+  local source_verifier="$source_root/vendor/bin/init-rootfs"
+  local destination="$PREFIX/lib/ntfsmac-runtime"
+  local stage_root staged_runtime backup_root=""
+
+  if [[ ! -d "$source_runtime" || -L "$source_runtime" ||
+        ! -f "$source_verifier" || -L "$source_verifier" ]]; then
+    echo "install.sh: HARD-STOP — offline runtime payload or native verifier is missing; reinstall ntfsmac" >&2
+    return 1
+  fi
+  if ! /usr/bin/file "$source_verifier" | grep -q 'Mach-O'; then
+    echo "install.sh: HARD-STOP — offline runtime verifier is not a native macOS executable" >&2
+    return 1
+  fi
+  verify_signature "$source_verifier" || return 1
+  source_runtime="$(cd "$source_runtime" && pwd -P)" || {
+    echo "install.sh: HARD-STOP — could not canonicalize the offline runtime payload path" >&2
+    return 1
+  }
+  if ! "$source_verifier" -verify-offline-runtime "$source_runtime"; then
+    echo "install.sh: HARD-STOP — offline runtime payload verification failed; reinstall ntfsmac" >&2
+    return 1
+  fi
+  if find "$source_runtime" -type l -print -quit | grep -q .; then
+    echo "install.sh: HARD-STOP — offline runtime payload contains a symlink; reinstall ntfsmac" >&2
+    return 1
+  fi
+
+  mkdir -p "$PREFIX/lib" || return 1
+  if [[ -L "$destination" || ( -e "$destination" && ! -d "$destination" ) ]]; then
+    echo "install.sh: HARD-STOP — installed offline runtime path is unsafe: $destination" >&2
+    return 1
+  fi
+  stage_root="$(mktemp -d "$PREFIX/lib/.ntfsmac-runtime-stage.XXXXXX")" || return 1
+  staged_runtime="$stage_root/vendor/runtime"
+  mkdir -p "$stage_root/vendor" || {
+    rm -rf -- "$stage_root"
+    return 1
+  }
+  if ! cp -R "$source_runtime" "$staged_runtime"; then
+    rm -rf -- "$stage_root"
+    echo "install.sh: HARD-STOP — could not stage the offline runtime payload" >&2
+    return 1
+  fi
+  staged_runtime="$(cd "$staged_runtime" && pwd -P)" || {
+    rm -rf -- "$stage_root"
+    echo "install.sh: HARD-STOP — could not canonicalize the staged offline runtime path" >&2
+    return 1
+  }
+  if ! "$source_verifier" -verify-offline-runtime "$staged_runtime"; then
+    rm -rf -- "$stage_root"
+    echo "install.sh: HARD-STOP — staged offline runtime verification failed; reinstall ntfsmac" >&2
+    return 1
+  fi
+
+  if [[ -d "$destination" ]]; then
+    backup_root="$(mktemp -d "$PREFIX/lib/.ntfsmac-runtime-old.XXXXXX")" || {
+      rm -rf -- "$stage_root"
+      return 1
+    }
+    rmdir "$backup_root" || {
+      rm -rf -- "$stage_root" "$backup_root"
+      return 1
+    }
+    if ! mv -- "$destination" "$backup_root"; then
+      rm -rf -- "$stage_root"
+      echo "install.sh: HARD-STOP — could not preserve the installed offline runtime during update" >&2
+      return 1
+    fi
+  fi
+  if ! mv -- "$staged_runtime" "$destination"; then
+    if [[ -n "$backup_root" && -d "$backup_root" ]]; then
+      mv -- "$backup_root" "$destination" 2>/dev/null || true
+    fi
+    rm -rf -- "$stage_root"
+    echo "install.sh: HARD-STOP — could not publish the verified offline runtime update" >&2
+    return 1
+  fi
+  rm -rf -- "$stage_root"
+  [[ -n "$backup_root" ]] && rm -rf -- "$backup_root"
+  echo "install.sh: installed verified offline runtime payload"
 }
 
 install_binaries() {
@@ -140,6 +230,7 @@ commands:
   copy --verify <source> <dest>      Copy, reread, and compare a SHA-256 manifest
   verify <source> <destination>      Compare existing file/tree bytes with SHA-256
   diagnose [--json]                  Read-only health check
+  filesystem <device>               Read actual filesystem metadata as JSON (may ask for sudo)
   opengui                            Open the menu-bar popover
   uninstall [--force] [--keep-cache] Remove the CLI, vendored deps, and the GUI helper
   help                               Show this message
@@ -155,6 +246,7 @@ case "\$sub" in
   unmount) exec "\$LIBEXEC/commands/unmount.sh" "\$@" ;;
   copy) exec "\$LIBEXEC/commands/copy.sh" "\$@" ;;
   verify) exec "\$LIBEXEC/commands/verify.sh" "\$@" ;;
+  filesystem) exec "\$LIBEXEC/commands/filesystem.sh" "\$@" ;;
   diagnose) exec "\$LIBEXEC/commands/diagnose.sh" "\$@" ;;
   opengui) exec "\$LIBEXEC/commands/opengui.sh" "\$@" ;;
   uninstall) exec "\$LIBEXEC/commands/uninstall.sh" "\$@" ;;
@@ -240,6 +332,7 @@ main() {
   done
 
   refuse_non_arm64 || exit 1
+  install_offline_runtime || exit 1
   install_binaries || exit 1
   install_cli || exit 1
   repair_runtime_cache_ownership || exit 1

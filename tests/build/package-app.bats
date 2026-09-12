@@ -50,6 +50,12 @@ teardown() {
   [ -f "$APP/Contents/Resources/AppIcon.icns" ]
   [ -f "$APP/Contents/Resources/HelperIcon.png" ]
   [ -f "$APP/Contents/Resources/cli-src/cli/pf/ntfsmac.anchor.tmpl" ]
+  [ -f "$APP/Contents/Resources/cli-src/vendor/runtime/SHA256SUMS" ]
+  [ -f "$APP/Contents/Resources/cli-src/vendor/runtime/oci/index.json" ]
+  [ -f "$APP/Contents/Resources/cli-src/build/verify-offline-runtime.py" ]
+  run python3 "$APP/Contents/Resources/cli-src/build/verify-offline-runtime.py" \
+    "$APP/Contents/Resources/cli-src"
+  [ "$status" -eq 0 ]
   [ -f "$APP/Contents/Resources/ntfsmac-helper" ]
   [ -f "$APP/Contents/Library/LaunchDaemons/com.binarybears.ntfsmac.helper.daemon.plist" ]
   run /usr/libexec/PlistBuddy -c "Print :BundleProgram" \
@@ -59,6 +65,85 @@ teardown() {
   [ "$output" = "modern" ]
   run /usr/libexec/PlistBuddy -c "Print :SMPrivilegedExecutables" "$APP/Contents/Info.plist"
   [ "$status" -ne 0 ]
+}
+
+@test "offline payload staging rejects corruption without publishing a partial runtime" {
+  local fixture_root stage_root
+  fixture_root="$BATS_TEST_TMPDIR/corrupt-package-source"
+  stage_root="$BATS_TEST_TMPDIR/package-stage"
+  mkdir -p "$fixture_root/build" "$fixture_root/vendor" "$stage_root"
+  cp "$REPO_ROOT/build/verify-offline-runtime.py" "$fixture_root/build/"
+  cp "$REPO_ROOT/build/sources.lock" "$REPO_ROOT/build/alpine-base-packages.lock" \
+    "$REPO_ROOT/build/alpine-packages.lock" "$REPO_ROOT/build/alpine-apks.lock" "$fixture_root/build/"
+  cp -R "$REPO_ROOT/vendor/runtime" "$fixture_root/vendor/runtime"
+  printf 'tampered\n' >> "$fixture_root/vendor/runtime/entrypoint.sh"
+
+  run bash -c 'source "$1"; stage_offline_runtime "$2" "$3"' \
+    _ "$SCRIPT" "$fixture_root" "$stage_root"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"HARD-STOP"* ]]
+  [ ! -e "$stage_root/vendor/runtime" ]
+}
+
+@test "offline payload staging produces a self-verifying copy of the complete runtime" {
+  local stage_root
+  stage_root="$BATS_TEST_TMPDIR/verified-package-stage"
+  mkdir -p "$stage_root"
+
+  run bash -c 'source "$1"; stage_offline_runtime "$2" "$3"' \
+    _ "$SCRIPT" "$REPO_ROOT" "$stage_root"
+
+  [ "$status" -eq 0 ]
+  run python3 "$stage_root/build/verify-offline-runtime.py" "$stage_root"
+  [ "$status" -eq 0 ]
+  run diff -qr "$REPO_ROOT/vendor/runtime" "$stage_root/vendor/runtime"
+  [ "$status" -eq 0 ]
+}
+
+@test "native packaging gate rejects a payload whose updated locks exceed the embedded manifest" {
+  local stage_root license_sha manifest_sha
+  stage_root="$BATS_TEST_TMPDIR/stale-native-manifest-stage"
+  mkdir -p "$stage_root/build" "$stage_root/vendor/bin"
+  cp "$REPO_ROOT/build/verify-offline-runtime.py" "$stage_root/build/"
+  cp "$REPO_ROOT/build/sources.lock" "$REPO_ROOT/build/alpine-base-packages.lock" \
+    "$REPO_ROOT/build/alpine-packages.lock" "$REPO_ROOT/build/alpine-apks.lock" "$stage_root/build/"
+  cp "$REPO_ROOT/vendor/bin/init-rootfs" "$stage_root/vendor/bin/init-rootfs"
+  cp -R "$REPO_ROOT/vendor/runtime" "$stage_root/vendor/runtime"
+
+  printf '\nfixture revision\n' >> "$stage_root/vendor/runtime/LICENSE.nfs-entrypoint"
+  license_sha="$(shasum -a 256 "$stage_root/vendor/runtime/LICENSE.nfs-entrypoint" | awk '{print $1}')"
+  awk -v sha="$license_sha" 'BEGIN { OFS="  " } $2 == "LICENSE.nfs-entrypoint" { $1=sha } { print $1, $2 }' \
+    "$stage_root/vendor/runtime/SHA256SUMS" > "$stage_root/vendor/runtime/SHA256SUMS.new"
+  mv "$stage_root/vendor/runtime/SHA256SUMS.new" "$stage_root/vendor/runtime/SHA256SUMS"
+  manifest_sha="$(shasum -a 256 "$stage_root/vendor/runtime/SHA256SUMS" | awk '{print $1}')"
+  awk -v sha="$manifest_sha" 'BEGIN { FS=OFS="=" } $1 == "OFFLINE_RUNTIME_SHA256" { $2=sha } { print }' \
+    "$stage_root/build/sources.lock" > "$stage_root/build/sources.lock.new"
+  mv "$stage_root/build/sources.lock.new" "$stage_root/build/sources.lock"
+
+  run python3 "$stage_root/build/verify-offline-runtime.py" "$stage_root"
+  [ "$status" -eq 0 ]
+  run bash -c 'source "$1"; verify_staged_native_offline_runtime "$2"' \
+    _ "$SCRIPT" "$stage_root"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"embedded offline runtime manifest"* ]]
+}
+
+@test "offline payload staging rejects a missing source without publishing a partial runtime" {
+  local fixture_root stage_root
+  fixture_root="$BATS_TEST_TMPDIR/missing-package-source"
+  stage_root="$BATS_TEST_TMPDIR/missing-package-stage"
+  mkdir -p "$fixture_root/build" "$fixture_root/vendor" "$stage_root"
+  cp "$REPO_ROOT/build/verify-offline-runtime.py" "$fixture_root/build/"
+  cp "$REPO_ROOT/build/sources.lock" "$REPO_ROOT/build/alpine-base-packages.lock" \
+    "$REPO_ROOT/build/alpine-packages.lock" "$REPO_ROOT/build/alpine-apks.lock" "$fixture_root/build/"
+
+  run bash -c 'source "$1"; stage_offline_runtime "$2" "$3"' \
+    _ "$SCRIPT" "$fixture_root" "$stage_root"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"HARD-STOP"* ]]
+  [ ! -e "$stage_root/vendor/runtime" ]
 }
 
 @test "assembles the Legacy app with the SMJobBless trust pairing" {

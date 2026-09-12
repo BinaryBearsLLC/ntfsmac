@@ -25,7 +25,8 @@ experimental choice.
 
 ## Requirements
 
-This branch maintains **3.1.3 Beta 2**, published separately from the stable 3.1.2 line.
+This branch prepares **3.1.3 Beta 3**. The currently published beta remains Beta 2,
+separate from the stable 3.1.2 line.
 The beta targets macOS 14+; native Sonoma filesystem qualification remains open.
 The compatibility table below distinguishes verified operations from the build target.
 
@@ -82,6 +83,10 @@ when a supported partition is detected.
 Official BinaryBears DMGs are Developer ID signed, notarized by Apple, stapled, and published with
 a SHA-256 checksum. Draft releases are not final downloads.
 
+The Beta 3 candidate includes the complete runtime in the compressed DMG. Initial
+setup and mounting use local, integrity-checked files and do not download Linux
+packages or scripts. Administrator approval and Full Disk Access are still required.
+
 ### Build from source
 
 To build this beta development line (`dev` still contains the stable line):
@@ -112,7 +117,7 @@ confirmed read/write.
 The CLI remains available for scripted and diagnostic use:
 
 ```sh
-ntfsmac list
+ntfsmac filesystem disk4s1
 ntfsmac mount disk4s1
 ntfsmac mount --fs-driver ntfs3 disk4s1
 ntfsmac unmount disk4s1
@@ -121,6 +126,11 @@ ntfsmac diagnose
 
 Only partition identifiers matching `diskNsN` are accepted. A whole disk such as `disk4` is
 rejected independently by the CLI and helper.
+
+The app shows the actual filesystem and volume label when it can read the partition's
+metadata, including before mounting. `Linux (unverified)` means only the partition type is
+known. The `filesystem` command returns the same native metadata as JSON without mounting
+the drive; macOS may ask for administrator access to read it.
 
 ### Verified Copy
 

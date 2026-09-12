@@ -126,7 +126,7 @@ run_anylinuxfs_mount() {
     args+=(-o norecover)
   fi
 
-  # Bounded + heartbeated (NTFSMAC_MOUNT_TIMEOUT, default 240s — generous: first-run download +
+  # Bounded + heartbeated (NTFSMAC_MOUNT_TIMEOUT, default 240s — generous: first-run offline unpack +
   # VM boot legitimately takes 1-2 min per the notice above, this just bounds a truly wedged
   # guest instead of hanging forever with zero feedback). outfile "-": anylinuxfs's own live
   # "macOS: .../Linux: ..." progress lines stay visible in real time, never buffered.

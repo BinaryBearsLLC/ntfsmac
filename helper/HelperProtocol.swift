@@ -37,7 +37,7 @@ public let deviceNamePattern = "^disk[0-9]+s[0-9]+$"
 /// Bump whenever the XPC selector surface or required helper behavior changes. The CLI tree hash
 /// alone cannot distinguish a newly packaged GUI from an older helper when only Swift/helper
 /// code changed.
-public let helperProtocolRevision = 4
+public let helperProtocolRevision = 5
 
 public func helperBuildIdentity(cliTreeHash: String) -> String {
     "xpc\(helperProtocolRevision):\(cliTreeHash)"
@@ -272,6 +272,9 @@ public struct CommandResult: Codable, Sendable {
 /// each is read-only and explicitly Don't-listed as privileged in their own units
 /// (`3-drive-detect`, `3-status-speed`, `3-diagnose-ui` all call the CLI directly, unprivileged).
 @objc public protocol HelperXPCProtocol {
+    /// Read only the requested partition's superblock. Does not enumerate, mount, unlock,
+    /// assemble volumes, initialize a runtime or start a VM.
+    func probeFilesystem(device: String, reply: @escaping (Data?, String?) -> Void)
     /// Performs a non-mutating Full Disk Access preflight against the exact external partition
     /// the GUI detected. The helper reads one 512-byte block from the raw device into
     /// `/dev/null`; success proves the helper can open the disk before any mount is attempted.
@@ -346,7 +349,14 @@ public struct CommandResult: Codable, Sendable {
 /// production implementation.
 public protocol PrivilegedCommandRunning {
     func run(_ executablePath: String, _ arguments: [String]) -> CommandResult
+    func run(_ executablePath: String, _ arguments: [String], timeout: TimeInterval) -> CommandResult
     func runPipingStdin(_ input: String, to executablePath: String, _ arguments: [String]) -> CommandResult
+}
+
+public extension PrivilegedCommandRunning {
+    func run(_ executablePath: String, _ arguments: [String], timeout: TimeInterval) -> CommandResult {
+        run(executablePath, arguments)
+    }
 }
 
 /// Lock-protected single-value holder — lets `captureOutput`'s two background readers each
@@ -601,6 +611,31 @@ public final class HelperService: NSObject, HelperXPCProtocol {
             "/bin/dd",
             ["if=/dev/r\(device)", "of=/dev/null", "bs=512", "count=1"]
         )
+        encode(result, reply: reply)
+    }
+
+    public func probeFilesystem(device: String, reply: @escaping (Data?, String?) -> Void) {
+        // Metadata is optional: do not queue a refresh behind a long mount/install.
+        // The next scan retries; no stale format is retained while the helper is busy.
+        guard Self.mutationLock.try() else {
+            encode(CommandResult(output: "filesystem probe busy", exitCode: 75), reply: reply)
+            return
+        }
+        defer { Self.mutationLock.unlock() }
+        guard validateDevice(device) else {
+            reply(nil, "rejected: invalid partition identifier")
+            return
+        }
+        let executable = "\(resolvePrefix())/bin/anylinuxfs"
+        // Old anylinuxfs routes unknown commands to its implicit mount parser.
+        // Confirm capability first even if someone replaced the installed runtime.
+        let help = runner.run(executable, ["--help"], timeout: 2)
+        guard help.exitCode == 0 && help.output.contains("probe-filesystem") else {
+            encode(CommandResult(output: "filesystem probe unavailable; reinstall runtime", exitCode: 1), reply: reply)
+            return
+        }
+        let result = runner.run(executable,
+                                ["probe-filesystem", device], timeout: 5)
         encode(result, reply: reply)
     }
 

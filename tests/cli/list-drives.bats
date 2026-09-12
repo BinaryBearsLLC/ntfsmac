@@ -36,6 +36,46 @@ teardown() {
   rm -rf "$STUB_DIR"
 }
 
+@test "MBR SSD exposes every Linux sibling and preserves unlabeled filesystem routing" {
+  cat > "$STUB_DIR/anylinuxfs" <<'STUB'
+#!/bin/bash
+cat <<'OUTPUT'
+/dev/disk4 (external, physical):
+   #:                       TYPE NAME                    SIZE       IDENTIFIER
+   0:     FDisk_partition_scheme                        *1.0 TB     disk4
+   1:             Windows_FAT_32 bootfs                  536.9 MB   disk4s1
+   2:                      Linux                         124.0 GB   disk4s2
+   3:                      Linux                         875.7 GB   disk4s3
+OUTPUT
+STUB
+  run list_mountable_drives
+  [ "$status" -eq 0 ]
+  [ "$output" = $'disk4s2\t\t124.0 GB\text\ndisk4s3\t\t875.7 GB\text' ]
+  run fs_type_for_device disk4s2
+  [ "$output" = ext ]
+  run fs_type_for_device disk4s3
+  [ "$output" = ext ]
+}
+
+@test "MBR Linux fallback preserves labels and excludes LVM RAID swap and unsupported filesystems" {
+  cat > "$STUB_DIR/anylinuxfs" <<'STUB'
+#!/bin/bash
+cat <<'OUTPUT'
+   1:                      Linux My Linux Volume          12.0 GB   disk5s1
+   2:                  Linux LVM                          12.0 GB   disk5s2
+   3:                  Linux_LVM                          12.0 GB   disk5s3
+   4:                 Linux_RAID                          12.0 GB   disk5s4
+   5:                 Linux Swap                          12.0 GB   disk5s5
+   6:                      btrfs                          12.0 GB   disk5s6
+   7:                crypto_LUKS                          12.0 GB   disk5s7
+   8:                      Linux                          12.0 GB   disk5
+OUTPUT
+STUB
+  run list_mountable_drives
+  [ "$status" -eq 0 ]
+  [ "$output" = $'disk5s1\tMy Linux Volume\t12.0 GB\text' ]
+}
+
 @test "list_mountable_drives surfaces ext4 partitions alongside NTFS" {
   run list_mountable_drives
   [ "$status" -eq 0 ]

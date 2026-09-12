@@ -15,7 +15,10 @@ GitHub Actions creates a draft. Publish only that tested draft; never rebuild or
 GitHub compiles, signs and notarizes the complete distribution. Its virtualized
 runner uses the explicit `compile-only` rootfs build mode; native VM/package-install
 acceptance is not reported as a remote pass. The default local build still performs
-that acceptance. The generated test rootfs is not shipped in the application.
+that acceptance. The generated test rootfs is not shipped in the application. The verified OCI base,
+locked APKs and entrypoint are shipped in `Contents/Resources/cli-src/vendor/runtime`;
+first initialization must succeed without outbound network access. Run
+`python3 build/verify-offline-runtime.py .` and the offline regression tests before packaging.
 Final native media checks must use the downloaded draft DMG before publication.
 
 ## Beta channel

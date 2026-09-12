@@ -637,9 +637,14 @@ public final class MountController: ObservableObject {
             || snapshot.warningCode == "MOUNT_BACKEND_UNRESPONSIVE"
         var updated = snapshot.mounts.map { observed -> MountedDrive in
             let prior = previous[observed.deviceIdentifier]
-            let drive = known[observed.deviceIdentifier]
+            var drive = known[observed.deviceIdentifier]
                 ?? prior?.drive
                 ?? fallbackDrive(for: observed)
+            if drive.fsType == "ext", let format = observed.fsDriver,
+               ["ext2", "ext3", "ext4"].contains(format) {
+                drive = Drive(identifier: drive.identifier, fsType: format,
+                              label: drive.label, size: drive.size)
+            }
             let readOnlyReason: ReadOnlyReason?
             switch observed.isReadOnly {
             case true:

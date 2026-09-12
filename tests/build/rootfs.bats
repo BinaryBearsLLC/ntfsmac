@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
 # tests/build/rootfs.bats — v-alpine-rootfs acceptance (PLAN.md §6).
 #
-# Runs the real build (network pull of alpine at the locked tag+digest, real cargo/go
-# build of a patched init-rootfs) — same live-verification pattern as fetch-prebuilt.bats
+# Runs the real build (verified local OCI import plus real cargo/go build of a
+# patched init-rootfs) — same live-verification pattern as fetch-prebuilt.bats
 # and gvproxy.bats. Checks the generated vm-setup.sh (the package manifest for this rootfs
 # — see build/init-rootfs.sh's header for why full VM-boot package installation isn't
 # reachable yet: it needs vendor/bin/vmproxy, a v-anylinuxfs-build artifact) against
@@ -46,6 +46,142 @@ setup() {
   [[ "$output" == *built-rust* && "$output" == *built-go* && "$output" == *signed-binary* ]]
   [[ "$output" == *"acceptance NOT RUN"* ]]
   [[ "$output" != *unexpected-vm-boot* ]]
+}
+
+@test "Alpine digest verification uses the verified local OCI layout without registry access" {
+  local fixture_root stub_dir
+  fixture_root="$BATS_TEST_TMPDIR/offline-digest"
+  stub_dir="$BATS_TEST_TMPDIR/no-network-bin"
+  mkdir -p "$fixture_root/vendor/runtime/oci" "$stub_dir"
+  cp -R "$REPO_ROOT/vendor/runtime/oci/." "$fixture_root/vendor/runtime/oci/"
+  cat > "$fixture_root/verify.py" <<'PY'
+#!/usr/bin/env python3
+import pathlib
+import sys
+pathlib.Path(sys.argv[1], "verifier.called").write_text("verified\n")
+PY
+  chmod +x "$fixture_root/verify.py"
+  cat > "$stub_dir/curl" <<'STUB'
+#!/bin/bash
+echo "curl must not be called" >&2
+exit 99
+STUB
+  chmod +x "$stub_dir/curl"
+
+  PATH="$stub_dir:$PATH" run bash -c '
+    source "$1"
+    OFFLINE_RUNTIME_REPO_ROOT="$2"
+    OFFLINE_RUNTIME_DIR="$2/vendor/runtime"
+    OFFLINE_RUNTIME_VERIFIER="$2/verify.py"
+    verify_alpine_digest 3.24.1 "$3"
+  ' _ "$SCRIPT" "$fixture_root" "$ALPINE_RUNTIME_DIGEST"
+
+  [ "$status" -eq 0 ]
+  [ -f "$fixture_root/verifier.called" ]
+  [[ "$output" == *"local OCI"* ]]
+  [[ "$output" != *"curl must not be called"* ]]
+}
+
+@test "APK artifact verification copies only hash-matching files from the offline payload" {
+  local fixture_root lock cache good_sha
+  fixture_root="$BATS_TEST_TMPDIR/offline-apks"
+  lock="$BATS_TEST_TMPDIR/offline-apks.lock"
+  cache="$BATS_TEST_TMPDIR/offline-apk-cache"
+  mkdir -p "$fixture_root/apks"
+  printf 'verified-apk\n' > "$fixture_root/apks/example-1.0-r0.apk"
+  good_sha="$(shasum -a 256 "$fixture_root/apks/example-1.0-r0.apk" | awk '{print $1}')"
+  printf 'example=1.0-r0 v3.24/main %s\n' "$good_sha" > "$lock"
+
+  run bash -c '
+    source "$1"
+    OFFLINE_RUNTIME_DIR="$2"
+    APK_LOCK="$3"
+    APK_CACHE_ROOT="$4"
+    ALPINE_APKS_SHA256=fixture-set
+    verify_apk_artifacts
+  ' _ "$SCRIPT" "$fixture_root" "$lock" "$cache"
+
+  [ "$status" -eq 0 ]
+  run cmp "$fixture_root/apks/example-1.0-r0.apk" \
+    "$cache/fixture-set/example-1.0-r0.apk"
+  [ "$status" -eq 0 ]
+}
+
+@test "APK artifact verification rejects a corrupt local payload without a remote fallback" {
+  local fixture_root lock cache expected_sha stub_dir
+  fixture_root="$BATS_TEST_TMPDIR/corrupt-offline-apks"
+  lock="$BATS_TEST_TMPDIR/corrupt-offline-apks.lock"
+  cache="$BATS_TEST_TMPDIR/corrupt-offline-apk-cache"
+  stub_dir="$BATS_TEST_TMPDIR/corrupt-no-network-bin"
+  mkdir -p "$fixture_root/apks" "$stub_dir"
+  printf 'corrupt-apk\n' > "$fixture_root/apks/example-1.0-r0.apk"
+  expected_sha="$(printf 'expected-apk\n' | shasum -a 256 | awk '{print $1}')"
+  printf 'example=1.0-r0 v3.24/main %s\n' "$expected_sha" > "$lock"
+  cat > "$stub_dir/curl" <<'STUB'
+#!/bin/bash
+echo "curl must not be called" >&2
+exit 99
+STUB
+  chmod +x "$stub_dir/curl"
+
+  PATH="$stub_dir:$PATH" run bash -c '
+    source "$1"
+    OFFLINE_RUNTIME_DIR="$2"
+    APK_LOCK="$3"
+    APK_CACHE_ROOT="$4"
+    ALPINE_APKS_SHA256=fixture-set
+    verify_apk_artifacts
+  ' _ "$SCRIPT" "$fixture_root" "$lock" "$cache"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"sha256 mismatch"* ]]
+  [[ "$output" != *"curl must not be called"* ]]
+  [ ! -e "$cache/fixture-set/example-1.0-r0.apk" ]
+}
+
+@test "run_init_rootfs stages the verified offline payload before launching init-rootfs" {
+  local fixture_repo cache rootfs_home physical_rootfs_home marker_sha
+  fixture_repo="$BATS_TEST_TMPDIR/run-offline-repo"
+  cache="$BATS_TEST_TMPDIR/run-offline-cache"
+  physical_rootfs_home="$BATS_TEST_TMPDIR/run-offline-home-physical"
+  rootfs_home="$BATS_TEST_TMPDIR/run-offline-home-link"
+  mkdir -p "$physical_rootfs_home"
+  ln -s "$physical_rootfs_home" "$rootfs_home"
+  mkdir -p "$fixture_repo/vendor/runtime" "$fixture_repo/vendor/bin" "$fixture_repo/vendor/kernel"
+  printf 'available-before-launch\n' > "$fixture_repo/vendor/runtime/marker"
+  marker_sha="$(shasum -a 256 "$fixture_repo/vendor/runtime/marker" | awk '{print $1}')"
+  printf '%s  marker\n' "$marker_sha" > "$fixture_repo/vendor/runtime/SHA256SUMS"
+  printf 'kernel\n' > "$fixture_repo/vendor/kernel/Image"
+  cat > "$fixture_repo/vendor/bin/init-rootfs" <<'STUB'
+#!/bin/bash
+test -f ../lib/ntfsmac-runtime/marker || exit 41
+test "$HOME" = "$(cd "$HOME" && pwd -P)" || exit 42
+printf 'offline-runtime-visible\n'
+STUB
+  chmod +x "$fixture_repo/vendor/bin/init-rootfs"
+  cat > "$fixture_repo/verify.py" <<'PY'
+#!/usr/bin/env python3
+raise SystemExit(0)
+PY
+  chmod +x "$fixture_repo/verify.py"
+
+  run bash -c '
+    source "$1"
+    REPO_ROOT="$2"
+    CACHE_DIR="$3"
+    ROOTFS_HOME="$4"
+    BIN_DIR="$2/vendor/bin"
+    OFFLINE_RUNTIME_REPO_ROOT="$2"
+    OFFLINE_RUNTIME_DIR="$2/vendor/runtime"
+    OFFLINE_RUNTIME_VERIFIER="$2/verify.py"
+    run_init_rootfs fixture-reference fixture-base
+  ' _ "$SCRIPT" "$fixture_repo" "$cache" "$rootfs_home"
+
+  [ "$status" -eq 0 ]
+  local launch_output="$output"
+  run cmp "$fixture_repo/vendor/runtime/marker" "$cache/run/lib/ntfsmac-runtime/marker"
+  [ "$status" -eq 0 ]
+  [[ "$launch_output" == *"offline-runtime-visible"* ]]
 }
 
 @test "unknown rootfs build mode fails closed" {

@@ -1,9 +1,9 @@
 #!/bin/bash
 # build/init-rootfs.sh — v-alpine-rootfs (PLAN.md §6).
 #
-# Pulls Alpine at the sources.lock tag, independently verifies the registry manifest
-# digest against ALPINE_DIGEST before doing anything else (abort on mismatch — never
-# trust :latest or an unpinned pull). Builds a *patched copy* of vendored anylinuxfs's
+# Verifies the tracked offline Alpine OCI layout against sources.lock before doing
+# anything else (abort on mismatch; there is no registry fallback). Builds a
+# *patched copy* of vendored anylinuxfs's
 # init-rootfs (Go) + vmrunner-sys (Rust/CGO) — the vendored submodule itself is never
 # edited — swapping its embedded default-alpine-packages.txt for the exact, complete
 # add-on closure in build/alpine-packages.lock. build/alpine-apks.lock also fixes the source
@@ -40,6 +40,8 @@ source "$SCRIPT_DIR/lib/cargo-lock-overlay.sh"
 source "$REPO_ROOT/cli/lib/runtime-alpine.sh"
 # shellcheck source=lib/patch-runtime-alpine.sh
 source "$SCRIPT_DIR/lib/patch-runtime-alpine.sh"
+# shellcheck source=lib/patch-offline-runtime.sh
+source "$SCRIPT_DIR/lib/patch-offline-runtime.sh"
 
 # NOTE: deliberately NOT under $REPO_ROOT. This repo's own path can contain spaces
 # (e.g. when checked out on a "Windows Shared Folder" network volume), and
@@ -65,6 +67,24 @@ PACKAGE_LOCK="$REPO_ROOT/build/alpine-packages.lock"
 APK_LOCK="$REPO_ROOT/build/alpine-apks.lock"
 APK_CACHE_ROOT="${NTFSMAC_ALPINE_APK_CACHE_DIR:-${TMPDIR:-/tmp}/ntfsmac-build/alpine-apks}"
 BIN_DIR="${NTFSMAC_VENDOR_BIN_DIR:-$REPO_ROOT/vendor/bin}"
+OFFLINE_RUNTIME_REPO_ROOT="${NTFSMAC_OFFLINE_RUNTIME_REPO_ROOT:-$REPO_ROOT}"
+OFFLINE_RUNTIME_DIR="${NTFSMAC_OFFLINE_RUNTIME_DIR:-$OFFLINE_RUNTIME_REPO_ROOT/vendor/runtime}"
+OFFLINE_RUNTIME_VERIFIER="${NTFSMAC_OFFLINE_RUNTIME_VERIFIER:-$OFFLINE_RUNTIME_REPO_ROOT/build/verify-offline-runtime.py}"
+
+verify_offline_runtime_payload() {
+  if [[ ! -f "$OFFLINE_RUNTIME_VERIFIER" || -L "$OFFLINE_RUNTIME_VERIFIER" ]]; then
+    echo "init-rootfs: HARD-STOP — offline runtime verifier is missing; reinstall ntfsmac: $OFFLINE_RUNTIME_VERIFIER" >&2
+    return 1
+  fi
+  if [[ ! -d "$OFFLINE_RUNTIME_DIR" || -L "$OFFLINE_RUNTIME_DIR" ]]; then
+    echo "init-rootfs: HARD-STOP — offline runtime payload is missing or unsafe; reinstall ntfsmac: $OFFLINE_RUNTIME_DIR" >&2
+    return 1
+  fi
+  if ! python3 "$OFFLINE_RUNTIME_VERIFIER" "$OFFLINE_RUNTIME_REPO_ROOT"; then
+    echo "init-rootfs: HARD-STOP — offline runtime payload verification failed; reinstall ntfsmac" >&2
+    return 1
+  fi
+}
 
 verify_package_lock() {
   local lock_file="$1" expected_sha="$2" label="$3" actual_sha
@@ -133,34 +153,39 @@ verify_apk_lock() {
 }
 
 verify_apk_artifacts() {
-  local artifact_cache constraint channel expected_sha extra name version file url destination download actual_sha
+  local artifact_cache constraint channel expected_sha extra name version file source destination staged actual_sha
   artifact_cache="$APK_CACHE_ROOT/$ALPINE_APKS_SHA256"
   mkdir -p "$artifact_cache"
   while IFS=' ' read -r constraint channel expected_sha extra; do
     name="${constraint%%=*}"
     version="${constraint#*=}"
     file="${name}-${version}.apk"
-    url="https://dl-cdn.alpinelinux.org/alpine/${channel}/aarch64/${file}"
+    source="$OFFLINE_RUNTIME_DIR/apks/$file"
     destination="$artifact_cache/$file"
-    if [[ -f "$destination" ]]; then
-      actual_sha="$(shasum -a 256 "$destination" | awk '{print $1}')"
-      [[ "$actual_sha" == "$expected_sha" ]] && continue
-    fi
-    download="${destination}.download.$$"
-    if ! curl -fsSL "$url" -o "$download"; then
-      rm -f -- "$download"
-      echo "init-rootfs: HARD-STOP — could not fetch locked Alpine APK $file" >&2
+    if [[ ! -f "$source" || -L "$source" ]]; then
+      echo "init-rootfs: HARD-STOP — bundled Alpine APK is missing or unsafe; reinstall ntfsmac: $file" >&2
       return 1
     fi
-    actual_sha="$(shasum -a 256 "$download" | awk '{print $1}')"
+    actual_sha="$(shasum -a 256 "$source" | awk '{print $1}')"
     if [[ "$actual_sha" != "$expected_sha" ]]; then
-      rm -f -- "$download"
+      echo "init-rootfs: HARD-STOP — bundled Alpine APK sha256 mismatch for $file (expected $expected_sha, got $actual_sha); reinstall ntfsmac" >&2
+      return 1
+    fi
+    staged="$(mktemp "${destination}.new.XXXXXX")" || return 1
+    if ! /bin/cp -X "$source" "$staged"; then
+      rm -f -- "$staged"
+      echo "init-rootfs: HARD-STOP — could not stage bundled Alpine APK $file" >&2
+      return 1
+    fi
+    actual_sha="$(shasum -a 256 "$staged" | awk '{print $1}')"
+    if [[ "$actual_sha" != "$expected_sha" ]]; then
+      rm -f -- "$staged"
       echo "init-rootfs: HARD-STOP — Alpine APK sha256 mismatch for $file (expected $expected_sha, got $actual_sha)" >&2
       return 1
     fi
-    mv -f -- "$download" "$destination"
+    mv -f -- "$staged" "$destination"
   done < "$APK_LOCK"
-  echo "init-rootfs: verified all locked Alpine APK artifacts"
+  echo "init-rootfs: staged all locked Alpine APK artifacts from the verified offline payload"
 }
 
 verify_rootfs_package_versions() {
@@ -192,40 +217,32 @@ verify_rootfs_package_versions() {
 }
 
 # verify_alpine_digest <tag> <expected_digest>
-# ALPINE_DIGEST is pinned to the linux/arm64 PLATFORM manifest digest (not the
-# top-level multi-arch index digest — those differ). Fetches the manifest list body
-# from the registry v2 API and picks out the linux/arm64 entry's digest, matching how
-# the pin itself was derived (Apple Silicon only, per PLAN.md L-rule). Real
-# cryptographic pin check, done BEFORE any pull.
+# ALPINE_DIGEST is pinned to the linux/arm64 platform manifest digest. The complete
+# local payload verifier checks the OCI hash graph and source locks; this function
+# additionally confirms that the OCI index selects the caller's expected digest.
 verify_alpine_digest() {
-  local tag="$1" expected="$2" token actual
-  token="$(curl -fsSL "https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/alpine:pull" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')"
-  if [[ -z "$token" ]]; then
-    echo "init-rootfs: could not obtain a Docker Hub registry token" >&2
-    return 1
-  fi
-  actual="$(curl -fsSL \
-    -H "Authorization: Bearer $token" \
-    -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.oci.image.index.v1+json" \
-    "https://registry-1.docker.io/v2/library/alpine/manifests/${tag}" \
-    | python3 -c '
-import json, sys
-d = json.load(sys.stdin)
-for m in d.get("manifests", []):
-    p = m.get("platform", {})
-    if p.get("architecture") == "arm64" and p.get("os") == "linux":
-        print(m["digest"])
-        break
-')"
+  local tag="$1" expected="$2" actual
+  verify_offline_runtime_payload || return 1
+  actual="$(python3 - "$OFFLINE_RUNTIME_DIR/oci/index.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    index = json.load(handle)
+manifests = index.get("manifests", [])
+if len(manifests) == 1:
+    print(manifests[0].get("digest", ""))
+PY
+)" || return 1
   if [[ -z "$actual" ]]; then
-    echo "init-rootfs: could not find a linux/arm64 manifest entry for alpine:${tag}" >&2
+    echo "init-rootfs: HARD-STOP — local OCI index does not contain exactly one pinned manifest for alpine:${tag}" >&2
     return 1
   fi
   if [[ "$actual" != "$expected" ]]; then
-    echo "init-rootfs: HARD-STOP — alpine:${tag} linux/arm64 manifest digest mismatch (expected $expected, got $actual)" >&2
+    echo "init-rootfs: HARD-STOP — alpine:${tag} local OCI manifest digest mismatch (expected $expected, got $actual)" >&2
     return 1
   fi
-  echo "init-rootfs: alpine:${tag} linux/arm64 digest verified ($actual)"
+  echo "init-rootfs: alpine:${tag} local OCI digest verified ($actual)"
 }
 
 # prepare_build_copy — copy the vendored Go+Rust sources (never edit the submodule
@@ -244,7 +261,8 @@ prepare_build_copy() {
   cp "$REPO_ROOT/vendor/src/anylinuxfs/anylinuxfs/cc_linux" "$CACHE_DIR/anylinuxfs/cc_linux"
   chmod +x "$CACHE_DIR/anylinuxfs/cc_linux"
   cp "$PACKAGE_LOCK" "$CACHE_DIR/init-rootfs/default-alpine-packages.txt"
-  patch_init_rootfs_runtime_alpine "$CACHE_DIR/init-rootfs" "$APK_LOCK"
+  patch_init_rootfs_runtime_alpine "$CACHE_DIR/init-rootfs" "$APK_LOCK" || return 1
+  patch_init_rootfs_offline_runtime "$CACHE_DIR/init-rootfs" "$REPO_ROOT"
 }
 
 # build_vmrunner_sys — settled PLAN.md decision: try without -F freebsd first.
@@ -298,6 +316,10 @@ run_init_rootfs() {
   local reference="$1" base_dir="$2"
   local run_dir="$CACHE_DIR/run"
   mkdir -p "$run_dir/libexec" "$ROOTFS_HOME"
+  ROOTFS_HOME="$(cd "$ROOTFS_HOME" && pwd -P)" || {
+    echo "init-rootfs: HARD-STOP — could not canonicalize the runtime home" >&2
+    return 1
+  }
   # vendor_init_rootfs_bin signs the vendored copy, not the compiler output.
   # Launching the latter loses the Hypervisor entitlement and fails before boot.
   cp "$BIN_DIR/init-rootfs" "$run_dir/libexec/init-rootfs" || return 1
@@ -311,6 +333,27 @@ run_init_rootfs() {
   else
     echo "init-rootfs: WARN — vendor/kernel/modules.squashfs not found (run v-fetch-prebuilt first)" >&2
   fi
+
+  local staged_runtime="$run_dir/lib/.ntfsmac-runtime.new.$$"
+  rm -rf -- "$staged_runtime"
+  verify_offline_runtime_payload || return 1
+  if find "$OFFLINE_RUNTIME_DIR" -type l -print -quit | grep -q .; then
+    echo "init-rootfs: HARD-STOP — offline runtime payload contains a symlink; reinstall ntfsmac" >&2
+    return 1
+  fi
+  if ! cp -R "$OFFLINE_RUNTIME_DIR" "$staged_runtime"; then
+    rm -rf -- "$staged_runtime"
+    echo "init-rootfs: HARD-STOP — could not stage the offline runtime payload" >&2
+    return 1
+  fi
+  if find "$staged_runtime" -type l -print -quit | grep -q . ||
+     ! (cd "$staged_runtime" && shasum -a 256 -c SHA256SUMS >/dev/null); then
+    rm -rf -- "$staged_runtime"
+    echo "init-rootfs: HARD-STOP — staged offline runtime payload verification failed" >&2
+    return 1
+  fi
+  rm -rf -- "$run_dir/lib/ntfsmac-runtime"
+  mv -- "$staged_runtime" "$run_dir/lib/ntfsmac-runtime" || return 1
 
   # vmproxy is a v-anylinuxfs-build artifact (not yet built at this point in the DAG —
   # PLAN.md's V-1 layer runs v-alpine-rootfs in parallel with v-fetch-prebuilt/v-gvproxy,

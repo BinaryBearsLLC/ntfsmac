@@ -46,6 +46,17 @@ with **Try Again**. It never uses the Full Disk Access header. Raw output remain
 diagnostic only because it can contain personal paths. The normal Diagnose footer is available
 here too, including Command-click JSON export; Settings and Quit stay reachable.
 
+Discovery retains every compatible partition independently, including MBR SSDs with multiple
+`Linux` partitions as well as GPT `Linux Filesystem` partitions. If an unprivileged scan cannot
+read the superblock, the authenticated helper runs a bounded `probe-filesystem` against that
+exact partition. This reads metadata without runtime initialization, VM startup, mounting,
+volume assembly or decryption. Confirmed formats and labels replace the generic row before
+mounting. The GUI matches the returned identifier and never caches a format by disk number.
+If metadata cannot be verified, **Linux (unverified)** retains the auto-detect mount path.
+Observed mount metadata also refines a generic mounted row. Explicit LVM, RAID, swap and unsupported filesystem
+types remain excluded. FAT/exFAT volumes already handled by macOS stay under native mounting.
+Refresh reconciles each partition identifier, never just the parent disk.
+
 ## Idle controls
 
 | Control | Behavior |

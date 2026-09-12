@@ -44,6 +44,8 @@ source "$REPO_ROOT/cli/lib/runtime-alpine.sh"
 # shellcheck disable=SC1091
 source "$REPO_ROOT/build/lib/patch-runtime-alpine.sh"
 # shellcheck disable=SC1091
+source "$REPO_ROOT/build/lib/patch-offline-runtime.sh"
+# shellcheck disable=SC1091
 source "$REPO_ROOT/build/lib/patch-filesystem-detection.sh"
 
 current_pin=$(lock_get ANYLINUXFS_COMMIT) || exit 1
@@ -116,6 +118,8 @@ patch_anylinuxfs_runtime_alpine "$audit_tmp" >/dev/null \
   || fail "runtime Alpine patch no longer applies to the candidate"
 patch_init_rootfs_runtime_alpine "$audit_tmp/init-rootfs" "$REPO_ROOT/build/alpine-apks.lock" >/dev/null \
   || fail "init-rootfs runtime patch no longer applies to the candidate"
+patch_init_rootfs_offline_runtime "$audit_tmp/init-rootfs" "$REPO_ROOT" >/dev/null \
+  || fail "offline runtime patch no longer applies to the candidate"
 
 source_status_after=$(git -C "$SOURCE_DIR" status --porcelain)
 [[ "$source_status_after" == "$source_status_before" ]] || fail "audit unexpectedly modified the submodule"

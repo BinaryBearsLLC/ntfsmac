@@ -83,6 +83,57 @@ private let sampleExtOutput = """
    3:                       btrfs BtrVol                   20.0 GB   disk4s4
 """
 
+// Captured layout from a multi-partition MBR SSD. Unprivileged blkid cannot read
+// the superblocks, so both Linux siblings retain their partition-family name.
+private let sampleMBRLinuxOutput = """
+/dev/disk4 (external, physical):
+   #:                       TYPE NAME                    SIZE       IDENTIFIER
+   0:     FDisk_partition_scheme                        *1.0 TB     disk4
+   1:             Windows_FAT_32 bootfs                  536.9 MB   disk4s1
+   2:                      Linux                         124.0 GB   disk4s2
+   3:                      Linux                         875.7 GB   disk4s3
+"""
+
+@Test func parsesEveryMBRLinuxSiblingWithoutInventingLabels() {
+    #expect(DriveListParser.parse(sampleMBRLinuxOutput) == [
+        Drive(identifier: "disk4s2", fsType: "ext", label: "", size: "124.0 GB"),
+        Drive(identifier: "disk4s3", fsType: "ext", label: "", size: "875.7 GB"),
+    ])
+}
+
+@Test func mbrLinuxFallbackPreservesLabelsAndRejectsOtherLinuxPartitionFamilies() {
+    let output = """
+       1:                      Linux My Linux Volume          12.0 GB   disk5s1
+       2:                  Linux LVM                          12.0 GB   disk5s2
+       3:                  Linux_LVM                          12.0 GB   disk5s3
+       4:                 Linux_RAID                          12.0 GB   disk5s4
+       5:                 Linux Swap                          12.0 GB   disk5s5
+       6:                      btrfs                          12.0 GB   disk5s6
+       7:                crypto_LUKS                          12.0 GB   disk5s7
+       8:                      Linux                          12.0 GB   disk5
+    """
+    #expect(DriveListParser.parse(output) == [
+        Drive(identifier: "disk5s1", fsType: "ext", label: "My Linux Volume", size: "12.0 GB")
+    ])
+}
+
+@MainActor
+@Test func scanRefreshKeepsEveryMBRSiblingAndRemovesDisconnectedPartitions() async {
+    let runner = FakeListRunner(output: sampleMBRLinuxOutput)
+    let scanner = DriveScanner(runner: runner, anylinuxfsPath: "/stub/anylinuxfs")
+    await scanner.refresh()
+    #expect(scanner.drives.map(\.identifier) == ["disk4s2", "disk4s3"])
+    #expect(scanner.drives.allSatisfy { MountController.driverFor($0.fsType) == .ext })
+    runner.output = sampleMBRLinuxOutput.replacingOccurrences(
+        of: "   2:                      Linux                         124.0 GB   disk4s2", with: ""
+    )
+    await scanner.refresh()
+    #expect(scanner.drives.map(\.identifier) == ["disk4s3"])
+    runner.output = ""
+    await scanner.refresh()
+    #expect(scanner.drives.isEmpty)
+}
+
 @Test func parsesExt4PartitionWithCorrectFsType() {
     let drives = DriveListParser.parse(sampleExtOutput)
     let ext4 = drives.first { $0.identifier == "disk4s3" }
@@ -380,12 +431,65 @@ private struct ListCall: Equatable {
 }
 
 private final class FakeListRunner: PrivilegedCommandRunning {
+    var output: String
+    init(output: String = sampleExtOutput) { self.output = output }
     private(set) var calls: [ListCall] = []
     func run(_ executablePath: String, _ arguments: [String]) -> CommandResult {
         calls.append(ListCall(path: executablePath, args: arguments))
-        return CommandResult(output: sampleExtOutput, exitCode: 0)
+        return CommandResult(output: output, exitCode: 0)
     }
     func runPipingStdin(_ input: String, to executablePath: String, _ arguments: [String]) -> CommandResult {
         CommandResult(output: "", exitCode: 0)
     }
+}
+
+@MainActor
+@Test func linuxMetadataProbeResolvesBothSiblingsBeforeMountAndNeverCachesDiskIdentifiers() async {
+    let runner = FakeListRunner(output: sampleMBRLinuxOutput)
+    var format = "ext4"
+    let scanner = DriveScanner(runner: runner, filesystemProber: { device in
+        CommandResult(output: "{\"device\":\"\(device)\",\"fs_type\":\"\(format)\",\"label\":\"Volume \(device)\"}", exitCode: 0)
+    })
+    await scanner.refresh()
+    #expect(scanner.drives.count == 2)
+    #expect(scanner.drives.allSatisfy { $0.filesystemDisplayName == "EXT4" && !$0.label.isEmpty })
+    format = "ext3"
+    await scanner.refresh()
+    #expect(scanner.drives.allSatisfy { $0.fsType == "ext3" })
+    format = "btrfs"
+    await scanner.refresh()
+    #expect(scanner.drives.isEmpty, "a confirmed unsupported format must not retain a generic mount button")
+    runner.output = ""
+    format = "ext2"
+    await scanner.refresh()
+    #expect(scanner.drives.isEmpty, "removed devices must not survive in a metadata cache")
+}
+
+@MainActor
+@Test func linuxProbeFailureOrMismatchedIdentityPreservesUnverifiedCandidates() async {
+    for output in ["invalid json", "{\"device\":\"disk99s1\",\"fs_type\":\"ext4\"}",
+                   "{\"device\":\"disk4s2\",\"fs_type\":null}"] {
+        let scanner = DriveScanner(runner: FakeListRunner(output: sampleMBRLinuxOutput), filesystemProber: { _ in
+            CommandResult(output: output, exitCode: 0)
+        })
+        await scanner.refresh()
+        #expect(scanner.drives.count == 2)
+        #expect(scanner.drives.allSatisfy { $0.filesystemDisplayName == "Linux (unverified)" })
+        #expect(scanner.lastError == nil, "an optional metadata failure must not hide available drives")
+    }
+    let scanner = DriveScanner(runner: FakeListRunner(output: sampleMBRLinuxOutput), filesystemProber: { _ in
+        CommandResult(output: "permission denied", exitCode: 1)
+    })
+    await scanner.refresh()
+    #expect(scanner.drives.count == 2 && scanner.drives.allSatisfy { $0.fsType == "ext" })
+}
+
+@MainActor
+@Test func confirmedInventoryDoesNotNeedPrivilegedMetadataProbe() async {
+    let scanner = DriveScanner(runner: FakeListRunner(output: sampleExtOutput), filesystemProber: { _ in
+        Issue.record("already confirmed filesystems must not trigger an extra raw-device probe")
+        return CommandResult(output: "", exitCode: 1)
+    })
+    await scanner.refresh()
+    #expect(scanner.drives.map(\.fsType) == ["ntfs", "ext4"])
 }

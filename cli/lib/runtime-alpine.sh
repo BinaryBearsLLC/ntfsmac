@@ -12,13 +12,15 @@ runtime_alpine_load() {
     return 1
   fi
 
-  local tag digest commit digest_hex base_packages_sha packages_sha apks_sha package_hash
+  local tag digest commit digest_hex base_packages_sha packages_sha apks_sha offline_sha package_hash
   tag="$(lock_get ALPINE_TAG)" || return 1
   digest="$(lock_get ALPINE_DIGEST)" || return 1
   commit="$(lock_get ANYLINUXFS_COMMIT)" || return 1
   base_packages_sha="$(lock_get ALPINE_BASE_PACKAGES_SHA256)" || return 1
   packages_sha="$(lock_get ALPINE_PACKAGES_SHA256)" || return 1
   apks_sha="$(lock_get ALPINE_APKS_SHA256)" || return 1
+
+  offline_sha="$(lock_get OFFLINE_RUNTIME_SHA256)" || return 1
 
   case "$tag" in
     TODO-UNRESOLVED)
@@ -53,30 +55,28 @@ runtime_alpine_load() {
     echo "runtime-alpine: HARD-STOP — ANYLINUXFS_COMMIT must contain 40 lowercase hexadecimal characters" >&2
     return 1
   fi
-  for package_hash in "$base_packages_sha" "$packages_sha" "$apks_sha"; do
+  for package_hash in "$base_packages_sha" "$packages_sha" "$apks_sha" "$offline_sha"; do
     if [[ ${#package_hash} -ne 64 ]] || [[ "$package_hash" == *[!0-9a-f]* ]]; then
       echo "runtime-alpine: HARD-STOP — Alpine runtime lock hashes must contain 64 lowercase hexadecimal characters" >&2
       return 1
     fi
   done
 
-  # Revision 4 makes the complete base and add-on package manifests part of the runtime contract.
-  # Exact package constraints replace the previous floating `apk add` resolution. Keep the lock
-  # hash in both the directory and marker so a package-only update cannot reuse an older rootfs.
-  ALPINE_RUNTIME_REVISION="4"
+  # Revision 5 initializes exclusively from the bundled, verified payload. Its identity is part
+  # of the cache key so older online runtimes remain available for rollback but cannot be reused.
+  ALPINE_RUNTIME_REVISION="5"
   ALPINE_RUNTIME_TAG="$tag"
   ALPINE_RUNTIME_DIGEST="$digest"
   ALPINE_BASE_PACKAGES_SHA256="$base_packages_sha"
   ALPINE_PACKAGES_SHA256="$packages_sha"
   ALPINE_APKS_SHA256="$apks_sha"
-  # containers/image rejects a Docker reference containing both tag and digest. The pull uses the
-  # immutable digest-only reference; build/init-rootfs.sh separately proves that ALPINE_TAG's arm64
-  # manifest resolves to this exact digest before either runtime binary is produced.
+  OFFLINE_RUNTIME_SHA256="$offline_sha"
+  # Retain the immutable upstream identity while importing its verified local OCI copy.
   ALPINE_RUNTIME_REF="docker.io/library/alpine@${digest}"
-  ALPINE_RUNTIME_BASE_DIR="alpine-${tag}-${digest_hex:0:12}-${commit:0:12}-${packages_sha:0:12}-${apks_sha:0:12}-r${ALPINE_RUNTIME_REVISION}"
-  ALPINE_RUNTIME_VERSION="ntfsmac-alpine-v${ALPINE_RUNTIME_REVISION}|tag=${tag}|digest=${digest}|anylinuxfs=${commit}|base_packages=${base_packages_sha}|packages=${packages_sha}|apks=${apks_sha}"
+  ALPINE_RUNTIME_BASE_DIR="alpine-${tag}-${digest_hex:0:12}-${commit:0:12}-${packages_sha:0:12}-${apks_sha:0:12}-${offline_sha:0:12}-r${ALPINE_RUNTIME_REVISION}"
+  ALPINE_RUNTIME_VERSION="ntfsmac-alpine-v${ALPINE_RUNTIME_REVISION}|tag=${tag}|digest=${digest}|anylinuxfs=${commit}|base_packages=${base_packages_sha}|packages=${packages_sha}|apks=${apks_sha}|offline=${offline_sha}"
   export ALPINE_RUNTIME_TAG ALPINE_RUNTIME_DIGEST ALPINE_RUNTIME_REF
-  export ALPINE_BASE_PACKAGES_SHA256 ALPINE_PACKAGES_SHA256 ALPINE_APKS_SHA256
+  export ALPINE_BASE_PACKAGES_SHA256 ALPINE_PACKAGES_SHA256 ALPINE_APKS_SHA256 OFFLINE_RUNTIME_SHA256
   export ALPINE_RUNTIME_BASE_DIR ALPINE_RUNTIME_VERSION ALPINE_RUNTIME_REVISION
 }
 
@@ -156,7 +156,7 @@ runtime_alpine_preserve_cache() {
 
 # Prepares only the application-owned cache immediately before a mount. Existing caches are moved,
 # never removed. New/legacy caches are left untouched until anylinuxfs performs the related mount
-# initialization, so merely installing, diagnosing, or opening Settings never forces a download.
+# initialization, so merely installing, diagnosing, or opening Settings never initializes the guest.
 runtime_alpine_prepare_cache() {
   local runtime_home="$1" state base
   state="$(runtime_alpine_cache_state "$runtime_home")" || return 1
@@ -167,7 +167,7 @@ runtime_alpine_prepare_cache() {
       echo "mount: reusing pinned Alpine runtime ${ALPINE_RUNTIME_TAG} (${ALPINE_RUNTIME_DIGEST})" >&2
       ;;
     not_initialized)
-      echo "mount: first run — downloading and initializing pinned Alpine ${ALPINE_RUNTIME_TAG} (one-time, ~1-2 min)..." >&2
+      echo "mount: first run — initializing bundled Alpine offline ${ALPINE_RUNTIME_TAG} (one-time, ~1-2 min)..." >&2
       ;;
     migration_available)
       echo "mount: legacy Alpine cache detected and preserved; initializing pinned Alpine ${ALPINE_RUNTIME_TAG} side-by-side for safe rollback" >&2

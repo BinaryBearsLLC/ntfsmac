@@ -20,11 +20,11 @@
 	<key>CFBundleShortVersionString</key>
 	<string>3.1.3</string>
 	<key>CFBundleVersion</key>
-	<string>31304</string>
+	<string>31306</string>
 	<key>NTFSMACReleaseLabel</key>
-	<string>Beta 2</string>
+	<string>Beta 3</string>
 	<key>NTFSMACReleaseTag</key>
-	<string>3.1.3-beta.2</string>
+	<string>3.1.3-beta.3</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<!-- No Dock icon, no main window — menu-bar agent shape (L7, GUI-PLAN "App shape"). -->

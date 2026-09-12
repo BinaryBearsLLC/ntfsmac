@@ -156,6 +156,13 @@ public final class HelperClient: Sendable {
         }
     }
 
+    public func probeFilesystem(device: String) async throws -> CommandResult {
+        guard validateDevice(device) else { throw HelperClientError.invalidDevice(device) }
+        return try await call { proxy, reply in
+            proxy.probeFilesystem(device: device, reply: reply)
+        }
+    }
+
     public func unmount(target: String) async throws -> CommandResult {
         guard isValidUnmountTarget(target) else { throw HelperClientError.invalidUnmountTarget(target) }
         return try await call { proxy, reply in proxy.unmount(target: target, reply: reply) }

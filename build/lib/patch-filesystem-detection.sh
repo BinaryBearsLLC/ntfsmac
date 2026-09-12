@@ -2,7 +2,9 @@
 # Apply only to a disposable copy; never change the pinned upstream submodule.
 patch_anylinuxfs_filesystem_detection() {
   local target="$1/anylinuxfs/src/diskutil/darwin.rs"
-  python3 - "$target" <<'PY'
+  local probe_source
+  probe_source="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../runtime" && pwd)/filesystem_probe.rs"
+  python3 - "$target" "$probe_source" <<'PY'
 from pathlib import Path
 import sys
 
@@ -103,6 +105,29 @@ mod ntfsmac_filesystem_tests {
 }
 '''
 path.write_text(text)
+source_dir = path.parent.parent
+main = source_dir / 'main.rs'
+cli = source_dir / 'cli.rs'
+main_text, cli_text = main.read_text(), cli.read_text()
+replacements = [
+    ('mod fsutil;', 'mod fsutil;\nmod filesystem_probe;'),
+    ('            Commands::List(cmd) => self.run_list(cmd),',
+     '            Commands::List(cmd) => self.run_list(cmd),\n'
+     '            Commands::ProbeFilesystem { device } => filesystem_probe::run(&device),'),
+]
+for old, new in replacements:
+    if main_text.count(old) != 1:
+        raise SystemExit('filesystem patch: HARD-STOP — native probe main marker drifted')
+    main_text = main_text.replace(old, new, 1)
+marker = '    List(ListCmd),'
+if cli_text.count(marker) != 1:
+    raise SystemExit('filesystem patch: HARD-STOP — native probe CLI marker drifted')
+cli_text = cli_text.replace(marker, marker + '\n'
+    '    /// Read one partition superblock as JSON, without mounting or starting a VM\n'
+    '    ProbeFilesystem { device: String },', 1)
+main.write_text(main_text)
+cli.write_text(cli_text)
+(source_dir / 'filesystem_probe.rs').write_text(Path(sys.argv[2]).read_text())
 print('filesystem patch: verified per-device macOS filesystem fallback')
 PY
 }

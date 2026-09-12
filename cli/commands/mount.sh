@@ -95,7 +95,7 @@ cmd_mount() {
   local chosen_fstype=""
   if [[ -z "$device" ]]; then
     local -a idents=() fstypes=() menu_lines=()
-    local ident label size fstype rest
+    local ident label size fstype display_fstype rest
     local drives_tmp
     drives_tmp="$(mktemp)"
     # Real exit status, not process substitution: list_mountable_drives() returns 1 (with its
@@ -121,7 +121,9 @@ cmd_mount() {
       [[ -n "$ident" ]] || continue
       idents+=("$ident")
       fstypes+=("$fstype")
-      menu_lines+=("/dev/$ident  $label  $size  $fstype")
+      display_fstype="$fstype"
+      [[ "$fstype" == "ext" ]] && display_fstype="Linux"
+      menu_lines+=("/dev/$ident  $label  $size  $display_fstype")
     done < "$drives_tmp"
     rm -f "$drives_tmp"
 

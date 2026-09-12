@@ -82,17 +82,17 @@ GVPROXY_COMMIT=9cfc86f66679ef0feed0f20ba1df558fe2bef5c6
 GVPROXY_X_CRYPTO_VERSION=v0.55.0
 GVPROXY_GO_OVERLAY_SHA256=8e39b57de838dd933fc2be46fc2233b2435cbdef2d812b9b62548244257a3b62
 
-# Alpine rootfs base (pulled by init-rootfs via umoci) — Docker Hub library/alpine.
+# Alpine rootfs base (bundled OCI imported by init-rootfs via umoci) — Docker Hub library/alpine.
 # Pinned to a specific patch tag + digest, never :latest (L9/HARD-STOP).
 ALPINE_TAG=3.24.1
 ALPINE_DIGEST=sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18
 # The immutable OCI digest owns the 16-package base manifest. The second lock owns the complete
 # 54-package add-on closure installed for ntfsmac; all lock hashes are part of the runtime marker.
 ALPINE_BASE_PACKAGES_SHA256=00afb49158f9a22de9da83c5ecac44d29e50c9460f24d21d952bd4af1f43d370
-ALPINE_PACKAGES_SHA256=08456aa1550bff36b4e6d5a0e26e231a7af97db567aa5170fa0df569e6675f16
-# Every add-on APK is also pinned to an Alpine channel and byte-level SHA-256. The guest downloads
-# only these artifacts and installs them locally with network access disabled for apk itself.
-ALPINE_APKS_SHA256=06a3d02506a7467a17403ac327076b38c04711959af86039fb50722551a261f3
+ALPINE_PACKAGES_SHA256=7454a64625c8d4a7b967a0fd0747ce920c7b87b92a63926e5308eddf42e4b481
+# Every add-on APK is also pinned to an Alpine channel and byte-level SHA-256. The guest receives
+# these bundled artifacts and installs them locally with network access disabled.
+ALPINE_APKS_SHA256=07f67d27fdbe0671d3fd5388e484c1b1afdb98c7ec7da2f1171fb9c3fe0edd93
 
 # util-linux — Homebrew BUILD-toolchain dep (not a runtime dep, not built from source here).
 # anylinuxfs depends on libblkid-rs/libblkid-rs-sys for host-side FS probing; the submodule's
@@ -107,3 +107,7 @@ ALPINE_APKS_SHA256=06a3d02506a7467a17403ac327076b38c04711959af86039fb50722551a26
 # the static archives are present. Homebrew's util-linux is the build known to work on macOS
 # (a vanilla util-linux from-source build is the risky path we deliberately don't take).
 UTIL_LINUX_BREW_FORMULA=util-linux
+
+# Self-contained first-run runtime payload tracked in vendor/runtime.
+OFFLINE_RUNTIME_SHA256=b278488bea308e3c1bf210b0dd4c59cd70001d12c9c9678be486bfd8660b68d5
+NFS_ENTRYPOINT_COMMIT=8ddf22ad566c35ba9b2ab667989c1a311681c25d

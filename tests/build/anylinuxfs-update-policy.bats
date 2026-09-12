@@ -13,6 +13,8 @@ setup() {
   cp "$REPO_ROOT/vendor/src/anylinuxfs/anylinuxfs/src/vm_image.rs" "$FIXTURE/anylinuxfs/src/vm_image.rs"
   mkdir -p "$FIXTURE/anylinuxfs/src/diskutil"
   cp "$REPO_ROOT/vendor/src/anylinuxfs/anylinuxfs/src/diskutil/darwin.rs" "$FIXTURE/anylinuxfs/src/diskutil/darwin.rs"
+  cp "$REPO_ROOT/vendor/src/anylinuxfs/anylinuxfs/src/main.rs" "$FIXTURE/anylinuxfs/src/main.rs"
+  cp "$REPO_ROOT/vendor/src/anylinuxfs/anylinuxfs/src/cli.rs" "$FIXTURE/anylinuxfs/src/cli.rs"
   cp "$REPO_ROOT/vendor/src/anylinuxfs/anylinuxfs/Cargo.toml" "$FIXTURE/anylinuxfs/Cargo.toml"
   cp "$REPO_ROOT/vendor/src/anylinuxfs/vmproxy/Cargo.toml" "$FIXTURE/vmproxy/Cargo.toml"
   cp "$REPO_ROOT/vendor/src/anylinuxfs/init-rootfs/main.go" "$FIXTURE/init-rootfs/main.go"
@@ -35,7 +37,7 @@ setup() {
 
   printf 'ANYLINUXFS_VERSION=0.19.0\nANYLINUXFS_COMMIT=%s\nALPINE_TAG=3.24.1\nALPINE_DIGEST=sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18\n' \
     "$PINNED_COMMIT" > "$LOCK_FIXTURE"
-  grep -E '^ALPINE_(BASE_PACKAGES|PACKAGES|APKS)_SHA256=' "$REPO_ROOT/build/sources.lock" >> "$LOCK_FIXTURE"
+  grep -E '^(ALPINE_(BASE_PACKAGES|PACKAGES|APKS)_SHA256|OFFLINE_RUNTIME_SHA256)=' "$REPO_ROOT/build/sources.lock" >> "$LOCK_FIXTURE"
 }
 
 @test "candidate audit is read-only and leaves approval pending" {
@@ -96,4 +98,21 @@ setup() {
   run "$REPO_ROOT/build/lib/lock.sh" get ANYLINUXFS_COMMIT
   [ "$status" -eq 0 ]
   [ "$output" = "0a4472bd7507c1f9a57894547c1af7ea4382d99f" ]
+}
+
+@test "candidate audit rejects offline initializer drift without modifying the pin" {
+  git -C "$FIXTURE" checkout -q --detach "$CANDIDATE_COMMIT"
+  sed -i.bak 's/func downloadEntrypointScript(/func changedEntrypointScript(/' "$FIXTURE/init-rootfs/main.go"
+  rm "$FIXTURE/init-rootfs/main.go.bak"
+  git -C "$FIXTURE" add init-rootfs/main.go
+  git -C "$FIXTURE" commit -qm "change initializer source layout"
+  local drifted
+  drifted="$(git -C "$FIXTURE" rev-parse HEAD)"
+  git -C "$FIXTURE" checkout -q --detach "$PINNED_COMMIT"
+  NTFSMAC_ANYLINUXFS_SOURCE="$FIXTURE" NTFSMAC_SOURCES_LOCK="$LOCK_FIXTURE" \
+    run "$SCRIPT" "$drifted"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"offline runtime patch no longer applies"* ]]
+  [ "$(git -C "$FIXTURE" rev-parse HEAD)" = "$PINNED_COMMIT" ]
+  [ -z "$(git -C "$FIXTURE" status --porcelain)" ]
 }

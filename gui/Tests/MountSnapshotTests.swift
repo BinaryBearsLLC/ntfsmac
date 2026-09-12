@@ -280,6 +280,20 @@ private struct SnapshotCommandRunner: PrivilegedCommandRunning {
 }
 
 @MainActor
+@Test func observedExtFilesystemRefinesGenericLinuxMountedRow() async {
+    let drive = Drive(identifier: "disk6s1", fsType: "ext", label: "", size: "124 GB")
+    let provider = MutableSnapshotProvider(MountSnapshot(mounts: [
+        ObservedMount(deviceIdentifier: drive.identifier, mountPoint: "/Volumes/rootfs",
+                      fsDriver: "ext4", isReadOnly: false),
+    ]))
+    let controller = MountController(helper: SuccessfulHelper(), readOnlyChecker: AlwaysReadWrite(),
+                                     snapshotProvider: provider, appState: AppState())
+    await controller.reconcile(knownDrives: [drive])
+    #expect(controller.mountedDrives.first?.drive.filesystemDisplayName == "EXT4")
+    #expect(controller.mountedDrives.first?.isVerified == true)
+}
+
+@MainActor
 @Test func physicalRemovalOverridesStaleRuntimeAndMountTableTruth() async {
     let removed = Drive(identifier: "disk6s1", fsType: "ntfs", label: "Media", size: "120 GB")
     let survivor = Drive(identifier: "disk7s2", fsType: "ntfs", label: "Backup", size: "32 GB")

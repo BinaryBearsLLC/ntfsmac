@@ -1,0 +1,497 @@
+{
+  "alpine_oci_reference": "docker.io/library/alpine@sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18",
+  "nfs_entrypoint": {
+    "commit": "8ddf22ad566c35ba9b2ab667989c1a311681c25d",
+    "license": "GPL-3.0",
+    "repository": "https://github.com/nohajc/docker-nfs-server",
+    "sha256": "4eb3888fa031e389817191d132002957d0b5cc8beb6caebe914177ac0db23e7d"
+  },
+  "packages": [
+    {
+      "arch": "aarch64",
+      "commit": "1522c3193610902d8493f9790a2755c11f21f26d",
+      "license": "GPL-3.0-or-later",
+      "origin": "bash",
+      "pkgname": "bash",
+      "pkgver": "5.3.9-r1",
+      "url": "https://www.gnu.org/software/bash/bash.html"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "d98c55af59055e6ca60fbe36e171546918709965",
+      "license": "LGPL-1.0-only",
+      "origin": "util-linux",
+      "pkgname": "blkid",
+      "pkgver": "2.42.3-r1",
+      "url": "https://git.kernel.org/cgit/utils/util-linux/util-linux.git"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "d2f0440960e65952ee22c6b840faecb14d9f0173",
+      "license": "GPL-2.0-or-later WITH cryptsetup-OpenSSL-exception",
+      "origin": "cryptsetup",
+      "pkgname": "cryptsetup-libs",
+      "pkgver": "2.8.6-r0",
+      "url": "https://gitlab.com/cryptsetup/cryptsetup"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "d2f0440960e65952ee22c6b840faecb14d9f0173",
+      "license": "GPL-2.0-or-later WITH cryptsetup-OpenSSL-exception",
+      "origin": "cryptsetup",
+      "pkgname": "cryptsetup",
+      "pkgver": "2.8.6-r0",
+      "url": "https://gitlab.com/cryptsetup/cryptsetup"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "a9f462dee63c7d522585e53f5c04b71eab563ec7",
+      "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "origin": "device-mapper",
+      "pkgname": "device-mapper-event-libs",
+      "pkgver": "2.03.35-r3",
+      "url": "https://sourceware.org/lvm2/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "a9f462dee63c7d522585e53f5c04b71eab563ec7",
+      "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "origin": "device-mapper",
+      "pkgname": "device-mapper-libs",
+      "pkgver": "2.03.35-r3",
+      "url": "https://sourceware.org/lvm2/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "1ea03990396db618edfcc8a9a0bc6b72662bac8f",
+      "license": "GPL-3.0-or-later",
+      "origin": "gdbm",
+      "pkgname": "gdbm",
+      "pkgver": "1.26-r0",
+      "url": "https://www.gnu.org/software/gdbm/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "8e0faa63c91abd41feb359ce5fe4299a88a57ef1",
+      "license": "MIT",
+      "origin": "json-c",
+      "pkgname": "json-c",
+      "pkgver": "0.18-r1",
+      "url": "https://github.com/json-c/json-c/wiki"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "8bac74716d06c84627ab02d101fd9d2bafd0a34c",
+      "license": "GPL-2.0-or-later AND LGPL-2.0-or-later",
+      "origin": "keyutils",
+      "pkgname": "keyutils-libs",
+      "pkgver": "1.6.3-r4",
+      "url": "https://people.redhat.com/~dhowells/keyutils/"
+    },
+    {
+      "arch": "noarch",
+      "commit": "4a46b2cb955e25fd6d6f913794d35bc6d876aea9",
+      "license": "MIT",
+      "origin": "krb5-conf",
+      "pkgname": "krb5-conf",
+      "pkgver": "1.0-r2",
+      "url": "https://web.mit.edu/kerberos/www/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "92bc4f0d36aa5307e819fb57167fc19952cf515f",
+      "license": "MIT",
+      "origin": "krb5",
+      "pkgname": "krb5-libs",
+      "pkgver": "1.22.2-r1",
+      "url": "https://web.mit.edu/kerberos/www/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "4efcc59469af67dcd537e43b9a410a019803d643",
+      "license": "LGPL-2.1-or-later",
+      "origin": "libaio",
+      "pkgname": "libaio",
+      "pkgver": "0.3.113-r2",
+      "url": "https://pagure.io/libaio"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "d98c55af59055e6ca60fbe36e171546918709965",
+      "license": "LGPL-2.1-or-later",
+      "origin": "util-linux",
+      "pkgname": "libblkid",
+      "pkgver": "2.42.3-r1",
+      "url": "https://git.kernel.org/cgit/utils/util-linux/util-linux.git"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "33283848034c9885d984c8e8697c645c57324938",
+      "license": "bzip2-1.0.6",
+      "origin": "bzip2",
+      "pkgname": "libbz2",
+      "pkgver": "1.0.8-r6",
+      "url": "https://sourceware.org/bzip2/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "0c35848136c4c16a1b1672cb812efa88fffef1c2",
+      "license": "BSD-3-Clause OR GPL-2.0-only",
+      "origin": "libcap",
+      "pkgname": "libcap2",
+      "pkgver": "2.78-r0",
+      "url": "https://sites.google.com/site/fullycapable/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "8683a6972cb245fbbdb535dad6435a9930bb9374",
+      "license": "GPL-2.0-or-later AND LGPL-2.0-or-later AND BSD-3-Clause AND MIT",
+      "origin": "e2fsprogs",
+      "pkgname": "libcom_err",
+      "pkgver": "1.47.4-r0",
+      "url": "https://e2fsprogs.sourceforge.net/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "62db33049768522f381410614d59c7d732f72c3a",
+      "license": "MIT",
+      "origin": "libeconf",
+      "pkgname": "libeconf",
+      "pkgver": "0.8.3-r0",
+      "url": "https://github.com/openSUSE/libeconf"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "7c5a7049c5779d87b9b4fa1c7d416056f7e30298",
+      "license": "BSD-3-Clause",
+      "origin": "libevent",
+      "pkgname": "libevent",
+      "pkgver": "2.1.13-r0",
+      "url": "https://libevent.org/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "08d1eb8641965d3807628f6a4ff15914be5b79ae",
+      "license": "MIT",
+      "origin": "expat",
+      "pkgname": "libexpat",
+      "pkgver": "2.8.4-r0",
+      "url": "https://libexpat.github.io/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "2c2a7bb4a8b16066834e90402567b2c19403a790",
+      "license": "MIT",
+      "origin": "libffi",
+      "pkgname": "libffi",
+      "pkgver": "3.5.2-r1",
+      "url": "https://sourceware.org/libffi/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "423a8ad043d07f2c7546c8ec3e2b0384cda360ae",
+      "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "origin": "gcc",
+      "pkgname": "libgcc",
+      "pkgver": "15.2.0-r5",
+      "url": "https://gcc.gnu.org"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "d98c55af59055e6ca60fbe36e171546918709965",
+      "license": "LGPL-2.1-or-later",
+      "origin": "util-linux",
+      "pkgname": "libmount",
+      "pkgver": "2.42.3-r1",
+      "url": "https://git.kernel.org/cgit/utils/util-linux/util-linux.git"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "2cee8a7328d061418336ad327b512d96bcd7bc5e",
+      "license": "X11",
+      "origin": "ncurses",
+      "pkgname": "libncursesw",
+      "pkgver": "6.6_p20260516-r0",
+      "url": "https://invisible-island.net/ncurses/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "7831ef13a9d4ad46cbf4962aa573f81225e8220d",
+      "license": "GPL-2.0-only",
+      "origin": "nfs-utils",
+      "pkgname": "libnfsidmap",
+      "pkgver": "2.6.4-r6",
+      "url": "https://linux-nfs.org/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "2cee8a7328d061418336ad327b512d96bcd7bc5e",
+      "license": "X11",
+      "origin": "ncurses",
+      "pkgname": "libpanelw",
+      "pkgver": "6.6_p20260516-r0",
+      "url": "https://invisible-island.net/ncurses/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "d98c55af59055e6ca60fbe36e171546918709965",
+      "license": "LGPL-2.1-or-later",
+      "origin": "util-linux",
+      "pkgname": "libsmartcols",
+      "pkgver": "2.42.3-r1",
+      "url": "https://git.kernel.org/cgit/utils/util-linux/util-linux.git"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "423a8ad043d07f2c7546c8ec3e2b0384cda360ae",
+      "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "origin": "gcc",
+      "pkgname": "libstdc++",
+      "pkgver": "15.2.0-r5",
+      "url": "https://gcc.gnu.org"
+    },
+    {
+      "arch": "noarch",
+      "commit": "4519a8c0bafdd843397d13a9146c906ff64a6c2f",
+      "license": "BSD-3-Clause",
+      "origin": "libtirpc",
+      "pkgname": "libtirpc-conf",
+      "pkgver": "1.3.5-r1",
+      "url": "https://sourceforge.net/projects/libtirpc/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "4519a8c0bafdd843397d13a9146c906ff64a6c2f",
+      "license": "BSD-3-Clause",
+      "origin": "libtirpc",
+      "pkgname": "libtirpc",
+      "pkgver": "1.3.5-r1",
+      "url": "https://sourceforge.net/projects/libtirpc/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "d98c55af59055e6ca60fbe36e171546918709965",
+      "license": "BSD-3-Clause",
+      "origin": "util-linux",
+      "pkgname": "libuuid",
+      "pkgver": "2.42.3-r1",
+      "url": "https://git.kernel.org/cgit/utils/util-linux/util-linux.git"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "84a227baf001b6e0208e3352b294e4d7a40e93de",
+      "license": "MIT",
+      "origin": "libverto",
+      "pkgname": "libverto",
+      "pkgver": "0.3.2-r2",
+      "url": "https://github.com/latchset/libverto"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "d98c55af59055e6ca60fbe36e171546918709965",
+      "license": "GPL-2.0-or-later",
+      "origin": "util-linux",
+      "pkgname": "lsblk",
+      "pkgver": "2.42.3-r1",
+      "url": "https://git.kernel.org/cgit/utils/util-linux/util-linux.git"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "c7d0382051652f7d6d8c3f4a3a0a2fb93e1317fd",
+      "license": "GPL-2.0-or-later AND LGPL-2.1-or-later AND BSD-2-Clause",
+      "origin": "lvm2",
+      "pkgname": "lvm2-libs",
+      "pkgver": "2.03.35-r2",
+      "url": "https://sourceware.org/lvm2/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "c7d0382051652f7d6d8c3f4a3a0a2fb93e1317fd",
+      "license": "GPL-2.0-or-later AND LGPL-2.1-or-later AND BSD-2-Clause",
+      "origin": "lvm2",
+      "pkgname": "lvm2",
+      "pkgver": "2.03.35-r2",
+      "url": "https://sourceware.org/lvm2/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "1f16962f34234a77fab0f4651459c4381b4a0cd6",
+      "license": "BSD-2-Clause AND GPL-2.0-or-later",
+      "origin": "lz4",
+      "pkgname": "lz4-libs",
+      "pkgver": "1.10.0-r1",
+      "url": "https://github.com/lz4/lz4"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "03fe9a0a61940d07592e897e7a5983e2c7d91fff",
+      "license": "GPL-2.0-or-later",
+      "origin": "lzo",
+      "pkgname": "lzo",
+      "pkgver": "2.10-r5",
+      "url": "https://www.oberhumer.com/opensource/lzo"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "d98c55af59055e6ca60fbe36e171546918709965",
+      "license": "GPL-3.0-or-later AND GPL-2.0-or-later AND GPL-2.0-only AND GPL-1.0-only AND LGPL-2.1-or-later AND BSD-1-Clause AND BSD-3-Clause AND BSD-4-Clause-UC AND MIT AND Public-Domain",
+      "origin": "util-linux",
+      "pkgname": "mount",
+      "pkgver": "2.42.3-r1",
+      "url": "https://git.kernel.org/cgit/utils/util-linux/util-linux.git"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "c0519b85456e9b838e3142e1d233aab0b433b476",
+      "license": "BSD-2-Clause",
+      "origin": "mpdecimal",
+      "pkgname": "mpdecimal",
+      "pkgver": "4.0.1-r0",
+      "url": "https://www.bytereef.org/mpdecimal/index.html"
+    },
+    {
+      "arch": "noarch",
+      "commit": "2cee8a7328d061418336ad327b512d96bcd7bc5e",
+      "license": "X11",
+      "origin": "ncurses",
+      "pkgname": "ncurses-terminfo-base",
+      "pkgver": "6.6_p20260516-r0",
+      "url": "https://invisible-island.net/ncurses/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "7831ef13a9d4ad46cbf4962aa573f81225e8220d",
+      "license": "GPL-2.0-only",
+      "origin": "nfs-utils",
+      "pkgname": "nfs-utils",
+      "pkgver": "2.6.4-r6",
+      "url": "https://linux-nfs.org/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "905147fb282a60cd622b45c7421db8a116cf80ab",
+      "license": "GPL-2.0-only",
+      "origin": "ntfs-3g",
+      "pkgname": "ntfs-3g-libs",
+      "pkgver": "2026.7.7-r0",
+      "url": "https://www.tuxera.com/company/open-source/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "905147fb282a60cd622b45c7421db8a116cf80ab",
+      "license": "GPL-2.0-only",
+      "origin": "ntfs-3g",
+      "pkgname": "ntfs-3g-progs",
+      "pkgver": "2026.7.7-r0",
+      "url": "https://www.tuxera.com/company/open-source/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "905147fb282a60cd622b45c7421db8a116cf80ab",
+      "license": "GPL-2.0-only",
+      "origin": "ntfs-3g",
+      "pkgname": "ntfs-3g",
+      "pkgver": "2026.7.7-r0",
+      "url": "https://www.tuxera.com/company/open-source/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "d3abe30d43524bed75a29a3006e703ab51836548",
+      "license": "MIT",
+      "origin": "popt",
+      "pkgname": "popt",
+      "pkgver": "1.19-r4",
+      "url": "https://github.com/rpm-software-management/popt"
+    },
+    {
+      "arch": "noarch",
+      "commit": "d17c5866a2f2c56b63c19dac9070091d6519b167",
+      "license": "PSF-2.0",
+      "origin": "python3",
+      "pkgname": "pyc",
+      "pkgver": "3.14.7-r1",
+      "url": "https://www.python.org/"
+    },
+    {
+      "arch": "noarch",
+      "commit": "d17c5866a2f2c56b63c19dac9070091d6519b167",
+      "license": "PSF-2.0",
+      "origin": "python3",
+      "pkgname": "python3-pyc",
+      "pkgver": "3.14.7-r1",
+      "url": "https://www.python.org/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "d17c5866a2f2c56b63c19dac9070091d6519b167",
+      "license": "PSF-2.0",
+      "origin": "python3",
+      "pkgname": "python3-pycache-pyc0",
+      "pkgver": "3.14.7-r1",
+      "url": "https://www.python.org/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "d17c5866a2f2c56b63c19dac9070091d6519b167",
+      "license": "PSF-2.0",
+      "origin": "python3",
+      "pkgname": "python3",
+      "pkgver": "3.14.7-r1",
+      "url": "https://www.python.org/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "a854c03acdac188901fb012f7acbee70a36e8041",
+      "license": "GPL-3.0-or-later",
+      "origin": "readline",
+      "pkgname": "readline",
+      "pkgver": "8.3.3-r1",
+      "url": "https://tiswww.cwru.edu/php/chet/readline/rltop.html"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "9f60e98ad26039ea2735af04f97f8d3619f9be76",
+      "license": "BSD-3-Clause",
+      "origin": "rpcbind",
+      "pkgname": "rpcbind",
+      "pkgver": "1.2.9-r0",
+      "url": "https://rpcbind.sourceforge.net/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "a9c3ba8b9129ec0f294d0a9bf538c2f1632bb016",
+      "license": "blessing",
+      "origin": "sqlite",
+      "pkgname": "sqlite-libs",
+      "pkgver": "3.53.4-r0",
+      "url": "https://www.sqlite.org/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "b47a80c6f4d5d2f6da8a6cc45d76f74d2b6cd90a",
+      "license": "GPL-2.0-or-later",
+      "origin": "squashfs-tools",
+      "pkgname": "squashfs-tools",
+      "pkgver": "4.7.5-r0",
+      "url": "https://github.com/plougher/squashfs-tools"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "ce9944f1daadb681dd6f0f81a06e9cce97127377",
+      "license": "GPL-2.0-or-later AND 0BSD AND Public-Domain AND LGPL-2.1-or-later",
+      "origin": "xz",
+      "pkgname": "xz-libs",
+      "pkgver": "5.8.3-r0",
+      "url": "https://tukaani.org/xz/"
+    },
+    {
+      "arch": "aarch64",
+      "commit": "3c6e2ee2b16f403d53eab39c4426eb61f003c322",
+      "license": "BSD-3-Clause OR GPL-2.0-or-later",
+      "origin": "zstd",
+      "pkgname": "zstd-libs",
+      "pkgver": "1.5.7-r2",
+      "url": "https://facebook.github.io/zstd/"
+    }
+  ]
+}

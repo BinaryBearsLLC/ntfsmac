@@ -72,7 +72,7 @@ public struct DriveRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(drive.label.isEmpty ? drive.identifier : drive.label)
                         .font(.system(size: 13, weight: .semibold))
-                    Text("\(drive.fsType.uppercased()) · /dev/\(drive.identifier)")
+                    Text("\(drive.filesystemDisplayName) · /dev/\(drive.identifier)")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -165,7 +165,9 @@ public struct DriveRow: View {
                         .ntfsmacKeyboardFocus()
                         .disabled(actionsDisabled)
                         .accessibilityLabel("Mount \(drive.label.isEmpty ? drive.identifier : drive.label)")
-                        .help("Mount with ntfs-3g, the compatibility-first default")
+                        .help(drive.fsType.hasPrefix("ext")
+                            ? "Detect the Linux filesystem and mount this partition"
+                            : "Mount with ntfs-3g, the compatibility-first default")
 
                         if onMountExperimental != nil {
                             Menu {

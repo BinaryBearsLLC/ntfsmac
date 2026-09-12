@@ -36,10 +36,73 @@ teardown() {
   [ -x "$PREFIX_DIR/libexec/ntfsmac/commands/mount.sh" ]
   [ -x "$PREFIX_DIR/libexec/ntfsmac/commands/copy.sh" ]
   [ -x "$PREFIX_DIR/libexec/ntfsmac/commands/verify.sh" ]
+  [ -x "$PREFIX_DIR/libexec/ntfsmac/commands/filesystem.sh" ]
   [ -x "$PREFIX_DIR/libexec/ntfsmac/commands/opengui.sh" ]
   [ -f "$PREFIX_DIR/libexec/ntfsmac/lib/version.sh" ]
   [ -f "$PREFIX_DIR/libexec/ntfsmac/pf/ntfsmac.anchor.tmpl" ]
   [ -f "$PREFIX_DIR/libexec/ntfsmac/lib/product-info.plist" ]
+  [ -f "$PREFIX_DIR/lib/ntfsmac-runtime/SHA256SUMS" ]
+  [ -f "$PREFIX_DIR/lib/ntfsmac-runtime/oci/index.json" ]
+  [ -f "$PREFIX_DIR/lib/ntfsmac-runtime/apks/bash-5.3.9-r1.apk" ]
+  run diff -qr "$REPO_ROOT/vendor/runtime" "$PREFIX_DIR/lib/ntfsmac-runtime"
+  [ "$status" -eq 0 ]
+  local installed_runtime
+  installed_runtime="$(cd "$PREFIX_DIR/lib/ntfsmac-runtime" && pwd -P)"
+  run "$REPO_ROOT/vendor/bin/init-rootfs" -verify-offline-runtime "$installed_runtime"
+  [ "$status" -eq 0 ]
+}
+
+@test "offline runtime update replaces the complete artifact set without retaining stale files" {
+  mkdir -p "$PREFIX_DIR/lib/ntfsmac-runtime/apks"
+  printf 'stale\n' > "$PREFIX_DIR/lib/ntfsmac-runtime/apks/removed-from-new-release.apk"
+  printf 'old-manifest\n' > "$PREFIX_DIR/lib/ntfsmac-runtime/SHA256SUMS"
+
+  run "$SCRIPT"
+
+  [ "$status" -eq 0 ]
+  [ ! -e "$PREFIX_DIR/lib/ntfsmac-runtime/apks/removed-from-new-release.apk" ]
+  run diff -qr "$REPO_ROOT/vendor/runtime" "$PREFIX_DIR/lib/ntfsmac-runtime"
+  [ "$status" -eq 0 ]
+}
+
+@test "offline runtime update keeps the installed set unchanged when the source is corrupt" {
+  local fixture_root installed_before
+  fixture_root="$BATS_TEST_TMPDIR/corrupt-source"
+  installed_before="$BATS_TEST_TMPDIR/installed-before"
+  mkdir -p "$fixture_root/vendor/bin"
+  cp "$REPO_ROOT/vendor/bin/init-rootfs" "$fixture_root/vendor/bin/init-rootfs"
+  cp -R "$REPO_ROOT/vendor/runtime" "$fixture_root/vendor/runtime"
+  printf 'tampered\n' >> "$fixture_root/vendor/runtime/entrypoint.sh"
+
+  run "$SCRIPT"
+  [ "$status" -eq 0 ]
+  cp -R "$PREFIX_DIR/lib/ntfsmac-runtime" "$installed_before"
+
+  run bash -c 'source "$1"; install_offline_runtime "$2"' _ "$SCRIPT" "$fixture_root"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"HARD-STOP"* ]]
+  run diff -qr "$installed_before" "$PREFIX_DIR/lib/ntfsmac-runtime"
+  [ "$status" -eq 0 ]
+}
+
+@test "offline runtime update keeps the installed set unchanged when the source payload is missing" {
+  local fixture_root installed_before
+  fixture_root="$BATS_TEST_TMPDIR/missing-source"
+  installed_before="$BATS_TEST_TMPDIR/missing-installed-before"
+  mkdir -p "$fixture_root/vendor/bin"
+  cp "$REPO_ROOT/vendor/bin/init-rootfs" "$fixture_root/vendor/bin/init-rootfs"
+
+  run "$SCRIPT"
+  [ "$status" -eq 0 ]
+  cp -R "$PREFIX_DIR/lib/ntfsmac-runtime" "$installed_before"
+
+  run bash -c 'source "$1"; install_offline_runtime "$2"' _ "$SCRIPT" "$fixture_root"
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"HARD-STOP"* ]]
+  run diff -qr "$installed_before" "$PREFIX_DIR/lib/ntfsmac-runtime"
+  [ "$status" -eq 0 ]
 }
 
 @test "installed CLI version comes from the copied canonical app Info.plist" {
@@ -195,6 +258,7 @@ STUB
   [[ "$output" == *"mount "* ]]
   [[ "$output" == *"unmount "* ]]
   [[ "$output" == *"copy --verify"* ]]
+  [[ "$output" == *"filesystem <device>"* ]]
   [[ "$output" == *"verify "* ]]
   [[ "$output" == *"diagnose"* ]]
   [[ "$output" == *"opengui"* ]]

@@ -6,6 +6,54 @@ Every package/feature decision below is backed by evidence read from the real
 for every non-obvious call. Scope test: {ntfs-3g mount, rpc.nfsd export, blkid device
 detection} per PLAN.md §6 `v-audit`.
 
+## Beta 3: self-contained runtime and locked util-linux repair (2026-09-12)
+
+The complete native build reproduced HTTP 404 for the locked Alpine
+`libblkid-2.42.1-r0.apk`, including inside a newly initialized guest. A libblkid-only
+replacement then exposed an unavailable `lsblk-2.42.1-r0.apk`; cached responses from
+other clients were not reliable evidence of cold-install availability. The owner
+authorized the minimum coherent dependency repair.
+
+- Move the seven guest APKs from the same `util-linux` source to `2.42.3-r1`:
+  `blkid`, `libblkid`, `libmount`, `libsmartcols`, `libuuid`, `lsblk`, `mount`.
+  The other 47 add-on APKs and 16 base packages remain pinned. No packages are added
+  or removed; anylinuxfs and the independently built host static libblkid stay pinned.
+- Artifacts come from `https://dl-cdn.alpinelinux.org/alpine/v3.24/main/aarch64/`.
+  Exact per-artifact SHA-256 values are in `alpine-apks.lock`; the aggregate hashes
+  are in `sources.lock`. All seven APKs were downloaded and their aarch64/origin/version
+  metadata checked against Alpine's `util-linux` build, commit
+  `d98c55af59055e6ca60fbe36e171546918709965`.
+- Every package retains its existing runtime dependency and SONAME-provides set.
+  The old/new libblkid ELF libraries expose the same 125 global/weak definitions.
+  Command-provides and optional `install_if` package versions advance with the family.
+- The changed aggregate hashes create a separate runtime cache identity automatically;
+  previous caches remain available. This update covers only the shipped guest family,
+  not the host static library or unshipped util-linux tools.
+- Native signature-checked installation, exact 70-package verification, source gates
+  and GUI/CLI hardware acceptance are recorded in the current testing guide.
+
+The owner subsequently required an entirely self-contained installer. The verified
+OCI base, all 54 locked APKs, and the NFS entrypoint source now live directly in
+`vendor/runtime` (ordinary Git files, no LFS or remote indirection). The entrypoint
+is pinned at `8ddf22ad566c35ba9b2ab667989c1a311681c25d`; its bytes match the previously
+installed script. `SHA256SUMS` covers all payload files, anchored by
+`OFFLINE_RUNTIME_SHA256` in `sources.lock` and embedded in the initializer binary.
+Build verification also checks the complete OCI digest graph and APK lock closure.
+
+Initialization imports the local OCI, verifies/copies the local APKs, uses Alpine's
+signature validation and `apk --no-network`, and copies the local entrypoint.
+Missing or altered assets fail before cache replacement; there is no network fallback.
+Revision 5 includes the offline payload hash in the cache path and marker. The DMG
+uses UDZO with zlib level 9; the app contains the compressed OCI/APKs rather than a
+large expanded guest rootfs. Compiler/source acquisition remains a developer build
+step and is separate from the end-user runtime.
+
+The filesystem-label follow-up adds `probe-filesystem` only to a disposable anylinuxfs
+build copy. It uses the existing static libblkid `DevInfo::pv` safeprobe on one validated
+partition and returns its filesystem/label as JSON. It does not call `run_list`, whose
+container-volume discovery can initialize a VM or assemble volume metadata. No source pin,
+library dependency, filesystem driver or runtime payload changes for this addition.
+
 ## Per-session live security transaction (2026-08-11)
 
 - Replaced the unevaluated shared `ntfsmac` anchor model with one child below the macOS default

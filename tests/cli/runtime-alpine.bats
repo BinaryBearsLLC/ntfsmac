@@ -38,8 +38,8 @@ make_initialized_cache() {
 @test "derives one digest-only pull reference plus tag-aware cache and marker from sources.lock" {
   [[ "$ALPINE_RUNTIME_REF" == "docker.io/library/alpine@sha256:"* ]]
   [[ "$ALPINE_RUNTIME_BASE_DIR" == "alpine-${ALPINE_RUNTIME_TAG}-"* ]]
-  [[ "$ALPINE_RUNTIME_BASE_DIR" == *"-${ALPINE_PACKAGES_SHA256:0:12}-${ALPINE_APKS_SHA256:0:12}-r4" ]]
-  [[ "$ALPINE_RUNTIME_VERSION" == "ntfsmac-alpine-v4|"* ]]
+  [[ "$ALPINE_RUNTIME_BASE_DIR" == *"-${ALPINE_PACKAGES_SHA256:0:12}-${ALPINE_APKS_SHA256:0:12}-${OFFLINE_RUNTIME_SHA256:0:12}-r5" ]]
+  [[ "$ALPINE_RUNTIME_VERSION" == "ntfsmac-alpine-v5|"* ]]
   [[ "$ALPINE_RUNTIME_VERSION" == *"digest=${ALPINE_RUNTIME_DIGEST}"* ]]
   [[ "$ALPINE_RUNTIME_VERSION" == *"anylinuxfs="* ]]
   [[ "$ALPINE_RUNTIME_VERSION" == *"base_packages=${ALPINE_BASE_PACKAGES_SHA256}"* ]]
@@ -49,12 +49,12 @@ make_initialized_cache() {
   [[ "$ALPINE_RUNTIME_REF" != *":${ALPINE_RUNTIME_TAG}@"* ]]
 }
 
-@test "v4 package contract never reuses the prior v3 cache" {
+@test "v5 offline contract never reuses the prior v4 cache" {
   local current_base previous_base
   current_base="$(runtime_alpine_cache_path "$TEST_HOME")"
-  previous_base="${current_base%-r4}-r3"
+  previous_base="${current_base%-${OFFLINE_RUNTIME_SHA256:0:12}-r5}-r4"
   mkdir -p "$previous_base/rootfs"
-  printf 'ntfsmac-alpine-v3' > "$previous_base/rootfs.ver"
+  printf 'ntfsmac-alpine-v4' > "$previous_base/rootfs.ver"
 
   run runtime_alpine_prepare_cache "$TEST_HOME"
 
@@ -64,7 +64,7 @@ make_initialized_cache() {
   [ ! -e "$current_base" ]
 }
 
-@test "v4 cache is incomplete without the read-only dirty-flag inspector" {
+@test "v5 cache is incomplete without the read-only dirty-flag inspector" {
   make_initialized_cache
   rm "$(runtime_alpine_cache_path "$TEST_HOME")/rootfs/usr/bin/ntfsinfo"
 
@@ -74,7 +74,7 @@ make_initialized_cache() {
   [ "$output" = "incomplete" ]
 }
 
-@test "v4 cache is incomplete without the exact package-lock marker" {
+@test "v5 cache is incomplete without the exact package-lock marker" {
   make_initialized_cache
   rm "$(runtime_alpine_cache_path "$TEST_HOME")/rootfs/etc/ntfsmac-alpine-packages.sha256"
 
@@ -84,7 +84,7 @@ make_initialized_cache() {
   [ "$output" = "incomplete" ]
 }
 
-@test "v4 cache is incomplete without the exact APK artifact marker" {
+@test "v5 cache is incomplete without the exact APK artifact marker" {
   make_initialized_cache
   rm "$(runtime_alpine_cache_path "$TEST_HOME")/rootfs/etc/ntfsmac-alpine-apks.sha256"
 
@@ -190,4 +190,17 @@ make_initialized_cache() {
   run runtime_alpine_load
   [ "$status" -ne 0 ]
   [[ "$output" == *"runtime lock hashes"* ]]
+}
+
+@test "offline payload identity invalidates cache without deleting previous runtime" {
+  make_initialized_cache
+  local old_base old_version
+  old_base="$(runtime_alpine_cache_path "$TEST_HOME")"
+  old_version="$ALPINE_RUNTIME_VERSION"
+  sed -i '' 's/^OFFLINE_RUNTIME_SHA256=.*/OFFLINE_RUNTIME_SHA256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/' "$LOCK_FIXTURE"
+  runtime_alpine_load
+  [ "$(runtime_alpine_cache_path "$TEST_HOME")" != "$old_base" ]
+  [ "$ALPINE_RUNTIME_VERSION" != "$old_version" ]
+  [ "$(runtime_alpine_cache_state "$TEST_HOME")" = "not_initialized" ]
+  [ -f "$old_base/rootfs.ver" ]
 }

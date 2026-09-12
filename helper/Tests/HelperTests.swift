@@ -11,10 +11,21 @@ final class FakeRunner: PrivilegedCommandRunning {
         var arguments: [String]
     }
     private(set) var calls: [Call] = []
+    var onRun: (() -> Void)?
+    var supportsFilesystemProbe = true
     var stubbedResult = CommandResult(output: "ok", exitCode: 0)
+    private(set) var timeouts: [TimeInterval] = []
+    func run(_ executablePath: String, _ arguments: [String], timeout: TimeInterval) -> CommandResult {
+        timeouts.append(timeout)
+        return run(executablePath, arguments)
+    }
 
     func run(_ executablePath: String, _ arguments: [String]) -> CommandResult {
         calls.append(Call(executablePath: executablePath, arguments: arguments))
+        onRun?()
+        if arguments == ["--help"] {
+            return CommandResult(output: supportsFilesystemProbe ? "probe-filesystem" : "mount list", exitCode: 0)
+        }
         if executablePath == "/bin/launchctl", arguments.first == "print" {
             return CommandResult(output: "service not found", exitCode: 113)
         }
@@ -28,6 +39,58 @@ final class FakeRunner: PrivilegedCommandRunning {
         calls.append(Call(executablePath: executablePath, arguments: arguments))
         return stubbedResult
     }
+}
+
+@Test func filesystemProbeUsesOnlyBoundedNativeMetadataCommand() async throws {
+    let runner = FakeRunner()
+    runner.stubbedResult = CommandResult(output: "{\"device\":\"disk12s3\",\"fs_type\":\"ext4\"}", exitCode: 0)
+    let service = HelperService(runner: runner, ntfsmacPrefix: "/test/prefix")
+    let (data, error) = await awaitReply { service.probeFilesystem(device: "disk12s3", reply: $0) }
+    #expect(error == nil)
+    let result = try JSONDecoder().decode(CommandResult.self, from: #require(data))
+    #expect(result.output == runner.stubbedResult.output && result.exitCode == runner.stubbedResult.exitCode)
+    #expect(runner.calls == [FakeRunner.Call(executablePath: "/test/prefix/bin/anylinuxfs", arguments: ["--help"]),
+                            FakeRunner.Call(executablePath: "/test/prefix/bin/anylinuxfs",
+                                           arguments: ["probe-filesystem", "disk12s3"])])
+    #expect(runner.timeouts == [2, 5])
+}
+
+@Test func filesystemProbeNeverDispatchesToAnOlderRuntimeImplicitMountParser() async throws {
+    let runner = FakeRunner()
+    runner.supportsFilesystemProbe = false
+    let service = HelperService(runner: runner)
+    let (data, error) = await awaitReply { service.probeFilesystem(device: "disk4s2", reply: $0) }
+    #expect(error == nil)
+    let result = try JSONDecoder().decode(CommandResult.self, from: #require(data))
+    #expect(result.exitCode != 0)
+    #expect(runner.calls.map(\.arguments) == [["--help"]])
+}
+
+@Test func filesystemProbeRejectsInvalidInputsBeforeExecution() async {
+    let runner = FakeRunner()
+    let service = HelperService(runner: runner)
+    for device in ["/dev/disk4s2", "disk4", "disk4s2;id", ""] {
+        let (data, error) = await awaitReply { service.probeFilesystem(device: device, reply: $0) }
+        #expect(data == nil && error != nil)
+    }
+    #expect(runner.calls.isEmpty)
+}
+
+@Test func optionalFilesystemProbeReturnsBusyWhileAnotherOperationOwnsHelper() async throws {
+    let runner = FakeRunner()
+    let service = HelperService(runner: runner)
+    var busyResult: CommandResult?
+    runner.onRun = {
+        service.probeFilesystem(device: "disk4s2") { data, _ in
+            busyResult = data.flatMap { try? JSONDecoder().decode(CommandResult.self, from: $0) }
+        }
+    }
+    defer { runner.onRun = nil }
+    let started = Date()
+    _ = await awaitReply { service.checkDeviceAccess(device: "disk4s2", reply: $0) }
+    #expect(try #require(busyResult).exitCode == 75)
+    #expect(Date().timeIntervalSince(started) < 1)
+    #expect(runner.calls.count == 1, "a busy optional probe must not reach the disk")
 }
 
 /// Awaits a `HelperService` reply-closure call as a plain async value.

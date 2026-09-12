@@ -39,6 +39,13 @@ privileged actions use the reviewed helper. Partition identifiers must match
 `^disk[0-9]+s[0-9]+$` at both UI and execution boundaries. Read-only diagnostics
 must not initialize a VM, elevate privileges or upload information.
 
+Drive inventory remains unprivileged. The separate `probeFilesystem` XPC method can read
+the superblock of one validated partition using the existing helper's raw-device access.
+Its fixed native command is bounded to five seconds and bypasses runtime/configuration,
+mounting, decryption and volume assembly. GUI responses must match the requested identifier;
+failed or missing metadata cannot establish a filesystem. The CLI exposes the same operation
+as `ntfsmac filesystem <device>` (JSON; administrator access may be required).
+
 ntfs-3g is the default; NTFS3 is explicitly experimental. Unsafe writable NTFS is
 refused, not overridden. Missing filesystem or security evidence stays unknown.
 Copy success requires flush and reread verification, not just a successful write.
@@ -57,3 +64,37 @@ Cargo features or Alpine packages without checking their actual dependencies.
 
 The original phased implementation plan and session diaries are available at
 commit `90388df` in Git history. They are not current build or product instructions.
+
+## Self-contained runtime — Beta 3 implementation
+
+The owner requires first-run initialization and mounting without downloads from third parties.
+The release candidate tracks the Alpine OCI base, the exact 54 APKs and the NFS entrypoint
+under `vendor/runtime/`, and include them in both the app and CLI distribution. The installed
+location is `lib/ntfsmac-runtime` beneath the existing installation prefix. GitHub stores the
+actual payload files; Git LFS pointers or third-party download fallbacks do not satisfy this.
+Development toolchains and source-build downloads are distinct from the end-user runtime.
+
+`SHA256SUMS` lists every payload file. Its own hash is pinned in `build/sources.lock`, and the
+initializer embeds the verified manifest at compile time. Verify files and reject symlink/path
+escapes before modifying a runtime cache. Import the local OCI image with its existing pinned
+platform digest, stage local APKs, verify their hashes and Alpine signatures, and install them
+with `apk --no-network`. Copy the versioned NFS entrypoint locally. Missing or corrupt payloads
+must fail with a reinstall instruction; they must never trigger a remote fallback.
+
+The runtime cache identity includes the payload hash, so an earlier online cache cannot count
+as offline initialization evidence. Existing caches and user volumes remain untouched.
+
+Implementation and validation order:
+
+- [x] Track and validate the payload, OCI content graph, package metadata and source provenance.
+  `build/verify-offline-runtime.py <repository-root>` validates the manifest against all locks.
+- [x] Add a deterministic Go offline adapter and patch integration in scratch sources only.
+  Test missing/tampered files, unsafe paths, local OCI import and network denial.
+- [x] Stage the same payload in the build runner, installed CLI and signed app/helper tree.
+  Keep the existing XPC caller/signature validation and macOS 14 floor.
+- [x] Build and initialize a new cache with external networking denied; verify all 70 packages.
+  Run the source gates, both Swift variants, and package/sign/check the exact candidate.
+- [x] Test the installed candidate's GUI and CLI on the connected multi-partition SSD,
+  including independent mount/unmount, Finder, refresh and diagnostics. Native writes require
+  authorization for temporary test files on the named partitions. These local gates passed;
+  publication still requires the notarized draft artifact checks in the release guide.

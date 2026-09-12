@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import HelperShared
 @testable import NtfsmacGUI
 
 private final class ConnectionFactoryProbe: @unchecked Sendable {
@@ -14,6 +15,18 @@ private final class ConnectionFactoryProbe: @unchecked Sendable {
         lock.withLock { storedCallCount += 1 }
         return NSXPCConnection(machServiceName: machServiceName, options: .privileged)
     }
+}
+
+@MainActor
+@Test func filesystemProbeRejectsInvalidDeviceBeforeOpeningXPC() async {
+    let probe = ConnectionFactoryProbe()
+    let client = HelperClient(machServiceName: "com.binarybears.ntfsmac.tests.no-probe",
+                              connectionFactory: probe.makeConnection(machServiceName:))
+    do {
+        _ = try await client.probeFilesystem(device: "/dev/disk4s2")
+        Issue.record("raw paths must be rejected")
+    } catch HelperClientError.invalidDevice { } catch { Issue.record("unexpected error: \(error)") }
+    #expect(probe.callCount == 0)
 }
 
 @MainActor

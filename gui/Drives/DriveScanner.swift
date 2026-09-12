@@ -9,7 +9,8 @@ public struct Drive: Identifiable, Equatable, Sendable {
     /// `diskNsM`, already re-checked against `deviceNamePattern` (L6) at parse time.
     public let identifier: String
     /// Raw fstype anylinuxfs emits: "ntfs" | "BitLocker" (WINDOWS_FS_TYPES) or
-    /// "ext" (GPT-name fallback) or "ext2" | "ext3" | "ext4" (blkid fs_type). See `allowedFsTypes` below.
+    /// "ext" (Linux partition-family routing fallback, not a confirmed filesystem) or
+    /// "ext2" | "ext3" | "ext4" (blkid fs_type). See `allowedFsTypes` below.
     public let fsType: String
     /// Volume label; empty when the partition has none.
     public let label: String
@@ -17,6 +18,9 @@ public struct Drive: Identifiable, Equatable, Sendable {
     public let size: String
 
     public var id: String { identifier }
+
+    /// The generic routing fallback must not claim that a superblock probe confirmed ext.
+    public var filesystemDisplayName: String { fsType == "ext" ? "Linux (unverified)" : fsType.uppercased() }
 
     public init(identifier: String, fsType: String, label: String, size: String) {
         self.identifier = identifier
@@ -90,16 +94,24 @@ public enum DriveListParser {
             let label = trimmed.dropFirst("BitLocker".count).trimmingCharacters(in: .whitespaces)
             return ("BitLocker", label)
         }
-        // GPT type name "Linux Filesystem" (GUID 0FC63DAF-...) is what darwin::augment_line falls
-        // back to when blkid can't resolve the ext superblock (darwin.rs fs_type.unwrap_or(
-        // part_type); the name is in LINUX_PART_TYPES, mod.rs). One GPT type covers ALL ext
-        // versions — ext2, ext3, ext4 — Apple diskutil does not distinguish them, so the GPT
-        // name can't either. Map to a generic "ext" fstype (kernel auto-detects at mount; no
-        // --fs-driver needed). The single-token branch would grab "Linux" and the allow-set
-        // would reject the row — the ext equivalent of the NTFS "Microsoft Basic Data" bug.
+        // GPT's Linux data partition type can survive an unavailable superblock probe.
+        // "ext" is only the established auto-detect routing hint: the partition map does
+        // not prove a filesystem or ext version. The privileged mount resolves that later.
         if trimmed.hasPrefix("Linux Filesystem") {
             let label = trimmed.dropFirst("Linux Filesystem".count).trimmingCharacters(in: .whitespaces)
             return ("ext", label)
+        }
+        // MBR 0x83 appears as "Linux", unlike GPT's "Linux Filesystem" above.
+        // A non-root list commonly cannot open its superblock. Retain every such partition
+        // as a Linux candidate using the existing auto-detect mount route; never force NTFS.
+        // More specific Linux partition types are not ordinary filesystem candidates.
+        for unsupported in ["Linux LVM", "Linux RAID", "Linux Swap"] {
+            if trimmed == unsupported || trimmed.hasPrefix(unsupported + " ") {
+                return ("Unknown", "")
+            }
+        }
+        if trimmed == "Linux" || trimmed.hasPrefix("Linux ") {
+            return ("ext", trimmed.dropFirst("Linux".count).trimmingCharacters(in: .whitespaces))
         }
         let parts = trimmed.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
         let fsType = parts.isEmpty ? "" : String(parts[0])
@@ -136,6 +148,7 @@ public final class DriveScanner: ObservableObject {
     private let anylinuxfsPath: String
     private let scanTimeout: TimeInterval
     private let initialScanTimeout: TimeInterval
+    private let filesystemProber: (@MainActor (String) async throws -> CommandResult)?
     private var pollTask: Task<Void, Never>?
     private var refreshWaiters: [CheckedContinuation<Void, Never>] = []
     private var hasCompletedSuccessfulScan = false
@@ -144,12 +157,14 @@ public final class DriveScanner: ObservableObject {
         runner: (any PrivilegedCommandRunning)? = nil,
         anylinuxfsPath: String = "\(installPrefix)/bin/anylinuxfs",
         scanTimeout: TimeInterval = 10,
-        initialScanTimeout: TimeInterval = 120
+        initialScanTimeout: TimeInterval = 120,
+        filesystemProber: (@MainActor (String) async throws -> CommandResult)? = nil
     ) {
         self.runner = runner
         self.anylinuxfsPath = anylinuxfsPath
         self.scanTimeout = scanTimeout
         self.initialScanTimeout = initialScanTimeout
+        self.filesystemProber = filesystemProber
     }
 
     deinit {
@@ -216,7 +231,7 @@ public final class DriveScanner: ObservableObject {
             )
             results = await [microsoft, linux]
         } else {
-            // A clean installation may need to download and unpack the pinned Alpine runtime.
+            // A clean installation may need to unpack the bundled Alpine runtime offline.
             // Initialize it with one probe and a realistic bound; only then ask for the second
             // filesystem family. If initialization fails, a parallel duplicate would add noise
             // without producing useful inventory data.
@@ -242,9 +257,31 @@ public final class DriveScanner: ObservableObject {
             // A future anylinuxfs version may report a partition in both families. Preserve the
             // Microsoft-then-Linux display order while ensuring a stable one-row-per-device list.
             var seenIdentifiers = Set<String>()
-            drives = successfulResults
+            var scannedDrives = successfulResults
                 .flatMap { DriveListParser.parse($0.output) }
                 .filter { seenIdentifiers.insert($0.identifier).inserted }
+            // Inventory stays unprivileged. Only ambiguous Linux candidates need a bounded
+            // read-only superblock probe through the already installed, authenticated helper.
+            // Re-probe each scan: a reused diskNsM must never inherit a previous disk's format.
+            if let filesystemProber {
+                var resolved: [Drive] = []
+                for drive in scannedDrives {
+                    guard drive.fsType == "ext",
+                          let result = try? await filesystemProber(drive.identifier),
+                          result.exitCode == 0,
+                          let metadata = try? JSONDecoder().decode(FilesystemProbe.self, from: Data(result.output.utf8)),
+                          metadata.device == drive.identifier,
+                          let kind = metadata.fs_type, !kind.isEmpty
+                    else { resolved.append(drive); continue }
+                    // Confirmed unsupported formats stop being mount candidates. Unknown or
+                    // unreadable metadata stays visible for the existing mount-time detection.
+                    guard kind != "ext", DriveListParser.allowedFsTypes.contains(kind) else { continue }
+                    resolved.append(Drive(identifier: drive.identifier, fsType: kind,
+                                          label: metadata.label ?? drive.label, size: drive.size))
+                }
+                scannedDrives = resolved
+            }
+            drives = scannedDrives
         }
 
         let failedResults = results.filter { $0.exitCode != 0 }
@@ -257,6 +294,12 @@ public final class DriveScanner: ObservableObject {
                 .filter { !$0.isEmpty }
                 .joined(separator: "\n")
         }
+    }
+
+    private struct FilesystemProbe: Decodable {
+        let device: String
+        let fs_type: String?
+        let label: String?
     }
 
     private nonisolated static func runOffMain(

@@ -44,7 +44,7 @@ setup() {
   printf 'ANYLINUXFS_VERSION=0.18.0\n' >> "$FIXTURE_DIR/sources.lock"
   printf 'ALPINE_TAG=3.24.1\n' >> "$FIXTURE_DIR/sources.lock"
   printf 'ALPINE_DIGEST=sha256:e7a1a92a5bfeee40966aea60f0796b0e7917cc35591542701834f03a68fa3d18\n' >> "$FIXTURE_DIR/sources.lock"
-  grep -E '^ALPINE_(BASE_PACKAGES|PACKAGES|APKS)_SHA256=' "$REPO_ROOT/build/sources.lock" >> "$FIXTURE_DIR/sources.lock"
+  grep -E '^(ALPINE_(BASE_PACKAGES|PACKAGES|APKS)_SHA256|OFFLINE_RUNTIME_SHA256)=' "$REPO_ROOT/build/sources.lock" >> "$FIXTURE_DIR/sources.lock"
   printf 'ANYLINUXFS_COMMIT=8aa9ccd6504e64ca26ce769c1623ed1741c6b7d3\n' >> "$FIXTURE_DIR/sources.lock"
   printf 'VMPROXY_VERSION=0.18.0\n' >> "$FIXTURE_DIR/sources.lock"
   printf 'LIBKRUN_VERSION=1.19.3\n' >> "$FIXTURE_DIR/sources.lock"

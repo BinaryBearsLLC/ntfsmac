@@ -81,6 +81,109 @@ swift_build_release() {
   NTFSMAC_HELPER_VARIANT="$HELPER_VARIANT" swift build "${args[@]}"
 }
 
+# stage_offline_runtime <source-root> <staging-root>
+# Copies the verifier, its source locks, and the complete runtime into the same
+# tree install.sh will later consume. The copied tree is verified again before it
+# can participate in the helper's signed content hash.
+stage_offline_runtime() {
+  local source_root="$1" staging_root="$2"
+  local source_runtime="$source_root/vendor/runtime"
+  local source_verifier="$source_root/build/verify-offline-runtime.py"
+  local staged_runtime="$staging_root/vendor/runtime"
+  local lock
+
+  if [[ ! -d "$staging_root" || -L "$staging_root" ]]; then
+    echo "package-app: HARD-STOP — offline runtime staging root is missing or unsafe" >&2
+    return 1
+  fi
+  if [[ ! -d "$source_runtime" || -L "$source_runtime" ||
+        ! -f "$source_verifier" || -L "$source_verifier" ]]; then
+    echo "package-app: HARD-STOP — offline runtime payload or verifier is missing; reinstall the source checkout" >&2
+    return 1
+  fi
+  if ! python3 "$source_verifier" "$source_root"; then
+    echo "package-app: HARD-STOP — offline runtime source verification failed" >&2
+    return 1
+  fi
+  if find "$source_runtime" -type l -print -quit | grep -q .; then
+    echo "package-app: HARD-STOP — offline runtime payload contains a symlink" >&2
+    return 1
+  fi
+
+  mkdir -p "$staging_root/build" "$staging_root/vendor" || return 1
+  if [[ -e "$staged_runtime" || -L "$staged_runtime" ]]; then
+    echo "package-app: HARD-STOP — offline runtime staging destination already exists" >&2
+    return 1
+  fi
+  if ! cp "$source_verifier" "$staging_root/build/verify-offline-runtime.py"; then
+    echo "package-app: HARD-STOP — failed to stage offline runtime verifier" >&2
+    return 1
+  fi
+  chmod +x "$staging_root/build/verify-offline-runtime.py" || return 1
+  for lock in sources.lock alpine-base-packages.lock alpine-packages.lock alpine-apks.lock; do
+    if [[ ! -f "$source_root/build/$lock" || -L "$source_root/build/$lock" ]] ||
+       ! cp "$source_root/build/$lock" "$staging_root/build/$lock"; then
+      rm -rf -- "$staged_runtime"
+      echo "package-app: HARD-STOP — failed to stage offline runtime lock: $lock" >&2
+      return 1
+    fi
+  done
+  if ! cp -R "$source_runtime" "$staged_runtime"; then
+    rm -rf -- "$staged_runtime"
+    echo "package-app: HARD-STOP — failed to stage offline runtime payload" >&2
+    return 1
+  fi
+  if ! cmp -s "$source_verifier" "$staging_root/build/verify-offline-runtime.py" ||
+     ! python3 "$source_verifier" "$staging_root"; then
+    rm -rf -- "$staged_runtime"
+    echo "package-app: HARD-STOP — staged offline runtime verification failed" >&2
+    return 1
+  fi
+  echo "package-app: staged verified offline runtime payload"
+}
+
+verify_staged_native_offline_runtime() {
+  local staging_root="$1"
+  local native_verifier="$staging_root/vendor/bin/init-rootfs"
+  local staged_runtime="$staging_root/vendor/runtime"
+
+  if [[ ! -f "$native_verifier" || -L "$native_verifier" ]] ||
+     [[ ! -d "$staged_runtime" || -L "$staged_runtime" ]]; then
+    echo "package-app: HARD-STOP — staged native verifier or offline runtime payload is missing or unsafe" >&2
+    return 1
+  fi
+  if ! /usr/bin/file "$native_verifier" | grep -q 'Mach-O' ||
+     ! codesign --verify --strict "$native_verifier" >/dev/null 2>&1; then
+    echo "package-app: HARD-STOP — staged offline runtime verifier is not a valid signed macOS executable" >&2
+    return 1
+  fi
+  staged_runtime="$(cd "$staged_runtime" && pwd -P)" || {
+    echo "package-app: HARD-STOP — could not canonicalize the staged offline runtime path" >&2
+    return 1
+  }
+  if ! "$native_verifier" -verify-offline-runtime "$staged_runtime"; then
+    echo "package-app: HARD-STOP — staged payload does not match the embedded offline runtime manifest" >&2
+    return 1
+  fi
+  echo "package-app: staged payload matches the native embedded offline runtime manifest"
+}
+
+verify_filesystem_probe_cli() {
+  local executable="$1" output probe_exit=0
+  output="$("$executable" --help 2>&1)" || output=""
+  if [[ "$output" != *"probe-filesystem"* ]]; then
+    echo "package-app: HARD-STOP — native filesystem metadata command is missing; rebuild runtime" >&2
+    return 1
+  fi
+  # An invalid identifier exercises only parsing/validation. It cannot read a disk,
+  # initialize the runtime, or silently accept an older binary lacking this command.
+  output="$("$executable" probe-filesystem invalid 2>&1)" || probe_exit=$?
+  if [[ "$probe_exit" -ne 1 || "$output" != *"rejected: expected diskNsM partition identifier"* ]]; then
+    echo "package-app: HARD-STOP — native filesystem metadata command is missing or incompatible; rebuild runtime" >&2
+    return 1
+  fi
+}
+
 main() {
   validate_product_versions || exit 1
 
@@ -132,6 +235,10 @@ main() {
   local cli_stage
   cli_stage="$(mktemp -d)"
   mkdir -p "$cli_stage/vendor/bin" "$cli_stage/vendor/kernel" "$cli_stage/cli/commands" "$cli_stage/cli/lib" "$cli_stage/cli/pf" "$cli_stage/build/lib" "$cli_stage/gui"
+  stage_offline_runtime "$REPO_ROOT" "$cli_stage" || {
+    rm -rf -- "$cli_stage"
+    exit 1
+  }
   if ! cp "$REPO_ROOT/install.sh" "$cli_stage/install.sh"; then
     echo "package-app: HARD-STOP — failed to stage install.sh" >&2
     exit 1
@@ -179,6 +286,14 @@ main() {
     rm -rf "$cli_stage"
     exit 1
   fi
+  verify_staged_native_offline_runtime "$cli_stage" || {
+    rm -rf -- "$cli_stage"
+    exit 1
+  }
+  verify_filesystem_probe_cli "$cli_stage/vendor/bin/anylinuxfs" || {
+    rm -rf -- "$cli_stage"
+    exit 1
+  }
 
   echo "package-app: computing cli-src content hash (pass-1 helper binary as a hashing tool)"
   macos_target_verify_runtime "$cli_stage/vendor/bin" || exit 1

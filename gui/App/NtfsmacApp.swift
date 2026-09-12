@@ -67,7 +67,8 @@ final class NtfsmacApplicationDelegate: NSObject, NSApplicationDelegate {
                 notifier: eventNotifier
             )
         } else {
-            driveScanner = DriveScanner()
+            let filesystemHelper = HelperClient()
+            driveScanner = DriveScanner(filesystemProber: filesystemHelper.probeFilesystem)
             mountController = MountController(notifier: eventNotifier, appState: appState)
         }
 

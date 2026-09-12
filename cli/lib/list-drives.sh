@@ -78,15 +78,20 @@ list_mountable_drives() {
         fstype="BitLocker"
         label="${blob#BitLocker}"
       elif [[ "$blob" == "Linux Filesystem"* ]]; then
-        # GPT type name "Linux Filesystem" (GUID 0FC63DAF) is what darwin::augment_line falls
-        # back to when blkid can't resolve the ext superblock (darwin.rs fs_type.unwrap_or(
-        # part_type); the name is in LINUX_PART_TYPES, mod.rs). One GPT type covers ALL ext
-        # versions — ext2, ext3, ext4 — Apple diskutil does not distinguish them, so the GPT
-        # name can't either. Map to generic "ext" (kernel auto-detects at mount; no --fs-driver).
-        # The single-token branch below would grab "Linux" and the allow-set would reject the
-        # row — the ext equivalent of the NTFS "Microsoft Basic Data" bug above.
+        # GPT Linux data partition candidate when the superblock cannot be read.
+        # "ext" is the existing auto-detect routing hint, not a confirmed filesystem.
         fstype="ext"
         label="${blob#Linux Filesystem}"
+      elif [[ "$blob" == "Linux LVM" || "$blob" == "Linux LVM "* ||
+              "$blob" == "Linux RAID" || "$blob" == "Linux RAID "* ||
+              "$blob" == "Linux Swap" || "$blob" == "Linux Swap "* ]]; then
+        continue
+      elif [[ "$blob" == "Linux" || "$blob" == "Linux "* ]]; then
+        # MBR 0x83 counterpart of GPT's Linux Filesystem. "ext" is the existing
+        # auto-detect routing hint, not proof of a particular filesystem. Keep each
+        # sibling even when unprivileged blkid cannot read its superblock.
+        fstype="ext"
+        label="${blob#Linux}"
       else
         fstype="${blob%%[[:space:]]*}"
         label="${blob#"$fstype"}"
