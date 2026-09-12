@@ -193,4 +193,12 @@ without mounting or writing. A further GUI refresh/mount-both/Eject All cycle pr
 already mounted FAT32 bootfs partition throughout. After Eject All, Refresh reconfirmed both
 EXT4 labels; final diagnostics reported zero mounts/sessions and the bridge down. A separate
 attached exFAT drive was inspected read-only and correctly excluded from ntfsmac candidates.
-The notarized GitHub draft still requires downloaded-artifact validation before publication.
+The official GitHub DMG was then downloaded, installed and tested before publication.
+Developer ID signatures, stapling, Gatekeeper, checksum and Finder layout passed. Its runtime
+initialized with networking denied and exactly 70 locked packages. GUI/helper update, both
+EXT4 mounts, CLI copy, unmount/remount, SHA-256 reread and cleanup passed again; diagnostics
+ended with zero mounts/sessions and the FAT32 sibling preserved. Release and CI workflows
+passed, including 428 shell cases and 344 Swift tests per variant. The tested draft was
+published unchanged as `v3.1.3-beta.3`, prerelease and not latest; stable remains `v3.1.2`.
+Official DMG: 86,925,837 bytes; SHA-256
+`064214aaf093cd041a19e3ccac8542459d5d34f4e9ca51e32e36cc6cbbee6fba`.

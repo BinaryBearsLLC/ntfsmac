@@ -56,7 +56,7 @@ Release-candidate evidence is recorded in
 
 ### v3.1.3 candidate — `Update/3.1.3`
 
-- Beta 3 candidate fixes MBR multi-partition Linux discovery in both GUI and CLI. Every
+- Beta 3 fixes MBR multi-partition Linux discovery in both GUI and CLI. Every
   Linux sibling remains available to mount through filesystem auto-detection, even when
   an unprivileged scan cannot resolve its superblock. Generic rows display Linux rather
   than claiming a confirmed ext filesystem. Publication and native mount acceptance remain

@@ -25,8 +25,8 @@ experimental choice.
 
 ## Requirements
 
-This branch prepares **3.1.3 Beta 3**. The currently published beta remains Beta 2,
-separate from the stable 3.1.2 line.
+This branch maintains [**3.1.3 Beta 3**](https://github.com/BinaryBearsLLC/ntfsmac/releases/tag/v3.1.3-beta.3),
+published separately from the stable 3.1.2 line.
 The beta targets macOS 14+; native Sonoma filesystem qualification remains open.
 The compatibility table below distinguishes verified operations from the build target.
 
@@ -43,7 +43,7 @@ The minimum build target is not a claim that every Mac or macOS release has been
 
 | System | Confirmed locally | Still unverified |
 | --- | --- | --- |
-| macOS 26.6.2, Apple M5 (physical Mac) | Official notarized Beta 2 (31304): app/helper update; NTFS, ext2, ext3 and ext4 write/flush/remount/SHA-256 checks; simultaneous NTFS/EXT detection. NTFS/ExFAT detection previously checked on 31302 | Other M-series models and longer-term workloads |
+| macOS 26.6.2, Apple M5 (physical Mac) | Official notarized Beta 3 (31306): offline initialization, GUI/CLI identification, two simultaneous EXT4 mounts and write/remount/SHA-256 verification. Earlier Beta 2 (31304): app/helper update; NTFS, ext2, ext3 and ext4 write/flush/remount/SHA-256 checks; simultaneous NTFS/EXT detection. NTFS/ExFAT detection previously checked on 31302 | Other M-series models and longer-term workloads |
 | macOS 14.6.1 Sonoma (local VM on M5) | Official notarized Beta 2 (31304): Gatekeeper, app/helper update, Settings/error-view rendering and diagnostics; earlier helper installation recovery documented separately | This VM lacks nested Hypervisor access for filesystem mounting/read/write |
 | Other macOS 14.x, macOS 15, other macOS 26 versions and newer | Deployment target and guarded API paths only | Native end-to-end testing |
 
@@ -83,7 +83,7 @@ when a supported partition is detected.
 Official BinaryBears DMGs are Developer ID signed, notarized by Apple, stapled, and published with
 a SHA-256 checksum. Draft releases are not final downloads.
 
-The Beta 3 candidate includes the complete runtime in the compressed DMG. Initial
+Beta 3 includes the complete runtime in the compressed DMG. Initial
 setup and mounting use local, integrity-checked files and do not download Linux
 packages or scripts. Administrator approval and Full Disk Access are still required.
 
